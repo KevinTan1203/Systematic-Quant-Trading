@@ -82,13 +82,13 @@ Financial markets are ecosystems. Every price you see is the result of interacti
 **Mathematical Foundation:**
 
 $$
-\text{MM P\&L} \approx \frac{\text{Spread}}{2} \times \text{Volume} - \text{Inventory Risk Costs} - \text{Adverse Selection Costs}
+\text{MM Profit and Loss} \approx \frac{\text{Spread}}{2} \times \text{Volume} - \text{Inventory Risk Costs} - \text{Adverse Selection Costs}
 $$
 
 OR
 
 $$
-\text{P\&L}_{\text{MM}} \approx \frac{S}{2} \times V - C_{\text{inv}} - C_{\text{adv}}
+\text{Profit and Loss}_{\text{MM}} \approx \frac{S}{2} \times V - C_{\text{inv}} - C_{\text{adv}}
 $$
 
 where:
