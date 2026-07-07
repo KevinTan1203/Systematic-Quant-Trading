@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 3.3 Slippage</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0f12;--bg1:#111418;--bg2:#161a1f;--bg3:#1c2127;
+  --border:#20262d;--border2:#2a323a;
+  --ink:#e2e6ea;--ink2:#8a96a3;--muted:#4a5560;--ghost:#161a1f;
+  --cost:#e8604d;--cost-d:#3a1810;--cost-b:rgba(232,96,77,0.07);
+  --liq:#3dc2a8;--liq-d:#0a3830;--liq-b:rgba(61,194,168,0.07);
+  --algo:#8a6de8;--algo-d:#221a48;--algo-b:rgba(138,109,232,0.07);
+  --adv:#e8b13d;--adv-d:#3a2c08;--adv-b:rgba(232,177,61,0.07);
+  --imp:#4d9de8;--imp-d:#0a2848;--imp-b:rgba(77,157,232,0.07);
+  --dex:#e84da8;--dex-d:#480c30;--dex-b:rgba(232,77,168,0.07);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--ink);font-family:'Source Serif 4',serif;font-size:14.5px;line-height:1.72;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(61,194,168,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(61,194,168,0.02) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
+.masthead{position:relative;z-index:2;background:var(--bg1);border-bottom:1px solid var(--border2);}
+.mhd-inner{max-width:1080px;margin:0 auto;padding:52px 44px 0;display:grid;grid-template-columns:1fr 290px;gap:44px;align-items:start;}
+.mhd-kicker{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.26em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+.mhd-kicker::before{content:'';width:22px;height:1px;background:var(--cost);}
+.mhd-title{font-family:'Archivo',sans-serif;font-size:clamp(44px,6.5vw,84px);font-weight:800;letter-spacing:-0.04em;line-height:0.88;color:var(--ink);margin-bottom:14px;}
+.mhd-title .gap{color:var(--cost);}
+.mhd-sub{font-family:'Source Serif 4',serif;font-style:italic;font-size:14px;color:var(--ink2);line-height:1.65;max-width:480px;font-weight:400;margin-bottom:28px;}
+.exec-gauge{border:1px solid var(--border2);background:var(--bg2);overflow:hidden;}
+.eg-hdr{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.eg-visual{padding:16px;border-bottom:1px solid var(--border);}
+.eg-br{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.eg-br:last-child{margin-bottom:0;}
+.eg-bl{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);width:70px;flex-shrink:0;}
+.eg-bt{flex:1;height:9px;background:var(--bg3);border-radius:2px;overflow:hidden;}
+.eg-bf{height:100%;border-radius:2px;}
+.eg-bv{font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;min-width:56px;text-align:right;}
+.eg-rows{padding:0;}
+.eg-row{display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-bottom:1px solid var(--border);}
+.eg-row:last-child{border-bottom:none;}
+.eg-rl{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);}
+.eg-rv{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;}
+.eg-rv.cost{color:var(--cost);}.eg-rv.liq{color:var(--liq);}
+.page{position:relative;z-index:2;max-width:1080px;margin:0 auto;padding:34px 44px 100px;}
+.sec-hdr{display:flex;align-items:center;gap:13px;margin:30px 0 8px;}
+.sec-label{font-family:'Archivo',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;white-space:nowrap;}
+.sec-line{flex:1;height:1px;}
+.controls{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap;align-items:center;}
+.ctrl{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;padding:6px 14px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.ctrl:hover{border-color:var(--cost);color:var(--cost);}
+.ctrl-right{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--muted);letter-spacing:0.06em;}
+.entry{border:1px solid var(--border);background:var(--bg1);margin-bottom:4px;position:relative;overflow:hidden;transition:border-color 0.18s;}
+.entry::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;transition:width 0.2s;}
+.entry.open::before{width:4px;}
+.entry:hover{border-color:var(--border2);}
+.f-cost .entry::before{background:var(--cost-d);}.f-cost .entry.open::before{background:var(--cost);}
+.f-liq  .entry::before{background:var(--liq-d); }.f-liq  .entry.open::before{background:var(--liq);}
+.f-algo .entry::before{background:var(--algo-d);}.f-algo .entry.open::before{background:var(--algo);}
+.f-adv  .entry::before{background:var(--adv-d); }.f-adv  .entry.open::before{background:var(--adv);}
+.f-imp  .entry::before{background:var(--imp-d); }.f-imp  .entry.open::before{background:var(--imp);}
+.f-dex  .entry::before{background:var(--dex-d); }.f-dex  .entry.open::before{background:var(--dex);}
+.e-hdr{display:flex;align-items:center;cursor:pointer;user-select:none;min-height:58px;padding-left:4px;transition:background 0.14s;}
+.e-hdr:hover{background:var(--bg2);}
+.e-num{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ghost);width:44px;text-align:center;flex-shrink:0;letter-spacing:0.06em;}
+.e-icon{font-size:17px;width:46px;text-align:center;flex-shrink:0;border-right:1px solid var(--border);align-self:stretch;display:flex;align-items:center;justify-content:center;}
+.e-text{flex:1;padding:12px 16px;}
+.e-title{font-family:'Archivo',sans-serif;font-size:17px;font-weight:700;color:var(--ink);line-height:1.2;letter-spacing:-0.01em;}
+.e-sub{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--muted);margin-top:3px;letter-spacing:0.03em;font-weight:300;}
+.e-badge{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 9px;border:1px solid;flex-shrink:0;margin-right:14px;white-space:nowrap;}
+.e-toggle{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);width:44px;align-self:stretch;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--border);flex-shrink:0;transition:transform 0.24s,color 0.15s;}
+.entry.open .e-toggle{transform:rotate(90deg);}
+.f-cost .entry.open .e-toggle{color:var(--cost);}.f-liq  .entry.open .e-toggle{color:var(--liq);}
+.f-algo .entry.open .e-toggle{color:var(--algo);}.f-adv  .entry.open .e-toggle{color:var(--adv);}
+.f-imp  .entry.open .e-toggle{color:var(--imp); }.f-dex  .entry.open .e-toggle{color:var(--dex);}
+.e-body{display:none;border-top:1px solid var(--border);background:var(--bg);padding:22px 22px 26px 90px;animation:bIn 0.2s ease;}
+.entry.open .e-body{display:block;}
+@keyframes bIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.e-body p{font-family:'Source Serif 4',serif;font-size:14px;font-weight:400;line-height:1.86;color:var(--ink2);margin-bottom:14px;}
+.e-body p:last-of-type{margin-bottom:0;}
+.e-body p em{font-style:italic;color:var(--ink);}
+.e-body p strong{font-weight:700;color:var(--ink);font-family:'Archivo',sans-serif;font-size:13.5px;}
+.fmla-block{margin-top:16px;padding:16px 20px;background:var(--bg2);border:1px solid var(--border2);border-left:3px solid var(--imp);display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;}
+.fmla-main{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink);flex-shrink:0;line-height:1.65;}
+.fmla-main .a{color:var(--cost);}.fmla-main .b{color:var(--liq);}
+.fmla-main .c{color:var(--algo);}.fmla-main .op{color:var(--muted);}
+.fmla-note{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);line-height:1.7;white-space:pre-line;}
+.curve-vis{margin-top:18px;border:1px solid var(--border2);background:var(--bg2);overflow:hidden;}
+.cv-title{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);padding:7px 14px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.cv-svg{width:100%;height:160px;display:block;}
+.cv-legend{display:flex;gap:16px;padding:8px 14px;border-top:1px solid var(--border);flex-wrap:wrap;}
+.cv-leg{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);}
+.cv-dot{width:14px;height:2px;border-radius:1px;}
+.stats{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px;}
+.stat{flex:1;min-width:120px;padding:9px 12px;border:1px solid var(--border);background:var(--bg2);}
+.stat-l{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.stat-v{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;line-height:1.2;}
+.stat-v.cost{color:var(--cost);}.stat-v.liq{color:var(--liq);}
+.stat-v.algo{color:var(--algo);}.stat-v.adv{color:var(--adv);}
+.stat-v.imp{color:var(--imp);}.stat-v.dex{color:var(--dex);}
+.cmp{display:grid;gap:8px;margin-top:18px;}
+.cmp.c2{grid-template-columns:1fr 1fr;}.cmp.c3{grid-template-columns:1fr 1fr 1fr;}
+.cc{padding:13px 15px;border:1px solid var(--border);background:var(--bg2);}
+.cc-l{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:7px;}
+.cc p{font-size:12.5px!important;line-height:1.62!important;margin-bottom:0!important;font-family:'Archivo',sans-serif!important;font-weight:400!important;color:var(--ink2)!important;}
+.cc.cost{background:var(--cost-b);border-color:var(--cost-d);}.cc.cost .cc-l{color:var(--cost);}
+.cc.liq {background:var(--liq-b); border-color:var(--liq-d); }.cc.liq  .cc-l{color:var(--liq);}
+.cc.algo{background:var(--algo-b);border-color:var(--algo-d);}.cc.algo .cc-l{color:var(--algo);}
+.cc.adv {background:var(--adv-b); border-color:var(--adv-d); }.cc.adv  .cc-l{color:var(--adv);}
+.cc.imp {background:var(--imp-b); border-color:var(--imp-d); }.cc.imp  .cc-l{color:var(--imp);}
+.cc.dex {background:var(--dex-b); border-color:var(--dex-d); }.cc.dex  .cc-l{color:var(--dex);}
+.dtable{margin-top:18px;border:1px solid var(--border);overflow:auto;}
+.drow{display:grid;border-bottom:1px solid var(--border);}
+.drow:last-child{border-bottom:none;}
+.drow.hdr .dc{background:var(--bg3);font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+.dc{padding:8px 12px;border-right:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink2);line-height:1.5;}
+.dc:last-child{border-right:none;}
+.dc.label{color:var(--ink);font-weight:600;font-family:'Archivo',sans-serif;font-size:12px;}
+.dc.cost{color:var(--cost);}.dc.liq{color:var(--liq);}
+.dc.algo{color:var(--algo);}.dc.dex{color:var(--dex);}
+.waterfall{margin-top:18px;border:1px solid var(--border);overflow:hidden;}
+.wf-head{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);background:var(--bg3);padding:7px 14px;border-bottom:1px solid var(--border);}
+.wf-row{display:grid;grid-template-columns:160px 1fr 90px;border-bottom:1px solid var(--border);}
+.wf-row:last-child{border-bottom:none;}
+.wf-label{padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink2);border-right:1px solid var(--border);}
+.wf-bw{padding:7px 12px;display:flex;align-items:center;border-right:1px solid var(--border);}
+.wf-bar{height:10px;border-radius:1px;}
+.wf-val{padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;text-align:right;}
+.ki{margin-top:20px;padding:14px 18px;background:var(--bg2);border:1px solid var(--border2);display:flex;gap:12px;align-items:flex-start;}
+.ki-mark{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.08em;flex-shrink:0;padding-top:2px;line-height:1;}
+.ki-text{font-family:'Source Serif 4',serif;font-style:italic;font-size:14.5px;color:var(--ink);line-height:1.62;}
+.f-cost .ki-mark{color:var(--cost);}.f-liq  .ki-mark{color:var(--liq);}
+.f-algo .ki-mark{color:var(--algo);}.f-adv  .ki-mark{color:var(--adv);}
+.f-imp  .ki-mark{color:var(--imp); }.f-dex  .ki-mark{color:var(--dex);}
+.tags{margin-top:16px;display:flex;flex-wrap:wrap;gap:5px;}
+.tag{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border:1px solid var(--border2);color:var(--muted);}
+.tag.cost{border-color:var(--cost-d);color:var(--cost);}.tag.liq{border-color:var(--liq-d);color:var(--liq);}
+.tag.algo{border-color:var(--algo-d);color:var(--algo);}.tag.adv{border-color:var(--adv-d);color:var(--adv);}
+.tag.imp{border-color:var(--imp-d);color:var(--imp);}.tag.dex{border-color:var(--dex-d);color:var(--dex);}
+.foot{position:relative;z-index:2;max-width:1080px;margin:0 auto;padding:18px 44px;border-top:1px solid var(--border);display:flex;justify-content:space-between;}
+.foot span{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);}
+@media(max-width:720px){
+  .mhd-inner{grid-template-columns:1fr;}
+  .exec-gauge{display:none;}
+  .page,.foot{padding-left:18px;padding-right:18px;}
+  .mhd-inner{padding:36px 18px 0;}
+  .e-body{padding-left:16px;}
+  .cmp.c2,.cmp.c3{grid-template-columns:1fr;}
+  .e-badge{display:none;}
+}
+</style>
+</head>
+<body>
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 3.3 · Core Trading Foundations</div>
+      <div class="mhd-title">Slip<span class="gap">page</span></div>
+      <div class="mhd-sub">The cost of converting an intention into a position — the gap between the price you wanted and the price you got. Market impact, implementation shortfall, adverse selection, and AMM mechanics. 10 topics.</div>
+    </div>
+    <div class="exec-gauge">
+      <div class="eg-hdr">// Execution gap — illustrative buy order</div>
+      <div class="eg-visual">
+        <div class="eg-br"><div class="eg-bl">Decision</div><div class="eg-bt"><div class="eg-bf" style="width:100%;background:var(--liq)"></div></div><div class="eg-bv" style="color:var(--liq)">$50.000</div></div>
+        <div class="eg-br"><div class="eg-bl">Arrival</div><div class="eg-bt"><div class="eg-bf" style="width:96%;background:var(--imp)"></div></div><div class="eg-bv" style="color:var(--imp)">$50.040</div></div>
+        <div class="eg-br"><div class="eg-bl">Fill</div><div class="eg-bt"><div class="eg-bf" style="width:82%;background:var(--cost)"></div></div><div class="eg-bv" style="color:var(--cost)">$50.180</div></div>
+      </div>
+      <div class="eg-rows">
+        <div class="eg-row"><span class="eg-rl">Total slippage</span><span class="eg-rv cost">+$0.18 / 36 bps</span></div>
+        <div class="eg-row"><span class="eg-rl">Market impact</span><span class="eg-rv cost">~24 bps</span></div>
+        <div class="eg-row"><span class="eg-rl">Delay cost</span><span class="eg-rv liq">~8 bps</span></div>
+        <div class="eg-row"><span class="eg-rl">Timing cost</span><span class="eg-rv liq">~4 bps</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">10 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>3.3 Slippage</span>
+</footer>
+
+<script>
+const sections = [
+  { label:"Foundations", color:"var(--cost)", line:"var(--cost-d)", fam:"f-cost", entries:[
+    { icon:"📏", badge:"DEFINITION", bc:"cost",
+      title:"Slippage — Definition",
+      sub:"The difference between expected and actual execution price",
+      tags:[["slippage","cost"],["execution price","cost"],["transaction cost","cost"],["bid-ask","liq"]],
+      fmla:{ main:`<span class="a">Slippage</span> <span class="op">=</span> <span class="b">Actual Fill Price</span> <span class="op">−</span> <span class="b">Expected Price</span>`, note:`For a buy order: positive slippage = paid MORE than expected (bad)\nFor a sell order: positive slippage = received LESS than expected (bad)\n\nExpressed as bps of notional, or absolute price difference\nMeasured vs: last trade price, mid-quote, or arrival price` },
+      stats:[{l:"Large-cap equity typical",v:"2–8 bps (normal)",c:"liq"},{l:"Small-cap / illiquid",v:"20–100+ bps",c:"cost"},{l:"Crypto major CEX",v:"5–15 bps typical",c:"cost"},{l:"Stressed market multiplier",v:"3–10× normal",c:"adv"}],
+      body:[
+        `<em>Slippage</em> is the difference between the price a trader expected to pay (or receive) when deciding to execute, and the price actually achieved when the trade fills. It is present in every asset class, every venue, and every order type — even "guaranteed" market orders. In traditional markets it is sometimes called <em>execution shortfall</em>; on crypto DEXes it appears as <em>price impact</em>.`,
+        `The reference price matters enormously. The most common definitions use: the <strong>last traded price</strong> at the moment of the decision, the <strong>mid-quote</strong> (midpoint between best bid and ask) at order submission, or the <strong>arrival price</strong> (price the moment the order reaches the market). Each isolates a different cost source — delay, market impact, and spread crossing respectively — which is why professional transaction cost analysis (TCA) decomposes slippage rather than treating it as a single undifferentiated number.`,
+        `Slippage is not a market failure or glitch. It is the structural cost of immediacy — trading now rather than waiting. Markets have finite liquidity at each price level; consuming that liquidity to fill an order pushes the price to the next available level. The question for any professional trader is not how to eliminate slippage (impossible) but how to predict it, decompose it, and manage it against the alternative cost of not trading immediately (timing risk and opportunity cost).`
+      ],
+      ki:"Slippage is the tax every market participant pays for immediacy — the price of converting a decision into an actual position right now rather than waiting for a counterparty to come to you. Every concept that follows — market impact, implementation shortfall, adverse selection — is a more precise decomposition of where that tax comes from and how its size can be predicted, reduced, and managed."
+    },
+    { icon:"⚖️", badge:"DRIVERS", bc:"liq",
+      title:"Slippage = f(Trade Size, Liquidity, Urgency)",
+      sub:"The three interacting variables that jointly determine execution cost",
+      tags:[["trade size","cost"],["liquidity","liq"],["urgency","algo"],["ADV","imp"],["participation rate","algo"]],
+      cmp:[
+        {cls:"cost",  label:"Trade Size (relative to ADV)", text:"Larger orders relative to available liquidity walk through progressively worse price levels. Size is always measured relative to the asset's average daily volume (ADV) — a $10M order is trivial in Apple but enormous in a small-cap. A 1% ADV order typically produces modest impact; a 10–20% ADV order can move the market significantly. Order sizing and position sizing decisions upstream directly determine how much slippage pressure any given trade will face."},
+        {cls:"liq",   label:"Liquidity (order book depth)", text:"Deeper order books absorb larger orders with less price movement. Liquidity varies by: time of day (deepest at open/close in traditional markets), market regime (collapses in stress), and asset class (large-cap equities and major FX are far deeper than small-cap equities or altcoins). Liquidity is the denominator: the same order in a deeper market costs a fraction of the same order in a thin one. Monitoring liquidity before execution — not just the top-of-book spread but depth at multiple price levels — is essential pre-trade analysis."},
+        {cls:"algo",  label:"Urgency (how fast you must trade)", text:"Immediate execution (market orders, sweeping the book) accepts worst-case slippage in exchange for certainty. Patient execution (limit orders, algorithms working over hours) reduces market impact but introduces timing risk and information leakage. Urgency is the trader's choice variable — the lever they control. The entire algorithmic execution industry exists to find the optimal urgency setting for each order given its size, the available liquidity, and the trader's actual deadline."},
+      ],
+      body:[
+        `These three variables form the fundamental trade-off of all execution strategy: <em>speed costs money</em> (via market impact), and <em>patience costs certainty</em> (via timing risk and opportunity cost if the trade never fills at an acceptable price). The interaction is multiplicative: a small order in a deep market requires almost no adjustment for any level of urgency; a large order in a thin market requires very careful urgency management to avoid catastrophic slippage regardless of how good the underlying investment idea is.`,
+        `<strong>Trade size</strong> is the most controllable driver — a portfolio manager who sizes a position too aggressively for the asset's liquidity has made an execution cost decision before any order has been placed. Many institutional investment processes include a pre-trade liquidity screen: if a desired position would require trading more than 5–10% of the asset's daily volume, the position size is adjusted downward, or the investment horizon is extended to allow a longer, more patient execution window. This upstream liquidity management is often more impactful than downstream algorithm selection.`,
+        `<strong>Urgency</strong> is where execution skill matters most. Two portfolio managers with identical investment ideas, making identical sizing decisions, can achieve dramatically different execution costs based purely on how well they communicate urgency context to their trading desk and how appropriately the trading desk calibrates algorithm aggressiveness to the market conditions. An overly aggressive algorithm paid to be "done by noon" on an order that could safely take three days wastes the most easily-recovered component of slippage.`
+      ],
+      ki:"Trade size, liquidity, and urgency are the independent variables of execution cost; slippage is the dependent variable. The sophisticated investor manages all three upstream — not just choosing the right execution algorithm downstream. Position sizing to match portfolio liquidity, timing trades to exploit predictable liquidity cycles, and communicating genuine (not padded) urgency constraints to execution desks collectively reduce slippage more than any algorithm choice can compensate for if these upstream decisions are poor."
+    },
+  ]},
+  { label:"Market Impact Modeling", color:"var(--imp)", line:"var(--imp-d)", fam:"f-imp", entries:[
+    { icon:"📐", badge:"IMPACT MODELS", bc:"imp",
+      title:"Market Impact Models",
+      sub:"Quantitative frameworks for predicting how much a trade will move the price",
+      tags:[["market impact","imp"],["Kyle model","imp"],["Almgren-Chriss","imp"],["pre-trade TCA","algo"]],
+      stats:[{l:"Kyle (1985) model type",v:"Linear, informed-trading based",c:"imp"},{l:"Almgren-Chriss (2000)",v:"Optimal execution, impact + risk",c:"imp"},{l:"Empirical model inputs",v:"ADV, volatility, spread, size",c:"liq"},{l:"Used by",v:"Algo desks, TCA vendors, quant funds",c:"algo"}],
+      body:[
+        `<em>Market impact models</em> predict, before a trade is executed, how much the act of trading a given quantity will move the price — separating this predictable, mechanical cost from unpredictable price volatility. These models are the backbone of institutional execution: pre-trade cost estimates, algorithmic order-slicing decisions, and post-trade performance evaluation all depend on a working quantitative framework for impact.`,
+        `<strong>Kyle's (1985) model</strong> is the theoretical foundation: impact arises from the interaction between informed traders (who possess private information) and market makers (who set prices to protect against adverse selection). In Kyle's framework, market makers widen their price response to order flow because some of that flow is informed — meaning price impact is partly a rational, information-theoretic response rather than a purely mechanical consequence of order book depth. This insight — that some portion of impact is permanent (reflecting genuine information) while another is temporary (reflecting pure liquidity consumption) — underpins all modern impact decomposition.`,
+        `<strong>Almgren-Chriss (2000)</strong> formalized the practical optimal execution problem: given a fixed quantity to trade over a fixed time horizon, what trading schedule minimizes the sum of expected market impact cost and expected timing risk (the chance the price moves adversely during execution)? This produced an explicit mathematical trade-off — the "efficient frontier" of execution — that underlies virtually every modern execution algorithm. At one extreme is instant execution (zero timing risk, maximum impact); at the other is infinitely patient execution (zero impact, infinite timing risk). The optimal schedule sits somewhere in between, calibrated to the trader's specific risk tolerance and the asset's volatility and liquidity profile.`,
+        `Modern practically-deployed models are empirically calibrated from actual historical execution data — fitting a functional form (typically a power-law relationship between impact and the ratio of order size to ADV) to millions of historical trades. These calibrated models feed directly into pre-trade TCA systems: a portfolio manager sees an estimated execution cost in basis points before committing to a trade, allowing explicit comparison of the investment thesis's expected alpha against its expected execution drag — the foundation of genuinely sophisticated portfolio management.`
+      ],
+      ki:"Market impact models exist to answer one question with quantitative precision: if I trade X shares of this asset right now, how much will the price move, and how much of that move will persist? The shift from Kyle's elegant theoretical model to empirically calibrated practical models mirrors the broader evolution of quantitative finance: the theory tells you what to model; the calibration tells you the actual numbers. Both are necessary — theory without data is speculative; data without theory is a black box that fails catastrophically out-of-sample."
+    },
+    { icon:"📈", badge:"IMPACT SHAPE", bc:"imp",
+      title:"Linear vs. Square-Root Market Impact",
+      sub:"The empirically dominant functional form — and why the exponent changes everything",
+      tags:[["linear impact","imp"],["square-root law","imp"],["power law","imp"],["Bouchaud","imp"]],
+      curveVis:true,
+      fmla:{ main:`<span class="a">Linear:</span>      Impact <span class="op">∝</span> <span class="b">Q / ADV</span>
+<span class="a">Square-Root:</span> Impact <span class="op">∝</span> <span class="b">√( Q / ADV )</span>`, note:`Empirical consensus across equities, FX, futures:\nimpact ≈ σ × √(Q / ADV), where σ = daily volatility\n\nDoubling order size → only +41% more impact (√2, not 2×)\n→ Strong justification for order-slicing over time` },
+      cmp:[
+        {cls:"cost", label:"Linear Impact (Theoretical)", text:"Impact grows proportionally with order size: 2× the order = 2× the price move. Simple, mathematically tractable, and embedded in Kyle's original model under specific assumptions. Tends to overestimate actual impact for large orders in liquid markets relative to what is empirically observed. Useful as a first approximation and for very small orders where the concavity of true impact is negligible."},
+        {cls:"imp",  label:"Square-Root Law (Empirical)", text:"The dominant empirical finding across decades of microstructure research (Bouchaud, Farmer, and institutional practitioners): impact scales approximately with √(Q/ADV), not linearly. Trading 4× the quantity produces only ~2× the impact. This concave functional form has been confirmed across equity markets, futures, and FX, suggesting a universal mechanism rather than an asset-specific regularity."},
+        {cls:"algo", label:"The Practical Consequence", text:"Because impact is concave in size, slicing a large order into many smaller pieces executed over time produces strictly less total impact than executing all at once — the core justification for algorithmic order-slicing. Under linear impact, total impact would be identical regardless of how you slice (since linear cost sums the same). Under square-root impact, slicing saves real money. This is why the whole algorithmic execution industry has a firm empirical foundation."},
+      ],
+      body:[
+        `The square-root market impact law is one of the most consequential empirical regularities in market microstructure — arguably the single most important quantitative fact for institutional execution strategy. It says that the cost of trading scales not with the order size itself but with its square root relative to normal trading volume: doubling order size raises impact costs by only about 41% (√2 ≈ 1.41), not 100%. Tripling order size raises costs by only ~73% (√3 ≈ 1.73).`,
+        `The economic mechanisms behind this concavity involve several reinforcing effects: larger orders spread over longer time horizons allow natural counterparty order flow to arrive and absorb the demand; the presence of a large, visible order flow attracts contra-side liquidity providers who are willing to trade against the trend for a spread; and the price discovery process partially incorporates the information content of large flows gradually rather than instantaneously, spreading the permanent impact component over time. The result: impact per unit traded declines as order size grows — economies of scale in execution.`,
+        `Real-world impact models typically take the form: <strong>Impact (bps) ≈ η × σ_daily × √(Q / ADV_daily)</strong>, where η is a market-specific constant (calibrated empirically), σ_daily is the daily volatility of the asset, and Q/ADV is the size-to-volume ratio. The volatility scaling reflects the intuition that more volatile markets produce more price movement per unit of order flow, since their prices are inherently more sensitive to any information signal (and large orders look like information signals).`
+      ],
+      ki:"The square-root law is the mathematical foundation of algorithmic execution. Without it, there would be little cost justification for the operational complexity of spreading a large order over time — it would just add timing risk without saving impact costs. Because impact is genuinely concave, patient execution is genuinely cheaper. Every VWAP, TWAP, and IS algorithm that exists is ultimately exploiting this empirical regularity."
+    },
+    { icon:"⏳", badge:"TEMP/PERM", bc:"algo",
+      title:"Temporary vs. Permanent Price Impact",
+      sub:"The price move that reverts vs. the price move that reflects real information",
+      tags:[["temporary impact","liq"],["permanent impact","imp"],["price reversion","liq"],["informed flow","adv"]],
+      cmp:[
+        {cls:"liq",  label:"Temporary Impact", text:"Price movement caused by mechanical liquidity consumption — walking through resting orders — that reverts (partially or fully) after execution completes. Reflects the urgency premium paid to get filled immediately: market makers who absorb the aggressive order gradually replenish inventory and prices drift back. The trader who paid temporary impact still paid it — the reversion happens after their fill, benefiting the next person to trade, not them. Reducing temporary impact is entirely within the execution trader's control."},
+        {cls:"imp",  label:"Permanent Impact", text:"Price movement that persists after trading completes — reflecting that the trade conveyed genuine information to the market. Market participants observe the sustained directional flow and rationally update their beliefs about fair value. Permanent impact is not a 'cost' in the same sense as temporary impact — it represents the market correctly incorporating new information. Funds with genuine alpha will have higher permanent impact than those running momentum or passive strategies."},
+        {cls:"adv",  label:"Distinguishing Them Empirically", text:"Measured by tracking the price at multiple intervals (5 min, 30 min, 2 hours, 1 day) after a trade completes. Temporary impact has already fully or partially reverted by the next day; permanent impact is still present. Comparing your trades' temporary/permanent split against benchmarks identifies whether high costs are a execution style problem (too aggressive → high temporary) vs. an inherent feature of your alpha source (informed → high permanent)."},
+      ],
+      body:[
+        `The decomposition of price impact into temporary and permanent components is fundamental to diagnosing whether execution costs arise from controllable choices or from inherent characteristics of a trading strategy. A fund paying 40 bps of total impact where 35 bps is temporary (fully reverts) has a genuine execution problem — they are demanding too much immediacy and would benefit from more patient algorithms. The same 40 bps where 30 bps is permanent reflects informed order flow where the trade is genuinely moving the market toward fair value — less actionable through execution improvement alone.`,
+        `<strong>Temporary impact</strong> is essentially the cost of urgency: it exists because resting liquidity providers demand a spread to absorb an aggressive order, and once absorbed, they (and other market makers who see the flow) gradually adjust their quotes back as the urgency signal dissipates. The speed of this reversion varies: in very liquid markets (large-cap equities, major FX pairs), temporary impact can revert within minutes; in illiquid markets, the reversal may take hours or never fully complete.`,
+        `<strong>Permanent impact</strong> occurs when trades cause a lasting repricing — typically because the order flow is genuinely information-bearing. Even uninformed traders can cause permanent impact if their order is large enough to persistently shift supply/demand balance (e.g., a large index rebalancing trade that permanently changes the ownership structure of a stock). The standard empirical method to measure permanent impact is the "price impact profile": plot the average price trajectory from T−60 minutes to T+1 day around a sample of trades and measure how much of the T=0 impact survives at T+1 day.`
+      ],
+      ki:"The temporary/permanent decomposition transforms slippage from a single opaque number into a diagnostic: temporary impact tells you about execution quality (how aggressively you demanded liquidity); permanent impact tells you about information content (whether your trades are actually moving the market toward fair value). Improving on temporary impact is an execution desk problem — better algorithms, better timing, better liquidity detection. Improving on permanent impact, if it's unwantedly high, is a strategy problem — perhaps you're trading in ways that signal your intentions too clearly to other market participants."
+    },
+  ]},
+  { label:"Execution Frameworks", color:"var(--algo)", line:"var(--algo-d)", fam:"f-algo", entries:[
+    { icon:"🧾", badge:"IS FRAMEWORK", bc:"algo",
+      title:"Implementation Shortfall Framework",
+      sub:"André Perold's 1988 framework for decomposing total execution cost into actionable components",
+      tags:[["implementation shortfall","algo"],["Perold 1988","algo"],["TCA","algo"],["paper portfolio","liq"]],
+      waterfall:true,
+      fmla:{ main:`<span class="a">IS</span> <span class="op">=</span> (<span class="b">Paper Return</span> <span class="op">−</span> <span class="b">Actual Return</span>) <span class="op">×</span> <span class="c">Position Size</span>`, note:`Paper portfolio: hypothetical fill at decision price,\ninstantaneously, at zero cost\n\nIS = Delay cost + Market impact cost\n     + Timing/opportunity cost + Explicit costs\n\nPerold (1988): the standard for institutional TCA` },
+      body:[
+        `The <em>Implementation Shortfall (IS)</em> framework — developed by André Perold in 1988 — is the dominant methodology for measuring the total cost of converting an investment decision into an executed position. Its central insight: compare the actual portfolio's performance against a hypothetical "paper portfolio" that achieves the same trades instantaneously, at the price prevailing at the moment of the decision, with zero transaction costs. The gap between the paper return and the actual return is the implementation shortfall.`,
+        `The framework decomposes IS into four distinct components, each with different responsible parties. <strong>Delay cost</strong>: the price movement between when the investment decision was made and when the order actually reached the market — reflecting internal workflow delays (PM sign-off, compliance review, order routing). This is not the trading desk's fault; it is the portfolio management process's cost. <strong>Market impact cost</strong>: the price movement caused by actually executing the order, within the trading desk's control through algorithm choice and style. <strong>Timing (opportunity) cost</strong>: the price movement while the order is being worked patiently over time — the cost of the patience decision. <strong>Explicit costs</strong>: direct itemized charges (commissions, fees, taxes) — fully transparent and directly auditable.`,
+        `This decomposition is operationally transformative because it assigns responsibility for each cost component to the right decision-maker: delay cost → the PM and operations workflow; market impact → the execution desk and algorithm choice; timing cost → the urgency decision made jointly by PM and trader; explicit costs → broker and venue selection. Without this decomposition, all costs are lumped together and the execution desk gets blamed for delay costs caused by a slow compliance approval process, or the PM gets blamed for timing costs that were a rational response to a correctly-diagnosed liquidity constraint.`,
+        `IS has spawned its own algorithm category: <em>IS algorithms</em> (offered by every major broker) directly minimize the Almgren-Chriss objective function — a weighted combination of expected market impact and expected timing variance — rather than targeting a historical price benchmark like VWAP. IS algorithms are "forward-looking": they trade more aggressively early (when timing risk is high) and taper off later, adapting dynamically to real-time market conditions.`
+      ],
+      ki:"Implementation shortfall transformed transaction cost analysis from a single-number complaint ('our fills were bad') into a multi-component diagnostic ('our fills were bad because the PM took 3 hours to approve the order and we then traded too aggressively given the asset's liquidity profile'). This decomposition is what makes TCA actionable — each component can be traced to a specific process or decision, measured, and improved independently."
+    },
+    { icon:"🎭", badge:"ADV. SELECT", bc:"adv",
+      title:"Adverse Selection Component",
+      sub:"Why market makers charge an information premium even to uninformed traders — and what it means for slippage",
+      tags:[["adverse selection","adv"],["Glosten-Milgrom","adv"],["bid-ask spread","cost"],["informed flow","adv"]],
+      stats:[{l:"Adverse selection share of spread",v:"30–60% of total bid-ask spread",c:"adv"},{l:"Key model",v:"Glosten-Milgrom (1985)",c:"adv"},{l:"Elevated around",v:"Earnings, FOMC, data releases",c:"cost"},{l:"Mitigated by",v:"Dark pools, speed bumps, off-hours",c:"liq"}],
+      body:[
+        `<em>Adverse selection</em> in market microstructure refers to the risk that a liquidity provider faces when trading against a counterparty who knows more than they do. Because a market maker cannot instantly identify whether the next incoming order comes from an uninformed retail participant or a well-informed institutional trader, they must defensively price their quotes — widening the bid-ask spread to compensate for the average expected loss from trading against the informed flow. Every market participant pays this premium, regardless of whether they personally are informed.`,
+        `The <strong>Glosten-Milgrom (1985) model</strong> formalized this: even a perfectly competitive, zero-profit market maker must quote a spread strictly greater than zero as compensation for adverse selection risk — the spread is not primarily compensation for inventory risk or operating costs, but a rational pricing response to information asymmetry. The spread's adverse selection component equals the expected loss the market maker would suffer if the counterparty is actually informed, weighted by the probability that any given order is from an informed trader.`,
+        `This component of slippage is structurally unavoidable but not constant. It is measurably higher around scheduled information events (earnings releases, FOMC announcements, economic data prints) when the probability of informed trading rises sharply — every sophisticated trader in the world is aware of the upcoming information and some of them are positioning based on that awareness. It is also higher for order types and size profiles that are more consistent with informed, institutional flow (large orders, sophisticated routing patterns, trading in illiquid derivatives that only sophisticated participants access).`,
+        `Market structure mechanisms have been designed specifically to manage adverse selection risk: <em>dark pools</em> allow institutional orders to match without pre-trade transparency, reducing the signal value of the order to market makers and therefore the adverse selection they price in; <em>speed bumps</em> (small, intentional delays at venues like IEX) reduce the advantage of the fastest, most likely technology-informed traders; <em>request-for-quote (RFQ) systems</em> in fixed income and OTC markets allow large orders to be placed directly with multiple potential counterparties simultaneously, reducing the information leakage associated with exposing a large order to a public order book.`
+      ],
+      ki:"Adverse selection is why bid-ask spreads cannot shrink to zero even in a perfectly competitive, technologically advanced market — it is a structural consequence of the fact that some traders are always more informed than others, and market makers cannot reliably identify which is which. Every trader, informed or not, pays an insurance premium embedded in the spread. Knowing this tells you when spreads will be widest (scheduled information events), what kind of orders will pay the most (large, institutional-looking), and what market structures have been built to reduce this cost (dark pools, RFQ systems, speed bumps)."
+    },
+    { icon:"🛠️", badge:"MANAGING IT", bc:"algo",
+      title:"Managing Slippage — Limit Orders and Algorithms",
+      sub:"The practical toolkit from simple order types through adaptive institutional algorithms",
+      tags:[["limit orders","liq"],["VWAP","algo"],["TWAP","algo"],["IS algorithm","algo"],["dark pool","liq"]],
+      dtable:{
+        cols:["Tool","Mechanism","Best for","Key trade-off"],
+        rows:[
+          ["Market order","Sweeps available book at market","Guaranteed execution, maximum urgency","Accepts all slippage; worst price outcome"],
+          ["Limit order","Sets price cap/floor; may not fill","Patient non-urgent orders","Non-execution risk if market moves away"],
+          ["VWAP algo","Slices to match historical volume pattern","Passive benchmark tracking","Doesn't minimize absolute cost, just tracks avg"],
+          ["TWAP algo","Slices evenly across time","Simple, predictable execution","Ignores liquidity variations intraday"],
+          ["IS algo","Optimizes impact vs. timing risk","Urgency-calibrated large orders","Needs accurate impact and volatility model"],
+          ["Dark pool","Matches without pre-trade transparency","Large blocks, reduced leakage","Execution uncertainty; adverse selection in pool"],
+          ["POV algo","Participates at fixed % of market volume","Keeping pace with natural volume","Slower if market is quiet; faster if busy"],
+        ]
+      },
+      body:[
+        `The slippage management toolkit spans a spectrum from order types accessible to any retail trader through to continuously-adapting institutional algorithms managing billions daily. The choice of tool is always a point on a trade-off curve between certainty of execution and quality of the execution price — no tool eliminates this trade-off, only lets you choose where on the curve to sit.`,
+        `<strong>Limit orders</strong> are the foundational cost-control tool: by specifying the worst-acceptable price, they cap slippage absolutely. The trade-off is non-execution risk — if the market moves away before your limit is reached, you stay flat while the opportunity or risk you were trying to address continues. Limit orders are ideal for patient, non-urgent trades with wide acceptable price windows; poorly suited for urgent risk management (where a market order's guaranteed fill justifies the slippage cost).`,
+        `<strong>VWAP (Volume-Weighted Average Price)</strong> algorithms slice the order to track the historical intraday volume pattern — trading more during normally high-volume periods (open, close) and less during quiet mid-day periods. The goal is an average fill close to the day's volume-weighted average — a common institutional benchmark for evaluating execution performance. VWAP does not minimize absolute cost; it minimizes the deviation from a specific benchmark price. <strong>TWAP (Time-Weighted)</strong> algorithms use simpler uniform slicing but ignore volume signals, trading the same at every interval.`,
+        `<strong>Implementation Shortfall algorithms</strong> are the most sophisticated common category: they optimize the Almgren-Chriss objective directly, dynamically adjusting trading rate based on real-time market conditions (spread, volatility, available depth) rather than following a fixed schedule. The most advanced versions use machine learning models trained on vast historical execution datasets to predict the optimal participation rate in real time, adapting to liquidity changes within the life of a single order. <strong>Dark pool routing</strong> reduces information leakage by matching away from the public lit book, but at the cost of execution uncertainty and the risk that the dark pool itself contains adversely-selecting participants.`
+      ],
+      ki:"Every slippage management tool trades certainty against quality — speed against price, visibility against execution. There is no tool that escapes this trade-off, only tools that help a trader navigate it more precisely given their specific urgency constraint, order size, and liquidity environment. Algo sophistication matters, but upstream decisions (position sizing relative to ADV, timing relative to liquidity cycles, urgency calibration) move the needle more than any downstream algorithm choice can compensate for if those upstream inputs are poor."
+    },
+  ]},
+  { label:"Crypto & DEX Mechanics", color:"var(--dex)", line:"var(--dex-d)", fam:"f-dex", entries:[
+    { icon:"₿", badge:"CRYPTO/TRAD", bc:"dex",
+      title:"Slippage in Crypto vs. Traditional Markets",
+      sub:"Same economic forces, different structural magnitudes and liquidity dynamics",
+      tags:[["crypto slippage","dex"],["fragmentation","cost"],["24/7 trading","liq"],["CEX depth","liq"]],
+      stats:[{l:"BTC/USD spread (deep CEX, calm)",v:"~1–3 bps",c:"liq"},{l:"Mid-cap altcoin spread (CEX)",v:"20–100+ bps",c:"cost"},{l:"Crypto weekend/overnight liquidity",v:"Often 30–60% thinner",c:"adv"},{l:"Large-cap equity typical spread",v:"~1–2 bps",c:"liq"}],
+      cmp:[
+        {cls:"liq", label:"Traditional Markets", text:"Concentrated liquidity in regulated centralized venues with designated market makers and circuit breakers. Predictable liquidity cycles driven by fixed trading hours (deepest at open/close auctions). Regulatory oversight constrains manipulation. Best large-cap instruments have spreads measured in fractions of a basis point — among the tightest, deepest markets in history. Execution algorithms have decades of calibration data."},
+        {cls:"dex", label:"Crypto Markets", text:"Genuinely fragmented across dozens of CEXes plus an entirely separate decentralized ecosystem, with no unified consolidated tape. True 24/7/365 trading means no predictable open/close liquidity cycle — weekends and off-peak hours produce materially thinner books. Market-making infrastructure is mature only for BTC and ETH; mid-to-small-cap tokens can see orders of magnitude higher impact per dollar traded. Much less execution algorithm calibration history."},
+      ],
+      body:[
+        `Crypto markets exhibit both familiar and genuinely distinct slippage dynamics relative to traditional markets — familiar because the same fundamental relationship (size × urgency / liquidity = impact) governs both; distinct because the structural realization of that relationship differs in ways that significantly affect execution cost management.`,
+        `For the very largest crypto assets on the deepest CEXes, slippage now closely resembles that of liquid traditional instruments — tight spreads, deep books, and efficient large-order execution. This depth drops off sharply outside the top few assets: mid-cap and small-cap tokens exhibit spreads and impact an order of magnitude larger than comparable traditional instruments, reflecting immature market-making infrastructure and shallow retail-dominated order flow.`,
+        `The <strong>24/7/365 trading cycle</strong> creates a liquidity dynamic with no direct traditional analog. Rather than the predictable open/close cycle of equity markets, crypto liquidity ebbs and flows continuously with global time-zone overlap. Measurably thinner books characterize weekends and overnight hours. A trade producing modest slippage at peak US/Asian session overlap can produce dramatically more during a quiet Sunday — a variable invisible in traditional intraday liquidity models that assume fixed session structures. The absence of circuit breakers also means crypto can cascade through multiple standard deviation moves without the emergency halt mechanisms that traditional markets use to reset fragile liquidity conditions.`,
+        `<strong>Venue fragmentation</strong> is structurally more severe in crypto. Equities in major markets benefit from consolidated tape, smart order routing infrastructure, and regulatory best-execution requirements that effectively unify liquidity across venues for standard-size institutional orders. Crypto has no equivalent — BTC liquidity genuinely lives independently across Binance, Coinbase, OKX, Bybit, and many others, with no consolidated pricing reference and no regulatory obligation to route to the best available price across venues. Cross-exchange arbitrage compresses price differences between major venues for top assets, but the arbitrage operates with meaningful friction compared to traditional smart-order routing.`
+      ],
+      ki:"Crypto slippage is 'traditional market dynamics, compressed and intensified': the same three-variable function (size, liquidity, urgency) governs both, but the structural parameters are different — thinner markets outside the top few assets, no predictable liquidity cycle, more fragmented venues, and far less calibration history for execution models. The practical lesson: execution strategies developed and calibrated for traditional markets need material recalibration before deployment in crypto, not just minor parameter adjustments."
+    },
+    { icon:"🔄", badge:"AMM IMPACT", bc:"dex",
+      title:"DEX Slippage — AMM Price Impact",
+      sub:"Deterministic, formula-driven price impact fundamentally unlike order-book markets",
+      tags:[["AMM","dex"],["constant product","dex"],["Uniswap","dex"],["DEX","dex"],["MEV","cost"]],
+      curveVis2:true,
+      fmla:{ main:`<span class="a">x · y = k</span>   (constant product formula)
+
+<span class="b">Price Impact %</span> <span class="op">≈</span> <span class="c">Δx</span> / (<span class="c">Δx</span> <span class="op">+</span> <span class="b">x</span>)`, note:`Where x = reserve of input token, Δx = trade size\n\n$10K swap into $1M pool → impact ≈ 1.0%\n$100K swap into $1M pool → impact ≈ 9.1%\n\nV3 concentrated liquidity: same TVL, much lower impact\nnear current price — concentrates depth where it's used` },
+      body:[
+        `<em>Automated Market Makers (AMMs)</em> — the trading mechanism underlying Uniswap, Curve, Balancer, and most DEXes — produce slippage through a fundamentally different mechanism than order-book matching. Understanding this distinction is essential for anyone executing on-chain.`,
+        `The <strong>constant product formula</strong> (x · y = k, where x and y are the quantities of the two pooled assets and k is a constant) defines the AMM's pricing: a trade that adds Δx of asset X to the pool must remove Δy of asset Y such that (x + Δx)(y − Δy) = k. The resulting execution price is inherently worse than the spot price as Δx grows, since the formula curves: each additional unit of X added commands fewer units of Y in return. This is price impact — a deterministic, formula-derivable function of trade size relative to pool reserves.`,
+        `This determinism is a fundamental structural distinction from order-book markets: <em>DEX price impact is fully calculable before execution</em>. In a traditional order book, slippage depends on the specific, constantly-changing configuration of resting orders — it can only be estimated statistically. In an AMM, impact for any given trade is precisely computed from the pool's current reserves before the trade is submitted. This transparency is valuable for pre-trade analysis but also for MEV bots, which exploit it to extract value.`,
+        `<strong>Pool depth</strong> is the AMM equivalent of order book depth: deeper pools (higher total value locked) produce lower impact for the same trade size. The evolution from Uniswap V2's uniform liquidity (spread across all possible prices, most of it never used) to V3's <em>concentrated liquidity</em> (LPs choose specific price ranges to deploy capital) was specifically designed to reduce effective price impact for typical trade sizes — by focusing capital where trading actually occurs, V3 can offer dramatically tighter impact for the same TVL compared to V2.`,
+        `<strong>MEV (Maximal Extractable Value)</strong> — particularly sandwich attacks — is a DEX-specific slippage amplifier with no centralized-market equivalent. Because pending Ethereum transactions are publicly visible in the mempool before confirmation, an automated bot can detect a large pending swap, place a buy order immediately before it (pushing the price up), allow the victim's trade to execute at the now-worse price, then immediately sell — capturing the price recovery at the victim's expense. Sandwich attacks create an additional slippage cost on top of pure AMM price impact, particularly for large, unprotected swaps in mempools with high block-building competition.`
+      ],
+      ki:"AMM slippage is simultaneously more transparent and more manipulable than order-book slippage. The deterministic formula makes cost fully knowable before execution — a genuine improvement for pre-trade analysis. But the same public visibility that enables pre-trade transparency also enables MEV extraction: the mempool shows your trade to bots before it confirms, giving them an opportunity to sandwich-attack large swaps that a dark or private order flow channel would never expose. Managing DEX slippage means managing both the formula-driven AMM impact and the MEV exposure of transacting on a public blockchain."
+    },
+  ]},
+];
+
+let cnt = 0;
+
+function buildCurveVis() {
+  return `<div class="curve-vis">
+    <div class="cv-title">Linear vs. Square-Root Impact — Cost Scaling with Order Size</div>
+    <svg class="cv-svg" viewBox="0 0 600 160">
+      <line x1="40" y1="140" x2="580" y2="140" stroke="#2a323a" stroke-width="1"/>
+      <line x1="40" y1="10"  x2="40"  y2="145" stroke="#2a323a" stroke-width="1"/>
+      <text x="270" y="157" font-size="9" fill="#4a5560" font-family="monospace">Order Size / ADV</text>
+      <text x="10" y="85" font-size="9" fill="#4a5560" font-family="monospace" transform="rotate(-90 10 85)">Impact (bps)</text>
+      <!-- linear -->
+      <polyline points="40,140 130,116 220,92 310,68 400,44 490,20 580,4"
+        stroke="#e8604d" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- square root -->
+      <polyline points="40,140 130,106 220,88 310,74 400,63 490,54 580,47"
+        stroke="#4d9de8" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="490" y="16" font-size="9" fill="#e8604d" font-family="monospace">Linear: cost ∝ Q</text>
+      <text x="470" y="60" font-size="9" fill="#4d9de8" font-family="monospace">Sqrt: cost ∝ √Q</text>
+      <text x="44" y="130" font-size="8" fill="#4a5560" font-family="monospace">small</text>
+      <text x="552" y="130" font-size="8" fill="#4a5560" font-family="monospace">large</text>
+    </svg>
+    <div class="cv-legend">
+      <div class="cv-leg"><div class="cv-dot" style="background:#e8604d"></div>Linear model — overestimates large-order cost</div>
+      <div class="cv-leg"><div class="cv-dot" style="background:#4d9de8"></div>Square-root (empirical) — concave, justifies algo slicing</div>
+    </div>
+  </div>`;
+}
+
+function buildCurveVis2() {
+  return `<div class="curve-vis">
+    <div class="cv-title">AMM Price Impact — x·y=k Constant Product Curve</div>
+    <svg class="cv-svg" viewBox="0 0 600 160">
+      <line x1="40" y1="140" x2="580" y2="140" stroke="#2a323a" stroke-width="1"/>
+      <line x1="40" y1="10"  x2="40"  y2="145" stroke="#2a323a" stroke-width="1"/>
+      <text x="240" y="157" font-size="9" fill="#4a5560" font-family="monospace">Trade Size / Pool Reserves</text>
+      <text x="10" y="85" font-size="9" fill="#4a5560" font-family="monospace" transform="rotate(-90 10 85)">Price Impact %</text>
+      <!-- AMM impact curve: accelerating -->
+      <polyline points="40,138 80,134 120,128 170,118 220,104 280,86 340,64 400,42 460,22 520,10 580,5"
+        stroke="#e84da8" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- deeper pool line -->
+      <polyline points="40,139 100,137 160,134 230,128 300,120 380,108 460,90 540,68 600,52"
+        stroke="#3dc2a8" stroke-width="1.6" fill="none" stroke-dasharray="6,3" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="390" y="36" font-size="9" fill="#e84da8" font-family="monospace">Standard pool (x·y=k)</text>
+      <text x="420" y="62" font-size="9" fill="#3dc2a8" font-family="monospace">Deeper pool (same formula)</text>
+      <text x="44" y="132" font-size="8" fill="#4a5560" font-family="monospace">1% of pool</text>
+      <text x="520" y="132" font-size="8" fill="#4a5560" font-family="monospace">100%+</text>
+    </svg>
+    <div class="cv-legend">
+      <div class="cv-leg"><div class="cv-dot" style="background:#e84da8"></div>AMM impact — deterministic, calculable pre-trade</div>
+      <div class="cv-leg"><div class="cv-dot" style="background:#3dc2a8"></div>Deeper pool — same formula, lower impact per dollar traded</div>
+    </div>
+  </div>`;
+}
+
+function buildWaterfall() {
+  const rows=[
+    {label:"Decision price",val:"$50.000",w:0, color:"var(--liq)"},
+    {label:"+ Delay cost",  val:"+8 bps", w:22,color:"var(--adv)"},
+    {label:"+ Market impact",val:"+24 bps",w:65,color:"var(--cost)"},
+    {label:"+ Timing cost", val:"+4 bps", w:12,color:"var(--algo)"},
+    {label:"+ Explicit fees",val:"+0.5 bps",w:5, color:"var(--imp)"},
+    {label:"TOTAL IS",      val:"36.5 bps",w:100,color:"var(--cost)"},
+  ];
+  return `<div class="waterfall">
+    <div class="wf-head">Implementation Shortfall — Component Decomposition (Illustrative Buy Order)</div>
+    ${rows.map(r=>`<div class="wf-row">
+      <div class="wf-label">${r.label}</div>
+      <div class="wf-bw"><div class="wf-bar" style="width:${r.w*2}px;max-width:100%;background:${r.color}"></div></div>
+      <div class="wf-val" style="color:${r.color}">${r.val}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function render(){
+  const root=document.getElementById('root');
+  sections.forEach(sec=>{
+    const sh=document.createElement('div');
+    sh.innerHTML=`<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line" style="background:${sec.line}"></div>
+    </div>`;
+    root.appendChild(sh);
+    const wrap=document.createElement('div');
+    wrap.className=sec.fam;
+    sec.entries.forEach(e=>{
+      const idx=cnt++;
+      const bc=e.bc;
+      const tH=(e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH=e.stats?`<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>`:'';
+      const cmpH=e.cmp?`<div class="cmp c${e.cmp.length}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>`:'';
+      const fmlaH=e.fmla?`<div class="fmla-block"><div class="fmla-main">${e.fmla.main}</div><pre class="fmla-note">${e.fmla.note}</pre></div>`:'';
+      const curveH=e.curveVis?buildCurveVis():'';
+      const curve2H=e.curveVis2?buildCurveVis2():'';
+      const wfH=e.waterfall?buildWaterfall():'';
+      const dtH=e.dtable?`<div class="dtable">
+        <div class="drow hdr" style="grid-template-columns:repeat(${e.dtable.cols.length},1fr)">
+          ${e.dtable.cols.map(c=>`<div class="dc">${c}</div>`).join('')}
+        </div>
+        ${e.dtable.rows.map(r=>`<div class="drow" style="grid-template-columns:repeat(${e.dtable.cols.length},1fr)">
+          ${r.map((c,i)=>`<div class="dc ${i===0?'label':''}">${c}</div>`).join('')}
+        </div>`).join('')}
+      </div>`:'';
+      const body=e.body.map(p=>`<p>${p}</p>`).join('')+
+        fmlaH+curveH+curve2H+wfH+stH+cmpH+dtH+
+        `<div class="ki"><div class="ki-mark">//</div><div class="ki-text">${e.ki}</div></div>
+        <div class="tags">${tH}</div>`;
+      const div=document.createElement('div');
+      div.className='entry';div.id=`e-${idx}`;
+      div.innerHTML=`
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-badge" style="color:var(--${bc});border-color:var(--${bc}-d);background:var(--${bc}-b)">${e.badge}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+function toggle(i){document.getElementById(`e-${i}`).classList.toggle('open');}
+function toggleAll(open){for(let i=0;i<cnt;i++){const el=document.getElementById(`e-${i}`);if(el)open?el.classList.add('open'):el.classList.remove('open');}}
+render();
+</script>
+</body>
+</html>

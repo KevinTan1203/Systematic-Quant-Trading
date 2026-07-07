@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 2.7 Futures</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;700;900&family=Inconsolata:wght@300;400;500;700&family=Merriweather:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #07080a;
+  --bg1:      #0c0e12;
+  --bg2:      #11141a;
+  --bg3:      #161a22;
+  --surface:  #1c2030;
+  --border:   #222840;
+  --border2:  #2c3450;
+
+  --ink:      #e0ddd4;
+  --ink2:     #9090a0;
+  --muted:    #505870;
+  --faint:    #1c2030;
+
+  /* product colours */
+  --equity:   #3ab870;
+  --equity-d: #0e4020;
+  --equity-b: rgba(58,184,112,0.08);
+
+  --treasury: #4090d8;
+  --treasury-d:#0e2858;
+  --treasury-b:rgba(64,144,216,0.08);
+
+  --commodity:#d89840;
+  --commodity-d:#583808;
+  --commodity-b:rgba(216,152,64,0.08);
+
+  --fx:       #c840a8;
+  --fx-d:     #481030;
+  --fx-b:     rgba(200,64,168,0.08);
+
+  --vol:      #a840e0;
+  --vol-d:    #300858;
+  --vol-b:    rgba(168,64,224,0.08);
+
+  --mech:     #40c0d8;
+  --mech-d:   #083040;
+  --mech-b:   rgba(64,192,216,0.08);
+
+  --analysis: #e8b030;
+  --analysis-d:#484008;
+  --analysis-b:rgba(232,176,48,0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inconsolata', monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* ─── TICKER TAPE ─── */
+.ticker {
+  background: var(--equity);
+  overflow: hidden; height: 32px;
+  display: flex; align-items: center;
+}
+.ticker-inner {
+  display: flex; gap: 60px; white-space: nowrap;
+  animation: tickerScroll 40s linear infinite;
+  padding: 0 40px;
+}
+@keyframes tickerScroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+.tick-item {
+  font-family: 'Inconsolata', monospace;
+  font-weight: 700; font-size: 11.5px;
+  letter-spacing: 0.12em; color: #070a08;
+  display: flex; align-items: center; gap: 8px;
+}
+.tick-item .sym { opacity: 0.6; font-weight: 400; }
+.tick-up  { color: #0a1a0a; }
+.tick-dn  { color: #2a0808; }
+
+/* ─── MASTHEAD ─── */
+.masthead {
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border2);
+  padding: 0;
+}
+
+.mhd-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 50px 42px 40px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 48px; align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'Inconsolata', monospace;
+  font-size: 10px; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mhd-kicker::before {
+  content: '▶';
+  font-size: 8px; color: var(--equity);
+}
+
+.mhd-title {
+  font-family: 'Unbounded', sans-serif;
+  font-size: clamp(36px, 5.5vw, 72px);
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 0.92; letter-spacing: -0.04em;
+  margin-bottom: 16px;
+}
+.mhd-title span { color: var(--equity); }
+
+.mhd-sub {
+  font-family: 'Merriweather', serif;
+  font-style: italic; font-size: 13px;
+  color: var(--ink2); line-height: 1.65;
+  font-weight: 300; max-width: 480px;
+}
+
+/* contract quick-ref */
+.contract-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px; min-width: 240px;
+}
+.cc-card {
+  padding: 9px 12px;
+  border: 1px solid var(--border); background: var(--bg2);
+}
+.cc-sym {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 13px; font-weight: 700; line-height: 1;
+  margin-bottom: 3px;
+}
+.cc-name {
+  font-family: 'Inconsolata', monospace;
+  font-size: 9px; color: var(--muted); letter-spacing: 0.06em;
+  line-height: 1.4;
+}
+.cc-card.eq { border-color: var(--equity-d); }
+.cc-card.eq .cc-sym { color: var(--equity); }
+.cc-card.tr { border-color: var(--treasury-d); }
+.cc-card.tr .cc-sym { color: var(--treasury); }
+.cc-card.co { border-color: var(--commodity-d); }
+.cc-card.co .cc-sym { color: var(--commodity); }
+.cc-card.vx { border-color: var(--vol-d); }
+.cc-card.vx .cc-sym { color: var(--vol); }
+
+/* ─── PAGE ─── */
+.page {
+  max-width: 1080px; margin: 0 auto;
+  padding: 34px 42px 100px;
+}
+
+/* section header */
+.section-hdr {
+  display: flex; align-items: center; gap: 14px;
+  margin: 28px 0 8px; padding-left: 0;
+}
+.sh-label {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.sh-line { flex: 1; height: 1px; }
+
+/* controls */
+.controls {
+  display: flex; gap: 8px;
+  margin-bottom: 28px; flex-wrap: wrap; align-items: center;
+}
+.ctrl {
+  font-family: 'Inconsolata', monospace;
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 6px 14px; border: 1px solid var(--border2);
+  background: transparent; color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.ctrl:hover { border-color: var(--equity); color: var(--equity); }
+.ctrl-right { margin-left: auto; font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; }
+
+/* ─── ENTRY ─── */
+.entry {
+  border: 1px solid var(--border);
+  background: var(--bg1);
+  margin-bottom: 3px; position: relative;
+  overflow: hidden; transition: border-color 0.18s;
+}
+.entry::before {
+  content: ''; position: absolute;
+  left: 0; top: 0; bottom: 0; width: 3px;
+  transition: width 0.2s;
+}
+.entry.open::before { width: 4px; }
+.entry:hover { border-color: var(--border2); }
+
+/* colour families */
+.c-mech     .entry::before { background: var(--mech-d); }
+.c-mech     .entry.open::before { background: var(--mech); }
+.c-equity   .entry::before { background: var(--equity-d); }
+.c-equity   .entry.open::before { background: var(--equity); }
+.c-treasury .entry::before { background: var(--treasury-d); }
+.c-treasury .entry.open::before { background: var(--treasury); }
+.c-commodity .entry::before { background: var(--commodity-d); }
+.c-commodity .entry.open::before { background: var(--commodity); }
+.c-fx       .entry::before { background: var(--fx-d); }
+.c-fx       .entry.open::before { background: var(--fx); }
+.c-vol      .entry::before { background: var(--vol-d); }
+.c-vol      .entry.open::before { background: var(--vol); }
+.c-analysis .entry::before { background: var(--analysis-d); }
+.c-analysis .entry.open::before { background: var(--analysis); }
+
+.e-hdr {
+  display: flex; align-items: center;
+  cursor: pointer; user-select: none;
+  min-height: 56px; padding-left: 4px;
+  transition: background 0.14s;
+}
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num {
+  font-family: 'Inconsolata', monospace;
+  font-size: 9px; color: var(--faint);
+  width: 44px; text-align: center; flex-shrink: 0;
+  letter-spacing: 0.06em;
+}
+
+/* product badge */
+.e-badge {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 8px; border: 1px solid;
+  flex-shrink: 0; margin-right: 14px; white-space: nowrap;
+}
+
+.e-icon {
+  font-size: 16px; width: 42px;
+  text-align: center; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.e-text { flex: 1; padding: 11px 16px; }
+
+.e-title {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 15px; font-weight: 600;
+  color: var(--ink); line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.e-sub {
+  font-family: 'Inconsolata', monospace;
+  font-size: 9.5px; color: var(--muted);
+  margin-top: 3px; letter-spacing: 0.04em;
+}
+
+.e-toggle {
+  font-family: 'Inconsolata', monospace;
+  font-size: 13px; color: var(--muted);
+  width: 44px; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  border-left: 1px solid var(--border); flex-shrink: 0;
+  transition: transform 0.24s, color 0.15s;
+}
+.entry.open .e-toggle { transform: rotate(90deg); }
+.c-mech     .entry.open .e-toggle { color: var(--mech); }
+.c-equity   .entry.open .e-toggle { color: var(--equity); }
+.c-treasury .entry.open .e-toggle { color: var(--treasury); }
+.c-commodity .entry.open .e-toggle { color: var(--commodity); }
+.c-fx       .entry.open .e-toggle { color: var(--fx); }
+.c-vol      .entry.open .e-toggle { color: var(--vol); }
+.c-analysis .entry.open .e-toggle { color: var(--analysis); }
+
+/* ─── BODY ─── */
+.e-body {
+  display: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  padding: 22px 22px 26px 86px;
+  animation: bIn 0.2s ease;
+}
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p {
+  font-family: 'Merriweather', serif;
+  font-size: 13px; font-weight: 300;
+  line-height: 1.88; color: var(--ink2);
+  margin-bottom: 14px;
+}
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+.e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Inconsolata', monospace; font-size: 12.5px; }
+
+/* formula strip */
+.fmla {
+  margin-top: 16px; padding: 13px 16px;
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-left: 3px solid var(--mech);
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;
+}
+.fmla-eq {
+  font-family: 'Inconsolata', monospace;
+  font-size: 12.5px; color: var(--ink); flex-shrink: 0; line-height: 1.7;
+}
+.fmla-eq .v { color: var(--equity); }
+.fmla-eq .k { color: var(--analysis); }
+.fmla-eq .op { color: var(--muted); }
+.fmla-note {
+  font-family: 'Inconsolata', monospace;
+  font-size: 10.5px; color: var(--muted);
+  line-height: 1.7; white-space: pre-line;
+}
+
+/* contract spec table */
+.spec-table {
+  margin-top: 18px; border: 1px solid var(--border); overflow: auto;
+}
+.srow { display: grid; border-bottom: 1px solid var(--border); }
+.srow:last-child { border-bottom: none; }
+.srow.hdr .sc {
+  background: var(--bg3);
+  font-family: 'Inconsolata', monospace;
+  font-size: 8.5px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--muted); font-weight: 700;
+}
+.sc {
+  padding: 8px 12px; border-right: 1px solid var(--border);
+  font-family: 'Inconsolata', monospace;
+  font-size: 10.5px; color: var(--ink2); line-height: 1.45;
+}
+.sc:last-child { border-right: none; }
+.sc.label { color: var(--ink); font-weight: 700; }
+.sc.eq  { color: var(--equity); }
+.sc.tr  { color: var(--treasury); }
+.sc.co  { color: var(--commodity); }
+.sc.fx  { color: var(--fx); }
+.sc.vx  { color: var(--vol); }
+.sc.ok  { color: var(--equity); }
+.sc.warn { color: #e05050; }
+
+/* cmp grid */
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cmp.c3 { grid-template-columns: 1fr 1fr 1fr; }
+.cmp.c4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.cc {
+  padding: 12px 14px; border: 1px solid var(--border);
+  background: var(--bg2);
+}
+.cc-l {
+  font-family: 'Inconsolata', monospace;
+  font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 6px;
+}
+.cc p { font-size: 12px !important; line-height: 1.6 !important; margin-bottom: 0 !important;
+        font-family: 'Inconsolata', monospace !important; color: var(--ink2) !important; }
+
+.cc.mech     { background: var(--mech-b);     border-color: var(--mech-d);     }
+.cc.equity   { background: var(--equity-b);   border-color: var(--equity-d);   }
+.cc.treasury { background: var(--treasury-b); border-color: var(--treasury-d); }
+.cc.commodity{ background: var(--commodity-b);border-color: var(--commodity-d);}
+.cc.fx       { background: var(--fx-b);       border-color: var(--fx-d);       }
+.cc.vol      { background: var(--vol-b);       border-color: var(--vol-d);      }
+.cc.analysis { background: var(--analysis-b); border-color: var(--analysis-d); }
+.cc.warn     { background: rgba(224,80,80,0.06); border-color: #5a1a1a;        }
+
+.cc.mech .cc-l      { color: var(--mech); }
+.cc.equity .cc-l    { color: var(--equity); }
+.cc.treasury .cc-l  { color: var(--treasury); }
+.cc.commodity .cc-l { color: var(--commodity); }
+.cc.fx .cc-l        { color: var(--fx); }
+.cc.vol .cc-l       { color: var(--vol); }
+.cc.analysis .cc-l  { color: var(--analysis); }
+.cc.warn .cc-l      { color: #e05050; }
+
+/* stats */
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.stat { flex: 1; min-width: 110px; padding: 9px 11px; border: 1px solid var(--border); background: var(--bg2); }
+.stat-l { font-family: 'Inconsolata', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.stat-v { font-family: 'Inconsolata', monospace; font-size: 13px; font-weight: 700; line-height: 1.2; }
+.stat-v.eq { color: var(--equity); }
+.stat-v.tr { color: var(--treasury); }
+.stat-v.co { color: var(--commodity); }
+.stat-v.fx { color: var(--fx); }
+.stat-v.vx { color: var(--vol); }
+.stat-v.up { color: var(--equity); }
+.stat-v.dn { color: #e05050; }
+.stat-v.an { color: var(--analysis); }
+
+/* margin visual */
+.margin-vis {
+  margin-top: 18px; border: 1px solid var(--border); overflow: hidden;
+}
+.mv-head {
+  font-family: 'Inconsolata', monospace; font-size: 8.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--muted); background: var(--bg2);
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+}
+.mv-row {
+  display: grid; grid-template-columns: 130px 1fr 100px;
+  border-bottom: 1px solid var(--border);
+}
+.mv-row:last-child { border-bottom: none; }
+.mv-cell {
+  padding: 8px 12px; border-right: 1px solid var(--border);
+  font-family: 'Inconsolata', monospace; font-size: 10.5px; color: var(--ink2);
+}
+.mv-cell:last-child { border-right: none; }
+.mv-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-right: 1px solid var(--border); }
+.mv-track { flex: 1; height: 6px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.mv-fill { height: 100%; border-radius: 2px; }
+
+/* curve visual (contango/backwardation) */
+.curve-vis { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cv-box { border: 1px solid var(--border); background: var(--bg2); padding: 14px; overflow: hidden; }
+.cv-title { font-family: 'Inconsolata', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 8px; }
+.cv-svg { width: 100%; height: 80px; display: block; }
+.cv-desc { font-family: 'Inconsolata', monospace; font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.55; }
+
+/* COT visual */
+.cot-vis { margin-top: 18px; border: 1px solid var(--border); overflow: hidden; }
+.cot-head { font-family: 'Inconsolata', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); background: var(--bg2); padding: 7px 14px; border-bottom: 1px solid var(--border); }
+.cot-row { display: grid; grid-template-columns: 120px 1fr 80px; border-bottom: 1px solid var(--border); }
+.cot-row:last-child { border-bottom: none; }
+.cot-label { padding: 8px 12px; font-family: 'Inconsolata', monospace; font-size: 10.5px; border-right: 1px solid var(--border); color: var(--ink2); }
+.cot-bar-wrap { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-right: 1px solid var(--border); }
+.cot-bar { height: 8px; border-radius: 2px; }
+.cot-val { padding: 8px 12px; font-family: 'Inconsolata', monospace; font-size: 10.5px; font-weight: 700; text-align: right; }
+
+/* key insight */
+.ki {
+  margin-top: 20px; padding: 14px 18px;
+  background: var(--bg2); border: 1px solid var(--border2);
+  display: flex; gap: 14px; align-items: flex-start;
+}
+.ki-marker {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  flex-shrink: 0; padding-top: 2px;
+}
+.ki-text {
+  font-family: 'Merriweather', serif;
+  font-style: italic; font-size: 14px;
+  color: var(--ink); line-height: 1.62;
+}
+.c-mech     .ki-marker { color: var(--mech); }
+.c-equity   .ki-marker { color: var(--equity); }
+.c-treasury .ki-marker { color: var(--treasury); }
+.c-commodity .ki-marker { color: var(--commodity); }
+.c-fx       .ki-marker { color: var(--fx); }
+.c-vol      .ki-marker { color: var(--vol); }
+.c-analysis .ki-marker { color: var(--analysis); }
+
+/* tags */
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-family: 'Inconsolata', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
+.tag.eq { border-color: var(--equity-d);   color: var(--equity); }
+.tag.tr { border-color: var(--treasury-d); color: var(--treasury); }
+.tag.co { border-color: var(--commodity-d); color: var(--commodity); }
+.tag.fx { border-color: var(--fx-d);       color: var(--fx); }
+.tag.vx { border-color: var(--vol-d);      color: var(--vol); }
+.tag.mc { border-color: var(--mech-d);     color: var(--mech); }
+.tag.an { border-color: var(--analysis-d); color: var(--analysis); }
+
+/* footer */
+.foot {
+  max-width: 1080px; margin: 0 auto;
+  padding: 18px 42px; border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between;
+}
+.foot span { font-family: 'Inconsolata', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .contract-cards { display: none; }
+  .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding: 36px 18px 28px; }
+  .e-body { padding-left: 16px; }
+  .cmp.c2,.cmp.c3,.cmp.c4 { grid-template-columns: 1fr; }
+  .curve-vis { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- TICKER TAPE -->
+<div class="ticker">
+  <div class="ticker-inner" id="ticker"></div>
+</div>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 2.7 · Asset Classes · Derivatives</div>
+      <div class="mhd-title">FU<span>TURES</span></div>
+      <div class="mhd-sub">Standardised contracts to buy or sell at a future date — the backbone of hedging, speculation, and price discovery across every asset class.</div>
+    </div>
+    <div class="contract-cards">
+      <div class="cc-card eq"><div class="cc-sym">ES</div><div class="cc-name">E-mini S&P 500<br>$50 × Index</div></div>
+      <div class="cc-card tr"><div class="cc-sym">ZB</div><div class="cc-name">30Y Treasury Bond<br>$1,000/32nd</div></div>
+      <div class="cc-card co"><div class="cc-sym">CL</div><div class="cc-name">WTI Crude Oil<br>1,000 bbls</div></div>
+      <div class="cc-card vx"><div class="cc-sym">VX</div><div class="cc-name">VIX Futures<br>$1,000 × VIX</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">15 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>2.7 Futures</span>
+</footer>
+
+<script>
+/* ─── TICKER DATA ─── */
+const tickerItems = [
+  ["ESZ4","S&P 500 E-mini","5,842.25","▲","eq"],["NQZ4","Nasdaq 100","20,444.50","▲","eq"],
+  ["RTYZ4","Russell 2000","2,234.10","▼","eq"],["CLZ4","WTI Crude","78.42","▲","co"],
+  ["GCZ4","Gold","2,345.20","▲","co"],["ZBZ4","30Y T-Bond","116-04","▼","tr"],
+  ["ZNZ4","10Y T-Note","109-16","▼","tr"],["VXF5","VIX","18.24","▼","vx"],
+  ["6EZ4","EUR/USD FX","1.0842","▲","fx"],["6JZ4","USD/JPY FX","149.23","▼","fx"],
+  ["HGZ4","Copper","4.52","▲","co"],["BTC1!","Micro BTC","63,400","▲","vx"],
+];
+const belt = document.getElementById('ticker');
+const full = [...tickerItems,...tickerItems,...tickerItems];
+full.forEach(([s,n,p,d,t])=>{
+  const el=document.createElement('div');
+  el.className=`tick-item`;
+  const col = t==='eq'?'#3ab870':t==='tr'?'#4090d8':t==='co'?'#d89840':t==='fx'?'#c840a8':'#a840e0';
+  el.innerHTML=`<span class="sym" style="color:${col}">${s}</span> ${n} <strong style="color:${col}">${p} ${d}</strong>`;
+  belt.appendChild(el);
+});
+
+/* ─── SECTIONS DATA ─── */
+const sections = [
+  {
+    label:"Contract Mechanics",
+    color:"var(--mech)", line:"var(--mech-d)", cat:"c-mech",
+    entries:[
+      {
+        icon:"📋", badge:"SPEC", badgeColor:"mech",
+        title:"Futures Contract Specifications",
+        sub:"Standardised terms that make a futures contract tradeable — and deliverable",
+        tags:[["contract spec","mc"],["underlying","mc"],["tick size","mc"],["CME","mc"],["delivery","co"]],
+        specs:{
+          cols:["Field","ES (Equity)","ZB (Treasury)","CL (Oil)","6E (FX)"],
+          rows:[
+            ["Underlying","S&P 500 Index","$100,000 T-Bond face","1,000 barrels WTI","€125,000"],
+            ["Exchange","CME","CBOT","NYMEX","CME"],
+            ["Tick size","0.25 pts ($12.50)","1/32 ($31.25)","$0.01/bbl ($10)","0.00005 ($6.25)"],
+            ["Settlement","Cash (final index)","Physical / cash","Physical delivery","Physical delivery"],
+            ["Last trading","3rd Fri exp month","7 biz days before month-end","25th prior to month","2nd biz day prior to 3rd Wed"],
+            ["Hours","Nearly 24hrs (23/5)","Nearly 24hrs","Nearly 24hrs","Nearly 24hrs"],
+          ]
+        },
+        body:[
+          `A <em>futures contract specification</em> defines every legally binding term of the standardised agreement — and it is the standardisation itself that creates liquidity. By mandating that all contracts for a given underlying, expiry, and exchange are identical in every term, the exchange enables any buyer and any seller to trade with each other without bilateral negotiation.`,
+          `The key specification parameters: <strong>underlying</strong> (what is being bought/sold — an index, a bond, barrels of oil); <strong>contract size</strong> (how much of the underlying one contract represents — multiplied by the futures price to determine notional value); <strong>tick size</strong> (minimum price increment, and its dollar value — the ES moves in 0.25-point increments worth $12.50 each); <strong>expiry date</strong> (when the contract expires, typically quarterly — March, June, September, December for most contracts); <strong>settlement method</strong> (physical delivery or cash settlement); and <strong>delivery terms</strong> (if physical: exact quality, delivery location, and transportation arrangement).`,
+          `The tick size and contract size together determine the smallest P&L move per contract. An ES futures position of 10 contracts: one tick (0.25 pts) = $12.50 × 10 = $125. A full point ($12.50 × 4 ticks = $50 per contract). The contract value itself: at S&P 5,000, ES notional = $50 × 5,000 = $250,000 per contract. This leverage — controlling $250,000 of equity with initial margin of perhaps $12,000 — is the futures market's defining characteristic.`
+        ],
+        ki:"Contract specifications are futures' 'rules of the road' — their uniformity is precisely what creates the liquidity that makes futures useful for hedging and speculation. When you buy one ES contract, you know exactly what you're getting: $50 × the S&P 500 index, cash-settled at expiry against the official settlement price. This certainty is what allows a pension fund and a day trader to trade opposite sides of the same contract."
+      },
+      {
+        icon:"💰", badge:"MARGIN", badgeColor:"mech",
+        title:"Margin — Initial and Maintenance",
+        sub:"Performance bond, not a down payment — the futures market's risk management system",
+        tags:[["initial margin","mc"],["maintenance margin","mc"],["margin call","mc"],["variation margin","mc"],["SPAN","mc"]],
+        fmla:{
+          eq:`<span class="v">Initial Margin</span> <span class="op">≥</span> required by exchange/broker
+<span class="v">Maintenance Margin</span> <span class="op">&lt;</span> Initial Margin
+<span class="k">Margin Call</span> when equity <span class="op">&lt;</span> <span class="v">Maintenance</span>`,
+          note:`ES Initial Margin (CME, approx): ~$12,500/contract\nMaintenance Margin: ~$11,000/contract\nFall below maintenance → broker calls you\nto restore to INITIAL margin (not just maintenance)`
+        },
+        marginData: true,
+        body:[
+          `<em>Futures margin</em> is fundamentally different from stock margin. In stocks, margin is a down payment — you borrow the rest. In futures, margin is a <em>performance bond</em> — good-faith collateral that you can lose if the market moves against you. You don't own the underlying; you have a contractual obligation to buy or sell it. Margin is the deposit that guarantees you will meet that obligation.`,
+          `<em>Initial margin</em> is the amount required to open a futures position. Set by the exchange (via SPAN — Standard Portfolio Analysis of Risk, a margin methodology that accounts for correlations across positions) and potentially increased by brokers, it represents approximately the maximum expected one-day loss in normal market conditions. For the ES (E-mini S&P 500), initial margin is approximately $12,500 per contract — against a notional value of ~$250,000 at current prices. This is leverage of approximately 20:1.`,
+          `<em>Maintenance margin</em> is the minimum equity required to hold an existing position — typically 70–80% of initial margin. If your account equity falls below maintenance margin, a <em>margin call</em> is issued requiring you to deposit additional funds to restore the account to the initial margin level. Unlike stock margin calls (where you can meet the call by returning to maintenance level), futures margin calls require restoration to the full initial margin. Failure to meet a futures margin call results in the broker liquidating your position, usually at the current market price.`,
+          `The margin system protects clearing houses by ensuring that losses are paid daily through <em>mark-to-market</em> rather than accumulating as unrealised losses. This daily settlement is the most important risk management feature of exchange-cleared futures — preventing the build-up of large unpaid obligations that characterised bilateral derivatives before central clearing.`
+        ],
+        ki:"Futures margin is a performance bond, not a down payment — you're not borrowing anything. The leverage comes from controlling a large notional position for a small capital outlay. The daily mark-to-market that accompanies margin ensures that losses are always current: you can never owe more than one day's loss on a futures position, because yesterday's loss was already collected."
+      },
+      {
+        icon:"📊", badge:"MTM", badgeColor:"mech",
+        title:"Mark-to-Market Daily P&L",
+        sub:"How futures settle profits and losses every day — eliminating the build-up of unpaid obligations",
+        tags:[["mark-to-market","mc"],["daily settlement","mc"],["variation margin","mc"],["DTCC","mc"],["open interest","an"]],
+        fmla:{
+          eq:`Daily P&L <span class="op">=</span> (<span class="v">Settlement Price Today</span> <span class="op">−</span> <span class="v">Settlement Price Yesterday</span>) <span class="op">×</span> <span class="k">Contract Size</span> <span class="op">×</span> <span class="k">Number of Contracts</span>`,
+          note:`Example: Long 5 ES contracts\nYesterday settlement: 5,000.00\nToday settlement:   5,010.00\nDaily P&L = (5,010 − 5,000) × $50 × 5 = +$2,500\nCash credited to account tonight`
+        },
+        body:[
+          `<em>Mark-to-market (MTM)</em> is the daily reconciliation of all open futures positions against the official settlement price at end of day. Unlike stocks, where unrealised gains and losses sit in a portfolio without cash changing hands until the position is closed, futures P&L is realised in cash every single business day. A position that gains $2,500 today has that cash credited to the trading account tonight; a position that loses $2,500 has that cash debited. There are no "paper profits" in futures.`,
+          `The daily settlement price is set by the exchange (not the last trade price) — typically the average of trades in the final seconds of trading, or a formula-based calculation, designed to prevent manipulation. This price is used to calculate variation margin calls and to set the baseline for the next day's P&L calculation.`,
+          `The implications of daily MTM are profound. <strong>Cash management</strong>: profitable traders receive cash daily; losing traders must fund daily. A trader holding a large losing position for weeks will be drained of cash every day — even if they ultimately prove correct about the eventual price direction. This cash drain can force a profitable long-term trade to be abandoned due to short-term funding constraints — the phenomenon Keynes called "the market can remain irrational longer than you can remain solvent." <strong>No counterparty risk accumulation</strong>: because losses are settled daily, the clearing house never faces a large accumulated unpaid obligation from any one participant — the primary reason futures markets have rarely experienced the counterparty defaults that paralysed OTC derivatives markets in 2008.`
+        ],
+        ki:"Daily mark-to-market is the feature that makes futures markets robust. By converting every position's P&L into cash every night, the clearing system eliminates the accumulation of unpaid obligations. This is why exchange-cleared futures markets kept functioning normally in 2008 when OTC derivatives markets froze — the different settlement mechanism produced a completely different systemic risk profile."
+      },
+      {
+        icon:"📦", badge:"SETTLEMENT", badgeColor:"mech",
+        title:"Physical vs. Cash Settlement",
+        sub:"What actually happens at a futures contract's expiry",
+        tags:[["physical delivery","co"],["cash settlement","mc"],["delivery grade","co"],["EDSP","mc"],["first notice day","co"]],
+        cmp:[
+          {cls:"mech", label:"Cash Settlement", text:"Most financial futures: no physical commodity or asset changes hands. Position simply closes at the official settlement price (for S&P 500 futures: the Special Opening Quotation on expiry Friday). All P&L settled via MTM over the life, with final MTM at expiry. Clean, operationally simple. No delivery logistics."},
+          {cls:"commodity", label:"Physical Delivery", text:"Commodity and Treasury futures: seller delivers the actual underlying. WTI crude: 1,000 barrels at Cushing, Oklahoma pipeline. ZB: any qualifying Treasury bond at a conversion factor. FX futures: actual currency transfer. Delivery triggers on First Notice Day. Very few contracts (1–2%) actually deliver physically — most are closed or rolled before expiry."},
+          {cls:"warn", label:"April 2020 WTI", text:"When WTI May 2020 futures expired physically with Cushing storage essentially full, sellers had nowhere to deliver crude. The May contract briefly traded at −$37.63/barrel — holders paying buyers to take oil — a phenomenon impossible in cash-settled markets. A dramatic illustration of physical delivery mechanics under stress."},
+        ],
+        body:[
+          `The settlement method determines what happens at a futures contract's expiry date. <em>Cash settlement</em> is the cleaner mechanism: no physical exchange of the underlying occurs. Instead, the futures position is simply marked to the official final settlement price, and the cumulative MTM P&L from the entire holding period is crystallised. All S&P 500 index futures, VIX futures, and most financial futures are cash-settled.`,
+          `<em>Physical delivery</em> contracts require the short (seller) to actually deliver the underlying asset and the long (buyer) to accept and pay for it. In commodity futures, delivery specifications are precise: WTI crude oil must be delivered at Cushing, Oklahoma, at a specific pipeline connection, meeting API gravity and sulphur content specifications. Treasury bond futures allow any qualifying Treasury bond to be delivered — but the cheapest-to-deliver (CTD) bond determines the effective hedge ratio through the conversion factor system.`,
+          `The existence of physical delivery is what anchors futures prices to spot prices at expiry — convergence is enforced by the delivery mechanism. A futures contract trading significantly above the spot price near expiry would attract arbitrageurs who buy spot, deliver, and profit — forcing convergence. For cash-settled contracts, convergence is enforced by settlement against a market-determined reference price (like the S&P 500 opening quotation) rather than by physical delivery.`
+        ],
+        ki:"Physical delivery is what connects futures prices to the real world — it's the mechanism that prevents futures from diverging indefinitely from spot. Yet 98%+ of futures never deliver physically. The delivery option exists to anchor prices, not to actually move commodities. The April 2020 negative oil price was the rare case where the delivery mechanism functioned precisely as designed — and shocked everyone who hadn't thought through what physical delivery in an oversupplied market actually means."
+      },
+      {
+        icon:"📉", badge:"CURVE", badgeColor:"mech",
+        title:"Contango & Backwardation",
+        sub:"The shape of the futures curve and what it tells you about supply, demand, and roll costs",
+        tags:[["contango","co"],["backwardation","co"],["roll yield","co"],["convenience yield","co"],["futures curve","mc"]],
+        curve: true,
+        fmla:{
+          eq:`<span class="k">Cost of Carry</span>: F <span class="op">=</span> S × e<sup>(r + s − c)T</sup>
+
+where r = financing cost, s = storage, c = convenience yield`,
+          note:`Contango:     F > S    (futures > spot)\nBackwardation: F < S    (futures < spot)\n\nContango drivers: high storage costs, low convenience yield\nBackwardation drivers: scarce supply, high convenience yield`
+        },
+        body:[
+          `The relationship between futures prices for different expiry months reveals the market's assessment of supply, demand, and carrying costs over time. When <em>contango</em> exists — farther-dated contracts are more expensive than near-dated ones — the futures curve slopes upward. When <em>backwardation</em> prevails — near-dated contracts are more expensive than farther-dated ones — the curve slopes downward.`,
+          `Contango is the "normal" state for commodities with significant storage costs and no urgency in the underlying physical market. Gold is almost always in contango because storage is cheap, gold doesn't deteriorate, and there is no urgency to have it delivered immediately. Crude oil was in persistent contango during 2009–2014 as US storage tanks filled with shale production and buyers had no immediate need for oil. For investors holding long futures positions through contango — like oil ETFs — the roll is a continuous cost: you sell the expiring (cheaper near-dated) contract and buy the next (more expensive far-dated) contract, losing money on every roll even if spot prices are flat.`,
+          `Backwardation reflects physical scarcity and high convenience yield. When supplies are tight and buyers urgently need immediate delivery, they pay a premium for the near-dated contract — bidding spot and near-term futures above long-dated futures. Natural gas in a polar vortex, copper during a supply disruption, grains following a drought: backwardated markets signal genuine physical scarcity. For long futures investors, backwardation provides positive roll yield — they sell the more expensive near contract and buy the cheaper far contract, earning profit on every roll.`
+        ],
+        ki:"The futures curve shape directly determines whether passive long positions in futures earn or lose money from rolling — independent of spot price direction. An investor long crude oil through persistent contango in 2009–2014 lost substantial money from roll costs even as crude prices were elevated. Understanding contango vs. backwardation is not academic — it is the primary driver of total return for any futures-based investment product."
+      },
+      {
+        icon:"⚖️", badge:"BASIS", badgeColor:"mech",
+        title:"Basis — Spot vs. Futures",
+        sub:"The relationship between the spot price and the futures price — and why it matters for hedgers",
+        tags:[["basis","mc"],["cash-futures","mc"],["hedge ratio","mc"],["basis risk","mc"],["CTD","tr"]],
+        fmla:{
+          eq:`<span class="v">Basis</span> <span class="op">=</span> <span class="k">Spot Price</span> <span class="op">−</span> <span class="k">Futures Price</span>
+
+<span class="v">Basis Change</span> <span class="op">=</span> <span class="k">Ending Basis</span> <span class="op">−</span> <span class="k">Beginning Basis</span>`,
+          note:`Basis > 0 (Spot > Futures): backwardation\nBasis < 0 (Spot < Futures): contango\n\nA futures hedge eliminates price risk\nbut leaves basis risk — the risk that the\nbasis changes unexpectedly.`
+        },
+        body:[
+          `<em>Basis</em> is the difference between the spot price of an asset and the futures price of the corresponding futures contract. While contango/backwardation describes the shape of the futures curve between different expiry months, basis describes the relationship between the spot market (physical delivery today) and the nearest futures contract at any given time.`,
+          `Basis is never zero in practice (except at expiry), and it fluctuates based on: storage costs, convenience yield, local supply/demand conditions, transportation costs, and quality differentials. For a Kansas wheat farmer, basis reflects the difference between CBOT wheat futures (Chicago delivery) and the local elevator's cash price — incorporating the cost of transporting wheat from Kansas to Chicago. The farmer hedges CBOT futures, but receives the local elevator price — so the actual hedge outcome depends on whether basis narrows or widens from entry to exit.`,
+          `<em>Basis risk</em> is the residual risk that remains after a futures hedge — the uncertainty about how the basis will change between when you initiate the hedge and when you close it. A perfect hedge would require a futures contract that exactly matches the physical commodity being hedged in type, quality, and location. Real hedges are almost never perfect, leaving basis risk. For Treasury futures hedgers, the analogous concept is the <em>cheapest-to-deliver (CTD)</em> bond — the specific Treasury bond that minimises the cost of fulfilling the delivery obligation. Changes in which bond is CTD affect the basis and can cause unexpected hedge P&L.`
+        ],
+        ki:"Basis is where the theoretical futures market meets the messy physical world. A perfect hedge using futures eliminates price risk but leaves basis risk — the risk that the local price differential changes unexpectedly. For commodity producers, basis management is as important as futures price management. For financial futures hedgers, the CTD concept is the basis equivalent — and changes in CTD are one of the most common sources of unexpected Treasury futures hedge P&L."
+      },
+      {
+        icon:"📅", badge:"ROLL", badgeColor:"mech",
+        title:"Roll Dates & Calendar Spreads",
+        sub:"Managing the transition between futures contract expiries",
+        tags:[["roll","mc"],["calendar spread","mc"],["roll yield","co"],["open interest","an"],["front month","mc"]],
+        stats:[
+          {l:"ES quarterly expiry",v:"3rd Fri of Mar/Jun/Sep/Dec",c:"eq"},
+          {l:"Roll window (institutional)",v:"~8 days before expiry",c:"mc"},
+          {l:"'Goldman roll' (GSCI)",v:"5th–9th business day of month",c:"an"},
+          {l:"Calendar spread",v:"Buy nearby, sell deferred (or vice versa)",c:"mc"},
+        ],
+        body:[
+          `Futures contracts expire. A trader or investor who wants continuous exposure to an asset must "roll" their position — closing the expiring contract and simultaneously opening the next expiry contract — before the expiration date. The timing, cost, and mechanics of rolling are crucial to understanding futures as an investment vehicle.`,
+          `The <em>roll date</em> is when open interest typically transitions from the expiring "front month" to the next "back month." For equity index futures (ES, NQ), the roll typically happens approximately 8 business days before quarterly expiry, when the back month contract begins to have higher open interest and tighter spreads than the front month. Institutional traders roll using <em>calendar spreads</em> — trading the spread between the two contract months (buy the back, sell the front) rather than closing and reopening separately — this is more efficient as it executes both legs simultaneously and locks in the roll cost at a known spread.`,
+          `The <em>roll cost</em> in calendar terms reflects the cost of carry: if ES December is 3 points above September (reflecting financing cost minus expected dividends), rolling from September to December costs 3 points. For contangoed commodity markets, the roll is more expensive because the deferred contract is significantly higher. This is why passive commodity index products consistently underperform spot commodity prices over long periods — the cumulative roll cost in contangoed markets can be enormous. The "Goldman roll" for GSCI index products is so predictable that sophisticated traders position for it in advance, extracting value from the mechanical selling of near-dated and buying of far-dated contracts.`
+        ],
+        ki:"The roll is the unavoidable cost (or benefit) of maintaining continuous futures exposure. In backwardated markets, rolling earns positive carry; in contangoed markets, rolling has a persistent cost. This is why the same commodity exposure can produce dramatically different returns depending on whether you hold the physical commodity, front-month futures, or a rolling index. Always know your roll structure before making a futures-based investment."
+      },
+    ]
+  },
+  {
+    label:"Equity Index Futures",
+    color:"var(--equity)", line:"var(--equity-d)", cat:"c-equity",
+    entries:[
+      {
+        icon:"📈", badge:"EQUITY IDX", badgeColor:"equity",
+        title:"Equity Index Futures — ES, NQ, RTY",
+        sub:"The most liquid futures in the world — cash-settled benchmarks for the global equity market",
+        tags:[["ES","eq"],["NQ","eq"],["RTY","eq"],["equity index","eq"],["fair value","eq"]],
+        specs:{
+          cols:["Contract","Underlying","Size","Tick Value","ADV","Margin~"],
+          rows:[
+            ["ES (E-mini S&P)","S&P 500 Index","$50 × Index","$12.50 (0.25pt)","~1.5M contracts","~$12,500"],
+            ["NQ (E-mini Nasdaq)","Nasdaq-100","$20 × Index","$5.00 (0.25pt)","~500K contracts","~$18,000"],
+            ["RTY (E-mini Russell)","Russell 2000","$50 × Index","$5.00 (0.10pt)","~150K contracts","~$8,500"],
+            ["MES (Micro E-mini S&P)","S&P 500 Index","$5 × Index","$1.25 (0.25pt)","~500K contracts","~$1,250"],
+            ["MNQ (Micro Nasdaq)","Nasdaq-100","$2 × Index","$0.50 (0.25pt)","~200K contracts","~$1,800"],
+          ]
+        },
+        body:[
+          `Equity index futures are the most liquid derivative instruments in the world by notional value. The <em>ES (E-mini S&P 500)</em> — the flagship CME Group contract — trades approximately 1.5 million contracts daily, representing notional value exceeding $375 billion. As a cash-settled contract tied to the S&P 500 index (the most widely tracked equity benchmark globally), ES serves simultaneously as a speculative instrument, a hedging tool for equity portfolio managers, and a real-time price discovery mechanism that often leads the underlying cash market.`,
+          `The relationship between futures prices and fair value is central to equity index futures. The theoretical fair value of an equity index futures contract is: <strong>Futures = Spot × (1 + r)^T − Dividends × e^(r×t)</strong> — the spot index level adjusted for financing costs and expected dividends over the futures' life. The futures typically trade at a premium to spot during non-dividend periods (financing cost dominates) and at a discount near ex-dividend dates (dividend payments reduce expected index level). The spread between actual futures price and calculated fair value defines arbitrage opportunities exploited by program traders.`,
+          `Equity index futures are critical for several institutional strategies. <strong>Portfolio overlay</strong>: a pension fund that needs to quickly increase equity exposure buys ES futures rather than transacting hundreds of underlying stocks — faster, cheaper, and reversible. <strong>Portable alpha</strong>: a manager with an alpha-generating strategy funds it by selling equity futures (replacing passive equity beta with active alpha + futures beta). <strong>Index arbitrage</strong>: exploiting any premium or discount of futures to fair value by simultaneously trading futures and the underlying basket. <strong>Hedging</strong>: equity investors short index futures to neutralise market risk while retaining stock selection alpha.`
+        ],
+        ki:"Equity index futures are not just derivatives — they are the primary price discovery mechanism for the equity market outside of exchange hours and often during volatile sessions when the cash market is reacting to information. The ES futures price at 3 AM reflects the global reaction to overnight news before a single stock trade occurs in New York. This price leadership function makes equity index futures the most important real-time indicator in all of finance."
+      },
+    ]
+  },
+  {
+    label:"Treasury Futures",
+    color:"var(--treasury)", line:"var(--treasury-d)", cat:"c-treasury",
+    entries:[
+      {
+        icon:"🏛️", badge:"RATES", badgeColor:"treasury",
+        title:"Treasury Futures — ZB, ZN, ZF, ZT",
+        sub:"The world's most important interest rate derivatives — priced in 32nds and driven by the Fed",
+        tags:[["ZB","tr"],["ZN","tr"],["ZF","tr"],["ZT","tr"],["CTD","tr"],["DV01","tr"]],
+        specs:{
+          cols:["Contract","Tenor","Face Value","Tick","Price Quote","CTD Concept"],
+          rows:[
+            ["ZB (T-Bond)","30-year","$100,000","1/32 ($31.25)","32nds","Any ≥25yr + conv factor"],
+            ["ZN (10yr Note)","10-year","$100,000","1/32 ($31.25)","32nds","6.5–10yr + conv factor"],
+            ["ZF (5yr Note)","5-year","$100,000","1/128 ($7.8125)","32nds","4y2m–5y3m range"],
+            ["ZT (2yr Note)","2-year","$200,000","1/128 ($15.625)","32nds","1y9m–2y range"],
+          ]
+        },
+        body:[
+          `Treasury futures are the primary exchange-traded vehicles for trading and hedging US interest rate risk. The four active contracts — ZB (30-year T-Bond), ZN (10-year Note), ZF (5-year Note), and ZT (2-year Note) — together represent the most important fixed income derivatives market in the world, trading trillions of dollars in notional value daily and providing the principal tools for duration management by portfolio managers, dealers, and macro investors.`,
+          `Treasury futures are quoted in <em>32nds of par</em>: a price of 109-16 means 109 and 16/32nds, or 109.5% of face value. Each 32nd on a $100,000 face value contract (ZN, ZF) = $31.25. This archaic pricing convention survives from the era of physical bond trading but is now universal in Treasury markets. For the ZB (30-year bond), price movements are particularly large because of the long duration — a 1/32 move on a 30-year bond represents a much larger yield change than the same price move on a 2-year note.`,
+          `The <em>cheapest-to-deliver (CTD)</em> bond is the specific Treasury security that is most economical for the short (seller) to deliver against a futures contract. Because Treasury futures allow any qualifying bond within a maturity range to be delivered, the futures price reflects the CTD bond's characteristics — its duration, coupon, and the conversion factor that adjusts each deliverable bond to a common 6% notional coupon baseline. When interest rates change, the CTD bond can switch — and this switch creates sudden, sometimes unexpected, changes in the futures/cash basis and in the effective duration of the futures position. Managing CTD risk is a core skill for Treasury futures traders.`
+        ],
+        ki:"Treasury futures are the beating heart of global fixed income markets. The 10-year note futures (ZN) is the primary instrument for expressing views on US interest rates, hedging bond portfolios, and implementing relative value strategies. Every basis point move in the 10-year yield moves ZN by approximately $625 per contract ($63 per DV01 on a $100,000 face value) — the relationship that connects rate markets to all other asset classes."
+      },
+    ]
+  },
+  {
+    label:"Specialised Futures",
+    color:"var(--commodity)", line:"var(--commodity-d)", cat:"c-commodity",
+    entries:[
+      {
+        icon:"🛢️", badge:"COMMODITY", badgeColor:"commodity",
+        title:"Commodity Futures",
+        sub:"Energy, metals, and agricultural futures — physical delivery, convenience yield, and seasonality",
+        tags:[["CL","co"],["GC","co"],["ZC","co"],["physical delivery","co"],["convenience yield","co"]],
+        specs:{
+          cols:["Contract","Sym","Exchange","Size","Key Specs"],
+          rows:[
+            ["WTI Crude Oil","CL","NYMEX","1,000 bbls","Physical delivery, Cushing OK. Monthly expiry."],
+            ["Brent Crude","BRN","ICE","1,000 bbls","Cash or EFP. Global benchmark. ~65% of world crude."],
+            ["Natural Gas","NG","NYMEX","10,000 MMBtu","Physical delivery. Highly seasonal. Henry Hub."],
+            ["Gold","GC","COMEX","100 troy oz","Physical delivery, NY vaults. Near-24hr trading."],
+            ["Copper","HG","COMEX","25,000 lbs","Physical delivery. 'Dr. Copper' economic indicator."],
+            ["Corn","ZC","CBOT","5,000 bushels","Physical delivery. #2 yellow corn. Highly seasonal."],
+            ["Soybeans","ZS","CBOT","5,000 bushels","Physical delivery. Biannual (US + Brazil) crop cycle."],
+            ["Wheat","ZW","CBOT","5,000 bushels","Physical delivery. Soft red winter wheat. Geopolitical."],
+          ]
+        },
+        body:[
+          `Commodity futures encompass the broadest range of physical assets — from crude oil to soybeans — and are the original futures product, predating financial futures by over a century. The CBOT began trading grain futures in 1848 precisely to solve the physical market's problem: seasonal supply uncertainty combined with year-round demand required a mechanism to discover future prices and allow hedging before harvest. This core function — price discovery and risk transfer for physical commodities — remains the backbone of commodity futures today.`,
+          `Commodity futures are characterised by <em>physical delivery</em> specifications that connect futures prices to real-world supply and demand. The WTI crude contract specifies delivery at Cushing, Oklahoma — a landlocked pipeline hub. Gold futures specify delivery to approved COMEX vaults in New York. Grain futures specify delivery to approved elevators in the Chicago area. These physical delivery specifications mean that when supply actually tightens (drought reduces corn harvest; OPEC+ cuts oil production; mine strikes reduce copper output), the effect is immediately visible in futures prices — making commodity futures among the most informationally efficient markets in finance.`,
+          `<em>Convenience yield</em> — the value of having physical commodity in hand rather than a futures contract for future delivery — is the key variable that determines when commodity markets are in backwardation versus contango. When physical supplies are tight, the convenience yield is high (immediate availability is worth a lot), pulling near-dated futures above far-dated ones (backwardation). When supplies are abundant, convenience yield is low, and storage costs push far-dated futures above near-dated (contango). The shape of the commodity futures curve is the market's real-time assessment of physical market tightness.`
+        ],
+        ki:"Commodity futures are the bridge between financial markets and the physical economy. Their prices incorporate weather forecasts, geopolitical risk, drilling rig counts, crop reports, and OPEC decisions simultaneously — making them among the most information-rich markets in finance. For investors, the key distinction is between the spot price return (determined by physical fundamentals) and the total futures return (spot return + roll yield + collateral return) — the latter can diverge dramatically from the former in strongly contangoed or backwardated markets."
+      },
+      {
+        icon:"💱", badge:"FX", badgeColor:"fx",
+        title:"FX Futures — CME",
+        sub:"Standardised currency futures as an alternative to OTC spot and forwards",
+        tags:[["6E","fx"],["6J","fx"],["CME FX","fx"],["FX futures","fx"],["IMM dates","fx"]],
+        stats:[
+          {l:"CME FX futures ADV",v:"~900K contracts",c:"fx"},
+          {l:"EUR/USD (6E) size",v:"€125,000 per contract",c:"fx"},
+          {l:"JPY (6J) size",v:"¥12,500,000 per contract",c:"fx"},
+          {l:"Settlement",v:"Physical delivery T+2",c:"mc"},
+          {l:"IMM dates (quarterly)",v:"3rd Wed Mar/Jun/Sep/Dec",c:"mc"},
+        ],
+        body:[
+          `CME <em>FX futures</em> are standardised, exchange-traded contracts for major currency pairs — the alternative to the OTC spot, forward, and swap markets that dominate global FX trading. While the OTC FX market ($7.5 trillion/day) dwarfs CME FX futures in volume, futures have distinct advantages for certain participants: exchange clearing (no counterparty risk), transparent pricing, full regulatory oversight, and accessibility to retail and smaller institutional participants who lack ISDA documentation for OTC FX.`,
+          `CME FX futures are quoted opposite to OTC convention in some cases. The EUR/USD (6E) futures quote in USD per euro — consistent with OTC. The JPY (6J) futures quote in USD per Japanese yen (0.007500 = ¥0.75 per 100 yen) — the inverse of the OTC convention of yen per dollar. This quoting difference is a common source of confusion for traders transitioning between OTC and exchange-traded FX.`,
+          `FX futures expire on the <em>IMM (International Monetary Market) dates</em> — the third Wednesday of March, June, September, and December. This standard expiry schedule aligns all major currency futures, enabling cross-currency spread trading and simplifying roll management. The large open interest that concentrates at IMM dates influences spot FX fixing rates as positions are hedged and closed, creating predictable positioning effects that macro traders monitor carefully. The basis between CME FX futures and OTC forward prices reflects the cross-currency basis swap discussed in the FX section — and is arbitraged to very tight levels by sophisticated dealers.`
+        ],
+        ki:"CME FX futures bring exchange-cleared transparency to a market dominated by opaque bilateral OTC trading. For retail and smaller institutional participants, futures provide regulated, collateralised FX exposure without the documentation requirements and credit lines of OTC FX. Their IMM expiry dates create predictable positioning cycles that are among the most-traded calendar effects in the currency market."
+      },
+      {
+        icon:"🌋", badge:"VIX", badgeColor:"vol",
+        title:"VIX Futures",
+        sub:"Futures on the fear gauge — trading expected volatility as an asset class",
+        tags:[["VIX","vx"],["variance premium","vx"],["contango","co"],["roll cost","co"],["vol term structure","vx"]],
+        stats:[
+          {l:"VIX futures exchange",v:"CBOE (CFE)",c:"vx"},
+          {l:"Contract size",v:"$1,000 × VIX",c:"vx"},
+          {l:"Settlement",v:"Cash — SOQ of VIX expiry day",c:"mc"},
+          {l:"Typical VIX contango",v:"~3–5% per month in calm mkts",c:"co"},
+          {l:"VIX all-time high",v:"85.47 (March 2020)",c:"vx"},
+        ],
+        body:[
+          `<em>VIX futures</em>, traded on the CBOE Futures Exchange (CFE), allow direct trading of the VIX — the S&P 500's 30-day implied volatility index. They settle cash against the "Special Opening Quotation" (SOQ) of VIX on the expiry date — a special calculation using the opening prices of SPX options. VIX futures are the only mechanism for institutional investors to take a direct position on the level of implied volatility without managing an options position's delta and vega.`,
+          `The VIX futures market is almost always in contango — near-dated VIX futures trade below far-dated ones because the VIX mean-reverts toward its long-run average (~20). When the VIX is at 12 (well below average), the market expects it to rise back toward 20 over the coming months — making far-dated VIX futures more expensive than current VIX. This persistent contango imposes severe roll costs on long VIX positions: a long VIX futures investor continuously sells cheap near-dated contracts and buys expensive far-dated contracts, eroding returns. This is why the VXX (iPath Series B S&P 500 VIX Short-Term Futures ETN) and similar products lost 99%+ of their value over their history — the roll cost in contangoed VIX markets is relentless.`,
+          `Conversely, <em>short VIX</em> strategies — selling VIX futures — benefit from this roll yield in contangoed markets, collecting the premium as futures converge toward the lower spot VIX. This worked brilliantly from 2012 to 2018, generating consistent positive returns for products like XIV. The model collapsed spectacularly in "Volmageddon" (February 5, 2018) when the VIX more than doubled in a single day, causing XIV to lose 96% overnight and triggering a self-reinforcing feedback loop of forced buying of the underlying VIX futures that amplified the spike.`
+        ],
+        ki:"VIX futures are the purest expression of the volatility seller's thesis — that implied vol exceeds realised vol on average, creating a structural seller's edge. The persistent contango in VIX futures is this thesis made liquid. But it is a short-volatility position that behaves like picking up nickels in front of a steamroller: small consistent profits interrupted by sudden, catastrophic losses when vol spikes. The Volmageddon episode showed that the feedback loop between VIX ETPs and their underlying futures can amplify vol spikes in ways that make the 'structural edge' momentarily irrelevant."
+      },
+      {
+        icon:"🔬", badge:"MICRO", badgeColor:"equity",
+        title:"Micro Futures Contracts",
+        sub:"1/10th-size contracts that democratised professional futures trading",
+        tags:[["MES","eq"],["MNQ","eq"],["MGC","co"],["micro futures","eq"],["retail access","eq"]],
+        stats:[
+          {l:"MES (Micro E-mini S&P) size",v:"$5 × Index (1/10 ES)",c:"eq"},
+          {l:"MGC (Micro Gold) size",v:"10 troy oz (1/10 GC)",c:"co"},
+          {l:"MBT (Micro Bitcoin) size",v:"0.1 BTC",c:"vx"},
+          {l:"Initial margin (MES)",v:"~$1,250 (1/10 ES margin)",c:"eq"},
+          {l:"CME micro futures launched",v:"2019",c:"mc"},
+        ],
+        body:[
+          `CME Group launched <em>micro futures contracts</em> in 2019, offering contracts one-tenth the size of their standard counterparts. The Micro E-mini S&P 500 (MES), Micro E-mini Nasdaq-100 (MNQ), Micro E-mini Russell 2000 (M2K), Micro E-mini Dow (MYM), Micro Gold (MGC), Micro Silver (MSI), Micro Crude Oil (MCL), and Micro Bitcoin (MBT) collectively transformed retail access to professional futures markets.`,
+          `Before micro contracts, the ES required initial margin of ~$12,500 and controlled $250,000 in notional value — inaccessible for most retail accounts and impractical for fine-tuned position sizing. The MES requires ~$1,250 and controls $25,000 in notional — a 10× democratisation of access. For professional traders, micro contracts enable precise hedging (hedging $25,000 of portfolio exposure instead of rounding to $250,000), fine-tuned position sizing, and cost-effective scaling in and out of positions.`,
+          `The strategic uses of micro contracts extend beyond retail access. A fund manager with $15 million in equity exposure wanting to reduce by exactly 3% can sell $450,000 of MES contracts (18 contracts) rather than the imprecise 2-contract ES approximation ($500,000). CTAs scaling complex multi-asset positions can achieve finer granularity with micro contracts. The micro Bitcoin futures in particular opened a regulated, exchange-cleared path to crypto exposure for institutions whose mandates prohibit holding spot crypto or trading on unregulated venues.`
+        ],
+        ki:"Micro futures contracts are one of the most genuinely democratising innovations in derivatives history. They made professional-grade futures markets accessible to retail traders and gave institutions the precision to manage exposure at granular levels. The 2019 launch proved so successful that micro contracts now exceed standard contracts in open interest for several products — a remarkable inversion of the anticipated order."
+      },
+    ]
+  },
+  {
+    label:"Market Analysis",
+    color:"var(--analysis)", line:"var(--analysis-d)", cat:"c-analysis",
+    entries:[
+      {
+        icon:"📰", badge:"COT", badgeColor:"analysis",
+        title:"COT Reports — Commitment of Traders",
+        sub:"The CFTC's weekly disclosure of who holds what in futures markets",
+        tags:[["COT","an"],["CFTC","an"],["commercials","an"],["non-commercials","an"],["positioning","an"]],
+        cotData: true,
+        body:[
+          `The <em>Commitment of Traders (COT) Report</em> is a weekly publication by the Commodity Futures Trading Commission (CFTC) that discloses the aggregate futures positions held by different categories of market participants as of each Tuesday's close. Released every Friday, the COT provides a unique window into futures market positioning that has no equivalent in most other financial markets.`,
+          `The traditional COT divides participants into three categories. <strong>Commercial traders</strong> (hedgers): entities with a commercial interest in the underlying commodity — grain processors, energy companies, miners, airlines. Their positions typically represent genuine hedging of physical exposure. They are contrarian relative to price moves (they sell futures when prices rise, hedging more of their production; they buy futures when prices fall, locking in input costs). <strong>Non-commercial traders</strong> (large speculators): hedge funds and managed money that hold positions large enough to require CFTC reporting. Their positioning is trend-following and contrarian at extremes. <strong>Non-reportable</strong>: small traders below the reporting threshold.`,
+          `The modern CFTC Disaggregated COT (released since 2009) provides more granular breakdowns: <strong>Producer/Merchant/Processor/User</strong> (commercials), <strong>Swap Dealers</strong> (banks taking the other side of OTC swaps, hedging back in futures), <strong>Managed Money</strong> (CTAs, hedge funds), and <strong>Other Reportables</strong>. This disaggregation allows analysts to distinguish dealer hedging activity from genuine speculative positioning.`,
+          `The primary use of COT data is as a <em>contrarian sentiment indicator</em> — particularly for managed money positioning. When speculative net longs reach historical extremes, the market is crowded and any reversal will be amplified by forced unwinding of those positions. When speculative nets reach historical extremes in the short direction, a short squeeze is possible. COT extremes are not precise timing tools (positions can stay extreme for months) but are reliable signals that risk/reward has shifted against the crowded position.`
+        ],
+        ki:"The COT report is the most comprehensive publicly available data on who holds what in futures markets. Its primary value is as a contrarian indicator: extreme speculative positioning creates crowded trades that are vulnerable to sharp reversals when momentum shifts. No single signal in futures analysis has been more consistently associated with major turning points than COT positioning at multi-year extremes."
+      },
+      {
+        icon:"📊", badge:"OI", badgeColor:"analysis",
+        title:"Open Interest Analysis",
+        sub:"How open interest reveals real money, real conviction, and real risk in futures markets",
+        tags:[["open interest","an"],["OI","an"],["volume","an"],["market structure","an"],["COT","an"]],
+        fmla:{
+          eq:`<span class="v">Open Interest</span> <span class="op">=</span> Total outstanding contracts (longs = shorts)
+<span class="k">↑ OI + ↑ Price</span>: New money entering, trend confirms
+<span class="k">↑ OI + ↓ Price</span>: New money short, bearish
+<span class="k">↓ OI + ↑ Price</span>: Short covering, trend weakening
+<span class="k">↓ OI + ↓ Price</span>: Long liquidation, trend weakening`,
+          note:`OI ≠ Volume\nVolume: total contracts traded today\nOI: total contracts currently outstanding\nOI only changes when a new position is opened or closed`
+        },
+        body:[
+          `<em>Open interest (OI)</em> is the total number of outstanding futures contracts that have been opened but not yet closed or settled — the sum of all existing long positions (which always equals the sum of all existing short positions, since every contract has both a buyer and a seller). Open interest is distinct from volume: volume counts how many contracts traded today; open interest counts how many contracts are still alive. A contract opened yesterday but not yet closed adds to OI; a contract opened and closed on the same day adds to volume but not net OI.`,
+          `The relationship between OI changes and price direction provides important information about the conviction behind price moves. When <strong>OI rises alongside price</strong>, new money is entering the market on the long side — suggesting strong conviction and potentially a sustainable trend. When <strong>OI rises as prices fall</strong>, new money is entering the short side — a bearish signal with real short commitment. When <strong>OI falls as prices rise</strong>, shorts are covering (buying back to close) rather than new longs entering — suggesting a potentially weaker, short-covering rally. When <strong>OI falls as prices fall</strong>, longs are liquidating — suggesting a distribution phase.`,
+          `For commodity futures, the <em>overall level</em> of OI has structural significance. Very high OI in a commodity futures market indicates significant speculative and hedging interest, creating deeper liquidity but also creating positioning risks. Before the 2008 commodity supercycle peak, OI in crude oil and agricultural futures reached unprecedented levels driven by index investor inflows — investors argued (controversially) that this speculative inflow itself contributed to commodity price spikes above fundamental levels.`,
+          `At contract expiry, OI must fall to zero as all positions are either closed (most) or settled (few). The path of OI decline toward expiry shows when commercial hedgers and speculators are rolling — and the timing of this roll can create temporary price pressure in the expiring contract relative to the next contract, creating the spread opportunities in calendar trading described earlier.`
+        ],
+        ki:"Open interest is the weight-of-money indicator for futures markets — it measures real capital at risk, not just trading activity. Rising OI in the direction of the trend is the strongest confirmation that the move has real commitment behind it. Falling OI on a trend move is a warning: the move may be position closure rather than new entry, and therefore less sustainable. Combined with COT positioning data, OI analysis provides the most complete picture of who holds what, how committed they are, and where the risk of forced liquidation lies."
+      },
+    ]
+  }
+];
+
+/* ─── RENDER ─── */
+let cnt = 0;
+
+function buildMarginVis() {
+  const rows = [
+    { label:"Account opens", bar:100, color:"var(--equity)", val:"Initial Margin  $12,500", extra:"" },
+    { label:"Small loss", bar:78, color:"var(--analysis)", val:"$9,750 equity", extra:"" },
+    { label:"Maintenance", bar:70, color:"var(--commodity)", val:"$8,750 line", extra:"← Call triggered below this" },
+    { label:"Margin call", bar:40, color:"#e05050", val:"Must restore to $12,500", extra:"← Deposit or liquidate" },
+  ];
+  return `<div class="margin-vis">
+    <div class="mv-head">ES Margin Example — Account Equity vs. Margin Levels</div>
+    ${rows.map(r=>`<div class="mv-row">
+      <div class="mv-cell">${r.label}</div>
+      <div class="mv-bar">
+        <div class="mv-track"><div class="mv-fill" style="width:${r.bar}%;background:${r.color}"></div></div>
+        <span style="font-family:'Inconsolata',monospace;font-size:9.5px;color:var(--ink2);min-width:100px">${r.val}</span>
+      </div>
+      <div class="mv-cell" style="font-size:9px;color:var(--muted)">${r.extra}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function buildCurve() {
+  return `<div class="curve-vis">
+    <div class="cv-box">
+      <div class="cv-title" style="color:var(--commodity)">Contango — Futures > Spot</div>
+      <svg class="cv-svg" viewBox="0 0 240 80" fill="none">
+        <line x1="10" y1="70" x2="230" y2="70" stroke="var(--border2)" stroke-width="1"/>
+        <line x1="10" y1="10" x2="10" y2="72" stroke="var(--border2)" stroke-width="1"/>
+        <polyline points="10,62 55,52 100,42 145,32 190,22" stroke="var(--commodity)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="10" cy="62" r="3" fill="var(--commodity)"/>
+        <text x="12" y="60" font-size="8" fill="var(--muted)" font-family="monospace">Spot</text>
+        <text x="172" y="20" font-size="8" fill="var(--commodity)" font-family="monospace">Fwd ↑</text>
+        <text x="20" y="80" font-size="7" fill="var(--muted)" font-family="monospace">M1  M2  M3  M4  M5</text>
+      </svg>
+      <div class="cv-desc">Roll costs money. Long investors sell cheap near, buy expensive far. Persistent drag on ETF/index returns. Common: gold, oil in oversupply.</div>
+    </div>
+    <div class="cv-box">
+      <div class="cv-title" style="color:var(--equity)">Backwardation — Futures &lt; Spot</div>
+      <svg class="cv-svg" viewBox="0 0 240 80" fill="none">
+        <line x1="10" y1="70" x2="230" y2="70" stroke="var(--border2)" stroke-width="1"/>
+        <line x1="10" y1="10" x2="10" y2="72" stroke="var(--border2)" stroke-width="1"/>
+        <polyline points="10,22 55,32 100,42 145,52 190,60" stroke="var(--equity)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="10" cy="22" r="3" fill="var(--equity)"/>
+        <text x="12" y="20" font-size="8" fill="var(--muted)" font-family="monospace">Spot</text>
+        <text x="170" y="58" font-size="8" fill="var(--equity)" font-family="monospace">Fwd ↓</text>
+        <text x="20" y="80" font-size="7" fill="var(--muted)" font-family="monospace">M1  M2  M3  M4  M5</text>
+      </svg>
+      <div class="cv-desc">Roll earns money. Sell expensive near, buy cheap far. Positive carry for passive longs. Common: oil in supply squeeze, agri shortage, VIX spike.</div>
+    </div>
+  </div>`;
+}
+
+function buildCOT() {
+  const rows = [
+    { label:"Commercials", long:"68%", longW:68, short:"44%", shortW:44, net:"Net Long +24%", col:"var(--equity)" },
+    { label:"Managed Money", long:"22%", longW:22, short:"38%", shortW:38, net:"Net Short −16%", col:"var(--commodity)" },
+    { label:"Swap Dealers", long:"6%", longW:6, short:"14%", shortW:14, net:"Net Short −8%", col:"var(--treasury)" },
+    { label:"Non-Report.", long:"4%", longW:4, short:"4%", shortW:4, net:"Net ~0%", col:"var(--muted)" },
+  ];
+  return `<div class="cot-vis">
+    <div class="cot-head">Illustrative COT Positioning — Long vs Short % of Total OI</div>
+    ${rows.map(r=>`<div class="cot-row">
+      <div class="cot-label">${r.label}</div>
+      <div class="cot-bar-wrap">
+        <div class="cot-bar" style="width:${r.longW*2}px;background:${r.col};opacity:0.8"></div>
+        <span style="font-family:'Inconsolata',monospace;font-size:9px;color:var(--ink2)">${r.long} long</span>
+        <div class="cot-bar" style="width:${r.shortW*2}px;background:#e05050;opacity:0.6"></div>
+        <span style="font-family:'Inconsolata',monospace;font-size:9px;color:var(--ink2)">${r.short} short</span>
+      </div>
+      <div class="cot-val" style="color:${r.col}">${r.net}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sDiv = document.createElement('div');
+    sDiv.innerHTML = `<div class="section-hdr">
+      <div class="sh-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sh-line" style="background:${sec.line}"></div>
+    </div>`;
+    root.appendChild(sDiv);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.cat;
+
+    sec.entries.forEach(e => {
+      const idx = cnt++;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+      const specsH = e.specs ? `<div class="spec-table">
+        <div class="srow hdr" style="grid-template-columns:repeat(${e.specs.cols.length},1fr)">
+          ${e.specs.cols.map(c=>`<div class="sc">${c}</div>`).join('')}
+        </div>
+        ${e.specs.rows.map(r=>`<div class="srow" style="grid-template-columns:repeat(${e.specs.cols.length},1fr)">
+          ${r.map((c,i)=>`<div class="sc ${i===0?'label':''}">${c}</div>`).join('')}
+        </div>`).join('')}
+      </div>` : '';
+
+      const fmlaH = e.fmla ? `<div class="fmla">
+        <div class="fmla-eq">${e.fmla.eq}</div>
+        <pre class="fmla-note">${e.fmla.note}</pre>
+      </div>` : '';
+
+      const cmpH = e.cmp ? `<div class="cmp c${e.cmp.length}">
+        ${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}
+      </div>` : '';
+
+      const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`<div class="stat">
+        <div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div>
+      </div>`).join('')}</div>` : '';
+
+      const marginH = e.marginData ? buildMarginVis() : '';
+      const curveH  = e.curve      ? buildCurve()     : '';
+      const cotH    = e.cotData    ? buildCOT()        : '';
+
+      const badgeColor = e.badgeColor;
+      const bcVar = `var(--${badgeColor})`;
+      const bcDVar = `var(--${badgeColor}-d)`;
+
+      const body = e.body.map(p=>`<p>${p}</p>`).join('') +
+        specsH + fmlaH + cmpH + stH + marginH + curveH + cotH +
+        `<div class="ki">
+          <div class="ki-marker">KEY</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+        <div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-badge" style="color:${bcVar};border-color:${bcDVar};background:var(--${badgeColor}-b)">${e.badge}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 3.1 Bid-Ask Spread</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;   /* bid = green — buyers */
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;   /* ask = red — sellers */
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;   /* spread = purple */
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;   /* mid-price = blue */
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  /* micro dot texture */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  /* ── HEADER ── */
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  /* live spread display widget */
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 220px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  /* header border */
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── ENTRY ── */
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  /* topic-colour left bars */
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  /* colour badge */
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  /* formula pill */
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  /* ── BODY ── */
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  /* formula display */
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  /* visual ladder */
+  .price-ladder {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .ladder-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ladder-row {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+  }
+
+  .ladder-row:last-child { border-bottom: none; }
+
+  .lr-price {
+    padding: 7px 16px;
+    min-width: 90px;
+    font-weight: 600;
+    border-right: 1px solid var(--border);
+  }
+
+  .lr-size {
+    padding: 7px 12px;
+    min-width: 80px;
+    color: var(--muted);
+    border-right: 1px solid var(--border);
+    text-align: right;
+  }
+
+  .lr-bar-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 4px 12px;
+  }
+
+  .lr-bar {
+    height: 10px;
+    border-radius: 2px;
+    opacity: 0.7;
+  }
+
+  .lr-label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    color: var(--muted);
+    text-align: right;
+    min-width: 80px;
+  }
+
+  .ask-row { background: var(--ask-light); }
+  .ask-row .lr-price { color: var(--ask); }
+  .ask-row .lr-bar   { background: var(--ask); }
+  .ask-row .lr-label { color: var(--ask); }
+
+  .bid-row { background: var(--bid-light); }
+  .bid-row .lr-price { color: var(--bid); }
+  .bid-row .lr-bar   { background: var(--bid); }
+  .bid-row .lr-label { color: var(--bid); }
+
+  .spread-row { background: var(--spread-light); }
+  .spread-row .lr-price { color: var(--spread); font-weight: 700; }
+  .spread-row .lr-label { color: var(--spread); font-weight: 700; }
+
+  .mid-row-style { background: var(--mid-light); }
+  .mid-row-style .lr-price { color: var(--mid); font-weight: 700; }
+  .mid-row-style .lr-label { color: var(--mid); font-weight: 700; }
+
+  /* data comparison table */
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  /* split box */
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* key insight */
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  /* tags */
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  /* foot */
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 3 · Section 3.1 · Core Trading Foundations</div>
+        <h1 class="hdr-title">Bid-Ask<br><em>Spread</em></h1>
+        <div class="hdr-sub">The fundamental cost structure of every market transaction — where buyers meet sellers</div>
+      </div>
+
+      <!-- live widget -->
+      <div class="spread-widget">
+        <div class="sw-title">Example: AAPL (illustrative)</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Bid (Buy from you)</div>
+            <div class="sw-price">189.98</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Ask (Sell to you)</div>
+            <div class="sw-price">190.01</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Spread = Ask − Bid</div>
+          <div class="sw-spread-val">$0.03 (1.6 bps)</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Mid-Price</div>
+          <div class="sw-mid-val">189.995</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">11 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>3.1 Bid-Ask Spread</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "3.1.01",
+    icon: "🟢",
+    tClass: "t-bid",
+    title: "Bid Price",
+    sub: "The highest price a buyer is willing to pay — you sell at the bid",
+    formula: "BID = max buy offer",
+    tags: [["bid","bid"], ["buy side","bid"], ["market maker",""], ["limit order",""]],
+    body: [
+      `The <em>bid price</em> is the highest price that a buyer in the market is currently willing to pay for a security. If you want to sell your shares immediately, you will sell them at the bid — the best available price from someone standing ready to buy from you. The bid represents demand: it is the market's current consensus on the maximum acceptable purchase price.`,
+      `Bid prices originate from two sources. In a <em>quote-driven market</em> (such as OTC bond or FX markets), a market maker or dealer publishes a bid — a firm commitment to purchase a stated quantity at that price. In an <em>order-driven market</em> (exchange equity markets), the bid is the highest-priced outstanding buy limit order in the order book, submitted by any participant. In practice, most liquid exchange markets blend both: designated market makers post bids, and public limit orders compete alongside them.`,
+      `The bid price will always be <strong>lower than the ask price</strong> — this is a mathematical necessity. If the bid exceeded the ask, an immediate arbitrage trade would occur (buy at the ask, sell at the bid for instant profit), which would eliminate the discrepancy instantaneously. The gap between bid and ask — the spread — is therefore always positive (or zero at the moment of a trade execution). The bid moves continuously as market makers update their willingness to buy and as limit orders are submitted, cancelled, or filled.`,
+      `In derivatives markets, the bid has a directional implication depending on whether you are buying or selling the underlying exposure. For an option: the bid is the price at which you can sell (write) the option; the ask is where you can buy it. For a CDS: the bid is the protection premium the dealer will pay (they are buying credit risk); the ask is the premium you pay to buy protection. This reversal of intuition — that "bid" is always where you sell, regardless of the underlying economics — is a source of confusion for new traders.`
+    ],
+    ladder: true,
+    keyPoint: "The bid is the seller's best friend and the market maker's commitment to buy. Always remember: you sell at the bid. The bid's location relative to fair value determines how much of a concession you make when you need to transact immediately."
+  },
+  {
+    num: "3.1.02",
+    icon: "🔴",
+    tClass: "t-ask",
+    title: "Ask (Offer) Price",
+    sub: "The lowest price a seller will accept — you buy at the ask",
+    formula: "ASK = min sell offer",
+    tags: [["ask","ask"], ["offer","ask"], ["sell side","ask"], ["market maker",""]],
+    body: [
+      `The <em>ask price</em> (also called the <em>offer price</em> in professional markets — "bid and offer" is the standard phrase in FX and fixed income) is the lowest price that a seller is currently willing to accept for a security. If you want to buy shares immediately, you buy them at the ask — paying the best available price from someone willing to sell to you. The ask represents supply: the market's current consensus on the minimum acceptable sale price.`,
+      `Ask prices are always higher than bid prices (see the bid-ask spread entry for why). The ask is where immediate buyers transact — the price of urgency and immediacy. A market order to buy executes at the ask. If you submit a limit buy order <em>at or above the ask</em>, it will execute immediately. If you submit it below the ask, it rests in the order book waiting for a seller willing to accept your lower price.`,
+      `In professional fixed income and FX markets, the ask/offer convention carries important nuance. When a bond dealer says they are "offering" bonds, they are willing to sell them. When they say they are "bidding" for bonds, they are willing to buy. A dealer showing a "two-way price" — say, 99.50 / 99.55 for a bond — is offering to buy at 99.50 and sell at 99.55. The five-cent spread between the two prices is their gross profit on a round-trip transaction. This two-way price structure — the dealer's standing offer to both buy and sell — is the definition of market making.`,
+      `The ask price is not static. In electronic markets, it updates continuously as sellers cancel and re-submit limit orders, as market makers adjust their inventory positions, and as information arrives that changes participants' views of fair value. The speed at which the ask updates in response to information is a measure of market efficiency: in a highly liquid, efficient market, a news announcement will be reflected in the ask within microseconds.`
+    ],
+    keyPoint: "The ask is the buyer's cost of immediacy. You pay the ask when you want to transact now rather than wait. The difference between the ask and your view of fair value is the premium you pay for that immediacy — and the market maker's reward for providing it."
+  },
+  {
+    num: "3.1.03",
+    icon: "↔️",
+    tClass: "t-spread",
+    title: "The Spread — Ask minus Bid",
+    sub: "The fundamental cost of immediate two-way trading",
+    formula: "Spread = Ask − Bid",
+    tags: [["spread","spread"], ["transaction cost","gold"], ["market making",""], ["liquidity premium","spread"]],
+    formulaBox: {
+      main: "<span class='ask-part'>Ask</span> − <span class='bid-part'>Bid</span> = <span class='spread-part'>Spread</span>",
+      note: "Ask: 190.01\nBid: 189.98\nSpread: $0.03\n\nRound-trip cost for a market order buyer\nwho immediately sells: pays spread twice"
+    },
+    body: [
+      `The <em>bid-ask spread</em> is simultaneously the simplest and most fundamental concept in market microstructure. It is the difference between the lowest price a seller will accept (ask) and the highest price a buyer will pay (bid). Every time you transact at market — buying at the ask or selling at the bid — you pay the spread as an implicit transaction cost. The market maker who is on the other side of your trade earns this spread as their gross profit for providing immediacy.`,
+      `The spread exists for three economic reasons, each contributing to its size. First, <em>inventory risk</em>: a market maker who buys from you now takes on price risk — the security may fall before they can sell it to someone else. The spread compensates them for this holding-period risk. Second, <em>adverse selection risk</em>: some of the people transacting with a market maker possess private information (they know the price is about to move). The market maker cannot distinguish informed from uninformed traders, so the spread must be wide enough that profits from uninformed traders offset losses from informed ones. Third, <em>operational costs</em>: order processing, technology, capital, and compliance costs must be recovered.`,
+      `The spread also conveys information. A <em>widening spread</em> signals increased uncertainty — the market maker is taking on more risk and demands more compensation. This is why spreads widen before major macro announcements (FOMC decisions, NFP reports): market makers face more adverse selection risk as informed traders front-run the announcement. A <em>narrowing spread</em> signals confidence: the market maker is comfortable with their inventory risk, adverse selection is low, and competition among market makers is tight.`,
+      `The round-trip cost of a market order trade is typically quoted as <em>one spread</em> — you pay the spread going in and assume you exit at the mid-price. In reality, the exit also crosses a spread, making the true round-trip cost two spreads (buy at ask, sell at bid). For high-frequency strategies that enter and exit in rapid succession, the spread is the primary performance hurdle — a strategy must generate alpha greater than two spreads per round trip to be profitable before any other cost.`
+    ],
+    keyPoint: "The spread is not an accident or an inefficiency — it is the price of liquidity. It exists because market making involves real economic risks (inventory, adverse selection, operational costs) that must be compensated. The spread is the market's mechanism for paying market makers to be present and ready to trade. Remove the spread, and you remove the incentive to make markets."
+  },
+  {
+    num: "3.1.04",
+    icon: "⚖️",
+    tClass: "t-mid",
+    title: "Mid-Price",
+    sub: "The theoretical fair value between bid and ask",
+    formula: "Mid = (Bid + Ask) ÷ 2",
+    tags: [["mid-price","mid"], ["fair value","mid"], ["mark-to-market",""], ["reference price","mid"]],
+    formulaBox: {
+      main: "<span class='mid-part'>Mid</span> = (<span class='bid-part'>Bid</span> + <span class='ask-part'>Ask</span>) ÷ 2",
+      note: "Mid = (189.98 + 190.01) ÷ 2\n     = 189.995\n\nThe mid represents the best estimate of\n'true' value absent a transaction."
+    },
+    splitBox: [
+      { cls: "bid",  label: "Bid Side", text: "189.98 — where sellers transact immediately. Selling at bid means selling below mid. The 'concession' paid for immediacy." },
+      { cls: "mid",  label: "Mid-Price", text: "189.995 — theoretical fair value. No transaction happens here. Used for P&L, NAV, and risk calculations." },
+      { cls: "ask",  label: "Ask Side", text: "190.01 — where buyers transact immediately. Buying at ask means buying above mid. The premium paid for immediacy." },
+      { cls: "spread", label: "Half-Spread", text: "±$0.015 — the distance from mid to either side. Each leg of a transaction costs one half-spread relative to mid." },
+    ],
+    body: [
+      `The <em>mid-price</em> is the arithmetic average of the bid and ask prices — the theoretical midpoint of the spread. No transaction takes place at the mid-price in a spread market; it is a calculated reference, not an executable level. Despite being untradeable, the mid-price is arguably the most important price in finance: it is used for portfolio mark-to-market (valuing positions for P&L reporting), NAV calculation (fund pricing), risk measurement (VaR calculations), derivatives pricing (options models use mid as the underlying price), and performance benchmarking.`,
+      `The mid-price matters because the bid and ask are not symmetric measures of value — they are execution prices that already embed a transaction cost. If you value your stock position at the ask (where you could buy more) you overstate its value; if you value it at the bid (where you could sell), you understate it. The mid corrects for this by sitting equidistant from both execution sides. However, mid is only an accurate proxy for fair value when the spread is tight and the order book is deep and balanced — in illiquid markets, mid can diverge significantly from where a large trade would actually clear.`,
+      `The concept of <em>mid-market valuation</em> has regulatory and accounting significance. Under IFRS 13 and ASC 820 (fair value accounting standards), financial instruments must be valued at "fair value" — which is interpreted as the price that would be received to sell an asset in an orderly transaction. For liquid instruments, mid-price is the standard fair value proxy. For illiquid instruments, determining fair value requires more model-dependent approaches, introducing significant judgment and the potential for manipulation of reported values.`
+    ],
+    keyPoint: "The mid-price is the market's best public estimate of fair value — but it is a phantom price that nobody actually pays. Its importance in accounting, risk management, and performance measurement means that the gap between mid and executable price (i.e. the half-spread) systematically understates the true transaction cost of any portfolio measured at mid."
+  },
+  {
+    num: "3.1.05",
+    icon: "💸",
+    tClass: "t-cost",
+    title: "Spread as Transaction Cost",
+    sub: "The implicit cost embedded in every market order — invisible but real",
+    formula: "Cost = ½ × Spread",
+    tags: [["transaction cost","gold"], ["implicit cost","gold"], ["market order",""], ["round-trip","spread"]],
+    body: [
+      `The spread is an <em>implicit transaction cost</em> — unlike commissions or taxes, it never appears on a trade confirmation or fee schedule, yet it is paid on every market order. When you buy at the ask, you pay more than mid (the best estimate of fair value) by exactly half the spread. When you sell at the bid, you receive less than mid by half the spread. Each leg of a round-trip trade (buy then sell) costs one half-spread, so the total round-trip cost is one full spread.`,
+      `For an investor who holds positions for months, the spread cost is trivial relative to the return generated. For a high-frequency trader making hundreds of round trips per day, the spread is the primary performance hurdle. For an active mutual fund manager with moderate turnover, spread costs can consume a meaningful fraction of alpha. Academic studies have consistently found that transaction costs — of which the spread is the dominant component for equity trades — are the primary explanation for why active funds underperform passive benchmarks net of fees.`,
+      `The spread cost's invisibility makes it particularly insidious. When a retail investor buys 100 shares of a stock at $50.03 (ask) when the bid is $49.97, they pay a $0.06 spread — $6 total on a $5,000 trade (12 basis points). This is invisible in their brokerage statement, which shows only the execution price. In contrast, a $5 commission is visible and complained about loudly. The shift to "commission-free" trading in the 2010s masked this reality: broker-dealers replaced explicit commissions with payment-for-order-flow arrangements that routed retail orders to market makers, who captured the spread — transferring the cost from visible to invisible.`,
+      `The cost of crossing the spread is not always a "waste" — it is the cost of immediacy. An investor who executes at market accepts the spread cost in exchange for certainty of execution at a known price. An investor who places a limit order at the mid-price may or may not get filled, and if filled, it is often because informed order flow has moved the price to that level — a phenomenon called <em>adverse selection</em>. The choice between crossing the spread (paying the cost of immediacy) and submitting a limit order (saving the spread but accepting execution uncertainty and adverse selection) is one of the most fundamental in trade execution.`
+    ],
+    keyPoint: "The spread is the market's toll road — you pay it every time you cross from wanting-to-trade to having-traded. Unlike a commission, it has no receipt. Its invisibility makes it the most commonly underestimated cost in investing. Any strategy evaluation that does not account for spread costs will overstate performance — sometimes dramatically."
+  },
+  {
+    num: "3.1.06",
+    icon: "📐",
+    tClass: "t-cost",
+    title: "Spread in Basis Points",
+    sub: "Normalising spread by price to compare across assets and contexts",
+    formula: "bps = (Spread ÷ Mid) × 10,000",
+    tags: [["basis points","gold"], ["relative spread","gold"], ["bps",""], ["normalisation",""]],
+    formulaBox: {
+      main: "Spread (bps) = (<span class='spread-part'>Spread</span> ÷ <span class='mid-part'>Mid</span>) × 10,000",
+      note: "AAPL: $0.03 / $190.00 × 10,000 = 1.6 bps\nHigh-yield bond: $2.00 / $95.00 × 10,000 = 210 bps\nEmerging mkt FX: 0.002 / 0.15 × 10,000 = 133 bps"
+    },
+    body: [
+      `A spread expressed in dollar terms is not directly comparable across securities at different price levels. A $0.05 spread on a $5 stock (100 bps) is dramatically more expensive than a $0.05 spread on a $500 stock (1 bp). To make spreads comparable, practitioners express them in <em>basis points (bps)</em> — hundredths of a percent (1 bp = 0.01%). The formula is simple: divide the absolute spread by the mid-price and multiply by 10,000. This normalised measure allows apples-to-apples comparison of liquidity costs across assets.`,
+      `Spreads in basis points vary by orders of magnitude across asset classes. <strong>On-the-run US Treasuries</strong> trade with spreads of 0.1–0.5 bps — the most liquid instruments in the world. <strong>Large-cap US equities (S&P 500 constituents)</strong> trade at 1–5 bps. <strong>Small-cap equities</strong> can be 20–100+ bps. <strong>Investment-grade corporate bonds</strong> trade at 10–50 bps in secondary markets. <strong>High-yield bonds</strong>: 50–300+ bps. <strong>Emerging market FX</strong>: 20–200 bps depending on the pair. <strong>OTC options</strong>: effectively hundreds of bps given wide vol spreads. These differences reflect differences in liquidity, information asymmetry, and trading volume.`,
+      `The basis-point spread is also used to express the <em>cost of trading as a fraction of expected return</em>. If a stock has an expected annual return of 8% (800 bps), and each round-trip trade costs 10 bps (5 bps in, 5 bps out), then a strategy must generate meaningful alpha per trade to be worth the execution cost. A strategy that generates 5 bps alpha per trade and costs 10 bps to execute is a money-loser before any other costs. This is why trading frequency and spread costs interact: high-frequency trading requires either very tight spreads or very high alpha-per-trade.`
+    ],
+    keyPoint: "Expressing spreads in basis points is the essential normalisation that makes liquidity costs comparable. A 5 bps spread is cheap on any instrument; a 200 bps spread is expensive on any instrument. The basis-point metric is the universal language of transaction cost analysis."
+  },
+  {
+    num: "3.1.07",
+    icon: "📏",
+    tClass: "t-spread",
+    title: "Effective Spread vs. Quoted Spread",
+    sub: "What the screen shows vs. what you actually pay — they often differ",
+    formula: "Eff. Spread = 2 × |Trade Price − Mid|",
+    tags: [["effective spread","spread"], ["quoted spread","spread"], ["price improvement","bid"], ["TCA","gold"]],
+    splitBox: [
+      { cls: "spread", label: "Quoted Spread", text: "The spread visible on screen between the best bid and ask. Observable before trading. The maximum you should pay for a single round-trip trade." },
+      { cls: "mid",    label: "Effective Spread", text: "2 × |execution price − mid|. Measures what you actually paid. Lower than quoted if you received price improvement; higher if you traded beyond the inside quote." },
+    ],
+    body: [
+      `The <em>quoted spread</em> is what you see on your screen: the difference between the best bid and best ask displayed in the order book. It represents the cost of an immediate, standard-size transaction at the inside market. The <em>effective spread</em> is what you actually paid — calculated as twice the distance between your execution price and the prevailing mid-price at the time of execution. These two measures diverge for important reasons.`,
+      `Effective spread can be <strong>better than quoted spread</strong> (price improvement): when a broker-dealer internalises a retail market order by executing it within the spread — say, buying at 190.005 when the ask is 190.01 and the bid is 189.99 — the customer transacts at a price better than the quoted ask. This "price improvement" reduces the effective spread below the quoted spread. Payment-for-order-flow arrangements often claim this as a benefit: retail orders get price improvement from the internalising market maker who profits from the smaller spread. The debate is whether the improvement would have been even larger in a fully competitive, non-internalised environment.`,
+      `Effective spread can be <strong>worse than quoted spread</strong> (market impact): when a large order moves the price as it executes, subsequent fills happen at increasingly unfavourable prices. An institutional order for 500,000 shares may start executing at the ask of $190.01 but push the price to $190.15 by the time it's complete — a dramatically worse average than the quoted spread implied. This price movement beyond the quoted spread is <em>market impact</em>, a separate cost from the spread itself. <em>Transaction cost analysis (TCA)</em> in institutional trading separates quoted spread, effective spread, and market impact as distinct components of total execution cost, allowing attribution of where costs were incurred.`
+    ],
+    keyPoint: "The quoted spread is the listed price; the effective spread is the price you paid. Smart execution (limit orders, VWAP algorithms, dark pool routing) aims to reduce effective spread below quoted spread. Naive execution (large market orders) produces effective spreads far above quoted spreads due to market impact. The gap between the two is the measure of execution quality."
+  },
+  {
+    num: "3.1.08",
+    icon: "🌊",
+    tClass: "t-impact",
+    title: "Market Impact vs. Spread",
+    sub: "Two distinct components of total execution cost — spread is the entry toll; impact is the price you move the market",
+    formula: "Total Cost = ½ Spread + Impact",
+    tags: [["market impact",""], ["price impact",""], ["slippage",""], ["VWAP",""], ["participation rate",""]],
+    body: [
+      `<em>Market impact</em> is the additional cost incurred when an order is large enough to move the price against the trader as it executes. It is distinct from the spread (which is paid even on a tiny order) and is proportional to order size relative to available liquidity. If you submit a market order to buy 100 shares of a large-cap stock, you execute at the ask and pay the quoted spread — essentially no market impact. If you submit a market order to buy 1,000,000 shares, you will exhaust multiple layers of the order book, and each layer sits at a worse price — you might average $190.08 when the initial ask was $190.01. That additional $0.07 per share beyond the initial spread is market impact.`,
+      `Market impact has two components. <em>Temporary impact</em> is the immediate price pressure from your order — prices move against you as liquidity is consumed, then partially reverse as the market maker rebuilds inventory. <em>Permanent impact</em> is the lasting price change driven by the information content of your trade — if your buying reveals genuine value (informed flow), the price stays higher after your trade. The distinction matters for strategy evaluation: temporary impact is a pure transaction cost; permanent impact may be offset by the alpha that motivated the trade.`,
+      `The <em>square root model</em> of market impact (attributed to various practitioners) is a widely used empirical approximation: impact ≈ σ × √(Q/V), where σ is daily volatility, Q is order size, and V is daily trading volume. The square root form implies that doubling order size does not double impact — it increases it by 1.4x. This concavity reflects that the first units of a large order consume the tightest liquidity, and subsequent units face progressively worse prices but the marginal impact decreases. Institutional execution algorithms (VWAP, TWAP, implementation shortfall) are designed to minimise total impact by slicing large orders across time and venues, spreading the liquidity demand to avoid hitting the diminishing returns of the impact curve.`
+    ],
+    keyPoint: "For small orders, spread is the dominant cost. For large orders, market impact dwarfs the spread. This is why institutional trading desks invest heavily in execution algorithms and why market impact measurement is one of the most practically important topics in quantitative finance — a pension fund paying 30 bps in unnecessary market impact on a $10B equity allocation leaves $30M of returns on the table annually."
+  },
+  {
+    num: "3.1.09",
+    icon: "🗺️",
+    tClass: "t-classes",
+    title: "Spread Dynamics Across Asset Classes",
+    sub: "Why spreads vary by orders of magnitude — and what that tells you about liquidity",
+    formula: "Spread ∝ 1/Liquidity",
+    tags: [["cross-asset",""], ["equities",""], ["FX",""], ["bonds",""], ["commodities",""]],
+    table: {
+      cols: ["Asset / Market", "Typical Quoted Spread", "Bps", "Liquidity Driver"],
+      rows: [
+        ["On-the-run 10Y Treasury","$0.015625 (½ tick)","0.1–0.5 bps","World's deepest market; primary dealer competition"],
+        ["EUR/USD spot FX","0.0001–0.0003","0.6–2 bps","$1T+ daily volume; highly competitive dealer market"],
+        ["S&P 500 large-cap equity","$0.01–0.03","1–3 bps","High volume; HFT market makers; tight regulation"],
+        ["S&P 500 ETF (SPY)","$0.01","0.5 bps","Most liquid equity instrument; arbitrage with futures"],
+        ["Mid-cap equity","$0.03–0.15","5–20 bps","Less volume; fewer market makers; wider spreads"],
+        ["Small-cap equity","$0.10–0.50","30–150 bps","Low volume; high adverse selection; illiquidity premium"],
+        ["Investment-grade corporate bond","$0.25–$1.00","25–100 bps","OTC dealer market; fragmented; inventory-constrained"],
+        ["High-yield corporate bond","$0.50–$3.00","75–400 bps","Lower liquidity; dealer unwilling to hold inventory"],
+        ["EM sovereign bond (liquid)","$0.50–$1.50","50–200 bps","Fewer dealers; political risk premium in spread"],
+        ["Bitcoin (major CEX)","$1–5","1–5 bps","24/7 trading; competitive MM; crypto-native spreads"],
+        ["Small-cap crypto altcoin","$0.01–0.10","50–500+ bps","Thin markets; few MMs; high adverse selection"],
+      ]
+    },
+    body: [
+      `Spreads across asset classes reflect the underlying economics of market making in each instrument. The key variables are: <strong>trading volume</strong> (high volume dilutes fixed costs per trade; market makers can narrow spreads), <strong>price volatility</strong> (higher volatility increases inventory risk, requiring wider spreads to compensate), <strong>adverse selection risk</strong> (markets dominated by informed traders — insiders, specialists — require wider spreads to compensate uninformed market making), and <strong>number of competing market makers</strong> (more competition narrows spreads toward the cost of market making).`,
+      `The contrast between US Treasuries and corporate bonds illustrates how market structure — not just issuer credit quality — determines spread width. An AAA-rated corporation may pay 100x the spread in its bond market as the US government (technically lower credit quality) pays in Treasury markets. The difference is entirely structural: Treasuries trade in a centralised, competitive dealer-to-dealer market with primary dealer obligations; corporate bonds trade bilaterally through dealers who hold inventory, have limited competition, and face illiquidity risk on both sides of their position.`,
+      `Spread dynamics vary over time as well as across asset classes. Spreads in all markets widen during risk-off episodes (market makers demand more compensation for elevated inventory risk), around major news events (adverse selection risk peaks), near market opens and closes (thinner participation), and for individual securities around earnings announcements or M&A rumours. Monitoring spread widening is a real-time indicator of deteriorating liquidity and rising market stress — a practical risk management tool as much as a transaction cost concern.`
+    ],
+    keyPoint: "The spread hierarchy across asset classes is a map of liquidity — and liquidity is a map of how much information, competition, and standardisation exists in each market. The most liquid instruments (Treasuries, major FX, large-cap ETFs) have all three in abundance. The least liquid (small-cap equities, off-the-run bonds, exotic derivatives) have none. Understanding this hierarchy is essential for any cross-asset risk manager or allocator."
+  },
+  {
+    num: "3.1.10",
+    icon: "🔬",
+    tClass: "t-dynamics",
+    title: "Tight vs. Wide Spreads — Liquid vs. Illiquid Markets",
+    sub: "What drives spread width and what it signals about a market's health",
+    formula: "Liquidity ~ 1/Spread",
+    tags: [["tight spread","bid"], ["wide spread","ask"], ["illiquid",""], ["liquid","bid"], ["market stress",""]],
+    splitBox: [
+      { cls: "bid",  label: "Tight Spread → Liquid Market", text: "Low bid-ask cost. Deep order book. Small orders have negligible impact. Many competing market makers. High volume. Arbitrage keeps price efficient. Example: SPY at $0.01 spread." },
+      { cls: "ask",  label: "Wide Spread → Illiquid Market", text: "High bid-ask cost. Thin order book. Even moderate orders move price. Few or no market makers. Low volume. Price may be stale or unreliable. Example: small-cap stock at $0.50 spread." },
+      { cls: "gold", label: "Dynamic Widening (stress)", text: "Normal markets: tight spreads. Crisis/earnings/macro event: spreads widen 5–20x. Flash Crash, COVID selloff. Spreads widen because market maker inventory risk spikes and adverse selection risk peaks simultaneously." },
+      { cls: "spread", label: "Spread as Signal", text: "Sudden spread widening = early warning. Pre-announcement: informed trading increases adverse selection. Crisis onset: market makers withdraw. Spread is a real-time sentiment and stress indicator." },
+    ],
+    body: [
+      `The tightness or width of a spread is not a fixed property of a security — it is a dynamic equilibrium that reflects current market conditions. In calm, high-volume conditions with many competing market makers, spreads compress toward the bare minimum needed to cover market making costs. In stressed, low-volume conditions with elevated uncertainty, spreads widen as market makers demand higher compensation for the same risks. Understanding these dynamics allows traders and risk managers to use the spread itself as a real-time market indicator.`,
+      `The factors that tighten spreads: <strong>high trading volume</strong> (more flow means each market maker can make many small profits rather than demanding wide margins on each trade); <strong>standardisation and transparency</strong> (well-defined, publicly priced instruments reduce information asymmetry); <strong>competing market makers</strong> (more competition forces spreads toward marginal cost); <strong>stable macroeconomic conditions</strong> (lower inventory risk means market makers accept thinner margins). The factors that widen spreads are the precise inverses of these.`,
+      `An important distinction is between <em>structural illiquidity</em> (a security that is always thinly traded — a small-cap stock, an off-the-run bond — because of its fundamental characteristics) and <em>episodic illiquidity</em> (a security that is normally liquid but becomes temporarily illiquid during market stress). Episodic illiquidity is particularly dangerous because risk models calibrated on normal conditions will dramatically underestimate actual spread costs during stress — precisely the moment when investors most need to transact.`
+    ],
+    keyPoint: "Tight spreads are a gift of competitive, transparent, high-volume markets. Wide spreads are a tax on participation — they exist because the economics of market making in that instrument demand it. Monitoring spread dynamics in real time is one of the earliest and most reliable indicators of changing market conditions. A spread that suddenly doubles tells you something fundamental has changed in the market's risk perception — often before price itself moves."
+  },
+  {
+    num: "3.1.11",
+    icon: "🏗️",
+    tClass: "t-markets",
+    title: "Quote-Driven vs. Order-Driven Markets",
+    sub: "The two fundamental architectures for price formation — and the hybrid reality",
+    formula: "QDM: dealers set price | ODM: orders set price",
+    tags: [["quote-driven",""], ["order-driven",""], ["dealer market","ask"], ["LOB","bid"], ["hybrid","spread"]],
+    table: {
+      cols: ["Feature", "Quote-Driven Market", "Order-Driven Market"],
+      rows: [
+        ["Price setter","Dealers / market makers","All participants via limit orders"],
+        ["Examples","OTC bonds, FX, OTC derivatives","NYSE, NASDAQ, CME futures"],
+        ["Transparency","Pre-trade opacity (dealer quotes only)","Full pre-trade: public order book"],
+        ["Counterparty","Always a dealer","Anonymous via CCP"],
+        ["Execution","Negotiated or hit dealer quote","Automatic matching engine"],
+        ["Liquidity source","Dealer inventory commitment","Crowd of limit orders"],
+        ["Best for","Large, bespoke, infrequent trades","Small-to-medium, standardised, frequent"],
+        ["Spreads","Wider (negotiated, relationship)","Tighter (competitive, public)"],
+        ["Fragility","Dealers can widen/withdraw","Order book can thin but is transparent"],
+      ]
+    },
+    body: [
+      `The two fundamental market architectures differ in <em>who sets prices</em>. In a <em>quote-driven market</em>, designated dealers or market makers publish two-sided quotes — prices at which they will buy and sell — and other participants respond to those quotes. The dealer is the price setter; other participants are price takers. This is the dominant model in OTC markets: FX dealers quote bid/ask for currencies; bond dealers quote prices for specific bonds; swap dealers quote rates for interest rate swaps. The advantage is certainty of execution at a known price; the disadvantage is that the dealer extracts a spread and participants cannot see what price others received.`,
+      `In an <em>order-driven market</em>, there are no designated dealers. All participants submit limit orders (specifying a price and quantity) into a shared central limit order book (CLOB). The matching engine automatically executes trades when a buy order price meets or exceeds a sell order price. Prices are set by the intersection of public demand and supply, not by a privileged dealer. All outstanding orders are visible, creating pre-trade transparency. This is the model for exchange-listed equities, futures, and increasingly for some FX. The advantage is competition, transparency, and tight spreads; the disadvantage is that there is no guaranteed source of liquidity — if no one submits a matching limit order, you cannot trade.`,
+      `In practice, most markets are <em>hybrids</em>. NASDAQ combines the registered market maker system (dealers obligated to quote) with a fully public order book where any participant can post limit orders — the best displayed price wins regardless of whether it comes from a designated dealer or a public order. NYSE's DMM (Designated Market Maker) system similarly blends dealer obligations with open order book competition. The hybrid model attempts to capture the guaranteed liquidity of the quote-driven model and the transparency and competition of the order-driven model — while inheriting some disadvantages of both.`
+    ],
+    keyPoint: "Quote-driven and order-driven markets are not just technical distinctions — they represent fundamentally different theories of how liquidity is produced. Quote-driven markets rely on private incentives (dealer profitability) to ensure someone is always willing to trade. Order-driven markets rely on public competition (anyone can post a limit order) to produce tight spreads. The shift from dealer markets toward electronic order books over the past 30 years is the most significant structural change in financial market history — and it is still incomplete in many asset classes."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    // formula box
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    // price ladder (only for entry 0)
+    const ladderHtml = e.ladder ? `
+      <div class="price-ladder">
+        <div class="ladder-title">Order Book Snapshot (illustrative)</div>
+        <div class="ladder-row ask-row">
+          <div class="lr-price">190.04</div>
+          <div class="lr-size">1,200</div>
+          <div class="lr-bar-wrap"><div class="lr-bar" style="width:45%"></div></div>
+          <div class="lr-label">ASK +3</div>
+        </div>
+        <div class="ladder-row ask-row">
+          <div class="lr-price">190.02</div>
+          <div class="lr-size">3,400</div>
+          <div class="lr-bar-wrap"><div class="lr-bar" style="width:65%"></div></div>
+          <div class="lr-label">ASK +2</div>
+        </div>
+        <div class="ladder-row ask-row" style="opacity:1;border:2px solid var(--ask-border)">
+          <div class="lr-price" style="font-size:13px">190.01</div>
+          <div class="lr-size">8,900</div>
+          <div class="lr-bar-wrap"><div class="lr-bar" style="width:100%"></div></div>
+          <div class="lr-label" style="font-weight:700">BEST ASK ↑</div>
+        </div>
+        <div class="ladder-row mid-row-style">
+          <div class="lr-price">189.995</div>
+          <div class="lr-size">—</div>
+          <div class="lr-bar-wrap"></div>
+          <div class="lr-label">MID</div>
+        </div>
+        <div class="ladder-row spread-row">
+          <div class="lr-price">← $0.03 →</div>
+          <div class="lr-size">spread</div>
+          <div class="lr-bar-wrap"></div>
+          <div class="lr-label">SPREAD</div>
+        </div>
+        <div class="ladder-row bid-row" style="border:2px solid var(--bid-border)">
+          <div class="lr-price" style="font-size:13px">189.98</div>
+          <div class="lr-size">12,000</div>
+          <div class="lr-bar-wrap"><div class="lr-bar" style="width:100%"></div></div>
+          <div class="lr-label" style="font-weight:700">BEST BID ↓</div>
+        </div>
+        <div class="ladder-row bid-row">
+          <div class="lr-price">189.96</div>
+          <div class="lr-size">4,100</div>
+          <div class="lr-bar-wrap"><div class="lr-bar" style="width:72%"></div></div>
+          <div class="lr-label">BID −2</div>
+        </div>
+        <div class="ladder-row bid-row">
+          <div class="lr-price">189.94</div>
+          <div class="lr-size">1,800</div>
+          <div class="lr-bar-wrap"><div class="lr-bar" style="width:38%"></div></div>
+          <div class="lr-label">BID −3</div>
+        </div>
+      </div>` : '';
+
+    // split box
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    // data table
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + ladderHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

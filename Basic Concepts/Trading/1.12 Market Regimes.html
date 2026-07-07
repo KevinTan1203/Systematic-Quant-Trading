@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 1.12 Market Regimes</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Syne+Mono&family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;1,7..72,300;1,7..72,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:     #0b0d0f;
+    --bg1:    #0f1218;
+    --bg2:    #141820;
+    --bg3:    #1a2030;
+    --border: #1e2840;
+    --border2:#263352;
+
+    --bull:   #22c55e;
+    --bull-d: #14532d;
+    --bull-bg:#051a0d;
+
+    --bear:   #ef4444;
+    --bear-d: #7f1d1d;
+    --bear-bg:#1a0505;
+
+    --side:   #f59e0b;
+    --side-d: #78350f;
+    --side-bg:#1a1005;
+
+    --ron:    #38bdf8;   /* risk-on */
+    --ron-d:  #0c4a6e;
+    --ron-bg: #04111a;
+
+    --roff:   #a855f7;   /* risk-off */
+    --roff-d: #3b0764;
+    --roff-bg:#100520;
+
+    --low:    #10b981;
+    --high:   #f97316;
+    --trend:  #6366f1;
+    --mrv:    #ec4899;
+    --liq:    #ef4444;
+    --quant:  #06b6d4;
+
+    --ink:    #e2e8f4;
+    --ink2:   #94a3b8;
+    --muted:  #475569;
+    --faint:  #1e293b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    line-height: 1.65;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* scanline overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 3px,
+      rgba(0,0,0,0.08) 3px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  .page {
+    max-width: 1020px;
+    margin: 0 auto;
+    padding: 52px 32px 100px;
+  }
+
+  /* ── HEADER ── */
+  .hdr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    align-items: start;
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hdr-kicker {
+    font-family: 'Syne Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .hdr-kicker::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--quant);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.3; }
+  }
+
+  .hdr-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(34px, 5vw, 58px);
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title span { color: var(--quant); }
+
+  .hdr-sub {
+    font-family: 'Literata', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--ink2);
+    margin-top: 12px;
+    font-weight: 300;
+  }
+
+  /* regime palette preview */
+  .regime-palette {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    background: var(--bg1);
+    min-width: 160px;
+  }
+
+  .regime-palette-label {
+    font-family: 'Syne Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .pal-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Syne Mono', monospace;
+    font-size: 9.5px;
+    color: var(--ink2);
+    letter-spacing: 0.04em;
+  }
+
+  .pal-dot {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Syne Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--bg1);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.16s;
+  }
+
+  .ctrl:hover { border-color: var(--quant); color: var(--quant); background: var(--ron-bg); }
+
+  .entry-count {
+    font-family: 'Syne Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: auto;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── CATEGORY SECTION ── */
+  .cat-section { margin-bottom: 12px; }
+
+  .cat-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+    padding: 10px 16px;
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    border-left: 3px solid;
+  }
+
+  .cat-head-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .cat-head-sub {
+    font-family: 'Syne Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-left: auto;
+  }
+
+  /* ── ENTRY ── */
+  .entry {
+    margin-bottom: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg1);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.18s;
+  }
+
+  .entry.open { border-color: var(--border2); }
+
+  /* animated left bar */
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    opacity: 0.5;
+    transition: opacity 0.2s, width 0.2s;
+  }
+
+  .entry.open::before { opacity: 1; width: 4px; }
+
+  /* regime-colour left bars */
+  .r-bull::before  { background: var(--bull); }
+  .r-bear::before  { background: var(--bear); }
+  .r-side::before  { background: var(--side); }
+  .r-ron::before   { background: var(--ron); }
+  .r-roff::before  { background: var(--roff); }
+  .r-low::before   { background: var(--low); }
+  .r-high::before  { background: var(--high); }
+  .r-trend::before { background: var(--trend); }
+  .r-mrv::before   { background: var(--mrv); }
+  .r-liq::before   { background: var(--liq); }
+  .r-quant::before { background: var(--quant); }
+
+  /* header */
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg2); }
+
+  .e-regime-bar {
+    width: 56px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-right: 1px solid var(--border);
+    padding: 6px 0;
+  }
+
+  .e-regime-icon {
+    font-size: 16px;
+  }
+
+  .e-regime-code {
+    font-family: 'Syne Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .e-body-hdr { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-subtitle {
+    font-family: 'Syne Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  /* meter bars */
+  .meter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 14px;
+    border-left: 1px solid var(--border);
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  .meter-row { display: flex; flex-direction: column; gap: 2px; }
+
+  .meter-label {
+    font-family: 'Syne Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .meter-track {
+    height: 4px;
+    background: var(--faint);
+    border-radius: 2px;
+    overflow: hidden;
+    width: 110px;
+  }
+
+  .meter-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+    width: 0;
+  }
+
+  .entry.open .meter-fill { width: var(--fill-w); }
+
+  .e-toggle {
+    font-family: 'Syne Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.25s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--quant); }
+
+  /* ── EXPANDED BODY ── */
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 60px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Literata', serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.85;
+    color: #b0bcd0;
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em   { font-style: italic; color: var(--ink); }
+  .e-content p strong { font-weight: 400; font-style: normal; color: var(--ink); font-family: 'Syne', sans-serif; }
+
+  /* stat grid */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 6px;
+    margin-top: 18px;
+  }
+
+  .stat-cell {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg1);
+  }
+
+  .stat-cell-label {
+    font-family: 'Syne Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .stat-cell-val {
+    font-family: 'Syne Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+
+  /* signal comparison table */
+  .signal-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .sig-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sig-row:last-child { border-bottom: none; }
+
+  .sig-cell {
+    padding: 8px 12px;
+    font-family: 'Syne Mono', monospace;
+    font-size: 10.5px;
+    border-right: 1px solid var(--border);
+    line-height: 1.5;
+  }
+
+  .sig-cell:last-child { border-right: none; }
+
+  .sig-row.hdr-row .sig-cell {
+    background: var(--bg2);
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  /* code block */
+  .code-block {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--quant);
+    font-family: 'Syne Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.8;
+    color: var(--ink2);
+    overflow-x: auto;
+  }
+
+  .code-block .comment { color: var(--muted); }
+  .code-block .kw      { color: var(--quant); }
+  .code-block .fn      { color: var(--ron); }
+  .code-block .val     { color: var(--bull); }
+  .code-block .str     { color: var(--side); }
+
+  /* key insight */
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 16px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .ki-marker {
+    font-family: 'Syne Mono', monospace;
+    font-size: 11px;
+    color: var(--quant);
+    flex-shrink: 0;
+    padding-top: 2px;
+    letter-spacing: 0.05em;
+  }
+
+  .ki-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.58;
+  }
+
+  /* tags */
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Syne Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    background: transparent;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  /* regime-coloured tags */
+  .t-bull  { border-color: var(--bull-d);  color: var(--bull); }
+  .t-bear  { border-color: var(--bear-d);  color: var(--bear); }
+  .t-side  { border-color: var(--side-d);  color: var(--side); }
+  .t-ron   { border-color: var(--ron-d);   color: var(--ron); }
+  .t-roff  { border-color: var(--roff-d);  color: var(--roff); }
+  .t-quant { border-color: #0e4a5a;        color: var(--quant); }
+  .t-trend { border-color: #2a2a6a;        color: var(--trend); }
+  .t-mrv   { border-color: #5a1040;        color: var(--mrv); }
+  .t-liq   { border-color: var(--bear-d);  color: var(--liq); }
+
+  /* footer */
+  .foot {
+    margin-top: 64px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .foot-left {
+    font-family: 'Syne Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .foot-right {
+    display: flex;
+    gap: 6px;
+  }
+
+  .foot-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  @media (max-width: 640px) {
+    .e-content { padding-left: 16px; }
+    .meter-group { display: none; }
+    .hdr { grid-template-columns: 1fr; }
+    .regime-palette { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div>
+      <div class="hdr-kicker">Chapter 1 · Section 1.12 · Market Structure</div>
+      <h1 class="hdr-title">Market<br><span>Regimes</span></h1>
+      <div class="hdr-sub">The recurring states that financial markets cycle through — how to identify them, trade them, and model them</div>
+    </div>
+    <div class="regime-palette">
+      <div class="regime-palette-label">Regime Legend</div>
+      <div class="pal-row"><div class="pal-dot" style="background:var(--bull)"></div>Bull / Risk-On</div>
+      <div class="pal-row"><div class="pal-dot" style="background:var(--bear)"></div>Bear / Crisis</div>
+      <div class="pal-row"><div class="pal-dot" style="background:var(--side)"></div>Ranging / Sideways</div>
+      <div class="pal-row"><div class="pal-dot" style="background:var(--roff)"></div>Risk-Off</div>
+      <div class="pal-row"><div class="pal-dot" style="background:var(--trend)"></div>Trending</div>
+      <div class="pal-row"><div class="pal-dot" style="background:var(--mrv)"></div>Mean-Reverting</div>
+      <div class="pal-row"><div class="pal-dot" style="background:var(--quant)"></div>Quant / Modelling</div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="entry-count">11 regime types</span>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <div class="foot-left">Financial Markets · 1.12 Market Regimes</div>
+    <div class="foot-right">
+      <div class="foot-dot" style="background:var(--bull)"></div>
+      <div class="foot-dot" style="background:var(--bear)"></div>
+      <div class="foot-dot" style="background:var(--side)"></div>
+      <div class="foot-dot" style="background:var(--quant)"></div>
+    </div>
+  </footer>
+</div>
+
+<script>
+const categories = [
+  {
+    label: "Directional Regimes",
+    sub: "Markets defined by the direction of price trend",
+    color: "#22c55e",
+    entries: [
+      {
+        rClass: "r-bull",
+        icon: "📈",
+        code: "BULL",
+        title: "Bull Markets",
+        subtitle: "Sustained uptrend — rising prices, expanding multiples, positive sentiment",
+        meters: [
+          { label: "Trend strength", fill: 90, color: "#22c55e" },
+          { label: "Volatility", fill: 25, color: "#f59e0b" },
+          { label: "Correlation", fill: 55, color: "#38bdf8" },
+        ],
+        tags: [["bull","t-bull"], ["trend-following","t-trend"], ["equities",""], ["momentum",""]],
+        stats: [
+          { label: "Avg S&P 500 bull market length", val: "~4.3 years" },
+          { label: "Avg gain from trough", val: "+152%" },
+          { label: "Longest bull (US)", val: "2009–2020: 11 yrs" },
+          { label: "Technical definition", val: "+20% from trough" },
+        ],
+        body: [
+          `A <em>bull market</em> is a sustained period of rising asset prices — formally defined as a +20% gain from a recent low, though the intuitive definition is simply a multi-month or multi-year uptrend driven by improving fundamentals, expanding risk appetite, or both. Bull markets are the default state of equity markets over long enough time horizons: the combination of economic growth, corporate earnings expansion, and the compounding of retained earnings means that equities tend to appreciate over time. All major bear markets have eventually been followed by bull markets that exceeded the prior highs.`,
+          `Bull markets have characteristic cross-asset signatures. <strong>Equities outperform bonds</strong> as investors tolerate higher risk for higher return. <strong>High-beta, small-cap, and growth stocks outperform defensive, large-cap, and value stocks</strong> — investors reach for risk when the environment is benign. <strong>Credit spreads compress</strong> as default risk is perceived as low. <strong>Implied volatility (VIX) trends lower</strong> as uncertainty decreases. <strong>Commodity prices often rise</strong> in economically-driven bulls reflecting demand growth. These signatures make bull markets identifiable in retrospect, though calling the beginning and end in real time is notoriously difficult.`,
+          `Bull markets are internally heterogeneous — they contain corrections (drawdowns of 10–20%), rotations between sectors, and periods of consolidation. The 2009–2020 US bull market, the longest on record, included the 2011 European debt scare, the 2015–16 China devaluation selloff, the 2018 Fed tightening correction, and numerous other setbacks — each of which felt regime-changing in the moment, none of which ended the structural uptrend. The ability to distinguish temporary corrections within a bull market from the start of a genuine bear market is one of the most commercially important judgements in active portfolio management.`
+        ],
+        keyPoint: "Bull markets are the economy's reward for capital allocation over time — but they contain treacherous internal structure. The investor who correctly identifies the bull regime and stays long through corrections massively outperforms the one who exits at each drawdown. Regime misidentification — selling into corrections as if they were bear markets — is the most common and costly error in active management."
+      },
+      {
+        rClass: "r-bear",
+        icon: "📉",
+        code: "BEAR",
+        title: "Bear Markets",
+        subtitle: "Sustained downtrend — falling prices, multiple compression, fear and forced selling",
+        meters: [
+          { label: "Trend strength", fill: 85, color: "#ef4444" },
+          { label: "Volatility", fill: 88, color: "#f97316" },
+          { label: "Correlation (cross-asset)", fill: 90, color: "#38bdf8" },
+        ],
+        tags: [["bear","t-bear"], ["volatility",""], ["correlation spike","t-liq"], ["drawdown","t-bear"]],
+        stats: [
+          { label: "Avg S&P 500 bear market length", val: "~10 months" },
+          { label: "Avg decline from peak", val: "−33%" },
+          { label: "Deepest (US, modern)", val: "2007–09: −57%" },
+          { label: "Technical definition", val: "−20% from peak" },
+        ],
+        body: [
+          `A <em>bear market</em> is a sustained decline of 20% or more from recent highs — but the defining characteristic is not just the magnitude of decline but the structural shift in investor behaviour that accompanies it. Fear replaces greed as the dominant emotion. Liquidity contracts as market makers widen spreads and reduce inventory. Forced selling — from margin calls, redemptions, and risk limit breaches — creates price-insensitive supply that overwhelms demand. Cross-asset correlations spike: in a genuine bear market, equities, credit, commodities, and risk assets all fall together as investors reduce risk regardless of individual asset fundamentals.`,
+          `Bear markets have distinct phases. The first phase is <strong>denial</strong>: the initial decline is interpreted as a buying opportunity; sentiment remains broadly bullish; "dip-buyers" push back against the selling. The second phase is <strong>capitulation</strong>: prolonged losses exhaust buyers; even long-term holders reduce positions; volatility peaks; volumes spike; the news flow turns uniformly bearish. The third phase is <strong>despair</strong>: prices stabilise at depressed levels; volumes thin; interest in equity markets wanes; the "wall of worry" begins rebuilding. Paradoxically, the despair phase is typically when the next bull market silently begins — when pessimism is most widespread and discounts are greatest, forward returns are highest.`,
+          `Bear markets have characteristic tactical strategy implications. <strong>Short selling</strong> becomes viable (in a bull, short-sellers fight the trend). <strong>Long volatility positions</strong> (long puts, long VIX) generate profit. <strong>Defensive assets outperform</strong>: government bonds (in a recession-driven bear), gold (in a crisis bear), and low-beta equities (consumer staples, utilities). <strong>Momentum strategies reverse</strong>: prior winners become losers as risk reduction flows disproportionately out of overcrowded long positions. <strong>Cash becomes a competitive asset class</strong> in nominal terms — a relationship that's easy to forget after years of near-zero rates.`
+        ],
+        keyPoint: "Bear markets are not simply the inverse of bull markets — they are structurally different regimes. The physics change: correlations spike, liquidity contracts, and strategies that worked in the bull regime (momentum, high beta, buy-the-dip) become actively harmful. The most valuable skill in bear markets is not finding the bottom — it is not mistaking a bear market rally for the end of the regime."
+      },
+      {
+        rClass: "r-side",
+        icon: "↔️",
+        code: "SIDE",
+        title: "Sideways / Ranging Markets",
+        subtitle: "No sustained trend — prices oscillate between support and resistance",
+        meters: [
+          { label: "Trend strength", fill: 12, color: "#22c55e" },
+          { label: "Mean-reversion", fill: 82, color: "#ec4899" },
+          { label: "Vol of vol", fill: 55, color: "#f97316" },
+        ],
+        tags: [["ranging","t-side"], ["mean-reversion","t-mrv"], ["options sellers",""], ["consolidation",""]],
+        stats: [
+          { label: "Hurst exponent in ranging", val: "H < 0.5" },
+          { label: "Options strategy", val: "Short straddle / condor" },
+          { label: "Equity markets ranging example", val: "Nikkei 1990–2013" },
+          { label: "Trend-follow returns", val: "Near-zero / negative" },
+        ],
+        body: [
+          `A <em>ranging or sideways market</em> exists when there is no persistent directional trend — prices oscillate within a defined range, with support (price floor) and resistance (price ceiling) repeatedly containing moves. From a statistical perspective, ranging markets display <em>mean-reversion</em>: moves away from the central value tend to be reversed rather than extended. The Hurst exponent (H) — a statistical measure of long-range memory — is below 0.5 in a ranging market, indicating anti-persistence (below-average returns tend to be followed by above-average returns, and vice versa).`,
+          `Ranging markets are strategically distinct from trending ones because they reward the opposite set of behaviours. <strong>Trend-following strategies generate flat or negative returns</strong>: signals to buy breakouts or sell breakdowns are repeatedly faded, producing a series of small losses as the market reverses back into range. <strong>Mean-reversion and contrarian strategies thrive</strong>: buy weakness near support, sell strength near resistance. <strong>Option selling strategies (short straddles, iron condors) are highly profitable</strong> because implied volatility (which prices in the possibility of large moves) is systematically overpriced relative to realised volatility in a low-directional environment.`,
+          `Ranging regimes are particularly common in commodity markets between supply/demand equilibria, equity indices during periods of macro uncertainty without clear fundamental direction, and FX markets when policy rates are stable across major economies. The danger of ranging markets is the eventual breakout: a market can range for months or years before a fundamental catalyst triggers a directional move — and traders positioned for continued range-trading suffer maximum drawdown on the breakout. Identifying when a ranging regime is about to transition to a trending regime is one of the hardest problems in technical analysis and quant strategy design.`
+        ],
+        keyPoint: "Ranging markets punish directional traders and reward options sellers and contrarians. The irony is that the strategies that perform best in ranging markets (mean-reversion, short volatility) are exactly those that produce the largest losses when the range finally breaks. Understanding the regime is only half the challenge — knowing when the regime is ending is the other half."
+      }
+    ]
+  },
+  {
+    label: "Sentiment & Risk Regimes",
+    sub: "Markets defined by investor risk appetite and cross-asset behaviour",
+    color: "#38bdf8",
+    entries: [
+      {
+        rClass: "r-ron",
+        icon: "🟢",
+        code: "R-ON",
+        title: "Risk-On Environments",
+        subtitle: "Investors seek return — capital flows into risk assets, out of safe havens",
+        meters: [
+          { label: "Equity appetite", fill: 88, color: "#22c55e" },
+          { label: "Credit spread", fill: 15, color: "#f97316" },
+          { label: "EM demand", fill: 78, color: "#38bdf8" },
+        ],
+        tags: [["risk-on","t-ron"], ["credit spread",""], ["EM",""], ["carry trade","t-ron"]],
+        stats: [
+          { label: "VIX level (typical)", val: "<18" },
+          { label: "IG credit spread (typical)", val: "<100 bps" },
+          { label: "USD direction", val: "Weakens" },
+          { label: "EM flows", val: "Inflows" },
+        ],
+        sigTable: {
+          header: ["Asset Class", "Risk-On Behaviour", "Risk-Off Behaviour"],
+          rows: [
+            ["Equities",     "Rise, EM>DM, cyclical>defensive",  "Fall, DM>EM, defensive>cyclical"],
+            ["Credit",       "Spreads compress, HY outperforms", "Spreads widen sharply, HY underperforms"],
+            ["USD",          "Weakens (carry trades)",           "Strengthens (safe haven demand)"],
+            ["Gold",         "Mixed / slightly negative",        "Rises (crisis hedge)"],
+            ["Treasuries",   "Sell off / neutral",               "Rally strongly"],
+            ["EM currencies","Appreciate",                       "Depreciate sharply"],
+          ]
+        },
+        body: [
+          `<em>Risk-on</em> describes a market environment in which investors' appetite for risk is elevated — they allocate capital toward higher-returning, higher-risk assets (equities, high-yield bonds, emerging market securities, cyclical commodities) and away from safe havens (government bonds, gold, JPY, CHF). Risk-on is the default companion of bull markets but is distinguishable as a cross-asset regime concept: it is possible to have a risk-on environment in equities while interest rates are rising (early-cycle economic expansion), or risk-off in FX while equities are stable.`,
+          `The risk-on regime has characteristic cross-asset signatures that allow systematic identification. <strong>Credit spreads compress</strong> — the extra yield demanded to hold corporate vs. government bonds falls as perceived default risk declines. <strong>Emerging market assets outperform</strong> — higher-yielding EM currencies and equities attract carry-seeking capital. <strong>The USD weakens</strong> — as capital flows into higher-yielding non-dollar assets, demand for safe-haven dollars falls. <strong>Commodity prices rise</strong> (particularly cyclical commodities like copper) reflecting demand optimism. <strong>The VIX falls</strong> below 15–18, reflecting low perceived uncertainty.`,
+          `<em>Carry trades</em> are the archetypal risk-on strategy: borrow in low-yield currencies (JPY, CHF) and invest in high-yield currencies or assets (AUD, EM FX, high-yield bonds). These trades are highly profitable during sustained risk-on regimes but subject to violent, sudden "carry unwinds" when the regime shifts to risk-off — the crowding of carry positions means all unwinders compete simultaneously, amplifying the speed and magnitude of the regime transition. The August 2024 JPY carry unwind — triggered by unexpected Bank of Japan rate hikes — caused a sharp global selloff across equities and EM assets in a matter of hours, precisely because carry unwinds are self-reinforcing.`
+        ],
+        keyPoint: "Risk-on/risk-off is not a description of any single asset but of the correlation structure between all assets. In risk-on: correlations within risk assets are positive; risk assets and safe havens are negatively correlated. This regime-defined correlation structure is the foundation of cross-asset portfolio construction — and it breaks down precisely in the moments it matters most."
+      },
+      {
+        rClass: "r-roff",
+        icon: "🔴",
+        code: "R-OFF",
+        title: "Risk-Off Environments",
+        subtitle: "Investors seek safety — capital flees risk assets, flows to safe havens",
+        meters: [
+          { label: "Safety demand", fill: 92, color: "#a855f7" },
+          { label: "Volatility spike", fill: 85, color: "#f97316" },
+          { label: "Correlation to 1", fill: 90, color: "#38bdf8" },
+        ],
+        tags: [["risk-off","t-roff"], ["flight to safety",""], ["treasuries",""], ["JPY",""], ["gold",""]],
+        stats: [
+          { label: "VIX level in acute risk-off", val: ">30–40+" },
+          { label: "10Y Treasury yield (flight)", val: "Drops sharply" },
+          { label: "JPY in risk-off", val: "Strengthens" },
+          { label: "Cross-asset correlation", val: "→ 1" },
+        ],
+        body: [
+          `<em>Risk-off</em> is the mirror image of risk-on: investor sentiment shifts to fear or uncertainty, triggering capital flows out of risk assets and into safe havens. The driving forces can be macroeconomic (recession fears, inflation surprises), geopolitical (war, sanctions), financial (credit events, bank failures), or reflexive (a large risk-asset decline spooks investors into reducing risk, creating further declines). The most important characteristic of acute risk-off regimes is the <strong>correlation of all risky assets approaches 1</strong> — equities, credit, EM, commodities, and real estate all decline simultaneously as investors reduce risk across portfolios regardless of individual fundamentals.`,
+          `Safe haven assets in risk-off regimes follow predictable patterns: <strong>US Treasuries, German Bunds, and Japanese government bonds rally</strong> as investors accept negative real yields to preserve capital. <strong>Gold typically rises</strong>, particularly in crisis-driven rather than purely growth-driven risk-off episodes, as it is perceived as a store of value uncorrelated with institutional counterparty risk. <strong>The USD strengthens</strong> — even though the US may be the source of the risk event (as in 2008), global demand for dollar liquidity drives USD appreciation. <strong>JPY strengthens sharply</strong> as carry trades unwind and Japanese investors repatriate foreign assets.`,
+          `Acute risk-off episodes have characteristic market microstructure features. <strong>Liquidity evaporates</strong>: bid-ask spreads widen 5–20x in equity markets; corporate bond markets become one-sided; even government bond markets can experience dysfunction (as in March 2020 when Treasury bid-ask spreads blew out). <strong>VIX spikes</strong>: the VIX jumped from ~14 to 85 in February–March 2020, the fastest rise in history. <strong>Options skew steepens</strong>: demand for downside protection outpaces upside participation. These microstructure signals are among the most useful real-time indicators of regime transition.`
+        ],
+        keyPoint: "Risk-off regimes demonstrate the fundamental limit of diversification: when it matters most, correlations spike and supposedly uncorrelated assets all decline together. The assets that provide genuine protection — Treasuries, gold, long volatility — must be held before the regime transition, not bought after the fact when they are already expensive."
+      }
+    ]
+  },
+  {
+    label: "Volatility Regimes",
+    sub: "Markets defined by the level and character of price variability",
+    color: "#f97316",
+    entries: [
+      {
+        rClass: "r-low",
+        icon: "😴",
+        code: "VOL−",
+        title: "Low Volatility Regimes",
+        subtitle: "Compressed realised and implied volatility — the calm before the storm",
+        meters: [
+          { label: "VIX level", fill: 18, color: "#10b981" },
+          { label: "Realised vol", fill: 15, color: "#10b981" },
+          { label: "Risk appetite", fill: 82, color: "#22c55e" },
+        ],
+        tags: [["low vol",""], ["VIX",""], ["short vol","t-side"], ["carry","t-ron"], ["vol selling",""]],
+        stats: [
+          { label: "VIX in low-vol regime", val: "10–16" },
+          { label: "1M realised vol (quiet markets)", val: "5–10%" },
+          { label: "Low-vol ETF AUM (peak)", val: ">$80B" },
+          { label: "Biggest VIX spike from low", val: "2018 Volmageddon: +115%" },
+        ],
+        body: [
+          `<em>Low volatility regimes</em> are periods in which both realised volatility (the actual day-to-day movement of prices) and implied volatility (the market's forward-looking expectation of future moves, as proxied by the VIX) are compressed. These regimes are typically associated with stable macroeconomic conditions, accommodative monetary policy, and positive but not exuberant investor sentiment. The 2013–2017 period and parts of 2019 are examples: the VIX frequently traded in the 10–14 range, realised equity volatility was in single digits, and the dominant market narrative was one of "Goldilocks" — not too hot, not too cold.`,
+          `Low volatility regimes create specific strategic opportunities and dangers. <strong>Volatility selling strategies thrive</strong>: short straddles, short puts, iron condors, and variance swaps generate steady income when realised volatility underruns implied. <strong>Carry strategies perform well</strong> as the low-vol environment suppresses the realised drawdowns that periodically wipe out carry trades. <strong>Low-vol equity factors outperform on a risk-adjusted basis</strong> — an empirical anomaly (lower-risk stocks generate higher risk-adjusted returns in low-vol regimes) that spawned a generation of low-vol ETFs and smart-beta products.`,
+          `The danger of low-vol regimes is their self-reinforcing and abruptly reversible nature. Persistently low volatility encourages leverage — when assets rarely move, it appears safe to hold more of them with borrowed money. As more capital is deployed into short-volatility strategies and leveraged positions, the market becomes increasingly fragile: a spike in volatility triggers margin calls, which trigger forced selling, which generates more volatility. <strong>Volmageddon (February 2018)</strong> is the canonical example: years of suppressed VIX had spawned multi-billion dollar short-volatility ETPs (XIV, SVXY). When the VIX spiked 115% in a single session, XIV's value fell 93% overnight, triggering its termination — a product designed to profit from low volatility was destroyed by the end of the low-vol regime.`
+        ],
+        keyPoint: "Low-vol regimes are the market equivalent of a calm sea — and the incentive to sail further from shore and carry more weight increases with each calm day. The longer the low-vol regime persists, the more leveraged and fragile the market becomes. Volatility is not destroyed by suppression; it is deferred and amplified."
+      },
+      {
+        rClass: "r-high",
+        icon: "⚡",
+        code: "VOL+",
+        title: "High Volatility Regimes",
+        subtitle: "Elevated uncertainty — fat tails, wide spreads, strategy breakdown",
+        meters: [
+          { label: "VIX level", fill: 85, color: "#f97316" },
+          { label: "Realised vol", fill: 88, color: "#f97316" },
+          { label: "Liquidity", fill: 15, color: "#ef4444" },
+        ],
+        tags: [["high vol",""], ["VIX spike","t-liq"], ["fat tails",""], ["long vol","t-mrv"], ["crisis alpha",""]],
+        stats: [
+          { label: "VIX in high-vol regime", val: ">30, often 40–85" },
+          { label: "Typical Sharpe of trend-follow in high-vol", val: "Elevated" },
+          { label: "Typical Sharpe of mean-reversion", val: "Collapses" },
+          { label: "VIX peak (COVID, March 2020)", val: "85.47" },
+        ],
+        body: [
+          `<em>High volatility regimes</em> are characterised by large, frequent, and often unpredictable price moves — elevated realised volatility, high implied volatility (VIX above 30), wide bid-ask spreads, and reduced market depth. They typically accompany bear markets, financial crises, or acute macro shocks, though elevated volatility can persist even in uptrending markets (e.g. the 2011 European debt crisis produced high vol alongside eventual market recovery). The statistical distribution of returns shifts in high-vol regimes: fat tails (extreme moves) are more frequent, and the Gaussian (normal distribution) assumptions underlying many risk models dramatically understate actual downside risk.`,
+          `High-vol regimes require wholesale strategy adaptation. <strong>Mean-reversion strategies fail</strong> — in high vol, momentum (moves extending rather than reversing) dominates short-term dynamics. <strong>Trend-following strategies often excel</strong> — large, persistent directional moves create strong trend signals that CTAs and momentum strategies capture. <strong>Long volatility positions generate outsized returns</strong> — long puts, long straddles, and long VIX call positions benefit directly from the vol spike. <strong>Position sizing must be reduced</strong> — the same position that represents a 1-sigma move in normal vol represents a 0.3-sigma move in a high-vol regime, requiring proportional reduction to maintain risk parity.`,
+          `High-vol regimes produce what traders call <em>crisis alpha</em> — the phenomenon that certain strategies (primarily trend-following CTAs and long-vol managers) generate positive returns in environments where most other strategies fail. This crisis alpha is the most valuable form of diversification in a multi-strategy portfolio: not assets that merely correlate less with equities, but strategies that actively benefit from the conditions that cause equity losses. The empirical track record of crisis alpha strategies (Winton, Man AHL during 2008; Universa during COVID) has driven institutional allocation to trend-following and tail-protection mandates as explicit regime-hedge tools.`
+        ],
+        keyPoint: "High-vol regimes are not simply 'harder' versions of low-vol markets — they are structurally different environments where the strategies that worked before actively lose money. The most important risk management decision in a high-vol regime is not which assets to hold but how much to hold: position sizing relative to realised vol is the primary determinant of survival."
+      }
+    ]
+  },
+  {
+    label: "Structural Regimes",
+    sub: "Technical market states defined by autocorrelation, trend persistence, and liquidity",
+    color: "#6366f1",
+    entries: [
+      {
+        rClass: "r-trend",
+        icon: "🏹",
+        code: "TREND",
+        title: "Trending vs. Mean-Reverting Regimes",
+        subtitle: "The Hurst exponent divide — momentum vs. reversion strategies",
+        meters: [
+          { label: "Hurst exponent", fill: 75, color: "#6366f1" },
+          { label: "Autocorrelation", fill: 72, color: "#6366f1" },
+          { label: "CTA performance", fill: 80, color: "#22c55e" },
+        ],
+        tags: [["trending","t-trend"], ["Hurst","t-quant"], ["autocorrelation","t-quant"], ["CTA","t-trend"], ["mean-reversion","t-mrv"]],
+        stats: [
+          { label: "Hurst > 0.5", val: "Trending (persistent)" },
+          { label: "Hurst < 0.5", val: "Mean-reverting (anti-persistent)" },
+          { label: "Hurst ≈ 0.5", val: "Random walk / efficient" },
+          { label: "Commodities (empirical H)", val: "Often >0.55" },
+        ],
+        codeBlock: `<span class="comment"># Hurst exponent calculation (simplified)</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="kw">def</span> <span class="fn">hurst_exponent</span>(ts):
+    lags = <span class="fn">range</span>(<span class="val">2</span>, <span class="val">100</span>)
+    tau  = [<span class="fn">np.std</span>(np.<span class="fn">subtract</span>(ts[lag:], ts[:-lag])) 
+            <span class="kw">for</span> lag <span class="kw">in</span> lags]
+    <span class="comment"># Log-log regression slope ≈ Hurst exponent</span>
+    H = <span class="fn">np.polyfit</span>(<span class="fn">np.log</span>(lags), <span class="fn">np.log</span>(tau), <span class="val">1</span>)[<span class="val">0</span>]
+    <span class="kw">return</span> H  <span class="comment"># H>0.5: trend | H<0.5: mean-revert</span>`,
+        body: [
+          `The distinction between <em>trending</em> and <em>mean-reverting</em> regimes is perhaps the most strategically fundamental in quantitative finance. A trending regime is one in which price moves exhibit <em>positive autocorrelation</em> — above-average returns are followed by above-average returns, and below-average returns by below-average returns. A mean-reverting regime displays <em>negative autocorrelation</em> — moves are followed by reversals. The <em>Hurst exponent (H)</em>, estimated by analysing how the variance of price returns scales with time lag, provides a single statistic that summarises this property: H > 0.5 indicates trending; H < 0.5 indicates mean-reversion; H = 0.5 indicates a random walk (the efficient market baseline).`,
+          `These two regimes require diametrically opposite trading strategies. In a trending regime: <strong>momentum and trend-following strategies</strong> (buy recent winners, sell recent losers; follow breakouts; use moving-average crossovers) generate excess returns. <strong>CTAs and systematic macro funds</strong> — which are predominantly trend-following — perform best in strongly trending markets. In a mean-reverting regime: <strong>contrarian and pairs-trading strategies</strong> (fade recent moves; buy relative losers vs. relative winners; use oscillators like RSI and Bollinger Bands) dominate. <strong>Statistical arbitrage strategies</strong> typically operate on mean-reversion assumptions across short time windows (minutes to hours).`,
+          `The empirical evidence suggests that different instruments and time scales exhibit different typical regimes. <strong>Commodity and FX markets</strong> have historically shown modest trending properties over medium-term horizons (days to months), which is why CTA strategies tend to trade them heavily. <strong>Equity indices</strong> are approximately random-walk in the medium term but show short-term mean-reversion (microstructure) and long-term momentum. <strong>Individual equities</strong> exhibit momentum over 1–12 month horizons (the classic momentum anomaly) but mean-reversion over very short (intraday) and very long (multi-year) windows. These empirical regularities are the foundation of systematic strategy design — and they shift as regimes evolve.`
+        ],
+        keyPoint: "Trending and mean-reverting regimes are not about direction — they are about the autocorrelation structure of returns. The same market can trend in one dimension (time scale) and mean-revert in another. A strategy that doesn't adapt when the regime shifts will inevitably produce losses: mean-reversion strategies bleed in trending markets; trend-following strategies whipsaw in mean-reverting ones. Regime detection is not optional for systematic traders."
+      },
+      {
+        rClass: "r-liq",
+        icon: "🌊",
+        code: "LIQ−",
+        title: "Liquidity Crises",
+        subtitle: "When the ability to transact at any reasonable price collapses — the most dangerous market state",
+        meters: [
+          { label: "Bid-ask spread", fill: 95, color: "#ef4444" },
+          { label: "Market depth", fill: 5, color: "#ef4444" },
+          { label: "Correlation to 1", fill: 95, color: "#a855f7" },
+        ],
+        tags: [["liquidity crisis","t-liq"], ["bid-ask","t-liq"], ["forced selling","t-bear"], ["contagion","t-bear"], ["Fed put","t-ron"]],
+        stats: [
+          { label: "March 2020 Treasury bid-ask", val: "5–20x normal" },
+          { label: "LTCM liquidity crisis (1998)", val: "$4.6B loss" },
+          { label: "March 2020 VIX peak", val: "85.47" },
+          { label: "Typical recovery period", val: "Weeks to months" },
+        ],
+        body: [
+          `A <em>liquidity crisis</em> is not merely a period of low liquidity — it is a regime in which normal market functioning breaks down. The bid-ask spread — the basic cost of transacting — widens by factors of 5–20x. Market depth collapses: the order book thins dramatically and large orders move prices by multiples of normal impact. Price discovery becomes unreliable: observed prices may not reflect where anyone is willing to actually transact. The crisis has a self-reinforcing dynamic: falling prices trigger margin calls; margin calls force asset sales; forced asset sales push prices further down; lower prices trigger more margin calls. This is the <em>liquidity spiral</em>, first formalised by Markus Brunnermeier and Lasse Pedersen.`,
+          `Liquidity crises have occurred with disturbing regularity across financial history: the 1987 Black Monday crash, the LTCM collapse (1998), the 2008 global financial crisis, the 2010 Flash Crash, the 2020 COVID crisis, and the 2022 UK gilt crisis. Each episode shares structural features: <strong>a sudden shift in risk appetite</strong> (often triggered by a specific event), <strong>a liquidity vacuum</strong> as market makers and risk-neutral traders withdraw, <strong>cross-asset contagion</strong> as investors liquidate whatever they can rather than what they want to sell, and <strong>policy intervention</strong> (central bank liquidity provision, circuit breakers) that eventually stabilises the system.`,
+          `The most dangerous aspect of liquidity crises is that they expose the difference between <em>normal-times liquidity</em> and <em>stress-times liquidity</em>. Assets that trade 10 million shares per day in calm markets may have no buyers at any price during a crisis — the "liquidity illusion" that normal trading conditions create. Portfolio managers who rely on historical liquidity data for risk models systematically underestimate the cost of liquidating positions in stressed conditions. The March 2020 US Treasury market dysfunction — where the world's deepest, most liquid market briefly failed to function — was the most dramatic illustration: if 10-year Treasuries can become illiquid, no portfolio is immune.`
+        ],
+        keyPoint: "Liquidity crises reveal the fundamental fragility of financial markets: liquidity is not a property of an asset but of an environment. The same asset can be instantly tradable in one regime and completely illiquid in another. Every portfolio model that treats liquidity as static underestimates tail risk. The practical implication: assets must be sized for stress liquidity, not average liquidity."
+      }
+    ]
+  },
+  {
+    label: "Quantitative Regime Analysis",
+    sub: "Methods for detecting, modelling, and trading regime transitions",
+    color: "#06b6d4",
+    entries: [
+      {
+        rClass: "r-quant",
+        icon: "🔬",
+        code: "HMM",
+        title: "Regime Detection — HMMs and Statistical Tests",
+        subtitle: "Quantitative tools for identifying which regime the market is currently in",
+        meters: [
+          { label: "Model complexity", fill: 72, color: "#06b6d4" },
+          { label: "Real-time accuracy", fill: 55, color: "#f59e0b" },
+          { label: "Practical utility", fill: 78, color: "#22c55e" },
+        ],
+        tags: [["HMM","t-quant"], ["regime detection","t-quant"], ["Bai-Perron","t-quant"], ["CUSUM","t-quant"], ["structural break",""]],
+        stats: [
+          { label: "HMM states (typical)", val: "2–4 regimes" },
+          { label: "Bai-Perron: tests for", val: "Structural breaks" },
+          { label: "CUSUM: monitors for", val: "Parameter shifts" },
+          { label: "Detection lag (typical)", val: "Weeks to months" },
+        ],
+        codeBlock: `<span class="comment"># Hidden Markov Model — regime detection skeleton</span>
+<span class="kw">from</span> hmmlearn.hmm <span class="kw">import</span> GaussianHMM
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="comment"># Fit 2-state HMM to daily equity returns</span>
+model = <span class="fn">GaussianHMM</span>(n_components=<span class="val">2</span>, covariance_type=<span class="str">"full"</span>,
+                    n_iter=<span class="val">1000</span>)
+model.<span class="fn">fit</span>(returns.reshape(-<span class="val">1</span>, <span class="val">1</span>))
+
+<span class="comment"># Posterior probability of being in each state</span>
+states = model.<span class="fn">predict</span>(returns.reshape(-<span class="val">1</span>, <span class="val">1</span>))
+<span class="comment"># State 0 typically = low-vol/bull, State 1 = high-vol/bear</span>`,
+        body: [
+          `<em>Regime detection</em> is the statistical problem of identifying, in real time or retrospect, which regime a market is currently in. The challenge is fundamental: regime transitions are only definitively identifiable after the fact, because the same return sequence could plausibly belong to multiple regimes depending on the model assumptions. The practical question is: given current data, what is the probability that we are in regime A versus regime B — and how should portfolio positioning respond?`,
+          `The <em>Hidden Markov Model (HMM)</em> is the most widely used probabilistic framework for regime detection. An HMM assumes the market can be in one of K unobservable ("hidden") states, each characterised by its own return distribution (mean, variance). The model learns state transition probabilities and emission distributions from historical data, then uses the Viterbi algorithm or forward-backward algorithm to compute the most likely state sequence — or the posterior probability of each state at each time point. A 2-state HMM applied to equity returns typically learns a "bull/low-vol" state (positive mean, low variance) and a "bear/high-vol" state (negative or zero mean, high variance). More states allow finer resolution at the cost of overfitting risk.`,
+          `Alternative detection approaches include <strong>Bai-Perron structural break tests</strong> (identifying dates where the statistical properties of a series change significantly — useful for detecting permanent regime shifts rather than cyclical alternation), <strong>CUSUM (cumulative sum) control charts</strong> (monitoring a running statistic for persistent deviations from a baseline, providing real-time break detection), <strong>Markov-switching regressions</strong> (Hamilton 1989 — the foundational academic model), and <strong>non-parametric methods</strong> (clustering returns by their statistical properties using k-means or Gaussian mixture models without the Markov assumption). Each method involves trade-offs: HMMs are powerful but require stationarity; structural break tests are statistically rigorous but retrospective; CUSUM is real-time but sensitive to parameter choice.`
+        ],
+        keyPoint: "Regime detection is never certain in real time — it is always probabilistic and subject to revision. The practitioner's challenge is acting on incomplete, probabilistic regime signals without either over-trading on noise or under-responding to genuine transitions. Models that work in backtests often disappoint in live use because regimes shift faster than models can detect them, and because the regime labels learned from historical data may not persist into the future."
+      },
+      {
+        rClass: "r-quant",
+        icon: "🔀",
+        code: "MSM",
+        title: "Regime-Switching Models",
+        subtitle: "Econometric frameworks that let model parameters change with the unobserved state",
+        meters: [
+          { label: "Theoretical elegance", fill: 85, color: "#06b6d4" },
+          { label: "Implementation complexity", fill: 80, color: "#f97316" },
+          { label: "Out-of-sample performance", fill: 52, color: "#f59e0b" },
+        ],
+        tags: [["Hamilton","t-quant"], ["MS-VAR","t-quant"], ["regime-switching","t-quant"], ["parameter instability",""], ["EM algorithm","t-quant"]],
+        stats: [
+          { label: "Hamilton (1989) paper: seminal", val: "Markov-switching AR" },
+          { label: "MS-GARCH: models", val: "Vol regime switching" },
+          { label: "MS-VAR: models", val: "Multi-asset regime dynamics" },
+          { label: "Estimation: via", val: "Expectation-Maximisation" },
+        ],
+        body: [
+          `<em>Regime-switching models</em>, pioneered by James Hamilton's 1989 paper on business cycle dating, formalise the intuition that economic and financial time series are not generated by a single stable process but by multiple processes — one per regime — that alternate over time according to a Markov chain. The key insight is that a single model fitted to the full history of returns will be a misspecified average of multiple distinct regimes — and that a regime-conditional model will provide better inference and forecasting. The simplest version: a two-state Markov-switching autoregression where the intercept, autocorrelation coefficients, and error variance all switch depending on which latent state the system is in.`,
+          `The regime-switching framework has been extended in multiple directions. <strong>MS-GARCH (Markov-Switching GARCH)</strong> models volatility clustering as regime-dependent: in the high-vol regime, GARCH dynamics are more persistent (shocks decay slowly); in the low-vol regime, volatility reverts to baseline quickly. <strong>MS-VAR (Markov-Switching Vector Autoregression)</strong> models the joint dynamics of multiple assets simultaneously, allowing cross-asset correlations to be regime-dependent — empirically essential given that correlations between equities and bonds flip sign between bull and crisis regimes. <strong>MS-Copula</strong> models capture regime-dependent tail dependence, which is critical for options pricing and tail-risk management.`,
+          `The practical limitations of regime-switching models are significant. Estimation requires the <em>Expectation-Maximisation (EM) algorithm</em>, which is computationally intensive and can converge to local maxima. The number of states must be specified a priori (or selected by information criteria like AIC/BIC) and is sensitive to the estimation window. Models are estimated on historical regimes and implicitly assume those regimes will recur with similar properties — an assumption that fails when structural economic changes (zero interest rate periods, post-GFC bank regulation) alter the fundamental character of regimes. Out-of-sample forecasting performance is typically disappointing relative to in-sample fit, a common pattern in econometrics.`
+        ],
+        keyPoint: "Regime-switching models are intellectually compelling solutions to the parameter instability problem in finance — markets clearly do not follow a single stable process. Their limitation is that the regimes must be discovered from historical data, and the future may introduce regimes with no historical precedent. The model is only as good as the assumption that the past regime structure will repeat."
+      },
+      {
+        rClass: "r-quant",
+        icon: "📡",
+        code: "XAST",
+        title: "Cross-Asset Regime Signals",
+        subtitle: "Using multiple markets simultaneously to identify regime — robust, less noisy",
+        meters: [
+          { label: "Signal quality", fill: 82, color: "#06b6d4" },
+          { label: "Lead time vs eq-only", fill: 68, color: "#22c55e" },
+          { label: "Complexity", fill: 60, color: "#f97316" },
+        ],
+        tags: [["cross-asset","t-quant"], ["yield curve",""], ["credit spread",""], ["VIX",""], ["copper/gold",""]],
+        sigTable: {
+          header: ["Signal", "Regime Implication", "Lead/Lag"],
+          rows: [
+            ["Yield curve (2Y10Y)", "Inversion → recession/bear risk within 12–24M", "Leading (long)"],
+            ["Credit spreads (IG/HY)", "Widening → risk-off; tightening → risk-on", "Coincident–leading"],
+            ["VIX level & trend", "VIX>30: high-vol/bear; VIX<15: low-vol/bull", "Coincident"],
+            ["Copper/Gold ratio", "Rising → risk-on/growth; falling → risk-off", "Coincident"],
+            ["USD DXY", "USD strength → risk-off; weakness → risk-on", "Coincident"],
+            ["High-yield spreads",  "Divergence from equities → early warning", "Leading (medium)"],
+            ["EM/DM equity ratio", "EM outperform → risk-on; underperform → risk-off", "Coincident"],
+          ]
+        },
+        body: [
+          `<em>Cross-asset regime signals</em> exploit the empirical observation that regime transitions are rarely confined to a single asset class — they manifest simultaneously (or sequentially) across equities, bonds, credit, currencies, and commodities. Using multiple signals from different asset classes produces a more robust regime identification than any single-asset model, both because it reduces noise (one signal flashing risk-off may be idiosyncratic; five signals flashing simultaneously are more credible) and because different signals lead and lag at different horizons (credit spreads often lead equity markets by weeks; the yield curve can lead by 12–24 months).`,
+          `The <em>yield curve</em> (particularly the 2-year/10-year spread) is arguably the single most powerful regime signal in financial markets. Every US recession since the 1960s has been preceded by a yield curve inversion (short rates above long rates) — with a lead time of 6–24 months. The economic logic: when the Fed raises short rates above long rates, it constrains bank lending (banks borrow short and lend long; an inverted curve compresses or eliminates this margin) and signals that the market expects future rate cuts (reflecting anticipated recession). The 2022–2023 inversion is a recent example — the most extreme in 40 years — whose recessionary implications are still being evaluated in 2024–25.`,
+          `Composite cross-asset regime indicators combine multiple signals into a single score. Common approaches: <strong>equal-weighted signal averaging</strong> (each signal receives equal weight; regime is bullish if >50% of signals are bullish); <strong>factor-model composites</strong> (PCA or risk factor decomposition of cross-asset returns identifies the dominant common factor, which is then labelled as the regime); <strong>flow-of-funds indicators</strong> (tracking capital movements between asset classes using positioning data — CFTC Commitment of Traders, fund flow data — to detect early-stage regime transitions before price moves). The combination of quantitative signal construction with qualitative macro interpretation is the hallmark of global macro practitioners.`
+        ],
+        keyPoint: "Single-asset regime detection is noisy; cross-asset confirmation is signal. The most robust regime calls are those where credit spreads, yield curve, volatility, FX, and cross-asset correlations all point the same way simultaneously. Divergences — where one asset is pricing a bear regime and another is pricing a bull — are themselves information: they indicate regime uncertainty, and uncertainty demands reduced position sizing regardless of directional view."
+      }
+    ]
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  categories.forEach(cat => {
+    const wrap = document.createElement('div');
+    wrap.className = 'cat-section';
+
+    const cHead = document.createElement('div');
+    cHead.className = 'cat-head';
+    cHead.style.borderLeftColor = cat.color;
+    cHead.innerHTML = `
+      <div class="cat-head-label" style="color:${cat.color}">${cat.label}</div>
+      <div class="cat-head-sub">${cat.sub}</div>
+    `;
+    wrap.appendChild(cHead);
+
+    cat.entries.forEach(e => {
+      const idx = cnt++;
+      const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+      const statsHtml = e.stats ? `
+        <div class="stat-grid">
+          ${e.stats.map(s=>`
+            <div class="stat-cell">
+              <div class="stat-cell-label">${s.label}</div>
+              <div class="stat-cell-val">${s.val}</div>
+            </div>`).join('')}
+        </div>` : '';
+
+      const codeHtml = e.codeBlock ? `<div class="code-block">${e.codeBlock}</div>` : '';
+
+      const sigHtml = e.sigTable ? `
+        <div class="signal-table">
+          <div class="sig-row hdr-row">
+            ${e.sigTable.header.map(h=>`<div class="sig-cell">${h}</div>`).join('')}
+          </div>
+          ${e.sigTable.rows.map(row=>`
+            <div class="sig-row">
+              ${row.map((c,i)=>{
+                let color='';
+                if(i===0) color='color:var(--ink2)';
+                else if(i===1) color='color:var(--ink2)';
+                else color='color:var(--muted)';
+                return `<div class="sig-cell" style="${color}">${c}</div>`;
+              }).join('')}
+            </div>`).join('')}
+        </div>` : '';
+
+      // meters
+      const metersHtml = e.meters ? `
+        <div class="meter-group">
+          ${e.meters.map(m=>`
+            <div class="meter-row">
+              <div class="meter-label">${m.label}</div>
+              <div class="meter-track">
+                <div class="meter-fill" style="--fill-w:${m.fill}%; background:${m.color}"></div>
+              </div>
+            </div>`).join('')}
+        </div>` : '';
+
+      const bodyHtml =
+        e.body.map(p=>`<p>${p}</p>`).join('') +
+        codeHtml + statsHtml + sigHtml +
+        `<div class="key-insight">
+          <div class="ki-marker">KEY //</div>
+          <div class="ki-text">${e.keyPoint}</div>
+        </div>` +
+        `<div class="tags">${tagsHtml}</div>`;
+
+      const div = document.createElement('div');
+      div.className = `entry ${e.rClass}`;
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <div class="e-regime-bar">
+            <span class="e-regime-icon">${e.icon}</span>
+            <span class="e-regime-code">${e.code}</span>
+          </div>
+          <div class="e-body-hdr">
+            <div class="e-title">${e.title}</div>
+            <div class="e-subtitle">${e.subtitle}</div>
+          </div>
+          ${metersHtml}
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-content">${bodyHtml}</div>
+      `;
+      wrap.appendChild(div);
+    });
+
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 3.14 Basis</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0c0e0d;
+  --bg1:      #111413;
+  --bg2:      #161a18;
+  --bg3:      #1c211e;
+  --surface:  #14201b;
+  --border:   #1e2622;
+  --border2:  #28342e;
+
+  --ink:      #e0e8e2;
+  --ink2:     #8a988e;
+  --muted:    #485a50;
+  --faint:    #18201c;
+
+  --pos:      #4dd982;   /* positive basis / convergence — green */
+  --pos-d:    #0e3a20;
+  --pos-b:    rgba(77,217,130,0.07);
+
+  --neg:      #e8645d;   /* negative basis — coral red */
+  --neg-d:    #4a1814;
+  --neg-b:    rgba(232,100,93,0.07);
+
+  --risk:     #e8a83d;   /* basis risk — amber */
+  --risk-d:   #4a3308;
+  --risk-b:   rgba(232,168,61,0.07);
+
+  --comm:     #3da8e8;   /* commodity basis — blue */
+  --comm-d:   #082e4a;
+  --comm-b:   rgba(61,168,232,0.07);
+
+  --bond:     #a83de8;   /* bond/CTD — purple */
+  --bond-d:   #2e084a;
+  --bond-b:   rgba(168,61,232,0.07);
+
+  --crypto:   #e83d9e;   /* crypto basis — magenta */
+  --crypto-d: #4a0830;
+  --crypto-b: rgba(232,61,158,0.07);
+
+  --xexch:    #3de8c5;   /* cross-exchange — cyan */
+  --xexch-d:  #084a3a;
+  --xexch-b:  rgba(61,232,197,0.07);
+
+  --credit:   #d9bd4d;   /* credit basis trade — gold */
+  --credit-d: #3a3008;
+  --credit-b: rgba(217,189,77,0.07);
+
+  --crisis:   #e8453d;   /* crisis widening — red */
+  --crisis-d: #4a1008;
+  --crisis-b: rgba(232,69,61,0.07);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Archivo', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* measurement grid texture */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(77,217,130,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(77,217,130,0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ── MASTHEAD: instrument gauge aesthetic ── */
+.masthead {
+  position: relative; z-index: 2;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border2);
+}
+
+.mhd-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 52px 44px 0;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 44px; align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--pos); }
+
+.mhd-title {
+  font-family: 'Archivo', sans-serif;
+  font-size: clamp(44px, 6.5vw, 84px);
+  font-weight: 800; letter-spacing: -0.04em;
+  line-height: 0.88; color: var(--ink);
+  margin-bottom: 14px;
+}
+.mhd-title .eq { color: var(--pos); }
+
+.mhd-sub {
+  font-family: 'Source Serif 4', serif;
+  font-style: italic; font-size: 14px;
+  color: var(--ink2); line-height: 1.65;
+  max-width: 480px; font-weight: 400;
+  margin-bottom: 28px;
+}
+
+/* basis equation display widget */
+.basis-gauge {
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  overflow: hidden; min-width: 260px;
+}
+.bg-hdr {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 8px 14px; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.bg-formula {
+  padding: 18px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px; text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.bg-formula .spot { color: var(--pos); }
+.bg-formula .fut  { color: var(--crypto); }
+.bg-formula .op   { color: var(--muted); }
+.bg-formula .res  { color: var(--risk); font-weight: 700; }
+.bg-rows { padding: 0; }
+.bg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+}
+.bg-row:last-child { border-bottom: none; }
+.bg-label { color: var(--muted); }
+.bg-val { font-weight: 700; }
+.bg-val.pos { color: var(--pos); }
+.bg-val.neg { color: var(--neg); }
+
+/* meter strip below header */
+.meter-strip {
+  max-width: 1080px; margin: 0 auto;
+  padding: 0 44px;
+  display: flex; gap: 0; overflow-x: auto;
+  border-top: 1px solid var(--border);
+}
+.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 130px; }
+.meter-name { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 3px; }
+.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; }
+.meter-val.pos { color: var(--pos); }
+.meter-val.neg { color: var(--neg); }
+
+/* ── PAGE ── */
+.page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 34px 44px 100px; }
+
+.sec-hdr { display: flex; align-items: center; gap: 14px; margin: 30px 0 8px; }
+.sec-label { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
+.sec-line { flex: 1; height: 1px; }
+
+.controls { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
+.ctrl { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.ctrl:hover { border-color: var(--pos); color: var(--pos); }
+.ctrl-right { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; }
+
+/* ── ENTRY ── */
+.entry { border: 1px solid var(--border); background: var(--bg1); margin-bottom: 4px; position: relative; overflow: hidden; transition: border-color 0.18s; }
+.entry::before { content: ''; position: absolute; left:0; top:0; bottom:0; width:3px; transition: width 0.2s; }
+.entry.open::before { width: 4px; }
+.entry:hover { border-color: var(--border2); }
+
+.c-mech   .entry::before { background: var(--pos-d); } .c-mech   .entry.open::before { background: var(--pos); }
+.c-risk   .entry::before { background: var(--risk-d); } .c-risk   .entry.open::before { background: var(--risk); }
+.c-comm   .entry::before { background: var(--comm-d); } .c-comm   .entry.open::before { background: var(--comm); }
+.c-bond   .entry::before { background: var(--bond-d); } .c-bond   .entry.open::before { background: var(--bond); }
+.c-crypto .entry::before { background: var(--crypto-d); } .c-crypto .entry.open::before { background: var(--crypto); }
+.c-xexch  .entry::before { background: var(--xexch-d); } .c-xexch  .entry.open::before { background: var(--xexch); }
+.c-credit .entry::before { background: var(--credit-d); } .c-credit .entry.open::before { background: var(--credit); }
+.c-crisis .entry::before { background: var(--crisis-d); } .c-crisis .entry.open::before { background: var(--crisis); }
+
+.e-hdr { display: flex; align-items: center; cursor: pointer; user-select: none; min-height: 58px; padding-left: 4px; transition: background 0.14s; }
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--faint); width: 44px; text-align: center; flex-shrink: 0; letter-spacing: 0.06em; }
+
+.e-icon { font-size: 17px; width: 46px; text-align: center; flex-shrink: 0; border-right: 1px solid var(--border); align-self: stretch; display: flex; align-items: center; justify-content: center; }
+
+.e-text { flex: 1; padding: 12px 16px; }
+.e-title { font-family: 'Archivo', sans-serif; font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.2; letter-spacing: -0.01em; }
+.e-sub { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); margin-top: 3px; letter-spacing: 0.03em; font-weight: 300; }
+
+.e-fmla { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink2); padding: 4px 12px; border: 1px solid var(--border2); background: var(--bg2); margin-right: 14px; flex-shrink: 0; white-space: nowrap; max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+
+.e-toggle { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; align-self: stretch; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--border); flex-shrink: 0; transition: transform 0.24s, color 0.15s; }
+.entry.open .e-toggle { transform: rotate(90deg); }
+.c-mech   .entry.open .e-toggle { color: var(--pos); }
+.c-risk   .entry.open .e-toggle { color: var(--risk); }
+.c-comm   .entry.open .e-toggle { color: var(--comm); }
+.c-bond   .entry.open .e-toggle { color: var(--bond); }
+.c-crypto .entry.open .e-toggle { color: var(--crypto); }
+.c-xexch  .entry.open .e-toggle { color: var(--xexch); }
+.c-credit .entry.open .e-toggle { color: var(--credit); }
+.c-crisis .entry.open .e-toggle { color: var(--crisis); }
+
+/* ── BODY ── */
+.e-body { display: none; border-top: 1px solid var(--border); background: var(--bg); padding: 22px 22px 26px 90px; animation: bIn 0.2s ease; }
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p { font-family: 'Source Serif 4', serif; font-size: 14px; font-weight: 400; line-height: 1.86; color: var(--ink2); margin-bottom: 14px; }
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); }
+.e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Archivo', sans-serif; font-size: 13.5px; }
+
+/* formula block */
+.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--pos); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.fmla-main { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--ink); flex-shrink: 0; line-height: 1.6; }
+.fmla-main .sp { color: var(--pos); }
+.fmla-main .ft { color: var(--crypto); }
+.fmla-main .op { color: var(--muted); }
+.fmla-main .res { color: var(--risk); }
+.fmla-note { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
+
+/* convergence diagram (SVG) */
+.converge-vis { margin-top: 18px; border: 1px solid var(--border2); background: var(--bg2); overflow: hidden; }
+.cv-title { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); padding: 7px 14px; border-bottom: 1px solid var(--border); background: var(--bg3); }
+.cv-svg { width: 100%; height: 140px; display: block; }
+
+/* stat grid */
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.stat { flex: 1; min-width: 120px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2); }
+.stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.stat-v { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.stat-v.pos    { color: var(--pos); }
+.stat-v.neg    { color: var(--neg); }
+.stat-v.risk   { color: var(--risk); }
+.stat-v.comm   { color: var(--comm); }
+.stat-v.bond   { color: var(--bond); }
+.stat-v.crypto { color: var(--crypto); }
+.stat-v.xexch  { color: var(--xexch); }
+.stat-v.credit { color: var(--credit); }
+.stat-v.crisis { color: var(--crisis); }
+
+/* cmp grid */
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cmp.c3 { grid-template-columns: 1fr 1fr 1fr; }
+.cc { padding: 13px 15px; border: 1px solid var(--border); background: var(--bg2); }
+.cc-l { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
+.cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Archivo', sans-serif !important; font-weight: 400 !important; color: var(--ink2) !important; }
+.cc.pos    { background: var(--pos-b);    border-color: var(--pos-d);    } .cc.pos    .cc-l { color: var(--pos); }
+.cc.neg    { background: var(--neg-b);    border-color: var(--neg-d);    } .cc.neg    .cc-l { color: var(--neg); }
+.cc.risk   { background: var(--risk-b);   border-color: var(--risk-d);   } .cc.risk   .cc-l { color: var(--risk); }
+.cc.comm   { background: var(--comm-b);   border-color: var(--comm-d);   } .cc.comm   .cc-l { color: var(--comm); }
+.cc.bond   { background: var(--bond-b);   border-color: var(--bond-d);   } .cc.bond   .cc-l { color: var(--bond); }
+.cc.crypto { background: var(--crypto-b); border-color: var(--crypto-d); } .cc.crypto .cc-l { color: var(--crypto); }
+.cc.xexch  { background: var(--xexch-b);  border-color: var(--xexch-d);  } .cc.xexch  .cc-l { color: var(--xexch); }
+.cc.credit { background: var(--credit-b); border-color: var(--credit-d); } .cc.credit .cc-l { color: var(--credit); }
+.cc.crisis { background: var(--crisis-b); border-color: var(--crisis-d); } .cc.crisis .cc-l { color: var(--crisis); }
+
+/* data table */
+.dtable { margin-top: 18px; border: 1px solid var(--border); overflow: auto; }
+.drow { display: grid; border-bottom: 1px solid var(--border); }
+.drow:last-child { border-bottom: none; }
+.drow.hdr .dc { background: var(--bg3); font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.dc { padding: 8px 12px; border-right: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink2); line-height: 1.5; }
+.dc:last-child { border-right: none; }
+.dc.label { color: var(--ink); font-weight: 600; font-family: 'Archivo', sans-serif; font-size: 12px; }
+.dc.pos    { color: var(--pos); }
+.dc.neg    { color: var(--neg); }
+.dc.risk   { color: var(--risk); }
+.dc.comm   { color: var(--comm); }
+.dc.crisis { color: var(--crisis); }
+
+/* key insight */
+.ki { margin-top: 20px; padding: 14px 18px; background: var(--bg2); border: 1px solid var(--border2); display: flex; gap: 14px; align-items: flex-start; }
+.ki-glyph { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; flex-shrink: 0; padding-top: 2px; }
+.ki-text { font-family: 'Source Serif 4', serif; font-style: italic; font-size: 14.5px; color: var(--ink); line-height: 1.62; }
+.c-mech   .ki-glyph { color: var(--pos); }
+.c-risk   .ki-glyph { color: var(--risk); }
+.c-comm   .ki-glyph { color: var(--comm); }
+.c-bond   .ki-glyph { color: var(--bond); }
+.c-crypto .ki-glyph { color: var(--crypto); }
+.c-xexch  .ki-glyph { color: var(--xexch); }
+.c-credit .ki-glyph { color: var(--credit); }
+.c-crisis .ki-glyph { color: var(--crisis); }
+
+/* tags */
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
+.tag.pos    { border-color: var(--pos-d);    color: var(--pos); }
+.tag.neg    { border-color: var(--neg-d);    color: var(--neg); }
+.tag.risk   { border-color: var(--risk-d);   color: var(--risk); }
+.tag.comm   { border-color: var(--comm-d);   color: var(--comm); }
+.tag.bond   { border-color: var(--bond-d);   color: var(--bond); }
+.tag.crypto { border-color: var(--crypto-d); color: var(--crypto); }
+.tag.xexch  { border-color: var(--xexch-d);  color: var(--xexch); }
+.tag.credit { border-color: var(--credit-d); color: var(--credit); }
+.tag.crisis { border-color: var(--crisis-d); color: var(--crisis); }
+
+/* footer */
+.foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+.foot span { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .basis-gauge { display: none; }
+  .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding: 36px 18px 0; }
+  .meter-strip { padding: 0 18px; }
+  .e-body { padding-left: 16px; }
+  .cmp.c2,.cmp.c3 { grid-template-columns: 1fr; }
+  .e-fmla { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 3.14 · Core Trading Foundations</div>
+      <div class="mhd-title">Basis<span class="eq"> =</span></div>
+      <div class="mhd-sub">The gap between spot and futures — the single number that ties physical markets, derivatives, credit, and crypto perpetuals together. 9 topics.</div>
+    </div>
+    <div class="basis-gauge">
+      <div class="bg-hdr">// Basis Formula</div>
+      <div class="bg-formula">
+        <span class="spot">Spot</span> <span class="op">−</span> <span class="fut">Futures</span> <span class="op">=</span> <span class="res">Basis</span>
+      </div>
+      <div class="bg-rows">
+        <div class="bg-row"><span class="bg-label">Spot (illustrative)</span><span class="bg-val">$78.40</span></div>
+        <div class="bg-row"><span class="bg-label">Front Futures</span><span class="bg-val">$78.85</span></div>
+        <div class="bg-row"><span class="bg-label">Basis</span><span class="bg-val neg">−$0.45 (contango)</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="meter-strip">
+    <div class="meter-item"><div class="meter-name">WTI Basis (M1)</div><div class="meter-val neg">−$0.45</div></div>
+    <div class="meter-item"><div class="meter-name">10Y CTD Basis</div><div class="meter-val pos">+0.18</div></div>
+    <div class="meter-item"><div class="meter-name">BTC Perp Basis</div><div class="meter-val pos">+0.012%</div></div>
+    <div class="meter-item"><div class="meter-name">IG CDS-Bond Basis</div><div class="meter-val neg">−12 bps</div></div>
+    <div class="meter-item"><div class="meter-name">Corn Gulf Basis</div><div class="meter-val pos">+$0.22</div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">9 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>3.14 Basis</span>
+</footer>
+
+<script>
+const sections = [
+  {
+    label:"Foundational Mechanics",
+    color:"var(--pos)", line:"var(--pos-d)", fam:"c-mech",
+    entries:[
+      {
+        icon:"⚖️", fmla:"Basis = Spot − Futures",
+        title:"Basis — Definition and Sign Convention",
+        sub:"The single number connecting cash and derivatives markets",
+        tags:[["basis","pos"],["spot","pos"],["futures","pos"],["sign convention","risk"]],
+        fmla2:{
+          main:`<span class="sp">Basis</span> <span class="op">=</span> <span class="sp">Spot Price</span> <span class="op">−</span> <span class="ft">Futures Price</span>`,
+          note:`Positive basis (Spot > Futures): backwardation\nNegative basis (Spot < Futures): contango\n\nNote: some markets (esp. financial futures)\nuse the reverse convention (Futures − Spot).\nALWAYS confirm convention before trading.`
+        },
+        stats:[
+          {l:"Standard commodity convention",v:"Spot − Futures",c:"pos"},
+          {l:"Positive basis means",v:"Backwardation (spot premium)",c:"pos"},
+          {l:"Negative basis means",v:"Contango (futures premium)",c:"neg"},
+          {l:"Basis = 0 at",v:"Futures expiration (convergence)",c:"risk"},
+        ],
+        body:[
+          `<em>Basis</em> is defined as the difference between the spot (cash market) price of an asset and the price of its corresponding futures contract: Basis = Spot − Futures. This single number is one of the most informationally dense figures in finance — it simultaneously reflects storage costs, financing costs, convenience yield, supply and demand imbalances, and market expectations about the future, compressed into a single observable price difference.`,
+          `The sign convention matters and is a frequent source of confusion. Under the standard commodity convention (Spot − Futures), a <em>positive basis</em> means spot trades above futures — the market is in <em>backwardation</em>, typically reflecting scarce current supply or high convenience yield (the value of having physical inventory in hand right now). A <em>negative basis</em> means futures trade above spot — the market is in <em>contango</em>, typically reflecting storage costs, financing costs, or ample current supply with no urgency for immediate delivery.`,
+          `Critically, some markets — particularly financial futures and certain trading desks — use the <em>reverse convention</em> (Futures − Spot), which flips the sign interpretation entirely. A trader moving between commodity desks (which traditionally use Spot − Futures) and financial futures desks (which often use Futures − Spot) must explicitly confirm which convention is in use before interpreting any basis figure or executing a basis trade — a sign error here can turn a hedge into a doubled-up directional bet.`,
+          `Basis is observable, tradeable, and economically meaningful in every market with both a spot/cash reference and a futures contract: commodities (crude oil, grains, metals), fixed income (Treasury cash bonds vs. Treasury futures), credit (cash bonds vs. CDS), and crypto (spot BTC vs. BTC perpetual futures or dated futures). In each domain, basis encodes a different combination of underlying economic forces — but the core insight is constant: basis measures the cost (or benefit) of accessing exposure synthetically through derivatives versus holding the asset directly.`
+        ],
+        ki:"Basis is the bridge between two parallel pricing universes — the cash market and the derivatives market — that should theoretically be tightly linked by arbitrage but never trade perfectly in lockstep. Every persistent or widening basis reflects either a genuine economic friction (storage costs, financing costs, convenience yield) or a market dislocation (funding stress, capacity constraints, panic). Learning to read basis is learning to read the plumbing of markets, not just their headline prices."
+      },
+      {
+        icon:"📐", fmla:"Basis → 0 at expiry",
+        title:"Convergence at Expiration",
+        sub:"Why basis must collapse to zero as the futures contract approaches delivery",
+        tags:[["convergence","pos"],["arbitrage","pos"],["delivery","comm"],["expiration","risk"]],
+        convergeVis: true,
+        body:[
+          `<em>Convergence</em> is the principle that, as a futures contract approaches its expiration date, its price must converge toward the spot price of the underlying asset — driving basis toward zero. This is not a market tendency or empirical regularity; it is a near-mathematical certainty enforced by arbitrage. At the moment of expiration (or delivery), a futures contract and the physical asset become economically identical — there is no longer any "future" period over which storage costs, financing costs, or convenience yield differentials can apply.`,
+          `The arbitrage mechanism enforcing convergence is direct: if futures traded meaningfully above spot just before expiry (would-be positive basis violation in commodity convention... more precisely, basis significantly negative beyond fair carrying cost), an arbitrageur could buy the underlying asset in the spot market, simultaneously sell the futures contract, and deliver the physical asset against the futures at expiry — capturing a riskless profit equal to the mispricing. This cash-and-carry arbitrage, executed at scale by professional trading desks, mechanically forces the two prices together as expiry nears.`,
+          `Convergence is not always smooth or perfectly clean in practice. <em>Delivery mechanics</em> can create localized basis distortions right at expiry — a shortage of deliverable supply, a specific delivery location constraint, or a delivery quality specification mismatch can cause basis to behave erratically in the contract's final days, even as it trends toward zero. The April 2020 WTI crude oil negative-price episode is the most extreme illustration: as the May 2020 contract approached expiry with Cushing, Oklahoma storage nearly full, the futures price became disconnected from any reasonable convergence path, ultimately trading to −$37.63 — a basis "explosion" driven by delivery logistics overwhelming the normal arbitrage mechanism.`,
+          `For traders and hedgers, the convergence principle has a direct practical implication: a hedge using a futures contract becomes progressively more precise (less basis risk) as the hedge approaches the futures' expiration date, and progressively less precise (more basis risk) the further out the hedge horizon extends relative to the contract's expiry. This is why hedgers frequently "roll" their hedges — closing a near-expiry contract and opening a new position in a later-dated contract — to maintain hedge coverage over an extended period while managing the basis risk inherent in any single contract's term.`
+        ],
+        ki:"Convergence is the law of gravity in futures markets — the force that pulls two distinct prices toward equality as their economic distinction (the remaining time to delivery) shrinks to zero. It is the single most reliable structural relationship in derivatives markets, more dependable than almost any other pricing regularity, because it isn't a statistical tendency — it is enforced directly by costless, low-risk arbitrage available to any sufficiently capitalized trading desk."
+      },
+    ]
+  },
+  {
+    label:"Basis Risk",
+    color:"var(--risk)", line:"var(--risk-d)", fam:"c-risk",
+    entries:[
+      {
+        icon:"⚠️", fmla:"Hedge ≠ Perfect Offset",
+        title:"Basis Risk",
+        sub:"The residual risk that remains even after a 'perfect' futures hedge",
+        tags:[["basis risk","risk"],["imperfect hedge","risk"],["hedge ratio","risk"],["cross hedge","risk"]],
+        stats:[
+          {l:"Basis risk arises from",v:"Mismatched asset, location, timing, or grade",c:"risk"},
+          {l:"Eliminated entirely only at",v:"Contract expiry with exact delivery match",c:"pos"},
+          {l:"Cross-hedge basis risk",v:"Highest (different underlying assets)",c:"crisis"},
+          {l:"Minimum-variance hedge ratio",v:"Optimizes for historical basis volatility",c:"risk"},
+        ],
+        cmp:[
+          {cls:"risk",   label:"Sources of Basis Risk", text:"Asset mismatch: hedging jet fuel exposure with heating oil futures (no direct jet fuel futures market). Location mismatch: hedging Gulf Coast gasoline with a futures contract that delivers in New York Harbor. Timing mismatch: hedge expires before or after the actual exposure date, requiring a roll that introduces additional basis uncertainty. Grade/quality mismatch: hedging a specific bond with a futures contract whose deliverable basket has different duration and coupon characteristics."},
+          {cls:"pos",    label:"Minimizing Basis Risk", text:"Choose the most closely correlated available futures contract (asset, location, grade). Match hedge expiry as closely as possible to the actual exposure date. Use a statistically optimized hedge ratio (minimum-variance hedge ratio) derived from historical basis volatility rather than a naive 1:1 notional hedge. Monitor and actively manage basis risk throughout the hedge's life, adjusting position size as correlation or volatility relationships evolve."},
+          {cls:"crisis", label:"When Basis Risk Becomes Severe", text:"Basis risk is usually a manageable, second-order risk in normal markets — but can become the dominant risk during periods of market stress, when historically stable basis relationships break down (the correlation between the hedge instrument and the underlying exposure can collapse precisely when the hedge is needed most, as seen in multiple historical crises across asset classes)."},
+        ],
+        body:[
+          `<em>Basis risk</em> is the risk that remains in a hedged position after using a futures (or other derivative) contract to offset exposure to an underlying asset — arising whenever the hedging instrument is not a perfect match for the exposure being hedged. Even a well-constructed hedge using the most appropriate available futures contract rarely eliminates risk entirely; it merely transforms outright price risk into the smaller, but still real, risk that the relationship between the hedge and the underlying exposure (the basis) will move unfavourably.`,
+          `Basis risk arises from several distinct sources, often layered together. <em>Asset mismatch</em> occurs when no futures contract exists for the exact asset being hedged, forcing the use of a related but distinct instrument (a "cross hedge") — an airline hedging jet fuel costs using heating oil or crude oil futures, since no sufficiently liquid jet fuel futures market exists, accepts the risk that jet fuel and heating oil prices diverge. <em>Location mismatch</em> occurs when the futures contract specifies delivery at a location different from where the actual physical exposure exists — a Gulf Coast refiner hedging with a futures contract that delivers in a different region accepts the risk of regional price divergence. <em>Timing mismatch</em> occurs when the hedge's expiration does not align with the actual exposure date, requiring rolls that introduce additional uncertainty.`,
+          `The standard quantitative tool for managing basis risk is the <em>minimum-variance hedge ratio</em> — rather than naively hedging notional-for-notional (1 futures contract per unit of underlying exposure), this approach uses the historical statistical relationship (regression beta) between changes in the spot exposure and changes in the futures price to determine the hedge ratio that minimizes the variance of the combined (hedged) position. This is particularly important for cross hedges, where the correlation between the hedge instrument and the underlying exposure may be substantially less than 1.0, meaning a 1:1 notional hedge would actually be a sub-optimal, over- or under-hedged position.`
+        ],
+        ki:"Basis risk is the tax every imperfect hedge pays — the price of using an available, liquid instrument instead of a perfectly matched but non-existent one. The sophisticated hedger's job is not to eliminate basis risk (usually impossible) but to understand its magnitude, monitor its drivers, and ensure that the basis risk remaining is meaningfully smaller and more tolerable than the outright price risk being hedged away. A hedge that trades large outright risk for small, well-understood basis risk is a good hedge; a hedge with basis risk comparable to the original exposure may not be worth executing at all."
+      },
+    ]
+  },
+  {
+    label:"Asset-Class Applications",
+    color:"var(--comm)", line:"var(--comm-d)", fam:"c-comm",
+    entries:[
+      {
+        icon:"🛢️", fmla:"Location + Quality Basis",
+        title:"Commodity Basis — Location and Quality",
+        sub:"Why the same commodity trades at different prices in different places and grades",
+        tags:[["commodity basis","comm"],["location basis","comm"],["quality basis","comm"],["transportation cost","comm"]],
+        stats:[
+          {l:"Corn Gulf export basis (typical)",v:"+$0.15 to +$0.30/bushel",c:"comm"},
+          {l:"WTI Midland vs Cushing basis",v:"Varies with pipeline capacity",c:"comm"},
+          {l:"Soybean basis seasonal swing",v:"±$0.50/bushel (harvest vs. scarcity)",c:"risk"},
+          {l:"Quality basis driver",v:"Protein content, sulphur, moisture, API gravity",c:"comm"},
+        ],
+        cmp:[
+          {cls:"comm", label:"Location Basis", text:"The price difference between a commodity at a specific physical location and the price of the corresponding futures contract (which references a specific delivery point — e.g. Cushing, Oklahoma for WTI; Chicago-area elevators for CBOT grains). Driven by transportation costs, regional supply/demand imbalances, and infrastructure constraints (pipeline capacity, rail availability, port access). A Kansas wheat farmer's local elevator basis reflects the cost of moving wheat from Kansas to the futures delivery point."},
+          {cls:"risk", label:"Quality Basis", text:"The price difference arising from the specific grade or quality of the commodity relative to the futures contract's deliverable specification. WTI futures specify light sweet crude with defined API gravity and sulphur content; crude that doesn't meet spec trades at a quality-adjusted basis to the futures price. Corn futures specify #2 yellow corn with maximum moisture content; off-spec grain trades at a discount basis. Quality basis can shift seasonally as harvest quality varies."},
+          {cls:"pos",  label:"Seasonal Basis Patterns", text:"Agricultural basis typically widens (becomes more negative for the holder, reflecting ample local supply) immediately after harvest when local grain elevators are full, and narrows (or turns positive) later in the marketing year as local supplies are drawn down. Energy basis follows seasonal demand patterns — heating oil basis strengthens ahead of winter; gasoline basis strengthens ahead of summer driving season."},
+        ],
+        body:[
+          `<em>Commodity basis</em> reflects two distinct but often intertwined sources of price divergence between a specific physical commodity transaction and the corresponding futures contract: <em>location</em> (where the commodity physically sits relative to the futures contract's specified delivery point) and <em>quality</em> (how the specific commodity's characteristics compare to the futures contract's deliverable specification).`,
+          `<em>Location basis</em> is fundamentally a transportation cost and regional supply-demand phenomenon. A wheat farmer in rural Kansas selling into the local cash market receives a price that reflects the CBOT futures price minus the cost (and margin) of transporting that wheat to the futures delivery point near Chicago, adjusted further for any local supply glut or scarcity. During and immediately after harvest, when local elevators are full and farmers are eager to sell, location basis typically widens unfavourably for sellers (cash price falls further below futures); as the marketing year progresses and local supplies are drawn down, basis often narrows or even turns positive.`,
+          `<em>Quality basis</em> reflects deviations from the futures contract's precise deliverable specification. WTI crude oil futures specify a narrow band of acceptable API gravity (density) and sulphur content; crude oil that is heavier, more sour, or otherwise off-specification trades at a quality-adjusted discount (or, rarely, premium) to the futures price — this is why "WTI Midland" (a specific grade pumped in the Permian Basin) can trade at a different basis to NYMEX WTI futures than other US crude grades, reflecting both quality and the cost of transporting Permian crude to the Cushing delivery hub.`,
+          `For commercial hedgers — farmers, refiners, grain elevator operators, oil producers — understanding and forecasting basis is often more economically important than forecasting the outright futures price, because their actual cash market transactions occur at the local, quality-adjusted basis level, not at the futures price itself. Sophisticated agricultural and energy trading operations maintain dedicated basis trading desks that specialize purely in trading and forecasting these location and quality differentials, independent of any view on the outright direction of futures prices.`
+        ],
+        ki:"Commodity basis is where the abstraction of a standardized futures contract meets the messy reality of physical commodities that exist in specific places, in specific grades, at specific times. A futures price tells you what a commodity is worth at one reference point; basis tells you what it's actually worth to you, where you are, with what you actually have. For any commercial hedger, basis — not the futures price itself — is often the number that determines whether a hedge actually protects their real economic exposure."
+      },
+      {
+        icon:"🏛️", fmla:"CTD Basis Analysis",
+        title:"Bond Basis — CTD Analysis",
+        sub:"How Treasury futures basis is driven by the cheapest-to-deliver bond and its conversion factor",
+        tags:[["bond basis","bond"],["CTD","bond"],["conversion factor","bond"],["Treasury futures","bond"]],
+        fmla2:{
+          main:`<span class="sp">Basis</span> <span class="op">=</span> <span class="sp">Cash Bond Price</span> <span class="op">−</span> (<span class="ft">Futures Price</span> <span class="op">×</span> <span class="ft">Conversion Factor</span>)`,
+          note:`CTD = bond with lowest (Cash Price − Futures × CF)\nNet basis = Gross basis − Carry (financing − coupon income)\n\nPositive net basis: cash bond "cheap" vs futures\nNegative net basis: cash bond "rich" vs futures\n→ drives the basis trade (see entry below)`
+        },
+        stats:[
+          {l:"CTD determination driver",v:"Duration, coupon, repo rate environment",c:"bond"},
+          {l:"Conversion factor purpose",v:"Normalize deliverable bonds to 6% notional coupon",c:"bond"},
+          {l:"CTD switch risk",v:"Changes duration/hedge ratio unexpectedly",c:"risk"},
+          {l:"Basis trade desks",v:"Major bank rates relative-value teams",c:"comm"},
+        ],
+        body:[
+          `<em>Treasury bond futures basis</em> is one of the most analytically rich and professionally important applications of basis analysis in all of finance, because Treasury futures contracts (ZB, ZN, ZF, ZT on CME) do not reference a single specific bond — they allow delivery of any Treasury security within a specified maturity range, each converted to a common basis via a <em>conversion factor</em>. This deliverable-basket design creates a genuinely interesting optimization problem: which bond is "cheapest" for a short futures position holder to actually deliver?`,
+          `The <em>cheapest-to-deliver (CTD) bond</em> is the specific Treasury security, among all those eligible for delivery, that minimizes the net cost of buying the bond in the cash market and delivering it against the futures contract — equivalently, the bond with the lowest (Cash Price − Futures Price × Conversion Factor). The conversion factor itself is a standardized adjustment that approximates each eligible bond's price if it had a 6% coupon, allowing bonds with very different actual coupons and maturities to be compared on a roughly equivalent basis — though this approximation is imperfect, which is precisely why a genuine CTD bond emerges rather than all deliverable bonds being equally economical to deliver.`,
+          `CTD determination depends on the interest rate environment: when yields are above the 6% notional coupon used in the conversion factor calculation, the CTD bond tends to be the longest-duration eligible bond; when yields are below 6%, the CTD tends to be the shortest-duration eligible bond. This creates the phenomenon of <em>CTD switches</em> — as market yields move, the identity of the cheapest-to-deliver bond can change, which immediately and discontinuously changes the effective duration and hedging characteristics of the futures contract itself, since the futures price effectively "tracks" whichever bond is currently CTD.`,
+          `The <em>basis trade</em> — buying the CTD cash bond and simultaneously selling Treasury futures (or the reverse) — is a core relative-value strategy for fixed income trading desks, profiting from the difference between the gross basis (the simple price differential) and the net basis (gross basis adjusted for the cost of financing the bond position and the coupon income earned while holding it, known as "carry"). A positive net basis suggests the cash bond is cheap relative to futures (favoring a long-basis position: buy cash, sell futures); a negative net basis suggests the opposite.`
+        ],
+        ki:"CTD analysis is Treasury futures' most distinctive structural feature — turning a simple futures contract into an embedded option-like instrument where the short position holder effectively owns the right to choose which of several eligible bonds to deliver, always selecting whichever is cheapest. This delivery option is priced into the futures contract itself, and understanding which bond is currently CTD — and how sensitive that identity is to further rate moves — is essential for anyone trading, hedging, or even just interpreting Treasury futures prices."
+      },
+    ]
+  },
+  {
+    label:"Crypto & Cross-Market Basis",
+    color:"var(--crypto)", line:"var(--crypto-d)", fam:"c-crypto",
+    entries:[
+      {
+        icon:"₿", fmla:"Perp Basis & Funding Rate",
+        title:"Crypto: Perpetual Basis to Spot",
+        sub:"How perpetual futures use funding rates to synthetically enforce convergence with no expiry",
+        tags:[["perp basis","crypto"],["funding rate","crypto"],["crypto futures","crypto"],["cash-and-carry","crypto"]],
+        fmla2:{
+          main:`<span class="sp">Perp Basis</span> <span class="op">=</span> <span class="ft">Perp Price</span> <span class="op">−</span> <span class="sp">Spot Price</span>
+
+<span class="res">Funding Rate</span> <span class="op">∝</span> <span class="ft">Perp Basis</span> (paid periodically, typically every 8h)`,
+          note:`Positive funding: longs pay shorts (perp > spot, bullish skew)\nNegative funding: shorts pay longs (perp < spot, bearish skew)\n\nCash-and-carry: long spot BTC + short perp\n→ captures funding rate as "yield," delta-neutral`
+        },
+        stats:[
+          {l:"Typical BTC funding rate (calm market)",v:"0.01% per 8h (~11% annualized)",c:"crypto"},
+          {l:"Funding rate extreme (euphoria)",v:">0.1% per 8h (>100% annualized)",c:"crisis"},
+          {l:"Perpetual futures: no expiry date",v:"Funding replaces convergence mechanism",c:"crypto"},
+          {l:"Dated futures basis (quarterly)",v:"Converges at expiry like traditional futures",c:"pos"},
+        ],
+        body:[
+          `Crypto markets introduced a genuinely novel instrument — the <em>perpetual futures contract</em> ("perp") — that has no expiration date, and therefore cannot rely on the traditional convergence-at-expiry mechanism to keep its price anchored to spot. Instead, perpetual futures use a <em>funding rate</em> mechanism: a periodic payment (typically every 8 hours) exchanged directly between long and short position holders, calibrated to push the perpetual contract's price back toward the spot price.`,
+          `When the perpetual futures price trades above spot (positive basis, reflecting bullish sentiment and excess long demand), the funding rate turns positive, meaning long position holders pay short position holders. This creates a direct financial incentive for new short sellers to enter (collecting funding) and for existing longs to reduce their positions (paying funding) — pushing the perp price back down toward spot. The mechanism works symmetrically in reverse when the perp trades below spot.`,
+          `This funding rate mechanism creates one of crypto's most popular and persistent relative-value strategies: the <em>cash-and-carry trade</em> (also called the "basis trade" in crypto context) — simultaneously holding spot BTC (or ETH) and shorting an equivalent notional amount of the perpetual futures contract. This position is delta-neutral (immune to BTC's price direction) while collecting the funding rate as a quasi-yield whenever funding is positive. During periods of strong bullish sentiment, annualized funding rates have exceeded 50–100%, making this trade extraordinarily lucrative for market-neutral funds — though funding can also turn sharply negative during bearish periods, reversing the trade's profitability.`,
+          `Crypto markets also trade <em>dated futures</em> (quarterly expiry contracts, common on exchanges like CME, Binance, and Deribit) which behave more like traditional commodity or financial futures — converging to spot at a specific expiration date, with basis driven by financing costs and market sentiment rather than a continuous funding mechanism. The basis on dated crypto futures (often expressed as an annualized percentage) is a closely watched institutional sentiment indicator: a steep positive basis (futures well above spot) signals strong bullish positioning and leverage demand, while compressed or negative basis signals bearish or risk-averse conditions.`
+        ],
+        ki:"The perpetual futures funding rate mechanism is crypto markets' elegant solution to a problem traditional futures never had to solve — how do you keep a contract with no expiration date anchored to spot? By directly paying the imbalance between long and short demand, funding rates create continuous, real-time pressure toward convergence rather than the episodic, expiry-driven convergence of traditional futures. The resulting cash-and-carry trade has become one of the largest market-neutral strategies in crypto, turning the basis itself into a tradeable yield source."
+      },
+      {
+        icon:"🔀", fmla:"Inter-venue Basis",
+        title:"Cross-Exchange Basis",
+        sub:"Price divergence for the same asset across different trading venues",
+        tags:[["cross-exchange basis","xexch"],["arbitrage","xexch"],["fragmentation","xexch"],["capital controls","xexch"]],
+        stats:[
+          {l:"Kimchi premium (Korea BTC, historical peaks)",v:"Up to +30–50% vs global price",c:"xexch"},
+          {l:"Driver",v:"Capital controls limiting arbitrage flow",c:"risk"},
+          {l:"WTI Cushing vs ICE WTI (financial)",v:"Reflects delivery location differences",c:"comm"},
+          {l:"CEX vs DEX price divergence",v:"Driven by liquidity depth, gas costs",c:"xexch"},
+        ],
+        body:[
+          `<em>Cross-exchange basis</em> refers to the price difference for what is nominally the identical asset trading simultaneously on two or more different exchanges or venues. In a perfectly efficient, frictionless market, identical assets should trade at identical prices everywhere (the "law of one price") — any divergence should be instantly arbitraged away by traders buying on the cheaper venue and selling on the more expensive one. In practice, cross-exchange basis persists and can become extreme when arbitrage is constrained.`,
+          `The most famous historical example is the <em>"Kimchi Premium"</em> — the persistent tendency for Bitcoin and other cryptocurrencies to trade at a significant premium on South Korean exchanges relative to global prices, at times exceeding 30–50%. This premium persisted despite being obviously profitable to arbitrage (buy BTC globally, sell in Korea) because South Korea's capital controls made it difficult or illegal for arbitrageurs to move the necessary capital across the border to actually execute and settle the arbitrage trade. The premium is a direct, real-time measure of the binding capital control constraint — when Korean regulations tightened or loosened, the premium widened or narrowed correspondingly.`,
+          `Cross-exchange basis also appears in less dramatic but economically meaningful forms throughout traditional and crypto markets: regional commodity benchmark differences (WTI at Cushing vs. ICE WTI, reflecting delivery location and transportation costs), centralized exchange (CEX) versus decentralized exchange (DEX) price divergence for the same crypto token (driven by liquidity depth differences, gas/transaction costs that create a band within which arbitrage isn't profitable, and oracle update latency), and even cross-listed equity basis (the same company's shares trading on two different national exchanges, with basis driven by FX conversion costs, settlement timing differences, and local liquidity).`,
+          `For sophisticated trading operations, monitoring and trading cross-exchange basis is a dedicated strategy category — requiring capital and infrastructure positioned across multiple venues simultaneously, fast execution to capture fleeting divergences, and careful management of the operational risk (settlement timing mismatches, venue-specific counterparty risk) inherent in holding offsetting positions across different trading venues that may not settle on the same schedule.`
+        ],
+        ki:"Cross-exchange basis is a direct, continuously observable measure of how frictionless (or constrained) capital flow actually is between two markets. When basis is persistently near zero, capital moves freely and arbitrage works efficiently. When basis is large and persistent — like the Kimchi Premium — it reveals a real, binding constraint (capital controls, settlement friction, liquidity fragmentation) that prevents the theoretical arbitrage from actually being executable, turning the basis itself into a measurement instrument for market frictions that would otherwise be invisible."
+      },
+    ]
+  },
+  {
+    label:"Credit & Crisis Basis",
+    color:"var(--credit)", line:"var(--credit-d)", fam:"c-credit",
+    entries:[
+      {
+        icon:"📉", fmla:"CDS − Bond Spread",
+        title:"Negative Basis Trade (Credit)",
+        sub:"Exploiting the gap between cash bond spreads and CDS spreads — a classic relative-value strategy",
+        tags:[["negative basis trade","credit"],["CDS-bond basis","credit"],["relative value","credit"],["2008 crisis","crisis"]],
+        fmla2:{
+          main:`<span class="sp">CDS-Bond Basis</span> <span class="op">=</span> <span class="ft">CDS Spread</span> <span class="op">−</span> <span class="sp">Cash Bond Spread</span>`,
+          note:`Negative basis: CDS spread < Bond spread\n→ Bond cheap relative to CDS protection cost\n\nNegative basis trade: Buy cash bond + Buy CDS protection\n→ "Self-financing" credit-neutral position\n→ Profit if basis converges toward zero (typically does)`
+        },
+        stats:[
+          {l:"Pre-2008 typical IG basis",v:"Near zero to slightly negative",c:"pos"},
+          {l:"2008 crisis peak negative basis",v:"−200 to −500+ bps (some names)",c:"crisis"},
+          {l:"Driver of crisis widening",v:"Bond market illiquidity vs CDS liquidity",c:"crisis"},
+          {l:"Negative basis trade funding need",v:"Repo financing for cash bond leg",c:"risk"},
+        ],
+        body:[
+          `The <em>CDS-bond basis</em> measures the difference between the credit spread implied by a company's credit default swap (CDS) — the cost of buying default protection — and the credit spread of that same company's actual cash bonds trading in the secondary market. In theory, these two measures of the same credit risk should be very closely aligned, since buying a cash bond and simultaneously buying CDS protection on the same issuer should approximate a risk-free position (you're long the bond's credit risk and long protection against that same risk).`,
+          `A <em>negative basis</em> — where the CDS spread trades below the cash bond spread — signals that cash bonds are "cheap" relative to the cost of CDS protection. This creates the classic <em>negative basis trade</em>: buy the cash bond (earning its higher credit spread) and simultaneously buy CDS protection on the same name (paying its lower spread for protection), pocketing the difference as a theoretically credit-risk-neutral, "near arbitrage" profit — if the issuer defaults, the bond's loss is offset by the CDS protection payout; if it doesn't, the trade earns the spread differential over time.`,
+          `In normal market conditions, the negative basis trade is genuinely close to risk-free arbitrage, and persistent attractive negative basis tends to be competed away by relative-value credit funds executing the trade at scale. However, the trade is not entirely riskless: it requires <em>financing</em> the cash bond position (typically via repo), exposing the trade to repo market funding risk and cost; it carries <em>counterparty risk</em> on the CDS protection seller (if they default, the protection may not actually pay out when needed — precisely the risk that materialized with AIG in 2008); and bond and CDS markets can experience <em>liquidity divergence</em> during stress, since cash bonds are generally less liquid than the corresponding CDS.`,
+          `The <em>2008 financial crisis</em> produced the most extreme and instructive episode in CDS-bond basis history: the basis widened dramatically negative (CDS trading far below bond spreads) for many investment-grade credits, reaching −200 to −500+ basis points for some names — an enormous, theoretically very profitable negative basis opportunity. Yet many funds that had put on negative basis trades suffered severe losses, not because the credit thesis was wrong, but because the cash bond leg of the trade was financed via repo, and as the crisis intensified, repo financing for corporate bonds became scarce and expensive, forcing funds to unwind their cash bond positions at distressed, illiquid prices — a textbook demonstration of how a "near-arbitrage" can still destroy capital when funding liquidity, not the underlying credit thesis, becomes the binding constraint.`
+        ],
+        ki:"The negative basis trade is one of finance's clearest illustrations that 'near-arbitrage' is not the same as 'risk-free profit.' The credit logic of the trade — bond plus CDS protection should roughly offset — is sound, but the trade's actual safety depends entirely on functioning repo financing markets and reliable CDS counterparties, both of which can fail simultaneously and most severely exactly when the trade looks most attractive (during a widening credit crisis). The 2008 experience taught the entire credit market that funding liquidity risk can overwhelm even theoretically well-hedged credit positions."
+      },
+      {
+        icon:"📊", fmla:"Δ Basis = Stress Signal",
+        title:"Basis Widening in Crisis",
+        sub:"Why basis relationships across every asset class break down simultaneously under stress",
+        tags:[["basis widening","crisis"],["market stress","crisis"],["funding stress","risk"],["March 2020","crisis"]],
+        dtable:{
+          cols:["Episode","Market","Basis Behavior","Root Cause"],
+          rows:[
+            ["April 2020","WTI Crude (M1 futures)","Negative basis explosion (futures to −$37)","Storage capacity exhaustion at Cushing"],
+            ["March 2020","US Treasury cash-futures basis","Severe dislocation, hedge fund deleveraging","Repo funding stress, forced unwind of basis trades"],
+            ["2008 GFC","CDS-Bond basis (IG credit)","Widened to −200 to −500+ bps","Repo financing for corporate bonds dried up"],
+            ["2022 (Mar)","Nickel (LME futures)","Extreme backwardation, trading halted","Short squeeze, Russia sanctions, margin calls"],
+            ["May 2022","UST/UST stablecoin basis","UST basis to spot collapsed entirely","Algorithmic stablecoin death spiral"],
+          ]
+        },
+        body:[
+          `<em>Basis widening in crisis</em> is one of the most consistent empirical regularities across every asset class studied in this section: relationships that are normally tight, stable, and reliably arbitraged — cash-futures basis, CDS-bond basis, cross-exchange basis — tend to widen dramatically and simultaneously during periods of acute market stress, precisely when market participants most need these relationships to hold steady. This is not a coincidence; it reflects a common underlying mechanism.`,
+          `The unifying explanation is <em>funding and balance sheet constraints on arbitrageurs</em>. In normal market conditions, basis relationships are kept tight by professional arbitrage desks (bank trading desks, hedge funds, market makers) who have the capital, financing access, and risk appetite to immediately exploit any meaningful basis dislocation. During genuine market stress, these same arbitrageurs face simultaneous pressures: their own funding costs rise (repo rates spike, credit lines tighten), their risk limits are cut by risk managers responding to elevated volatility, and they may face redemptions or margin calls on existing positions that force them to reduce risk-taking capacity precisely when new arbitrage opportunities are most abundant. The result: basis relationships that would normally be arbitraged tight instead widen, sometimes dramatically, because the capital and risk appetite needed to correct them has temporarily evaporated.`,
+          `The <em>March 2020 US Treasury market dislocation</em> is the canonical modern illustration in the world's most liquid bond market. As COVID-19 panic triggered a simultaneous dash for cash across asset classes, the normally extremely tight basis between Treasury cash bonds and Treasury futures widened severely. This was driven substantially by the forced unwinding of "Treasury cash-futures basis trades" — a popular hedge fund relative-value strategy similar in spirit to the credit negative basis trade — as funding markets seized and margin calls forced rapid, disorderly deleveraging, even though the underlying credit risk (US government default) was not in question. The episode was severe enough to prompt direct Federal Reserve intervention, including emergency Treasury purchases specifically aimed at restoring orderly market functioning.`,
+          `For risk managers and traders, the pattern of <em>basis widening as a real-time stress indicator</em> is extremely valuable: because basis relationships are normally so reliably tight, any sudden, sharp widening across multiple unrelated basis relationships simultaneously (commodity basis, credit basis, cross-exchange basis all moving together) is one of the most reliable early signals that a systemic liquidity event — rather than an isolated, asset-specific issue — is underway. Monitoring a dashboard of basis relationships across asset classes is therefore a standard component of institutional risk management and macro trading frameworks.`
+        ],
+        ki:"Basis widening in crisis reveals a deep truth about all financial markets: every 'tight' pricing relationship you observe in calm conditions is not a law of nature — it is the visible output of continuous, capital-intensive arbitrage activity. Remove or impair the arbitrageurs (through funding stress, margin calls, or risk limit cuts) and the relationship can dislocate suddenly and severely, even though nothing about the underlying economic logic of the relationship has changed. This is why basis widening across multiple unrelated markets simultaneously is one of the most reliable signals that a stress event has become systemic rather than isolated."
+      },
+    ]
+  }
+];
+
+let cnt = 0;
+
+function buildConvergeVis() {
+  return `<div class="converge-vis">
+    <div class="cv-title">Futures Price Converging to Spot as Expiry Approaches</div>
+    <svg class="cv-svg" viewBox="0 0 600 140">
+      <line x1="40" y1="120" x2="580" y2="120" stroke="#28342e" stroke-width="1"/>
+      <line x1="40" y1="20"  x2="40"  y2="125" stroke="#28342e" stroke-width="1"/>
+      <line x1="40" y1="60" x2="580" y2="60" stroke="#28342e" stroke-width="0.5" stroke-dasharray="4,4"/>
+      <text x="44" y="56" font-size="9" fill="#8a988e" font-family="monospace">Spot Price (relatively stable)</text>
+      <polyline points="40,30 120,38 200,44 280,49 360,53 440,56 520,58 580,60"
+        stroke="#e83d9e" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="44" y="26" font-size="9" fill="#e83d9e" font-family="monospace">Futures Price (in contango here)</text>
+      <circle cx="580" cy="60" r="4" fill="#4dd982"/>
+      <text x="500" y="80" font-size="9" fill="#4dd982" font-family="monospace">Convergence at expiry</text>
+      <text x="36" y="135" font-size="8" fill="#485a50" font-family="monospace">Contract start</text>
+      <text x="520" y="135" font-size="8" fill="#485a50" font-family="monospace">Expiration</text>
+    </svg>
+  </div>`;
+}
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sdiv = document.createElement('div');
+    sdiv.innerHTML = `<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line" style="background:${sec.line}"></div>
+    </div>`;
+    root.appendChild(sdiv);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.fam;
+
+    sec.entries.forEach(e => {
+      const idx = cnt++;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>` : '';
+      const cmpH = e.cmp ? `<div class="cmp c${e.cmp.length}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>` : '';
+      const fmlaH = e.fmla2 ? `<div class="fmla-block"><div class="fmla-main">${e.fmla2.main}</div><pre class="fmla-note">${e.fmla2.note}</pre></div>` : '';
+      const convH = e.convergeVis ? buildConvergeVis() : '';
+      const dtH = e.dtable ? `<div class="dtable">
+        <div class="drow hdr" style="grid-template-columns:repeat(${e.dtable.cols.length},1fr)">
+          ${e.dtable.cols.map(c=>`<div class="dc">${c}</div>`).join('')}
+        </div>
+        ${e.dtable.rows.map(r=>`<div class="drow" style="grid-template-columns:repeat(${e.dtable.cols.length},1fr)">
+          ${r.map((c,i)=>`<div class="dc ${i===0?'label':(i===1?'crisis':'')}">${c}</div>`).join('')}
+        </div>`).join('')}
+      </div>` : '';
+
+      const body = e.body.map(p=>`<p>${p}</p>`).join('') +
+        fmlaH + convH + stH + cmpH + dtH +
+        `<div class="ki">
+          <div class="ki-glyph">//</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+        <div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-fmla">${e.fmla}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

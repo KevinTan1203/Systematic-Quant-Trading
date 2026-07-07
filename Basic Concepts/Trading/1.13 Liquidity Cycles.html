@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 1.13 Liquidity Cycles</title>
+<link href="https://fonts.googleapis.com/css2?family=Neue+Haas+Grotesk+Display+Pro:wght@400;500;600;700&family=Roboto+Condensed:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ─── SYSTEM ─── */
+:root {
+  /* warm paper with water-stain rings */
+  --paper:    #f2ead8;
+  --paper2:   #e8dfc4;
+  --paper3:   #ddd4b8;
+  --ink:      #1a1208;
+  --ink2:     #3a2e18;
+  --muted:    #7a6e50;
+  --faint:    #c0b898;
+  --rule:     #d0c8ac;
+
+  /* cycle colours */
+  --expand:   #1a6b3a;   /* expansion = green */
+  --expand-l: #e8f4ec;
+  --expand-b: #8fcfaa;
+
+  --contract: #8b1a1a;   /* contraction = deep red */
+  --contract-l:#f4e8e8;
+  --contract-b:#d08888;
+
+  --credit:   #1a3a8b;   /* credit = navy */
+  --credit-l: #e8ecf4;
+  --credit-b: #8898d0;
+
+  --repo:     #6b3a1a;   /* repo = brown */
+  --repo-l:   #f4ece8;
+  --repo-b:   #d0a888;
+
+  --risk:     #1a6b6b;   /* risk appetite = teal */
+  --risk-l:   #e8f4f4;
+  --risk-b:   #8fcfcf;
+
+  --spiral:   #8b1a6b;   /* spiral = magenta/crisis */
+  --spiral-l: #f4e8f0;
+  --spiral-b: #d088b8;
+
+  --margin:   #6b4a1a;   /* margin = amber-brown */
+  --margin-l: #f4f0e8;
+  --margin-b: #d0b888;
+
+  --xasset:   #1a4a6b;   /* cross-asset = steel */
+  --xasset-l: #e8eff4;
+  --xasset-b: #88aad0;
+
+  --crypto:   #3a1a8b;   /* crypto = purple */
+  --crypto-l: #eee8f4;
+  --crypto-b: #a888d0;
+
+  --funding:  #3a6b1a;   /* funding vs mkt = olive */
+  --funding-l:#eef4e8;
+  --funding-b:#a8d088;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* aged paper texture via repeating gradient */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(160,140,100,0.10) 25px),
+    radial-gradient(ellipse 60% 40% at 25% 30%, rgba(200,180,120,0.08) 0%, transparent 100%),
+    radial-gradient(ellipse 40% 60% at 75% 70%, rgba(180,160,100,0.06) 0%, transparent 100%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ─── MASTHEAD ─── */
+.masthead {
+  position: relative; z-index: 2;
+  background: var(--ink);
+  padding: 0;
+}
+
+.mhd-top {
+  max-width: 1060px; margin: 0 auto;
+  padding: 50px 44px 42px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 40px; align-items: end;
+}
+
+.mhd-kicker {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; letter-spacing: 0.28em;
+  text-transform: uppercase; color: #5a5040;
+  margin-bottom: 14px;
+}
+
+.mhd-title {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: clamp(44px, 6.5vw, 88px);
+  font-weight: 700;
+  color: var(--paper);
+  line-height: 0.88; letter-spacing: -0.02em;
+}
+
+.mhd-title em {
+  font-style: italic; font-weight: 300;
+  color: var(--expand-b);
+}
+
+.mhd-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; color: #5a5040;
+  margin-top: 16px; line-height: 1.6;
+  letter-spacing: 0.03em; max-width: 500px;
+}
+
+/* cycle clock widget */
+.cycle-widget {
+  display: flex; flex-direction: column;
+  gap: 3px; min-width: 200px;
+}
+
+.cw-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: #3a3020;
+  margin-bottom: 4px;
+}
+
+.cw-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid #2a2418; background: #100e08;
+}
+
+.cw-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.cw-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; letter-spacing: 0.06em; color: #6a6050; flex: 1;
+}
+
+.cw-phase {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; letter-spacing: 0.08em;
+  padding: 2px 7px; border: 1px solid;
+}
+
+/* banner rule */
+.mhd-rule {
+  height: 3px;
+  background: linear-gradient(to right,
+    var(--expand) 0%, var(--expand) 20%,
+    var(--risk) 20%, var(--risk) 40%,
+    var(--contract) 40%, var(--contract) 60%,
+    var(--spiral) 60%, var(--spiral) 80%,
+    var(--credit) 80%, var(--credit) 100%);
+}
+
+/* ─── PAGE ─── */
+.page {
+  position: relative; z-index: 2;
+  max-width: 1060px; margin: 0 auto;
+  padding: 36px 44px 100px;
+}
+
+/* controls */
+.controls {
+  display: flex; gap: 8px;
+  margin-bottom: 30px; flex-wrap: wrap; align-items: center;
+}
+
+.ctrl {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 6px 14px;
+  border: 1px solid var(--rule); background: transparent;
+  color: var(--muted); cursor: pointer; transition: all 0.15s;
+}
+.ctrl:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.ctrl-right {
+  margin-left: auto;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9.5px; color: var(--faint); letter-spacing: 0.06em;
+}
+
+/* ─── ENTRY ─── */
+.entry {
+  border: 1px solid var(--rule);
+  background: #fdf8f0;
+  margin-bottom: 4px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.entry::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 4px; transition: width 0.2s;
+}
+.entry.open::before { width: 5px; }
+.entry:hover { border-color: var(--faint); box-shadow: 2px 2px 0 var(--paper2); }
+
+/* entry colours */
+.t-expand::before   { background: var(--expand-b); }
+.t-expand.open::before { background: var(--expand); }
+.t-contract::before { background: var(--contract-b); }
+.t-contract.open::before { background: var(--contract); }
+.t-credit::before   { background: var(--credit-b); }
+.t-credit.open::before { background: var(--credit); }
+.t-repo::before     { background: var(--repo-b); }
+.t-repo.open::before { background: var(--repo); }
+.t-risk::before     { background: var(--risk-b); }
+.t-risk.open::before { background: var(--risk); }
+.t-spiral::before   { background: var(--spiral-b); }
+.t-spiral.open::before { background: var(--spiral); }
+.t-margin::before   { background: var(--margin-b); }
+.t-margin.open::before { background: var(--margin); }
+.t-xasset::before   { background: var(--xasset-b); }
+.t-xasset.open::before { background: var(--xasset); }
+.t-crypto::before   { background: var(--crypto-b); }
+.t-crypto.open::before { background: var(--crypto); }
+.t-funding::before  { background: var(--funding-b); }
+.t-funding.open::before { background: var(--funding); }
+
+/* entry header */
+.e-hdr {
+  display: flex; align-items: center;
+  cursor: pointer; user-select: none;
+  min-height: 58px; padding-left: 4px;
+  transition: background 0.14s;
+}
+.e-hdr:hover { background: var(--paper2); }
+
+.e-num {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; color: var(--faint);
+  width: 48px; text-align: center; flex-shrink: 0;
+  letter-spacing: 0.06em;
+}
+
+/* coloured phase badge */
+.e-phase {
+  width: 60px; flex-shrink: 0;
+  align-self: stretch;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px;
+  border-right: 1px solid var(--rule);
+  padding: 6px 0;
+}
+
+.e-phase-icon { font-size: 16px; }
+.e-phase-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px; letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.t-expand   .e-phase-label { color: var(--expand); }
+.t-contract .e-phase-label { color: var(--contract); }
+.t-credit   .e-phase-label { color: var(--credit); }
+.t-repo     .e-phase-label { color: var(--repo); }
+.t-risk     .e-phase-label { color: var(--risk); }
+.t-spiral   .e-phase-label { color: var(--spiral); }
+.t-margin   .e-phase-label { color: var(--margin); }
+.t-xasset   .e-phase-label { color: var(--xasset); }
+.t-crypto   .e-phase-label { color: var(--crypto); }
+.t-funding  .e-phase-label { color: var(--funding); }
+
+.e-text { flex: 1; padding: 12px 16px; }
+
+.e-title {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 18px; font-weight: 700;
+  color: var(--ink); line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.e-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9.5px; color: var(--muted);
+  margin-top: 3px; letter-spacing: 0.04em;
+}
+
+/* key data badges */
+.e-data {
+  display: flex; flex-direction: column; gap: 3px;
+  padding-right: 14px; flex-shrink: 0;
+  align-self: center;
+}
+.e-datum {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; letter-spacing: 0.06em;
+  padding: 2px 8px; border: 1px solid var(--rule);
+  background: var(--paper2); color: var(--muted);
+  white-space: nowrap;
+}
+
+.e-toggle {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px; color: var(--faint);
+  width: 46px; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  border-left: 1px solid var(--rule); flex-shrink: 0;
+  transition: transform 0.24s, color 0.15s;
+}
+.entry.open .e-toggle { transform: rotate(90deg); }
+.t-expand.open   .e-toggle { color: var(--expand); }
+.t-contract.open .e-toggle { color: var(--contract); }
+.t-credit.open   .e-toggle { color: var(--credit); }
+.t-repo.open     .e-toggle { color: var(--repo); }
+.t-risk.open     .e-toggle { color: var(--risk); }
+.t-spiral.open   .e-toggle { color: var(--spiral); }
+.t-margin.open   .e-toggle { color: var(--margin); }
+.t-xasset.open   .e-toggle { color: var(--xasset); }
+.t-crypto.open   .e-toggle { color: var(--crypto); }
+.t-funding.open  .e-toggle { color: var(--funding); }
+
+/* ─── BODY ─── */
+.e-body {
+  display: none;
+  border-top: 1px solid var(--rule);
+  background: var(--paper);
+  padding: 22px 22px 26px 108px;
+  animation: bIn 0.2s ease;
+}
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 14px; font-weight: 300;
+  line-height: 1.86; color: var(--ink2);
+  margin-bottom: 13px;
+}
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+.e-body p strong { font-weight: 700; color: var(--ink); }
+
+/* ── CYCLE PHASE BARS ── */
+.phase-bars {
+  margin-top: 18px;
+  border: 1px solid var(--rule); overflow: hidden;
+}
+.pb-head {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--muted); background: var(--paper2);
+  padding: 7px 14px; border-bottom: 1px solid var(--rule);
+}
+.pb-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  border-bottom: 1px solid var(--rule);
+}
+.pb-row:last-child { border-bottom: none; }
+.pb-label {
+  padding: 8px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; color: var(--muted);
+  border-right: 1px solid var(--rule);
+  display: flex; align-items: center;
+}
+.pb-track {
+  padding: 8px 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.pb-bar-bg {
+  flex: 1; height: 8px; background: var(--paper3); border-radius: 2px;
+  position: relative; overflow: hidden;
+}
+.pb-fill {
+  height: 100%; border-radius: 2px;
+}
+.pb-val {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; color: var(--ink2); white-space: nowrap; min-width: 80px;
+}
+
+/* ── SPIRAL DIAGRAM ── */
+.spiral-vis {
+  margin-top: 18px;
+  display: flex; gap: 0;
+  border: 1px solid var(--rule); overflow: hidden;
+}
+.sv-step {
+  flex: 1; padding: 12px 14px;
+  border-right: 1px solid var(--rule);
+  position: relative; background: #fdf8f0;
+}
+.sv-step:last-child { border-right: none; }
+.sv-step::after {
+  content: '→';
+  position: absolute; right: -10px; top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px; color: var(--spiral);
+  z-index: 2;
+}
+.sv-step:last-child::after { display: none; }
+.sv-n {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--spiral);
+  margin-bottom: 4px;
+}
+.sv-title {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 13px; font-weight: 700; color: var(--ink);
+  line-height: 1.2; margin-bottom: 3px;
+}
+.sv-note {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9.5px; color: var(--muted); line-height: 1.5;
+}
+.sv-step.hot { background: var(--spiral-l); }
+
+/* ── COMPARISON GRID ── */
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cmp.c3 { grid-template-columns: 1fr 1fr 1fr; }
+
+.cc {
+  padding: 13px 15px;
+  border: 1px solid var(--rule); background: var(--paper2);
+}
+.cc-l {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; margin-bottom: 7px;
+}
+.cc p {
+  font-size: 12.5px !important; line-height: 1.62 !important;
+  margin-bottom: 0 !important;
+  font-family: 'Roboto Condensed', sans-serif !important;
+  font-weight: 300 !important; color: var(--ink2) !important;
+}
+
+.cc.expand   { background: var(--expand-l);   border-color: var(--expand-b);   }
+.cc.contract { background: var(--contract-l); border-color: var(--contract-b); }
+.cc.credit   { background: var(--credit-l);   border-color: var(--credit-b);   }
+.cc.repo     { background: var(--repo-l);     border-color: var(--repo-b);     }
+.cc.risk     { background: var(--risk-l);     border-color: var(--risk-b);     }
+.cc.spiral   { background: var(--spiral-l);   border-color: var(--spiral-b);   }
+.cc.margin   { background: var(--margin-l);   border-color: var(--margin-b);   }
+.cc.xasset   { background: var(--xasset-l);   border-color: var(--xasset-b);   }
+.cc.crypto   { background: var(--crypto-l);   border-color: var(--crypto-b);   }
+.cc.funding  { background: var(--funding-l);  border-color: var(--funding-b);  }
+
+.cc.expand   .cc-l { color: var(--expand); }
+.cc.contract .cc-l { color: var(--contract); }
+.cc.credit   .cc-l { color: var(--credit); }
+.cc.repo     .cc-l { color: var(--repo); }
+.cc.risk     .cc-l { color: var(--risk); }
+.cc.spiral   .cc-l { color: var(--spiral); }
+.cc.margin   .cc-l { color: var(--margin); }
+.cc.xasset   .cc-l { color: var(--xasset); }
+.cc.crypto   .cc-l { color: var(--crypto); }
+.cc.funding  .cc-l { color: var(--funding); }
+
+/* ── STAT STRIP ── */
+.stats {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px;
+}
+.stat {
+  flex: 1; min-width: 120px;
+  padding: 9px 12px;
+  border: 1px solid var(--rule); background: var(--paper2);
+}
+.stat-l {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 3px;
+}
+.stat-v {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12.5px; font-weight: 400; color: var(--ink); line-height: 1.2;
+}
+.stat-v.up     { color: var(--expand); }
+.stat-v.dn     { color: var(--contract); }
+.stat-v.warn   { color: var(--spiral); }
+.stat-v.credit { color: var(--credit); }
+.stat-v.repo   { color: var(--repo); }
+.stat-v.risk   { color: var(--risk); }
+.stat-v.crypto { color: var(--crypto); }
+
+/* ── TIMELINE SVG ── */
+.timeline-vis {
+  margin-top: 18px;
+  border: 1px solid var(--rule); background: var(--paper2);
+  padding: 16px;
+  overflow: auto;
+}
+.tv-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+}
+.tv-svg { width: 100%; min-width: 500px; height: 80px; }
+
+/* ── KEY INSIGHT ── */
+.ki {
+  margin-top: 20px;
+  display: grid; grid-template-columns: 40px 1fr;
+  border: 1px solid var(--rule); overflow: hidden;
+}
+.ki-bar {
+  background: var(--paper3);
+  display: flex; align-items: center; justify-content: center;
+  writing-mode: vertical-lr; transform: rotate(180deg);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px; letter-spacing: 0.2em; text-transform: uppercase;
+  padding: 12px 0;
+}
+.ki-inner { padding: 14px 18px; background: var(--paper2); }
+.ki-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 6px;
+}
+.ki-text {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-style: italic; font-size: 15px;
+  color: var(--ink); line-height: 1.6;
+}
+
+.t-expand   .ki-bar { color: var(--expand);   border-right: 3px solid var(--expand); }
+.t-contract .ki-bar { color: var(--contract); border-right: 3px solid var(--contract); }
+.t-credit   .ki-bar { color: var(--credit);   border-right: 3px solid var(--credit); }
+.t-repo     .ki-bar { color: var(--repo);     border-right: 3px solid var(--repo); }
+.t-risk     .ki-bar { color: var(--risk);     border-right: 3px solid var(--risk); }
+.t-spiral   .ki-bar { color: var(--spiral);   border-right: 3px solid var(--spiral); }
+.t-margin   .ki-bar { color: var(--margin);   border-right: 3px solid var(--margin); }
+.t-xasset   .ki-bar { color: var(--xasset);   border-right: 3px solid var(--xasset); }
+.t-crypto   .ki-bar { color: var(--crypto);   border-right: 3px solid var(--crypto); }
+.t-funding  .ki-bar { color: var(--funding);  border-right: 3px solid var(--funding); }
+
+/* ── TAGS ── */
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 8px; border: 1px solid var(--rule); color: var(--muted);
+}
+.tag.expand   { border-color: var(--expand-b);   color: var(--expand); }
+.tag.contract { border-color: var(--contract-b); color: var(--contract); }
+.tag.credit   { border-color: var(--credit-b);   color: var(--credit); }
+.tag.repo     { border-color: var(--repo-b);     color: var(--repo); }
+.tag.risk     { border-color: var(--risk-b);     color: var(--risk); }
+.tag.spiral   { border-color: var(--spiral-b);   color: var(--spiral); }
+.tag.margin   { border-color: var(--margin-b);   color: var(--margin); }
+.tag.xasset   { border-color: var(--xasset-b);   color: var(--xasset); }
+.tag.crypto   { border-color: var(--crypto-b);   color: var(--crypto); }
+.tag.funding  { border-color: var(--funding-b);  color: var(--funding); }
+
+/* ── FOOTER ── */
+.foot {
+  position: relative; z-index: 2;
+  max-width: 1060px; margin: 0 auto;
+  padding: 18px 44px;
+  border-top: 1px solid var(--rule);
+  display: flex; justify-content: space-between;
+}
+.foot span {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--faint);
+}
+
+@media (max-width: 640px) {
+  .masthead, .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-top { grid-template-columns: 1fr; padding: 36px 18px 28px; }
+  .cycle-widget { display: none; }
+  .e-body { padding-left: 16px; }
+  .cmp.c2, .cmp.c3 { grid-template-columns: 1fr; }
+  .spiral-vis { flex-direction: column; }
+  .sv-step::after { display: none; }
+  .e-data { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ MASTHEAD ═══ -->
+<div class="masthead">
+  <div class="mhd-top">
+    <div>
+      <div class="mhd-kicker">Chapter 1 · Section 1.13 · Market Structure</div>
+      <div class="mhd-title">Liquidity<br><em>Cycles</em></div>
+      <div class="mhd-sub">
+        The tidal forces that drive all asset markets — from central bank<br>
+        balance sheets to repo fails to crypto contagion. 10 topics.
+      </div>
+    </div>
+
+    <div class="cycle-widget">
+      <div class="cw-title">Cycle Components</div>
+      <div class="cw-row">
+        <div class="cw-dot" style="background:var(--expand)"></div>
+        <div class="cw-label">Global Liquidity</div>
+        <div class="cw-phase" style="color:var(--expand);border-color:var(--expand-b)">EXPAND</div>
+      </div>
+      <div class="cw-row">
+        <div class="cw-dot" style="background:var(--credit)"></div>
+        <div class="cw-label">Credit Impulse</div>
+        <div class="cw-phase" style="color:var(--credit);border-color:var(--credit-b)">CREDIT</div>
+      </div>
+      <div class="cw-row">
+        <div class="cw-dot" style="background:var(--repo)"></div>
+        <div class="cw-label">Repo Markets</div>
+        <div class="cw-phase" style="color:var(--repo);border-color:var(--repo-b)">FUNDING</div>
+      </div>
+      <div class="cw-row">
+        <div class="cw-dot" style="background:var(--risk)"></div>
+        <div class="cw-label">Risk Appetite</div>
+        <div class="cw-phase" style="color:var(--risk);border-color:var(--risk-b)">RISK-ON</div>
+      </div>
+      <div class="cw-row">
+        <div class="cw-dot" style="background:var(--spiral)"></div>
+        <div class="cw-label">Crisis Mode</div>
+        <div class="cw-phase" style="color:var(--spiral);border-color:var(--spiral-b)">SPIRAL</div>
+      </div>
+    </div>
+  </div>
+  <div class="mhd-rule"></div>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">10 concepts · click any entry</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>1.13 Liquidity Cycles</span>
+</footer>
+
+<script>
+const entries = [
+  {
+    tClass: "t-expand",
+    icon: "🌊", phase: "GLOBAL",
+    title: "Global Liquidity Cycles — The Howell Framework",
+    sub: "Cross Borders Capital's framework: the 'tide' that raises or lowers all asset prices simultaneously",
+    data: ["Michael Howell / CrossBorder", "~$170T global liquidity pool", "Lead/lag: 6–12 months vs assets"],
+    tags: [["global liquidity","expand"],["Howell",""],["cross-border capital","expand"],["liquidity tide","expand"],["asset prices",""]],
+    phaseBars: [
+      { label: "Expansion", fill: 85, color: "var(--expand)", val: "↑ CB balance sheets + private credit" },
+      { label: "Contraction", fill: 15, color: "var(--contract)", val: "↓ QT + deleveraging" },
+      { label: "Lead time", fill: 60, color: "var(--credit)", val: "6–12M ahead of asset mkt peaks" },
+    ],
+    body: [
+      `<em>Global liquidity</em> — the combined stock of credit and money available to global financial markets — is the macro variable that, according to Michael Howell of CrossBorder Capital, drives asset prices more powerfully and consistently than any other single factor. The framework begins with a counterintuitive observation: asset prices correlate more closely with changes in the global stock of liquidity than with GDP growth, earnings, or traditional valuation metrics. This is because modern financial markets are primarily a liquidity-allocation system, not a discounting-of-fundamentals mechanism.`,
+      `Howell defines global liquidity as the sum of: (1) <strong>central bank balance sheets</strong> (the "base" — reserves created by QE and currency swaps); (2) <strong>shadow banking and wholesale money markets</strong> (repo, commercial paper, money market funds — the "pipes" through which base liquidity flows); and (3) <strong>cross-border capital flows</strong> (the international recycling of liquidity through reserve accumulation, eurodollar markets, and carry trade channels). The total pool is approximately $170 trillion globally, dwarfing the $25–30 trillion global equity market capitalisation.`,
+      `The cycle operates with characteristic timing. Global liquidity typically leads asset markets by <strong>6–12 months</strong>: when central banks expand their balance sheets and private credit grows, liquidity flows into risk assets — equities, credit, and real assets — driving prices higher. When liquidity contracts (QT, credit tightening, deleveraging), asset prices typically follow lower with a lag. This lead relationship is not perfectly consistent (liquidity can be absorbed by precautionary demand or flow to safe havens) but is among the most reliable macro relationships in finance.`,
+      `The Howell framework distinguishes between two types of liquidity: <strong>funding liquidity</strong> (the ease of obtaining financing — interest rates, credit availability, collateral quality) and <strong>market liquidity</strong> (the ease of transacting in financial assets — bid-ask spreads, depth, price impact). Both must be favourable for sustained asset price appreciation. The 2022 episode illustrates: the Fed's rate hikes reduced funding liquidity; the March 2023 banking stress reduced both funding and market liquidity simultaneously — producing the most rapid asset price correction since 2008.`
+    ],
+    ki: "Global liquidity is the tide — all assets are ships. When the tide rises (global liquidity expanding), nearly all assets float higher regardless of individual fundamentals. When it falls (contraction), nearly all assets fall, often indiscriminately. Howell's insight is that traditional fundamental analysis misses this because it focuses on individual securities while liquidity operates at the whole-system level."
+  },
+  {
+    tClass: "t-contract",
+    icon: "🏦", phase: "CB SHEET",
+    title: "Central Bank Balance Sheet Expansion & Contraction",
+    sub: "QE and QT as the primary liquidity injection and withdrawal mechanisms",
+    data: ["Fed peak: $9T (2022)", "ECB: €8T+", "QT: $60–95B/month (2022–24)"],
+    tags: [["QE","expand"],["QT","contract"],["balance sheet","expand"],["reserves","credit"],["Fed",""]],
+    stats: [
+      { l: "Fed balance sheet peak (Apr 2022)", v: "$8.9 trillion", c: "up" },
+      { l: "Fed QT pace (peak, 2022–23)", v: "$95B/month", c: "dn" },
+      { l: "ECB PEPP + APP assets", v: "€8+ trillion at peak", c: "up" },
+      { l: "Bank reserves (US) at QT start", v: "~$3.5 trillion", c: "credit" },
+    ],
+    cmp: [
+      { cls: "expand", label: "Quantitative Easing (QE)", text: "Central bank purchases government bonds and/or MBS, crediting bank reserve accounts. Expands the monetary base directly. Suppresses long-term yields. Increases bank reserves → incentivises lending and risk-taking. Weakens currency. Portfolio rebalancing pushes investors into riskier assets. First deployed by BoJ (2001), then Fed/ECB/BoE post-2008." },
+      { cls: "contract", label: "Quantitative Tightening (QT)", text: "Passive (allow maturities to roll off without replacement) or active (sell assets outright). Reduces reserve balances. Puts upward pressure on long-end yields. Tightens financial conditions. Can trigger liquidity stress in repo markets when reserves fall below 'ample' threshold. Fed QT 2022–: passive, $60–95B/month." },
+      { cls: "credit", label: "Currency Swap Lines", text: "Fed swap lines with major central banks (ECB, BoE, BoJ, SNB, BoC) provide USD liquidity globally. In a crisis (2008, 2020), foreign banks facing USD funding stress draw on swap lines. Prevents dollar shortage from becoming a global financial crisis. Effectively extends Fed's QE impact globally. 'Stealth QE' via swap lines."},
+    ],
+    body: [
+      `Central bank balance sheet expansion — specifically the purchase of government bonds and agency MBS funded by newly created bank reserves — is the most direct and powerful form of liquidity creation in modern financial systems. When the Federal Reserve buys $1 trillion in Treasuries, it creates $1 trillion in new bank reserves (commercial bank deposits at the Fed), while simultaneously reducing the supply of long-term Treasuries available to private investors. Both channels are stimulative: lower Treasury supply raises bond prices (lower yields); higher reserves incentivise banks to deploy capital into lending and risk assets.`,
+      `The transmission mechanism from QE to asset prices operates through multiple channels. The <strong>portfolio balance channel</strong> is primary: investors displaced from Treasuries by Fed purchases reinvest in higher-yielding assets — corporate bonds, equities, real estate — bidding up those prices. The <strong>bank lending channel</strong> is secondary: abundant reserves reduce banks' marginal cost of funding, incentivising loan expansion. The <strong>expectations channel</strong> is immediate: the announcement of QE lowers long-term rate expectations, flattening the yield curve and repricing all assets.`,
+      `Quantitative tightening (QT) reverses this process but not symmetrically. The <strong>passive QT</strong> approach (allowing maturities to roll off) is less disruptive than active asset sales because it gradually reduces reserve balances without triggering forced selling by market participants. The critical constraint is the level of "ample reserves" — the minimum reserve balance at which the Fed funds rate still clears at target without repo market stress. The September 2019 repo crisis (when repo rates spiked from 2% to 10% overnight) occurred precisely because QT had reduced reserves to a level that left the system without sufficient buffer — an episode that forced the Fed to restart asset purchases even before COVID.`
+    ],
+    ki: "Central bank balance sheets are the primary driver of the global liquidity cycle over 3–5 year horizons. QE injects reserves that flow through the financial system like water seeking the highest available return, inflating asset prices broadly. QT withdraws reserves, but with the critical constraint that the system cannot go below 'ample' reserves without repo market dysfunction — a hard floor that limits how far QT can go before financial stability concerns force a reversal."
+  },
+  {
+    tClass: "t-credit",
+    icon: "📈", phase: "CREDIT",
+    title: "Credit Cycles",
+    sub: "The private sector's liquidity amplification mechanism — from animal spirits to bust",
+    data: ["Credit impulse: change in new credit", "Minsky: stability breeds instability", "Avg cycle length: 7–10 years"],
+    tags: [["credit cycle","credit"],["Minsky","spiral"],["credit impulse","credit"],["financial instability","spiral"],["leverage","margin"]],
+    stats: [
+      { l: "US total credit/GDP (2023)", v: "~250%", c: "credit" },
+      { l: "Credit impulse: most predictive lag", v: "9–12 months vs GDP", c: "credit" },
+      { l: "Global corporate debt (2023)", v: "~$90 trillion", c: "credit" },
+      { l: "Minsky moment definition", v: "Sudden debt crisis after long expansion", c: "warn" },
+    ],
+    body: [
+      `The <em>credit cycle</em> is the private sector's amplification of the central bank's base liquidity — the process by which commercial banks, shadow banks, and capital markets create additional liquidity through lending and credit creation. While central banks control the monetary base, the credit cycle determines how that base is multiplied through the financial system. At its peak, a financial system can create $10–20 of credit for each dollar of base money; at its trough, credit destruction can wipe out multiples of the initial stimulus.`,
+      `The <em>credit impulse</em> — the change in the flow of new credit as a percentage of GDP (not the level of credit, but its rate of change) — is one of the most reliable leading indicators for economic activity and asset prices. A rising credit impulse (credit growing faster than before) injects new purchasing power into the economy; a falling impulse (credit growth decelerating, even if still positive) removes momentum. The credit impulse typically leads economic output by 9–12 months and asset prices by a similar lag — making it one of the most useful cross-cycle timing signals available.`,
+      `<em>Hyman Minsky's</em> financial instability hypothesis formalises the credit cycle's inherent self-destructive tendency. Minsky argued that stability breeds instability: during stable, growing periods, borrowers and lenders become more optimistic, extending riskier credit on more aggressive terms. Borrowers progress from "hedge finance" (income covers principal and interest) to "speculative finance" (income covers only interest; principal refinanced) to "Ponzi finance" (income covers neither; relies on asset appreciation). When the transition to Ponzi financing is widespread, any shock that disrupts asset appreciation triggers a cascade of forced selling and credit contraction — the "Minsky moment." The 2008 US mortgage crisis is the cleanest modern illustration.`,
+      `The <em>credit cycle</em> interacts with the central bank cycle in ways that determine the amplitude of financial booms and busts. When central banks ease while private credit is also expanding, the two cycles reinforce each other, creating the conditions for excess. When central banks tighten as private credit is contracting, the two cycles amplify the downturn. The worst crises occur when both channels contract simultaneously — 2008 saw both central bank rate hikes (pre-crisis) and a catastrophic collapse in private credit creation, with no monetary offset until emergency action began in mid-2008.`
+    ],
+    ki: "The credit cycle is the lever that amplifies central bank liquidity injections into booms — and amplifies their withdrawal into busts. The credit impulse is more predictive than the level of credit because markets are forward-looking: it is the acceleration or deceleration of credit, not its current level, that drives the next 12 months of economic and asset market performance."
+  },
+  {
+    tClass: "t-repo",
+    icon: "🔄", phase: "REPO",
+    title: "Repo Market Liquidity",
+    sub: "The overnight plumbing of the financial system — and why its failures are systemic",
+    data: ["US repo market: ~$4–5T/day", "GCF repo: interdealer", "Sep 2019: rates spiked 10%"],
+    tags: [["repo","repo"],["SOFR","repo"],["GC repo","repo"],["RRP","expand"],["Sep 2019","warn"]],
+    cmp: [
+      { cls: "repo", label: "General Collateral (GC) Repo", text: "Overnight loan secured by government securities (Treasuries, Agencies). Borrower sells securities and agrees to repurchase next day at a slightly higher price — the 'repo rate.' The Fed Funds rate and SOFR (Secured Overnight Financing Rate) are anchored by GC repo. The most fundamental overnight funding market." },
+      { cls: "margin", label: "Specials / Fails", text: "A 'special' repo: a specific security in high demand trades at a special (lower) rate — lenders accept less interest because borrowers need that specific collateral. Securities 'on special' are scarce (e.g. on-the-run Treasury just issued). When fails occur (borrower can't return securities), the repo fails — settles at 0% by convention but creates settlement chain disruptions." },
+      { cls: "expand", label: "Fed's RRP and SRF", text: "Reverse Repo Program (RRP): Fed absorbs excess reserves by letting money market funds park cash overnight at the Fed (at IORB). Acts as a floor under short-term rates. Standing Repo Facility (SRF): dealers can borrow from Fed overnight at a ceiling rate — the backstop preventing repo rates from spiking above the target. Both introduced/expanded post-2008." },
+    ],
+    body: [
+      `The repo market is the financial system's overnight circulatory system — the mechanism by which banks, broker-dealers, money market funds, and hedge funds manage their short-term cash and securities needs on a daily basis. A <em>repurchase agreement (repo)</em> is a collateralised overnight loan: the borrower sells securities to the lender today and agrees to repurchase them tomorrow at a slightly higher price. The difference is the repo rate — the overnight cost of secured financing. This market processes $4–5 trillion per day in the US alone.`,
+      `The September 2019 repo crisis was a watershed event demonstrating how quickly repo market stress can propagate through the entire financial system. On September 16–17, 2019, general collateral repo rates spiked from approximately 2% to over 10% overnight — an eight-fold increase in the overnight cost of secured financing for dealers. The cause: a combination of corporate tax payments (withdrawing cash from the banking system), a large Treasury settlement (dealers needed to finance new inventory), and insufficient bank reserves following QT. The Fed responded with emergency repo operations and ultimately restarted asset purchases — a direct acknowledgment that QT had gone too far.`,
+      `Repo market stress transmits to all other asset markets through a simple mechanism: when dealers cannot cheaply finance their securities inventory via repo, they must either sell securities (pushing prices down), widen their bid-ask spreads (reducing liquidity for clients), or reduce their market-making activity. All three reduce the liquidity available to the broader market simultaneously. The <em>SOFR (Secured Overnight Financing Rate)</em> — the benchmark rate derived from GC repo transactions — measures this stress in real time: SOFR spikes are the repo market's distress signal.`
+    ],
+    ki: "The repo market is liquidity plumbing made visible — and it fails in the most inconvenient ways. Unlike equity market stress (visible to everyone), repo stress is invisible to most market participants until it has already caused contagion. The September 2019 episode proved that even in a functioning peacetime market, the repo system can seize within 24 hours when reserve levels are insufficient. This is why the Fed now maintains a Standing Repo Facility as a permanent backstop."
+  },
+  {
+    tClass: "t-risk",
+    icon: "⚡", phase: "RISK",
+    title: "Risk Appetite Cycles",
+    sub: "How investor sentiment oscillates between greed and fear — and how to measure it",
+    data: ["VIX: primary fear gauge", "Credit spreads: risk-on/off", "Survey data: AAII, BofA FMS"],
+    tags: [["risk appetite","risk"],["risk-on","expand"],["risk-off","contract"],["VIX","risk"],["sentiment",""]],
+    phaseBars: [
+      { label: "Risk-On Indicators", fill: 75, color: "var(--expand)", val: "VIX <15, IG spreads <80bps, EM inflows" },
+      { label: "Risk-Off Indicators", fill: 85, color: "var(--contract)", val: "VIX >30, HY spreads >600bps, USD surge" },
+      { label: "Positioning extremes", fill: 90, color: "var(--risk)", val: "AAII bearish >50% → contrarian buy" },
+    ],
+    body: [
+      `<em>Risk appetite</em> — the willingness of investors to accept uncertainty in pursuit of higher returns — oscillates in cycles that are partly rational (responding to genuine changes in economic conditions) and partly reflexive (self-reinforcing sentiment loops that detach from fundamentals). Risk appetite is not directly observable but is proxy-measured through dozens of market indicators: the VIX (expected equity volatility), credit spreads (the premium demanded to hold corporate over government bonds), the USD (safe haven demand), and cross-asset correlations (all risk assets moving together signals risk-off).`,
+      `The <em>risk-on/risk-off (RORO)</em> framework describes how risk appetite determines capital flows across asset classes simultaneously. In risk-on environments: equities outperform bonds, credit spreads compress, EM currencies appreciate against safe havens (JPY, CHF), commodity prices rise, and implied volatility falls. In risk-off: the entire pattern reverses. The striking feature is the synchronisation — all risk assets move together, and all safe havens move together. This cross-asset correlation structure makes risk appetite a single underlying factor that explains a large fraction of all asset price movements.`,
+      `Risk appetite cycles are closely linked to but not identical with economic cycles. The 2020 COVID episode is instructive: the sharpest risk-off episode in history (March 2020) was followed within months by one of the strongest risk-on recoveries, while the economic cycle was still deeply negative. The recovery was driven by unprecedented policy stimulus that restored liquidity before fundamentals improved — demonstrating that liquidity conditions, not economic fundamentals, are the primary near-term driver of risk appetite. Measuring risk appetite in advance requires monitoring the flow of central bank and credit cycle liquidity rather than waiting for economic data.`,
+      `Quantifying risk appetite for investment decisions requires avoiding two traps: <strong>trend-following</strong> (buying when risk appetite is already elevated and expensive) and <strong>premature contrarianism</strong> (fighting a deteriorating environment before it stabilises). The most useful signals are <em>extreme sentiment readings</em> — when survey-based measures of investor bearishness (AAII, BofA Fund Manager Survey) hit multi-year extremes, historical evidence shows forward returns improve substantially. These extremes typically coincide with peak risk-off, not peak risk-on, making sentiment extremes contrarian buy signals rather than follow signals.`
+    ],
+    ki: "Risk appetite is the translation mechanism between liquidity conditions and asset prices. Central bank expansion creates the raw material (liquidity); risk appetite determines where that liquidity flows. The cycle: liquidity expands → risk appetite rises → capital flows into risk assets → prices rise → leverage builds → appetite peaks → any shock creates reversal → liquidity drains → risk appetite collapses → forced selling → repeat. Timing the turn in risk appetite is the holy grail of macro trading."
+  },
+  {
+    tClass: "t-spiral",
+    icon: "🌀", phase: "SPIRAL",
+    title: "Liquidity Spirals",
+    sub: "The self-reinforcing feedback loop between funding liquidity and market liquidity that turns corrections into crises",
+    data: ["Brunnermeier & Pedersen (2009)", "Amplifying losses → margin calls", "2008, 2020 COVID, LTCM 1998"],
+    tags: [["liquidity spiral","spiral"],["Brunnermeier","spiral"],["deleveraging","contract"],["margin","margin"],["forced selling","contract"]],
+    spiral: true,
+    body: [
+      `A <em>liquidity spiral</em> is the self-amplifying feedback loop between two types of liquidity — funding liquidity (the ability to obtain financing) and market liquidity (the ability to transact in markets at reasonable prices) — that can transform a manageable market decline into a catastrophic crisis. The mechanism was formalised by economists Markus Brunnermeier and Lasse Pedersen in their 2009 paper "Market Liquidity and Funding Liquidity" — one of the most important papers in financial economics of the past quarter century.`,
+      `The spiral mechanism: a market decline reduces the value of leveraged investors' portfolios → margin calls require them to liquidate positions → forced selling reduces market liquidity (wider spreads, lower prices) → further price declines → more margin calls → more forced selling → and so on. The spiral has two self-reinforcing channels: the <strong>loss spiral</strong> (losses reduce equity, requiring deleveraging to maintain leverage ratios) and the <strong>margin spiral</strong> (falling market liquidity causes risk managers to raise margin requirements, forcing further deleveraging even without additional losses).`,
+      `The 2008 financial crisis is the most comprehensive real-world demonstration of a full liquidity spiral. The initial shock was losses on US subprime mortgages — large but not existentially threatening in isolation. The spiral amplified this: losses at highly leveraged banks and hedge funds required deleveraging → selling of all liquid assets (Treasury bonds, equities, corporate bonds) → asset prices fell universally → further losses → further deleveraging → complete collapse of short-term funding markets (commercial paper, repo) → fire-sale prices on fundamentally sound assets → counterparty risk concerns → freezing of interbank lending → systemic crisis. The March 2020 COVID shock created the fastest liquidity spiral in history — the S&P 500 fell 35% in 33 days — but the Fed's unprecedented speed of intervention (unlimited QE announced March 23) broke the spiral before it became a solvency crisis.`,
+      `The key insight from liquidity spiral theory is that <em>market liquidity and funding liquidity are endogenous to each other</em> — neither is fixed when the other deteriorates. Risk management systems that assume stable market liquidity when designing leverage ratios systematically underestimate crisis severity because they don't account for the feedback between the two. This is why VaR models (which assume stable liquidation costs) routinely underestimate actual losses in crises.`
+    ],
+    ki: "Liquidity spirals are the financial crisis amplification engine — they transform small shocks into systemic events by creating feedback loops that models designed for normal conditions cannot capture. The critical policy insight is equally important: once a spiral starts, only an external force powerful enough to break the feedback loop (central bank as buyer of last resort) can stop it. Austerity, moral hazard concerns, and market discipline are ineffective once the spiral is in motion."
+  },
+  {
+    tClass: "t-margin",
+    icon: "💥", phase: "MARGIN",
+    title: "Margin Calls & Forced Selling",
+    sub: "The mechanical trigger of liquidity spirals — when leverage becomes liability",
+    data: ["Margin call = return cash/collateral", "Initial vs variation margin", "Procyclical: amplifies moves"],
+    tags: [["margin call","margin"],["forced selling","contract"],["leverage","margin"],["VaR",""],["procyclical","spiral"]],
+    cmp: [
+      { cls: "margin", label: "Futures / Exchange-Cleared", text: "Variation margin (VM) collected daily — P&L settled in cash each day. No accumulation of unpaid losses. Initial margin (IM) posted to CCP. VM calls typically small relative to position size. Failure to meet = position liquidated by broker. Procyclical: large market moves → large VM calls on all participants simultaneously." },
+      { cls: "contract", label: "Prime Brokerage (Equity)", text: "Hedge funds borrow from prime brokers against portfolio collateral (margin lending). Maintenance margin level: if portfolio value falls below threshold, margin call issued. Fund must deposit cash/securities or reduce positions. In 2008, rapid prime broker deleveraging forced hedge funds to sell their most liquid positions — often their best ideas." },
+      { cls: "spiral", label: "OTC Derivatives (ISDA/CSA)", text: "Variation margin (VM): daily mark-to-market payments on bilateral swaps. Initial margin (IM): under UMR, posted to tri-party custodian. VM calls in a vol spike can be enormous: a 100bp move on a $1B interest rate swap portfolio can trigger hundreds of millions in VM calls simultaneously. Potential procyclical amplifier." },
+    ],
+    body: [
+      `A <em>margin call</em> is the demand that a leveraged investor return cash or post additional collateral because the value of their positions or collateral has fallen below a required threshold. Margin calls are the mechanical trigger of forced selling: an investor who cannot meet a margin call by posting additional funds must reduce positions — selling securities to generate the cash — often at the worst possible time, when prices are already falling.`,
+      `The procyclicality of margin systems is the critical systemic issue. In calm markets, low volatility → tight initial margin requirements → easy to maintain leverage → more leverage → more risk taking. In stressed markets: high volatility → margin requirements increase → existing leverage becomes unsustainable → forced deleveraging → more selling → lower prices → higher vol → still higher margin requirements. The very mechanism designed to protect clearing houses and counterparties from losses amplifies the losses of leveraged participants and the market moves that trigger the calls.`,
+      `The <em>2021 Archegos collapse</em> is a contained but instructive example. Bill Hwang's Archegos had built $120B+ in equity exposure via total return swaps with multiple prime brokers simultaneously. When its positions fell sharply in March 2021, margin calls from multiple prime brokers simultaneously could not be met. Prime brokers were forced to liquidate Archegos's positions in a disorderly rush, depressing the prices of affected stocks and causing Credit Suisse to lose $5.5B, Nomura $2.9B, and others. The key failure: no single prime broker saw the total leverage because each saw only their slice — and the OTC swap structure was opaque enough that no regulator saw it either.`,
+      `Central clearing (CCP margin) partially mitigates bilateral margin spirals by replacing a web of bilateral exposures with a single central counterparty — but concentrates the margin call stress on the CCP's clearing members, who must fund intraday VM calls before they receive offsetting VM payments. This "daylight credit" problem — dealers must be short-term cash-positive to meet CCP calls — creates its own liquidity demand that can strain dealer balance sheets during market dislocations.`
+    ],
+    ki: "Margin calls are liquidity spirals made mandatory. Unlike a normal investor who can choose to hold through a decline, a leveraged investor facing a margin call has no choice — they sell what they can, when they must, at whatever price the market offers. This mechanical, price-insensitive selling is the most destabilising force in financial markets during crises, and its procyclical amplification of stress is the strongest argument for regulatory limits on leverage."
+  },
+  {
+    tClass: "t-xasset",
+    icon: "🌐", phase: "XASSET",
+    title: "Cross-Asset Liquidity Transmission",
+    sub: "How liquidity stress in one market propagates into all markets — the connectedness of modern finance",
+    data: ["Common factor: risk appetite", "Contagion: 2008 → all assets", "FX as transmission channel"],
+    tags: [["contagion","spiral"],["cross-asset","xasset"],["flight to quality","expand"],["correlation",""],["common factor","xasset"]],
+    body: [
+      `<em>Cross-asset liquidity transmission</em> describes the process by which a liquidity shock originating in one market spreads to apparently unrelated markets through shared exposures, common funding constraints, and reflexive behaviour. In theory, a stress event in the US subprime mortgage market should not cause copper prices to fall or Korean equity markets to collapse. In practice, the 2008 financial crisis caused exactly this — demonstrating that modern financial markets are so interconnected through shared investor bases, common funding (repo, prime brokerage), and correlated risk management models (VaR) that stress anywhere transmits everywhere.`,
+      `The transmission channels are multiple and interact. <strong>Portfolio rebalancing</strong>: an investor who loses money in one asset class sells liquid holdings elsewhere (often their most liquid, highest-quality assets) to fund margin calls or redemptions — transmitting the original loss into unaffected markets. <strong>Risk budgeting</strong>: as volatility rises in one asset, risk models automatically reduce positions across all assets to maintain the same portfolio-level VaR — making risk models themselves a transmission channel. <strong>Funding channel</strong>: as credit facilities tighten (lenders become risk-averse), the cost of financing positions across all asset classes rises simultaneously — a common funding squeeze that hits all levered participants.`,
+      `The <em>correlation of correlations</em> — the tendency of cross-asset correlations to spike toward 1 during crises — is the empirical signature of cross-asset transmission. During normal markets, equity/bond/commodity/FX returns are partly independent. During the 2008 crisis, March 2020, and the 2022 simultaneous equity-bond selloff, the correlations between supposedly uncorrelated asset classes converged. This synchronisation destroys diversification precisely when investors need it most — the classic failure of portfolio construction that assumes normal-market correlations will persist in stress.`,
+      `FX markets are a particularly important transmission channel because they are global, liquid, and directly reflect the cost of cross-border capital flows. In crises, USD typically strengthens sharply (safe haven demand) while EM currencies and commodity-linked currencies (AUD, NZD, BRL) fall — reflecting the unwinding of carry trades, the reversal of cross-border capital flows, and the global demand for dollar liquidity. The USD DXY index is therefore a real-time indicator of cross-asset stress propagation: a rapidly rising DXY signals global de-risking and liquidity withdrawal from risk assets.`
+    ],
+    ki: "Cross-asset liquidity transmission proves that diversification is a peacetime luxury. When a true liquidity crisis hits, the correlations that justify multi-asset portfolio construction collapse: all risky assets fall together as investors raise cash, risk models reduce exposure everywhere simultaneously, and the common factor of 'risk appetite' overwhelms individual asset fundamentals. The only true diversifiers in a liquidity crisis are instruments that explicitly benefit from stress: long volatility, long UST, long gold, long USD."
+  },
+  {
+    tClass: "t-crypto",
+    icon: "₿", phase: "CRYPTO",
+    title: "Crypto Liquidity Cycles",
+    sub: "Bitcoin halving cycles, stablecoin flows, and how crypto liquidity interacts with traditional markets",
+    data: ["BTC halving: ~4 years", "Stablecoin mkt cap = crypto liquidity proxy", "2022 LUNA/FTX = crypto winter"],
+    tags: [["bitcoin halving","crypto"],["stablecoin","crypto"],["on-chain liquidity","crypto"],["FTX","contract"],["LUNA","spiral"]],
+    stats: [
+      { l: "BTC halving cycle (approx)", v: "Every ~4 years (210,000 blocks)", c: "crypto" },
+      { l: "Stablecoin mkt cap (2024)", v: "~$165B (proxy for crypto liquidity)", c: "credit" },
+      { l: "BTC post-halving avg return (1Y)", v: "+100–400%", c: "up" },
+      { l: "2022 crypto winter drawdown", v: "BTC −77%, ETH −80%", c: "dn" },
+    ],
+    cmp: [
+      { cls: "crypto", label: "Bitcoin Halving Cycle", text: "Every ~4 years, the block reward for Bitcoin miners is halved. Supply issuance rate falls by 50%, reducing selling pressure from miners. Historical pattern: halving → 12–18 month bull market as new supply shocks meets constant or growing demand. 2012, 2016, 2020 halvings each preceded major bull runs. 2024 halving: reward fell to 3.125 BTC." },
+      { cls: "expand", label: "Stablecoin as Crypto Liquidity", text: "Total stablecoin market cap is the best real-time proxy for available crypto liquidity — cash sitting on the sidelines ready to be deployed. Rising stablecoin supply = more dry powder = liquidity cycle expanding. Contracting stablecoin supply (redemptions, depegs) = liquidity cycle tightening. USDT, USDC together account for ~90% of stablecoin volume." },
+      { cls: "spiral", label: "2022 Contagion: LUNA/FTX", text: "Terra/LUNA collapse (May 2022): algorithmic stablecoin UST lost peg → death spiral → $40B+ destroyed in days. Contagion to 3AC (hedge fund), Celsius, Voyager (lenders). FTX collapse (Nov 2022): Bankman-Fried's exchange failed after Alameda Research insolvency → $8B customer shortfall → contagion to Genesis, BlockFi, others. Classic liquidity spiral in crypto." },
+    ],
+    body: [
+      `Crypto markets have their own liquidity cycle mechanics that are both distinct from traditional markets and increasingly interconnected with them. The <em>Bitcoin halving cycle</em> — the programmatic reduction of block rewards every 210,000 blocks (~4 years) — is the most distinctive: it mechanically reduces the supply of new Bitcoin entering the market by 50%, creating a supply shock that has historically been followed by substantial price appreciation over the subsequent 12–18 months. The halvings of 2012, 2016, 2020, and 2024 each preceded major bull markets — though the relationship is complicated by the fact that market participants anticipate the halving, potentially pulling forward some of its effect.`,
+      `The <em>stablecoin market cap</em> is the most useful real-time measure of crypto liquidity conditions. When the aggregate supply of USDT, USDC, and other stablecoins is growing, it means new fiat is entering the crypto ecosystem as cash equivalents — dry powder waiting to be deployed into BTC, ETH, or other crypto assets. Contraction (falling stablecoin supply driven by redemptions or destruction) signals liquidity withdrawal. The stablecoin supply expanded from ~$10B in early 2020 to ~$180B by early 2022, directly fuelling the 2020–2022 crypto bull market; it then contracted sharply as the LUNA/FTX crises triggered redemptions, directly corresponding with the 2022 crypto winter.`,
+      `The 2022 crypto liquidity crisis demonstrated that crypto markets can experience liquidity spirals that are structurally identical to traditional market crises, with the added vulnerability of near-zero regulation and nearly instant settlement. The Terra/LUNA collapse was a textbook bank run on an algorithmic stablecoin: UST lost its peg → holders rushed to exit → the redemption mechanism (burning UST to mint LUNA) was overwhelmed → LUNA hyperinflated as the minting mechanism flooded supply → price collapsed to near zero. Contagion then spread through the ecosystem via Three Arrows Capital (leveraged crypto hedge fund) to lenders (Celsius, Voyager, BlockFi) in the same sequence as traditional credit crises: asset price collapse → margin calls → forced selling → counterparty defaults → contagion.`,
+      `The interconnection between crypto and traditional finance liquidity cycles has grown with institutional adoption. Bitcoin increasingly responds to changes in real interest rates and the Fed's balance sheet — rising when real rates fall and liquidity expands, falling when rates rise and QT tightens conditions. The correlation between crypto and Nasdaq (both growth/risk assets) has become a primary cross-asset relationship. This integration means crypto is no longer an isolated liquidity cycle — it is a high-beta node in the global liquidity cycle, amplifying both expansions and contractions.`
+    ],
+    ki: "Crypto liquidity cycles are traditional liquidity cycles run at 10× speed with no regulatory circuit breakers. The halving cycle introduces a unique supply-side mechanic absent from traditional assets; stablecoin flows provide the most transparent real-time liquidity indicator available in any asset class. The 2022 crisis proved that crypto is subject to the same spiral dynamics as traditional finance — just faster, more extreme, and with fewer institutional backstops."
+  },
+  {
+    tClass: "t-funding",
+    icon: "⚖️", phase: "FUND/MKT",
+    title: "Funding Liquidity vs. Market Liquidity",
+    sub: "The two types of liquidity — and why their simultaneous failure defines a financial crisis",
+    data: ["Funding: ease of financing", "Market: ease of transacting", "Crisis = both fail together"],
+    tags: [["funding liquidity","funding"],["market liquidity","funding"],["bid-ask spread",""],["haircut","repo"],["liquidity illusion","spiral"]],
+    cmp: [
+      { cls: "funding", label: "Funding Liquidity", text: "The ease with which an investor can obtain financing for a position — interest rate, haircut (collateral discount), and credit availability. High funding liquidity: cheap, abundant financing on good terms. Low funding liquidity: expensive financing, high haircuts, credit rationing. Measured by: repo rates, commercial paper spreads, bank lending standards (Fed's SLOOS), credit spreads." },
+      { cls: "expand", label: "Market Liquidity", text: "The ease with which a financial asset can be bought or sold without significantly affecting its price. High market liquidity: tight spreads, deep order book, low market impact. Low market liquidity: wide spreads, thin book, large price impact per unit of volume. Measured by: bid-ask spreads, Amihud illiquidity ratio, Kyle's lambda, volume-weighted impact measures." },
+      { cls: "spiral", label: "Endogeneity: Why They Fail Together", text: "Low funding liquidity → forced selling → lower asset prices → lower collateral values → higher haircuts → lower funding liquidity. AND: Low market liquidity → higher volatility → higher margin requirements → lower funding liquidity → more forced selling → lower market liquidity. The two failures are self-reinforcing — which is why crises are catastrophic once the spiral begins." },
+    ],
+    body: [
+      `<em>Funding liquidity</em> and <em>market liquidity</em> are two distinct but deeply interconnected forms of liquidity. Funding liquidity refers to the ease with which an investor can obtain financing for a given position — characterised by the interest rate charged, the haircut on collateral (the discount applied when using securities as collateral for borrowing), and the willingness of lenders to extend credit at all. Market liquidity refers to the ease with which a financial instrument can be transacted — characterised by bid-ask spread, order book depth, and the price impact of trades.`,
+      `In normal conditions, both types of liquidity are abundant and their interaction is benign: easy financing (high funding liquidity) supports investor ability to hold and accumulate positions (deepening market liquidity). But the Brunnermeier-Pedersen framework shows that this relationship inverts in crises: low funding liquidity forces investors to sell assets regardless of price, destroying market liquidity; low market liquidity (wide spreads, inability to transact) increases volatility and uncertainty, causing lenders to raise margins (reducing funding liquidity). The two types of liquidity are <em>endogenous</em> to each other — each reinforces the deterioration of the other.`,
+      `The <em>liquidity illusion</em> is the false belief that an asset's normal-market liquidity profile will persist in stress. A mutual fund manager who holds corporate bonds that trade $10M per day in normal conditions may assume they can liquidate a $100M position in 10 days. In a crisis, when every holder is simultaneously trying to sell, the same bonds may trade $1M per day at prices 20% below where they were quoted — making the same liquidation take 100 days at a 20% loss. VaR models that use historical bid-ask spreads to estimate liquidation costs systematically embed this illusion, producing risk estimates that are too optimistic precisely when they matter most.`,
+      `Distinguishing funding from market liquidity in practice requires monitoring different indicators simultaneously. <strong>Funding liquidity indicators</strong>: TED spread (Treasury-Eurodollar spread, measuring bank credit risk), LIBOR-OIS or SOFR-OIS spread, repo special spreads, commercial paper-T-bill spread, bank lending standards. <strong>Market liquidity indicators</strong>: bid-ask spreads across asset classes, Amihud ratio (price impact per unit of volume), on-the-run vs off-the-run Treasury spread, VIX term structure. When both sets of indicators deteriorate simultaneously, a full liquidity crisis is underway.`
+    ],
+    ki: "The distinction between funding and market liquidity is more than academic — it is the difference between a manageable correction (where one type fails while the other holds) and a systemic crisis (where both fail simultaneously). Every major financial crisis in history has involved the simultaneous deterioration of both: investors couldn't fund their positions (funding crisis) and couldn't sell them (market crisis). This endogenous relationship is the reason central banks must act as both lender of last resort (funding) and buyer of last resort (market) in a full crisis."
+  },
+];
+
+/* ═══ BUILD SPIRAL HTML ═══ */
+function buildSpiral() {
+  const steps = [
+    { n:"01", title:"Initial Shock", note:"Price decline / loss event", cls:"" },
+    { n:"02", title:"Margin Call", note:"Required collateral shortfall", cls:"hot" },
+    { n:"03", title:"Forced Sale", note:"Price-insensitive liquidation", cls:"hot" },
+    { n:"04", title:"Price Falls", note:"Market liquidity falls", cls:"hot" },
+    { n:"05", title:"Higher Margins", note:"Risk mgmt raises haircuts", cls:"hot" },
+    { n:"06", title:"More Sales", note:"→ return to step 3", cls:"hot" },
+  ];
+  return `
+  <div class="spiral-vis">
+    ${steps.map(s=>`<div class="sv-step ${s.cls}">
+      <div class="sv-n">Step ${s.n}</div>
+      <div class="sv-title">${s.title}</div>
+      <div class="sv-note">${s.note}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+/* ═══ RENDER ═══ */
+let cnt = 0;
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach(e => {
+    const idx = cnt++;
+    const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const pbH = e.phaseBars ? `
+      <div class="phase-bars">
+        <div class="pb-head">Cycle Phase Indicators</div>
+        ${e.phaseBars.map(b=>`
+          <div class="pb-row">
+            <div class="pb-label">${b.label}</div>
+            <div class="pb-track">
+              <div class="pb-bar-bg">
+                <div class="pb-fill" style="width:${b.fill}%;background:${b.color}"></div>
+              </div>
+              <div class="pb-val">${b.val}</div>
+            </div>
+          </div>`).join('')}
+      </div>` : '';
+
+    const spiralH = e.spiral ? buildSpiral() : '';
+
+    const cmpH = e.cmp ? `<div class="cmp c${e.cmp.length}">
+      ${e.cmp.map(c=>`<div class="cc ${c.cls}">
+        <div class="cc-l">${c.label}</div><p>${c.text}</p>
+      </div>`).join('')}</div>` : '';
+
+    const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`
+      <div class="stat">
+        <div class="stat-l">${s.l}</div>
+        <div class="stat-v ${s.c}">${s.v}</div>
+      </div>`).join('')}</div>` : '';
+
+    const body = e.body.map(p=>`<p>${p}</p>`).join('') +
+      pbH + spiralH + cmpH + stH +
+      `<div class="ki">
+        <div class="ki-bar">Key Insight</div>
+        <div class="ki-inner">
+          <div class="ki-label">Key Insight</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+      </div>
+      <div class="tags">${tH}</div>`;
+
+    const dataH = (e.data||[]).map(d=>`<div class="e-datum">${d}</div>`).join('');
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+        <div class="e-phase">
+          <div class="e-phase-icon">${e.icon}</div>
+          <div class="e-phase-label">${e.phase}</div>
+        </div>
+        <div class="e-text">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        <div class="e-data">${dataH}</div>
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-body">${body}</div>`;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+render();
+</script>
+</body>
+</html>

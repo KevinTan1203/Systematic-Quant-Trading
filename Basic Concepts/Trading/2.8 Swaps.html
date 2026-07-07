@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 2.8 Swaps</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Azeret+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Blueprint palette — navy base, white lines */
+  --bg:       #f0f4f8;
+  --bg1:      #e8eef6;
+  --bg2:      #dce6f0;
+  --bg3:      #cfd9e8;
+  --surface:  #ffffff;
+  --border:   #c4d0e0;
+  --border2:  #a8bcd4;
+
+  --ink:      #0a1428;
+  --ink2:     #1e3050;
+  --muted:    #5a7090;
+  --faint:    #94a8c0;
+
+  /* swap type colours */
+  --irs:      #0a4a8a;   /* IRS — classic navy */
+  --irs-l:    #e8f0fa;
+  --irs-b:    #b4ccec;
+
+  --xccy:     #0a6a5a;   /* cross-currency — teal */
+  --xccy-l:   #e8f4f0;
+  --xccy-b:   #90ccba;
+
+  --cds:      #8a0a1a;   /* CDS — crimson */
+  --cds-l:    #fae8ea;
+  --cds-b:    #d89098;
+
+  --trs:      #5a0a8a;   /* TRS — purple */
+  --trs-l:    #f0e8fa;
+  --trs-b:    #b890d8;
+
+  --eq:       #0a6a0a;   /* equity swap — green */
+  --eq-l:     #e8f4e8;
+  --eq-b:     #90cc90;
+
+  --vol:      #8a5a0a;   /* var/corr swaps — amber */
+  --vol-l:    #f4f0e8;
+  --vol-b:    #d4b870;
+
+  --rates:    #0a4a6a;   /* OIS/SOFR — steel */
+  --rates-l:  #e8f0f4;
+  --rates-b:  #90b4cc;
+
+  --mech:     #3a3a5a;   /* mechanics — slate */
+  --mech-l:   #eeeef4;
+  --mech-b:   #9898b8;
+
+  --clear:    #3a6a0a;   /* clearing — olive */
+  --clear-l:  #eef4e8;
+  --clear-b:  #98c870;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.72;
+  overflow-x: hidden;
+}
+
+/* blueprint grid */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(10,74,138,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(10,74,138,0.06) 1px, transparent 1px),
+    linear-gradient(rgba(10,74,138,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(10,74,138,0.03) 1px, transparent 1px);
+  background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ─── MASTHEAD ─── */
+.masthead {
+  position: relative; z-index: 2;
+  background: var(--irs);
+  padding: 0;
+  border-bottom: 4px solid #0a3060;
+}
+
+.mhd-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 52px 44px 44px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 48px; align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.28em;
+  text-transform: uppercase; color: rgba(255,255,255,0.4);
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mhd-kicker::before { content:''; width:20px; height:1px; background:rgba(255,255,255,0.3); }
+
+.mhd-title {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: clamp(48px, 6.5vw, 90px);
+  font-weight: 700; letter-spacing: -0.04em;
+  color: #ffffff; line-height: 0.88; margin-bottom: 12px;
+}
+
+.mhd-subtitle {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 12px; font-weight: 300;
+  color: rgba(255,255,255,0.5); letter-spacing: 0.06em;
+}
+
+/* swap flow widget */
+.swap-widget {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 16px;
+  min-width: 280px;
+}
+.sw-title {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3); margin-bottom: 12px;
+}
+.sw-diagram { position: relative; }
+.sw-party {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 80px; padding: 8px 0;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px; font-weight: 500;
+  color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.08);
+}
+.sw-flows {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 10px 0;
+}
+.sw-flow {
+  display: flex; align-items: center; gap: 8px;
+}
+.sw-arrow {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 10px; letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.5);
+  flex: 1; text-align: center;
+}
+.sw-leg {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9.5px; font-weight: 400;
+  padding: 3px 8px; flex-shrink: 0;
+}
+.fixed-leg  { color: #90e890; border: 1px solid rgba(144,232,144,0.3); }
+.float-leg  { color: #90c8e8; border: 1px solid rgba(144,200,232,0.3); }
+.credit-leg { color: #e89090; border: 1px solid rgba(232,144,144,0.3); }
+
+/* ─── PAGE ─── */
+.page {
+  position: relative; z-index: 2;
+  max-width: 1080px; margin: 0 auto;
+  padding: 34px 44px 100px;
+}
+
+/* section header */
+.sec-hdr {
+  display: flex; align-items: center; gap: 14px;
+  margin: 30px 0 8px;
+}
+.sec-label {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9.5px; font-weight: 500;
+  letter-spacing: 0.24em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.sec-line { flex: 1; height: 1px; }
+
+/* controls */
+.controls {
+  display: flex; gap: 8px; margin-bottom: 28px;
+  flex-wrap: wrap; align-items: center;
+}
+.ctrl {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 6px 14px; border: 1px solid var(--border2);
+  background: var(--surface); color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.ctrl:hover { background: var(--irs); color: #fff; border-color: var(--irs); }
+.ctrl-right { margin-left: auto; font-family: 'Azeret Mono', monospace; font-size: 9.5px; color: var(--faint); letter-spacing: 0.06em; }
+
+/* ─── ENTRY ─── */
+.entry {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  margin-bottom: 4px; position: relative;
+  overflow: hidden; transition: border-color 0.18s, box-shadow 0.18s;
+}
+.entry::before {
+  content: ''; position: absolute; left:0; top:0; bottom:0; width:4px;
+  transition: width 0.2s;
+}
+.entry.open::before { width: 5px; }
+.entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+/* colour families */
+.f-irs   .entry::before { background: var(--irs-b); }
+.f-irs   .entry.open::before { background: var(--irs); }
+.f-xccy  .entry::before { background: var(--xccy-b); }
+.f-xccy  .entry.open::before { background: var(--xccy); }
+.f-cds   .entry::before { background: var(--cds-b); }
+.f-cds   .entry.open::before { background: var(--cds); }
+.f-trs   .entry::before { background: var(--trs-b); }
+.f-trs   .entry.open::before { background: var(--trs); }
+.f-eq    .entry::before { background: var(--eq-b); }
+.f-eq    .entry.open::before { background: var(--eq); }
+.f-vol   .entry::before { background: var(--vol-b); }
+.f-vol   .entry.open::before { background: var(--vol); }
+.f-rates .entry::before { background: var(--rates-b); }
+.f-rates .entry.open::before { background: var(--rates); }
+.f-mech  .entry::before { background: var(--mech-b); }
+.f-mech  .entry.open::before { background: var(--mech); }
+.f-clear .entry::before { background: var(--clear-b); }
+.f-clear .entry.open::before { background: var(--clear); }
+
+.e-hdr {
+  display: flex; align-items: center;
+  cursor: pointer; user-select: none;
+  min-height: 56px; padding-left: 4px;
+  transition: background 0.14s;
+}
+.e-hdr:hover { background: var(--bg1); }
+
+.e-num {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px; color: var(--faint);
+  width: 44px; text-align: center; flex-shrink: 0;
+  letter-spacing: 0.06em;
+}
+
+/* type badge */
+.e-type {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9px; font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 3px 10px; border: 1px solid;
+  flex-shrink: 0; margin-right: 14px; white-space: nowrap;
+}
+
+.e-icon {
+  font-size: 16px; width: 42px; text-align: center;
+  flex-shrink: 0; border-right: 1px solid var(--border);
+  align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.e-text { flex: 1; padding: 11px 16px; }
+
+.e-title {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 17px; font-weight: 600;
+  color: var(--ink); line-height: 1.2; letter-spacing: -0.01em;
+}
+
+.e-sub {
+  font-family: 'Azeret Mono', monospace;
+  font-size: 9.5px; color: var(--muted);
+  margin-top: 3px; letter-spacing: 0.04em; font-weight: 300;
+}
+
+.e-toggle {
+  font-family: 'Azeret Mono', monospace; font-size: 13px; color: var(--faint);
+  width: 44px; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  border-left: 1px solid var(--border); flex-shrink: 0;
+  transition: transform 0.24s, color 0.15s;
+}
+.entry.open .e-toggle { transform: rotate(90deg); }
+.f-irs   .entry.open .e-toggle { color: var(--irs); }
+.f-xccy  .entry.open .e-toggle { color: var(--xccy); }
+.f-cds   .entry.open .e-toggle { color: var(--cds); }
+.f-trs   .entry.open .e-toggle { color: var(--trs); }
+.f-eq    .entry.open .e-toggle { color: var(--eq); }
+.f-vol   .entry.open .e-toggle { color: var(--vol); }
+.f-rates .entry.open .e-toggle { color: var(--rates); }
+.f-mech  .entry.open .e-toggle { color: var(--mech); }
+.f-clear .entry.open .e-toggle { color: var(--clear); }
+
+/* ─── BODY ─── */
+.e-body {
+  display: none; border-top: 1px solid var(--border);
+  background: var(--bg); padding: 22px 22px 26px 86px;
+  animation: bIn 0.2s ease;
+}
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p {
+  font-family: 'Libre Caslon Text', serif;
+  font-size: 13.5px; font-weight: 400;
+  line-height: 1.86; color: var(--ink2);
+  margin-bottom: 14px;
+}
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); }
+.e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Hanken Grotesk', sans-serif; font-size: 14px; }
+
+/* cash flow diagram */
+.cashflow {
+  margin-top: 18px; border: 1px solid var(--border);
+  background: var(--bg1); overflow: hidden;
+}
+.cf-title {
+  font-family: 'Azeret Mono', monospace; font-size: 8.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--muted); padding: 7px 14px;
+  border-bottom: 1px solid var(--border); background: var(--bg2);
+}
+.cf-row {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1px solid var(--border); min-height: 36px;
+}
+.cf-row:last-child { border-bottom: none; }
+.cf-party {
+  font-family: 'Azeret Mono', monospace; font-size: 10.5px; font-weight: 500;
+  width: 110px; padding: 8px 12px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  color: var(--ink2); background: var(--bg2);
+}
+.cf-arrow-area {
+  flex: 1; padding: 6px 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.cf-arrow-line {
+  flex: 1; height: 2px; position: relative;
+}
+.cf-arrow-line::after {
+  content: ''; position: absolute; right: -1px; top: -4px;
+  border: 5px solid transparent;
+}
+.cf-leg-label {
+  font-family: 'Azeret Mono', monospace; font-size: 9.5px;
+  padding: 2px 8px; white-space: nowrap;
+}
+.cf-to {
+  font-family: 'Azeret Mono', monospace; font-size: 10.5px; font-weight: 500;
+  width: 110px; padding: 8px 12px; flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  color: var(--ink2); background: var(--bg2); text-align: right;
+}
+/* direction: right */
+.cf-arrow-line.right { background: linear-gradient(to right, transparent 0%, currentColor 100%); }
+.cf-arrow-line.right::after { border-left-color: currentColor; }
+/* direction: left */
+.cf-arrow-line.left  { background: linear-gradient(to left, transparent 0%, currentColor 100%); }
+.cf-arrow-line.left::after  { display: none; }
+.cf-arrow-area.left-dir .cf-arrow-line.left::before {
+  content: ''; position: absolute; left: -1px; top: -4px;
+  border: 5px solid transparent;
+}
+
+/* formula block */
+.fmla {
+  margin-top: 16px; padding: 13px 16px;
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-left: 3px solid var(--mech);
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;
+}
+.fmla-eq {
+  font-family: 'Azeret Mono', monospace; font-size: 12.5px;
+  color: var(--ink); flex-shrink: 0; line-height: 1.7;
+}
+.fmla-eq .v  { color: var(--irs); }
+.fmla-eq .k  { color: var(--vol); }
+.fmla-eq .r  { color: var(--cds); }
+.fmla-eq .op { color: var(--muted); }
+.fmla-note {
+  font-family: 'Azeret Mono', monospace; font-size: 10.5px;
+  color: var(--muted); line-height: 1.7; white-space: pre-line;
+}
+
+/* cmp grid */
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cmp.c3 { grid-template-columns: 1fr 1fr 1fr; }
+.cmp.c4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.cc { padding: 13px 15px; border: 1px solid var(--border); background: var(--bg1); }
+.cc-l { font-family: 'Azeret Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
+.cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Hanken Grotesk', sans-serif !important; font-weight: 300 !important; color: var(--ink2) !important; }
+.cc.irs   { background: var(--irs-l);   border-color: var(--irs-b);   } .cc.irs   .cc-l { color: var(--irs); }
+.cc.xccy  { background: var(--xccy-l);  border-color: var(--xccy-b);  } .cc.xccy  .cc-l { color: var(--xccy); }
+.cc.cds   { background: var(--cds-l);   border-color: var(--cds-b);   } .cc.cds   .cc-l { color: var(--cds); }
+.cc.trs   { background: var(--trs-l);   border-color: var(--trs-b);   } .cc.trs   .cc-l { color: var(--trs); }
+.cc.eq    { background: var(--eq-l);    border-color: var(--eq-b);    } .cc.eq    .cc-l { color: var(--eq); }
+.cc.vol   { background: var(--vol-l);   border-color: var(--vol-b);   } .cc.vol   .cc-l { color: var(--vol); }
+.cc.rates { background: var(--rates-l); border-color: var(--rates-b); } .cc.rates .cc-l { color: var(--rates); }
+.cc.mech  { background: var(--mech-l);  border-color: var(--mech-b);  } .cc.mech  .cc-l { color: var(--mech); }
+.cc.clear { background: var(--clear-l); border-color: var(--clear-b); } .cc.clear .cc-l { color: var(--clear); }
+.cc.warn  { background: #faeaea; border-color: #e8a8a8; } .cc.warn .cc-l { color: var(--cds); }
+
+/* stats */
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.stat { flex: 1; min-width: 110px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg1); }
+.stat-l { font-family: 'Azeret Mono', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.stat-v { font-family: 'Azeret Mono', monospace; font-size: 12.5px; font-weight: 500; line-height: 1.2; }
+.stat-v.irs   { color: var(--irs); }
+.stat-v.xccy  { color: var(--xccy); }
+.stat-v.cds   { color: var(--cds); }
+.stat-v.trs   { color: var(--trs); }
+.stat-v.vol   { color: var(--vol); }
+.stat-v.rates { color: var(--rates); }
+.stat-v.clear { color: var(--clear); }
+.stat-v.up    { color: var(--eq); }
+.stat-v.dn    { color: var(--cds); }
+
+/* SOFR vs LIBOR timeline */
+.timeline-vis { margin-top: 18px; border: 1px solid var(--border); overflow: hidden; }
+.tv-head { font-family: 'Azeret Mono', monospace; font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); background: var(--bg2); padding: 7px 14px; border-bottom: 1px solid var(--border); }
+.tv-row { display: grid; grid-template-columns: 90px 100px 1fr; border-bottom: 1px solid var(--border); }
+.tv-row:last-child { border-bottom: none; }
+.tv-row.hdr .tc { background: var(--bg3); font-family: 'Azeret Mono', monospace; font-size: 8.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.tc { padding: 8px 12px; border-right: 1px solid var(--border); font-family: 'Azeret Mono', monospace; font-size: 10.5px; color: var(--ink2); line-height: 1.45; }
+.tc:last-child { border-right: none; }
+.tc.label { color: var(--ink); font-weight: 500; }
+.tc.done  { color: var(--eq); }
+.tc.live  { color: var(--irs); }
+.tc.warn  { color: var(--cds); }
+
+/* DV01 visual */
+.dv01-vis { margin-top: 18px; border: 1px solid var(--border); background: var(--bg1); padding: 16px; }
+.dv01-title { font-family: 'Azeret Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+.dv01-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.dv01-label { font-family: 'Azeret Mono', monospace; font-size: 10px; color: var(--ink2); width: 100px; flex-shrink: 0; }
+.dv01-track { flex: 1; height: 8px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.dv01-fill { height: 100%; border-radius: 2px; }
+.dv01-val { font-family: 'Azeret Mono', monospace; font-size: 10px; font-weight: 700; width: 80px; text-align: right; color: var(--irs); }
+
+/* key insight */
+.ki {
+  margin-top: 20px; padding: 15px 18px;
+  background: var(--bg1); border: 1px solid var(--border2);
+  display: grid; grid-template-columns: 36px 1fr;
+  gap: 14px; align-items: flex-start;
+}
+.ki-num {
+  font-family: 'Azeret Mono', monospace; font-size: 9px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--faint); padding-top: 2px; text-align: center;
+  border-right: 2px solid; padding-right: 14px;
+}
+.ki-text {
+  font-family: 'Libre Caslon Text', serif; font-style: italic;
+  font-size: 14.5px; color: var(--ink); line-height: 1.62;
+}
+.f-irs   .ki-num { border-color: var(--irs);   color: var(--irs); }
+.f-xccy  .ki-num { border-color: var(--xccy);  color: var(--xccy); }
+.f-cds   .ki-num { border-color: var(--cds);   color: var(--cds); }
+.f-trs   .ki-num { border-color: var(--trs);   color: var(--trs); }
+.f-eq    .ki-num { border-color: var(--eq);    color: var(--eq); }
+.f-vol   .ki-num { border-color: var(--vol);   color: var(--vol); }
+.f-rates .ki-num { border-color: var(--rates); color: var(--rates); }
+.f-mech  .ki-num { border-color: var(--mech);  color: var(--mech); }
+.f-clear .ki-num { border-color: var(--clear); color: var(--clear); }
+
+/* tags */
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-family: 'Azeret Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
+.tag.irs   { border-color: var(--irs-b);   color: var(--irs); }
+.tag.xccy  { border-color: var(--xccy-b);  color: var(--xccy); }
+.tag.cds   { border-color: var(--cds-b);   color: var(--cds); }
+.tag.trs   { border-color: var(--trs-b);   color: var(--trs); }
+.tag.eq    { border-color: var(--eq-b);    color: var(--eq); }
+.tag.vol   { border-color: var(--vol-b);   color: var(--vol); }
+.tag.rates { border-color: var(--rates-b); color: var(--rates); }
+.tag.mech  { border-color: var(--mech-b);  color: var(--mech); }
+.tag.clear { border-color: var(--clear-b); color: var(--clear); }
+
+/* footer */
+.foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border2); display: flex; justify-content: space-between; }
+.foot span { font-family: 'Azeret Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .swap-widget { display: none; }
+  .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding: 36px 18px 28px; }
+  .e-body { padding-left: 16px; }
+  .cmp.c2,.cmp.c3,.cmp.c4 { grid-template-columns: 1fr; }
+  .tv-row { grid-template-columns: 70px 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── MASTHEAD ─── -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 2.8 · Asset Classes · OTC Derivatives</div>
+      <div class="mhd-title">SWAPS</div>
+      <div class="mhd-subtitle">// Exchange of cash flows between two parties over a defined period — the largest segment of the global derivatives market</div>
+    </div>
+
+    <div class="swap-widget">
+      <div class="sw-title">// Vanilla IRS Cash Flow Diagram</div>
+      <div class="sw-diagram">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <div class="sw-party">Party A<br><span style="font-size:8px;opacity:0.5">Fixed Payer</span></div>
+          <div class="sw-party">Party B<br><span style="font-size:8px;opacity:0.5">Float Payer</span></div>
+        </div>
+        <div class="sw-flows">
+          <div class="sw-flow">
+            <span class="sw-leg fixed-leg">FIXED 4.50%</span>
+            <span class="sw-arrow">────────────▶</span>
+          </div>
+          <div class="sw-flow">
+            <span class="sw-arrow">◀────────────</span>
+            <span class="sw-leg float-leg">SOFR + 25bps</span>
+          </div>
+        </div>
+        <div style="font-family:'Azeret Mono',monospace;font-size:9px;color:rgba(255,255,255,0.3);margin-top:6px">
+          Notional: $100M · 5Y · Semi-annual · Cash-settled
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MAIN ─── -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">15 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>2.8 Swaps</span>
+</footer>
+
+<script>
+/* ─── CASH FLOW DIAGRAM BUILDER ─── */
+function buildCF(title, rows) {
+  const rowsH = rows.map(r => `
+    <div class="cf-row">
+      <div class="cf-party">${r.from}</div>
+      <div class="cf-arrow-area" style="flex-direction:${r.dir==='left'?'row-reverse':'row'}">
+        <div class="cf-arrow-line ${r.dir}" style="color:${r.color}"></div>
+        <div class="cf-leg-label" style="color:${r.color};border:1px solid ${r.color}22;background:${r.color}11">${r.leg}</div>
+      </div>
+      <div class="cf-to">${r.to}</div>
+    </div>`).join('');
+  return `<div class="cashflow">
+    <div class="cf-title">${title}</div>
+    ${rowsH}
+  </div>`;
+}
+
+const sections = [
+  {
+    label:"Rate Swaps",
+    color:"var(--irs)", line:"var(--irs-b)", fam:"f-irs",
+    entries:[
+      {
+        icon:"📐", type:"IRS", typeColor:"irs",
+        title:"Interest Rate Swaps (IRS)",
+        sub:"The world's largest derivatives market — exchanging fixed for floating rate payments",
+        tags:[["IRS","irs"],["fixed leg","irs"],["floating leg","rates"],["SOFR","rates"],["DV01","mech"]],
+        stats:[
+          {l:"Global IRS notional outstanding",v:"~$500 trillion",c:"irs"},
+          {l:"Most common tenor",v:"2Y, 5Y, 10Y, 30Y",c:"irs"},
+          {l:"Settlement",v:"Net cash (no principal exchange)",c:"mech"},
+          {l:"Largest dealers",v:"JPM, GS, Citi, DB, MS",c:"irs"},
+        ],
+        cf:{
+          title:"IRS Cash Flows — $100M Notional, 5Y, Fixed vs SOFR",
+          rows:[
+            {from:"Fixed Payer (A)", dir:"right", color:"#0a4a8a", leg:"Fixed 4.50% × $100M (semi-annual)", to:"Float Receiver (B)"},
+            {from:"Float Receiver (B)", dir:"left", color:"#0a6a5a", leg:"SOFR + Spread × $100M (quarterly)", to:"Fixed Payer (A)"},
+          ]
+        },
+        fmla:{
+          eq:`Fixed Leg PV <span class="op">=</span> <span class="v">K</span> <span class="op">×</span> <span class="v">N</span> <span class="op">×</span> <span class="k">Σ δᵢ × P(0,tᵢ)</span>
+Float Leg PV <span class="op">=</span> <span class="v">N</span> <span class="op">×</span> [<span class="k">P(0,t₀)</span> <span class="op">−</span> <span class="k">P(0,tₙ)</span>]
+<span class="v">Par Swap Rate</span> <span class="op">=</span> [P(0,t₀) <span class="op">−</span> P(0,tₙ)] / <span class="k">Σ δᵢ × P(0,tᵢ)</span>`,
+          note:`K = fixed rate  N = notional  δᵢ = day count fraction
+P(0,t) = discount factor (zero coupon bond price)\n\nAt initiation: PV(Fixed) = PV(Float) → swap value = 0\nAfter initiation: mark-to-market reflects rate moves`
+        },
+        body:[
+          `An <em>interest rate swap (IRS)</em> is an agreement between two parties to exchange interest rate payments on a notional principal amount over a defined period, without exchanging the principal itself. The most common structure — the "plain vanilla" IRS — has one party paying a fixed rate (the "swap rate") while receiving a floating rate (historically LIBOR, now SOFR or equivalent RFR). Both payment streams are calculated on the same notional but are settled on a net basis: only the difference between fixed and floating payments changes hands at each settlement date.`,
+          `The economic motivation is straightforward. A bank that has lent at fixed rates but funded itself at floating rates faces significant interest rate risk — if rates rise, its funding costs increase while its income is fixed. By entering into a swap (paying fixed, receiving floating), the bank converts its fixed income to floating, matching its liability profile. Conversely, a corporation with floating-rate debt (a bank loan linked to SOFR) can enter a swap to pay fixed and receive floating, converting its variable interest expense to a predictable fixed cost — equivalent to refinancing into fixed-rate debt without actually refinancing.`,
+          `The <em>par swap rate</em> — the fixed rate at which the swap has zero net present value at inception — is derived from the discount curve and defines the "fair" fixed rate given current market expectations of future floating rates. The swap curve (the par swap rate at each tenor) is one of the most important reference curves in finance: it embodies the market's complete forecast of short-term rates across every maturity and is used to discount future cash flows, price other derivatives, and assess relative value in fixed income markets. The swap spread (swap rate minus corresponding Treasury yield) reflects bank credit risk, supply/demand for fixed-rate payers, and regulatory dynamics.`,
+          `IRS are almost entirely OTC — customised in terms of notional, tenor, payment frequency, day count convention, and settlement currency — though post-Dodd-Frank, standardised IRS must be centrally cleared through CCPs like LCH SwapClear or CME Clearing. LCH SwapClear alone clears over $400 trillion notional in IRS annually, making it one of the most systemically important financial market infrastructures in the world.`
+        ],
+        ki:"Interest rate swaps are the largest and most important derivatives market in the world — larger by notional value than all equity markets combined. Their primary function is matching the duration of assets to liabilities for banks, insurers, and pension funds. The swap curve is the financial system's consensus forecast of the future path of interest rates — more informative, more liquid, and more forward-looking than any central bank projection."
+      },
+      {
+        icon:"🌍", type:"XCCY", typeColor:"xccy",
+        title:"Cross-Currency Swaps",
+        sub:"Exchanging interest payments and principal in two different currencies — multi-year FX + rate hedge",
+        tags:[["cross-currency","xccy"],["xccy basis","xccy"],["principal exchange","xccy"],["long-term hedge","xccy"]],
+        stats:[
+          {l:"Market size (notional)",v:"~$50 trillion",c:"xccy"},
+          {l:"Standard tenors",v:"1–10 years (up to 30Y)",c:"xccy"},
+          {l:"Principal exchange",v:"At inception and maturity",c:"xccy"},
+          {l:"EUR/USD xccy basis (typical)",v:"−10 to −40 bps",c:"dn"},
+        ],
+        cf:{
+          title:"Cross-Currency Swap — EUR/USD, 5Y, €100M / $108M",
+          rows:[
+            {from:"Party A (USD)", dir:"right", color:"#0a4a8a", leg:"$108M principal (at inception)", to:"Party B (EUR)"},
+            {from:"Party B (EUR)", dir:"right", color:"#0a6a5a", leg:"€100M principal (at inception)", to:"Party A (USD)"},
+            {from:"Party A (USD)", dir:"right", color:"#0a4a8a", leg:"USD SOFR × $108M (quarterly)", to:"Party B (EUR)"},
+            {from:"Party B (EUR)", dir:"left",  color:"#0a6a5a", leg:"EUR €STR + basis × €100M", to:"Party A (USD)"},
+            {from:"AT MATURITY", dir:"right", color:"#8a5a0a", leg:"Principal re-exchange (reverse)", to:"Symmetric"},
+          ]
+        },
+        body:[
+          `A <em>cross-currency swap (XCCY)</em> extends the interest rate swap concept across currencies: two parties exchange interest payments in different currencies on notional principal amounts set at the prevailing spot exchange rate, and also exchange the principal amounts themselves at inception and return them at maturity. This distinguishes XCCY swaps from FX swaps (which are short-term and do not exchange full interest streams) and from currency forwards (which are single-settlement instruments).`,
+          `The XCCY swap's defining feature is the <em>cross-currency basis</em> — an additional spread (typically negative, meaning dollars are relatively scarce) added to one floating leg to make the swap fair value at inception. Under Covered Interest Rate Parity, this basis should theoretically be zero — arbitrage should eliminate it. In practice, the basis has been persistently non-zero since 2008, reflecting: bank balance sheet constraints that limit CIP arbitrage, regulatory capital requirements, structural USD funding demand from non-US banks, and central bank reserve accumulation patterns.`,
+          `The primary institutional users are those with long-horizon cross-border currency needs. A Japanese insurance company holding US Treasuries and wanting to hedge the USD exposure back to JPY for 10 years enters a XCCY swap: pay USD SOFR (on the Treasury's floating proceeds), receive JPY TONA − basis. The all-in hedged yield on the US Treasury, after accounting for the XCCY basis, may be negative in JPY terms — meaning Japanese investors are effectively paying to hold USD assets on a fully hedged basis. This structural demand from Japanese liability-driven investors has made USD/JPY XCCY basis one of the most closely watched metrics in global fixed income markets.`
+        ],
+        ki:"Cross-currency swaps are the multi-year equivalent of FX swaps — the mechanism by which institutions hedge long-dated cross-border currency exposures. The cross-currency basis embedded in their pricing is one of the most important measures of global dollar scarcity: when the basis is steeply negative (dollars expensive to obtain via foreign collateral), it signals stress in global dollar funding markets."
+      },
+      {
+        icon:"🏛️", type:"OIS", typeColor:"rates",
+        title:"OIS — Overnight Index Swaps",
+        sub:"The purest rate expectation instrument — and the risk-free rate benchmark",
+        tags:[["OIS","rates"],["risk-free rate","rates"],["SOFR","rates"],["ESTR","rates"],["term structure","rates"]],
+        stats:[
+          {l:"OIS = swap of compounded overnight rate",v:"vs fixed",c:"rates"},
+          {l:"USD OIS references",v:"Compounded SOFR",c:"rates"},
+          {l:"EUR OIS references",v:"€STR (formerly EONIA)",c:"rates"},
+          {l:"OIS-Libor spread at GFC peak",v:"+364 bps (Oct 2008)",c:"dn"},
+        ],
+        cmp:[
+          {cls:"rates", label:"What OIS Measures", text:"An OIS fixed rate reflects the market's expectation of the average compounded overnight rate over the swap's life. A 2-year USD OIS at 4.80% means the market expects the average daily SOFR rate over the next 2 years to equal approximately 4.80%. This makes OIS the cleanest expression of future central bank policy expectations available in the market."},
+          {cls:"irs",   label:"OIS vs IBOR Swaps", text:"Traditional LIBOR-based swaps incorporated term bank credit risk (LIBOR was a panel bank survey rate including credit premia). OIS references nearly risk-free overnight rates — no credit term premium. The OIS-LIBOR spread became the primary real-time measure of banking system stress during 2008: when banks distrusted each other, LIBOR rose above OIS, widening the spread to 364 bps at the GFC peak."},
+          {cls:"mech",  label:"SOFR Transition (post-LIBOR)", text:"LIBOR was permanently discontinued in June 2023. US replaced it with SOFR (Secured Overnight Financing Rate — GC repo rate). UK: SONIA. EU: €STR. JPY: TONA. AUD: AONIA. The transition required repricing ~$300 trillion in legacy LIBOR contracts via fallback protocols, voluntary early termination, or bilateral renegotiation — one of the largest-scale financial infrastructure changes in history."},
+        ],
+        body:[
+          `An <em>Overnight Index Swap (OIS)</em> is an interest rate swap where one party pays a fixed rate and the other pays the compounded overnight rate over the swap's life. Unlike standard IRS which reference term rates (3-month SOFR, 6-month Euribor), OIS reference overnight benchmark rates — SOFR in the US, €STR in the eurozone, SONIA in the UK — which carry essentially no term bank credit risk.`,
+          `OIS are simultaneously the market's most accurate measure of central bank policy expectations and the foundational discounting instrument for all derivatives. In the aftermath of the 2008 financial crisis, there was a regulatory shift from discounting derivatives using LIBOR curves to using OIS curves — recognising that OIS represents the true cost of funding a collateralised derivatives portfolio, which is closer to the risk-free rate than LIBOR's bank credit-inclusive term rate. LCH and CME both moved to SOFR-OIS discounting, effectively changing the market value of hundreds of trillions in cleared derivatives overnight — a "big bang" that required enormous coordination across the industry.`
+        ],
+        ki:"OIS rates are the financial system's consensus forecast of central bank policy rates — extracted directly from market prices rather than from central bank projections or economic models. The OIS curve at any point in time encodes every market participant's weighted expectation of every future central bank meeting outcome. This makes OIS the most informative forward-looking interest rate indicator available and the appropriate discount rate for collateralised derivatives."
+      },
+      {
+        icon:"🔄", type:"SOFR", typeColor:"rates",
+        title:"SOFR Swaps — Post-LIBOR Transition",
+        sub:"The new global benchmark replacing LIBOR in the world's largest derivatives market",
+        tags:[["SOFR","rates"],["LIBOR","mech"],["RFR","rates"],["ARRC","rates"],["fallback","mech"]],
+        sofr: true,
+        body:[
+          `The transition from LIBOR (London Interbank Offered Rate) to SOFR (Secured Overnight Financing Rate) is one of the most significant structural changes in financial markets in decades. LIBOR — a daily survey of major banks' self-reported borrowing costs at various terms — underpinned approximately $300 trillion in financial instruments globally: corporate loans, mortgages, swaps, bonds, and derivatives. Its discontinuation, forced by the 2012 rate-rigging scandal (Barclays, UBS, Deutsche Bank, and others were found to have manipulated their submissions), required the simultaneous replacement of the world's most important financial benchmark.`,
+          `SOFR, calculated by the New York Fed from actual GC repo transactions, has several important differences from LIBOR. It is <em>backward-looking</em> (it reflects today's overnight rate, not a forward-looking term rate), <em>transaction-based</em> (derived from actual trades, not bank submissions), and <em>nearly risk-free</em> (secured against government securities, versus LIBOR which incorporated unsecured bank credit risk). The backward-looking nature created operational challenges for loan markets (which need to know interest payments in advance), addressed by developing SOFR term rates (published by CME Group) derived from SOFR futures markets.`,
+          `In the swap market, the transition produced significant complexity around legacy contracts: LIBOR-based IRS had to either be novated to SOFR terms, amended via ISDA's Protocol (which automatically converts contracts following LIBOR cessation), or valued using published fallback rates. The market has now substantially completed this transition — the vast majority of new IRS are SOFR-based, and liquidity in SOFR swap markets has surpassed legacy LIBOR markets. The spread between SOFR and term SOFR rates (the latter reflecting rate expectations over the term, the former reflecting only overnight) is now a traded quantity, creating a new sub-market for "SOFR basis" swaps.`
+        ],
+        ki:"The LIBOR to SOFR transition is the single largest coordinated change in financial market infrastructure in history — touching $300 trillion in contracts spanning every major asset class. Its successful completion proved that financial markets can execute massive coordinated transitions when regulatory pressure, industry coordination, and clear deadlines are aligned. The new benchmark ecosystem (SOFR, €STR, SONIA) is more robust, more transparent, and more regulatorily defensible than LIBOR — but the transition itself created years of legal, operational, and pricing complexity."
+      },
+    ]
+  },
+  {
+    label:"Credit Derivatives",
+    color:"var(--cds)", line:"var(--cds-b)", fam:"f-cds",
+    entries:[
+      {
+        icon:"🛡️", type:"CDS", typeColor:"cds",
+        title:"Credit Default Swaps (CDS)",
+        sub:"Credit insurance that became a systemic risk instrument — and almost broke the financial system",
+        tags:[["CDS","cds"],["protection buyer","cds"],["spread","cds"],["reference entity","cds"],["AIG","cds"]],
+        stats:[
+          {l:"Global CDS notional (2023)",v:"~$10 trillion (post-GFC compression)",c:"cds"},
+          {l:"Pre-crisis peak notional",v:"~$60 trillion (2007)",c:"dn"},
+          {l:"Standard CDS premium payment",v:"Quarterly (SNAC convention)",c:"cds"},
+          {l:"Credit event triggers",v:"Default, restructuring, failure to pay",c:"cds"},
+        ],
+        cf:{
+          title:"CDS Cash Flows — $10M Notional, 5Y, Reference: Company X",
+          rows:[
+            {from:"Protection Buyer", dir:"right", color:"#8a0a1a", leg:"100 bps/yr quarterly premium × $10M", to:"Protection Seller"},
+            {from:"IF Credit Event:", dir:"right", color:"#8a0a1a", leg:"Delivers defaulted bonds (Physical) or cash (Auction)", to:"Protection Seller"},
+            {from:"Protection Seller", dir:"left",  color:"#5a0a8a", leg:"Par ($10M) on credit event OR nothing", to:"Protection Buyer"},
+          ]
+        },
+        cmp:[
+          {cls:"cds",  label:"Single-Name CDS", text:"References a specific entity (Ford Motor, Italy sovereign, etc.). Protection buyer pays quarterly premium (in basis points on notional). Protection seller pays par minus recovery value if a credit event occurs. Used by: banks hedging loan exposure, portfolio managers hedging bond holdings, hedge funds making directional credit views, relative value traders."},
+          {cls:"warn", label:"AIG — CDS Failure Case", text:"AIG's Financial Products subsidiary sold $440B in CDS protection (primarily on mortgage CDOs) with minimal capital backing. As underlying mortgages deteriorated in 2007–08, AIG faced catastrophic collateral calls on its CDS positions. Unable to post, AIG would have defaulted — triggering credit events on hundreds of billions of derivatives. US government bailout: $182B. AIG is the definitive case of uncollateralised CDS writing creating systemic risk."},
+          {cls:"trs",  label:"CDS Index (CDX/iTraxx)", text:"Standardised indices of CDS on a basket of 125 (CDX IG, North America) or 125 (iTraxx Europe) reference entities. More liquid than single-name CDS. New series issued every 6 months (March/September roll). CDX IG spread reflects average 5Y protection cost for investment-grade US corporates. iTraxx Europe for EU corporates. CDX HY for high-yield. iTraxx Crossover for EUR HY."},
+        ],
+        body:[
+          `A <em>credit default swap (CDS)</em> is a bilateral contract in which the protection buyer makes periodic payments to the protection seller in exchange for a contingent payment if a specified credit event occurs with respect to a reference entity (a corporation or sovereign). CDS can be used to hedge credit exposure (a bank that has lent to a company buys CDS protection on that company), to speculate on credit deterioration ("naked CDS" — buying protection without owning the underlying bonds), or to take relative value positions between different credits.`,
+          `The CDS <em>spread</em> — quoted in basis points per annum on the notional — is the market's real-time assessment of credit risk. A CDS spread of 200 bps on a company means the market values 5-year protection at approximately 2% per year — implying a roughly 2% annual probability of default (more precisely, spread ≈ default probability × (1 − recovery rate)). As spreads widen, the market is pricing higher default probability or lower recovery expectations.`,
+          `CDS settlements occur via two mechanisms. <em>Physical settlement</em>: the buyer delivers defaulted bonds to the seller and receives par value. <em>Cash settlement via auction</em>: ISDA coordinates an auction process to determine the "final price" of the defaulted debt; the CDS settles at (100 − final price). The auction mechanism (introduced after the Delphi default in 2005) standardised settlement and prevented the "bond squeeze" that would occur if more CDS notional outstanding than bonds available for delivery.`
+        ],
+        ki:"CDS are a dual-use instrument: genuinely valuable for hedging concentrated credit exposures (the bank that loans $1B to one corporation can buy CDS to offset the risk), and potentially catastrophic when used to take massive leveraged bets without adequate collateral (AIG). The key risk is not the instrument itself but the absence of margin requirements on bilateral CDS — the post-2008 mandatory clearing regime addressed this, but AIG-style accumulation of uncollateralised credit risk remains possible outside the clearing perimeter."
+      },
+      {
+        icon:"📊", type:"CDX/iTraxx", typeColor:"cds",
+        title:"CDS Indices — CDX and iTraxx",
+        sub:"Standardised baskets of CDS — the most liquid credit instruments in the world",
+        tags:[["CDX","cds"],["iTraxx","cds"],["CDS index","cds"],["IG","irs"],["HY","vol"],["credit risk","cds"]],
+        stats:[
+          {l:"CDX IG (North America)",v:"125 IG corporate CDS",c:"irs"},
+          {l:"CDX HY (North America)",v:"100 HY corporate CDS",c:"vol"},
+          {l:"iTraxx Europe",v:"125 European IG CDS",c:"irs"},
+          {l:"iTraxx Crossover",v:"75 sub-IG European CDS",c:"vol"},
+          {l:"New series every",v:"March & September",c:"mech"},
+          {l:"Mandatory clearing",v:"Yes — CFTC/EMIR mandated",c:"clear"},
+        ],
+        cmp:[
+          {cls:"cds",  label:"CDX IG (Investment Grade)", text:"125 equal-weighted CDS on North American investment-grade corporates. Standard 5Y tenor most liquid. Spread reflects average IG credit risk premium. Used to: hedge a corporate bond portfolio, take macro credit views, implement credit strategies without single-name selection. Rolls every 6 months — old series continues to trade (seasoned) while new series becomes on-the-run benchmark."},
+          {cls:"vol",  label:"CDX HY (High Yield)", text:"100 HY US corporates. Higher spread, more volatile. Behaves more like an equity instrument — correlates with equity indices, especially in risk-off. Used for: macro bearish credit views, hedging HY bond portfolios, structured credit (CLO exposure management). The CDX HY option market allows trading of 'jump to distress' risk around individual names."},
+          {cls:"irs",  label:"iTraxx Europe / Crossover", text:"iTraxx Europe: 125 European IG CDS. iTraxx Crossover: 75 sub-investment-grade European names — the most actively traded European credit index. Crossover used for: directional macro credit views on European corporates, hedging European HY bond exposure, cross-regional credit spread plays (CDX IG vs iTraxx Europe basis trades). Rolls in same March/September cycle as CDX."},
+          {cls:"trs",  label:"Index Tranches (CDO Tranches)", text:"Standardised tranches of CDX/iTraxx that reference specific loss ranges. Equity tranche: first 0–3% of losses (most levered, most credit sensitive). Mezzanine: 3–7%. Senior: 7–15%. Super senior: 15–100%. Tranche pricing depends on default correlation — the 'correlation smile' in tranche markets drives demand for correlation swaps. Tranches were central to CDO structuring pre-2008 GFC."},
+        ],
+        body:[
+          `<em>CDS indices</em> — CDX in North America and iTraxx in Europe — are standardised, liquid, exchange-clearable credit derivatives that reference a basket of single-name CDS rather than an individual issuer. A position in CDX IG provides exposure to the credit risk of 125 of the most liquid North American investment-grade corporate names, equally weighted. As with single-name CDS, the protection buyer pays a quarterly premium (the spread) and receives par minus recovery on any constituent that experiences a credit event.`,
+          `The defining feature of CDS indices is their <em>standardisation and liquidity</em>. Unlike single-name CDS (which can be illiquid for many names), CDX IG and iTraxx Europe trade in billions of dollars of notional daily — making them among the most liquid credit instruments in the world. This liquidity makes them the instrument of choice for: rapidly adjusting credit exposure without transacting in illiquid single-name or bond markets; implementing macro credit views (bullish or bearish on corporate credit broadly); and hedging the credit exposure in structured products or loan portfolios.`,
+          `CDS indices are <em>reconstituted every six months</em> (March and September "rolls"). At each roll, dealers survey the market, remove names that have defaulted, been acquired, or lost liquidity, and replace them with more liquid alternatives. The old series continues to trade as an "off-the-run" instrument, while the new series becomes the "on-the-run" benchmark. The roll itself creates significant trading activity as investors switch between series — the spread between on-the-run and off-the-run indices (the "roll basis") is actively traded.`,
+          `<em>CDX/iTraxx vs. corporate bonds</em>: the relationship between credit index spreads and underlying corporate bond spreads creates a "cash-CDS basis" that is actively traded. In normal markets, cash bonds trade at a spread above the CDS equivalent (reflecting bond-specific factors like liquidity, coupon, and repo). During crises, this basis can invert or widen dramatically, creating relative value opportunities between the two markets. Understanding the basis between index CDS and underlying bonds is essential for any credit portfolio manager.`
+        ],
+        ki:"CDS indices are the equity market equivalent of index futures for credit — they provide instant, liquid, standardised exposure to the broad credit market without single-name selection. Their existence transformed credit from a market where you had to take individual company risk into one where you can trade the entire credit cycle as a macro view. The CDX/iTraxx ecosystem — spot indices, tranches, options, term structure — is the most complete infrastructure for credit risk transfer ever built."
+      },
+    ]
+  },
+  {
+    label:"Total Return & Equity Swaps",
+    color:"var(--trs)", line:"var(--trs-b)", fam:"f-trs",
+    entries:[
+      {
+        icon:"📊", type:"TRS", typeColor:"trs",
+        title:"Total Return Swaps (TRS)",
+        sub:"Synthetic asset exposure: receive all economic returns without owning the asset",
+        tags:[["TRS","trs"],["total return","trs"],["synthetic","trs"],["Archegos","dn"],["financing","trs"]],
+        cf:{
+          title:"TRS — $50M on S&P 500 Index",
+          rows:[
+            {from:"TRS Receiver (fund)", dir:"left",  color:"#5a0a8a", leg:"Total Return of S&P 500 (divs + price change)", to:"TRS Payer (bank)"},
+            {from:"TRS Receiver (fund)", dir:"right", color:"#0a4a8a", leg:"SOFR + 50bps financing spread", to:"TRS Payer (bank)"},
+          ]
+        },
+        cmp:[
+          {cls:"trs",  label:"Mechanics", text:"The TRS receiver gets: dividends paid + price appreciation of the reference asset. The TRS payer gets: financing payment (SOFR + spread). If the reference asset falls, the receiver pays the depreciation to the payer. The receiver gets synthetic exposure (long economic position) without owning the asset, financing the position at SOFR + spread."},
+          {cls:"warn", label:"Archegos — TRS Abuse", text:"Bill Hwang's Archegos had built $120B+ in equity exposure via TRS with multiple prime brokers simultaneously. No single broker saw total exposure. In March 2021, positions collapsed — banks had to liquidate simultaneously. Credit Suisse: $5.5B loss. Nomura: $2.9B. Total losses: ~$10B. Triggered SEC rules requiring greater disclosure of large TRS positions."},
+          {cls:"eq",   label:"CLO TRS", text:"TRS are extensively used in structured finance: CLO managers enter TRS on leveraged loan portfolios, gaining the economic exposure at lower capital cost than direct ownership. The bank (TRS payer) holds the loans on its balance sheet but transfers their economic return. Creates regulatory capital arbitrage opportunities."},
+        ],
+        body:[
+          `A <em>Total Return Swap (TRS)</em> provides the TRS receiver with the complete economic exposure to a reference asset — all income (dividends, coupons) and all price appreciation or depreciation — in exchange for paying a financing rate (typically SOFR + spread) to the TRS payer. The payer typically owns the reference asset and effectively lends it to the receiver synthetically. No securities change hands; the reference asset remains on the payer's balance sheet.`,
+          `TRS are used for multiple purposes: <strong>leveraged synthetic long positions</strong> (hedge funds gaining equity or credit exposure at prime brokerage financing rates); <strong>regulatory capital arbitrage</strong> (banks transferring the economic risk of loans while retaining legal ownership for reporting purposes); <strong>short selling</strong> (entering TRS as payer on an asset you expect to depreciate); and <strong>accessing illiquid markets</strong> (gaining economic exposure to assets that are difficult to own directly, such as whole loans or private credit).`,
+          `The Archegos collapse (March 2021) exposed the systemic risk in TRS concentration. Because TRS are bilateral OTC instruments, each prime broker saw only their own TRS with Archegos — not the aggregate leverage across all counterparties. Archegos had accumulated effectively long exposure to ViacomCBS, Discovery, GSX, and others totalling $120B+, funded by TRS with six different prime brokers. When positions began falling, margin calls came simultaneously — and banks discovered they were all trying to sell the same blocks of stock at the same time, with no coordinated unwinding. The episode directly prompted regulatory discussion of mandatory TRS reporting and greater transparency in prime brokerage relationships.`
+        ],
+        ki:"The TRS is leverage made invisible — a leveraged long or short position that appears on no public filing, carries no margin requirement unless the CSA specifies one, and is invisible to regulators unless specifically disclosed. Archegos showed that TRS concentration risk across a single entity with multiple banks can be catastrophic. The instrument is legitimate and widely used; the problem is the opacity of bilateral OTC structures in the absence of adequate reporting requirements."
+      },
+      {
+        icon:"📈", type:"EQ SWAP", typeColor:"eq",
+        title:"Equity Swaps",
+        sub:"Exchanging equity returns for a fixed or floating rate — the building block of structured products",
+        tags:[["equity swap","eq"],["index swap","eq"],["single stock","eq"],["variance swap","vol"],["total return","trs"]],
+        cmp:[
+          {cls:"eq",   label:"Index Return Swap", text:"Receive S&P 500 total return (price + dividends), pay SOFR + spread. Standard institutional tool for gaining passive index exposure without purchasing the underlying securities. Enables efficient tax treatment in some jurisdictions, regulatory capital optimisation for banks, and portfolio overlay strategies without tracking error from physical replication."},
+          {cls:"trs",  label:"Single Stock Swap", text:"Receive total return of a specific equity, pay financing rate. Used by institutional investors for concentrated exposure, short-term tactical positioning, and accessing stocks with short-selling restrictions. The swap eliminates voting rights and withholding tax on dividends in many structures — the dividend equivalent may be paid at a different withholding rate than physical dividends."},
+          {cls:"vol",  label:"Dividend Swap", text:"Separate from total return swaps, dividend swaps isolate the dividend component: receive realized dividends, pay/receive fixed expected dividends. Used by banks to hedge their dividend risk in structured products (autocallables, barrier options) and by investors who want pure dividend exposure without price risk. Heavily influenced by corporate dividend policy changes."},
+        ],
+        body:[
+          `<em>Equity swaps</em> encompass any bilateral contract that exchanges equity-linked returns for a fixed or floating payment stream. The most common forms are: <strong>index return swaps</strong> (institutional long exposure to an equity index); <strong>single-stock swaps</strong> (exposure to individual equities, often for regulatory or tax efficiency reasons); <strong>basket swaps</strong> (exposure to a custom portfolio of stocks); and <strong>factor swaps</strong> (exchanging returns of a factor portfolio — value, momentum, quality — typically used by quantitative factor investors or market makers hedging factor products).`,
+          `Equity swaps are the underlying mechanism for many retail structured products: the bank writing a capital-protected structured note buys zero coupon bonds (to return principal) and equity call options, hedging the option risk via equity swaps with its trading desk. They are also extensively used in ESG-related strategies: investors can swap out certain sector returns (excluding tobacco, weapons) and receive a customised benchmark that matches their sustainability criteria without physically selling and rebying the excluded holdings.`
+        ],
+        ki:"Equity swaps are financial system plumbing that most retail investors never see but constantly benefit from. Every index-linked structured product, every passive strategy implemented through synthetic replication, and every ETF authorised participant hedging involves equity swaps at some level. They are the mechanism through which the banking system provides efficient capital markets intermediation between risk appetite and risk supply."
+      },
+    ]
+  },
+  {
+    label:"Volatility & Exotic Swaps",
+    color:"var(--vol)", line:"var(--vol-b)", fam:"f-vol",
+    entries:[
+      {
+        icon:"🌋", type:"VAR SWAP", typeColor:"vol",
+        title:"Variance Swaps",
+        sub:"Trading realised volatility vs implied volatility — the pure vol instrument",
+        tags:[["variance swap","vol"],["realised vol","vol"],["strike","vol"],["vega","vol"],["P&L","vol"]],
+        fmla:{
+          eq:`Payoff <span class="op">=</span> <span class="v">Notional</span> <span class="op">×</span> [<span class="r">σ²_realised</span> <span class="op">−</span> <span class="k">K²_var</span>]
+
+where <span class="r">σ²_realised</span> <span class="op">=</span> (252/N) × <span class="v">Σ ln²(Sᵢ/Sᵢ₋₁)</span>
+and <span class="k">K_var</span> is the variance strike (agreed at inception)`,
+          note:`Variance swap vs vol swap:\n- Variance: convex payoff (benefits from large moves)\n- Vol swap: linear in realised vol\n\nVega: a var swap with $1M vega per vol point\ngenerally has $1M/(2×ATM vol) variance notional\n\nGamma P&L = ½ × Γ × S² × (σ²_realized − σ²_implied)\nVar swaps perfectly replicate this payoff`
+        },
+        body:[
+          `A <em>variance swap</em> pays the difference between realised variance (the square of realised volatility over the contract's life) and the strike variance (agreed at inception), multiplied by the variance notional. It is the purest instrument for trading the difference between implied and realised volatility — without the complications of managing delta, gamma, and theta separately as you would with an options book.`,
+          `The key insight is that variance swaps have a <em>replication portfolio</em>: a log-contract (a position in all OTM calls and puts, each weighted by the inverse square of their strike) perfectly replicates the payoff of a variance swap. This replication is model-free — it works regardless of the actual price path, giving variance swaps unique theoretical properties unavailable to simpler volatility instruments.`,
+          `<em>Variance swaps are convex in volatility</em>: the payoff is in variance (σ²), not volatility (σ). This convexity means that a long variance position benefits disproportionately from volatility spikes. For example, if implied vol is 20% and realised vol spikes to 40%, the long variance swap pays on (40² − 20²) = (1600 − 400) = 1200 variance points — not merely on the linear difference of 20 vega points. This convexity makes variance swaps more expensive than equivalent vol swaps (dealers charge for the convexity), and it makes long variance positions the preferred tool for hedging tail risk or expressing a view on volatility spikes.`
+        ],
+        ki:"Variance swaps solve the options trader's constant problem: how to take a pure view on volatility without managing a constantly-changing delta and gamma hedge. The variance swap packages all that complexity into a single P&L function: (realised vol² − implied vol²) × notional. The convexity premium — what you pay for the fact that large vol moves pay more than small ones — is the key pricing insight and is directly related to the 'volatility of volatility' or volga of the position."
+      },
+      {
+        icon:"🔗", type:"CORR SWAP", typeColor:"vol",
+        title:"Correlation Swaps",
+        sub:"Trading realised vs implied correlation — the risk premium hiding inside index options",
+        tags:[["correlation swap","vol"],["dispersion","vol"],["index vol","vol"],["single-stock vol","vol"],["structured products","vol"]],
+        stats:[
+          {l:"Correlation strike (typical range)",v:"30–70% for equity indices",c:"vol"},
+          {l:"Implied vs realised corr premium",v:"~10–15pp on average",c:"vol"},
+          {l:"Primary use",v:"Dealer hedge for structured products",c:"mech"},
+          {l:"Dispersion trade",v:"Long single-name var + short index var",c:"vol"},
+        ],
+        fmla:{
+          eq:`Payoff = <span class="v">N</span> × (<span class="r">ρ_realised</span> − <span class="k">ρ_strike</span>)
+
+<span class="r">ρ_realised</span> = average pairwise correlation of N index constituents
+<span class="k">ρ_strike</span> = agreed correlation at inception (typically below implied)`,
+          note:`Example: 3-month correlation swap on S&P 500
+Strike: 45%  |  Realised: 62%
+Notional: $1M per correlation point
+Payoff = $1M × (62 − 45) = +$17M (long corr position)
+
+Implied correlation ≈ index vol² / Σ wᵢwⱼσᵢσⱼρᵢⱼ`
+        },
+        body:[
+          `A <em>correlation swap</em> pays the difference between the realised average pairwise correlation among the constituents of an index and a fixed correlation strike agreed at inception, multiplied by a notional amount per correlation percentage point. It provides direct, clean exposure to correlation as an asset class — separating it from the single-stock volatility and index volatility exposures that correlation is normally bundled with.`,
+          `The economic motivation stems from a structural imbalance in the options market. Dealers who sell index options (e.g. an S&P 500 straddle to a pension fund hedging equity risk) are effectively short index volatility. To hedge, they buy single-stock volatility (straddles on the index components). The net position is: short correlation — because index vol is approximately equal to the average single-stock vol scaled by correlation. When correlation is low (stocks move independently), single-stock vol hedges overpay for the index vol protection. Dealers therefore systematically want to sell correlation to offset this structural short.`,
+          `<em>Dispersion trading</em> is the closely related strategy: sell index variance (short index straddle), buy single-name variance on the constituents (long individual straddles). The trade profits when stocks disperse — move independently. Because dealers' demand to sell correlation creates a structural implied-vs-realised correlation premium (implied correlation typically exceeds realised correlation by 10–15 percentage points), dispersion trades have historically generated positive risk-adjusted returns, harvesting this premium at the cost of left-tail risk in correlation spikes (market crashes, when all stocks fall together).`
+        ],
+        ki:"Correlation swaps are the cleanest instrument for harvesting the structural correlation risk premium — the persistent tendency for implied pairwise equity correlation to exceed realised correlation. This premium exists because options dealers are structurally short correlation from their single-stock hedging of index options, creating consistent demand to sell correlation. The risk is correlation spikes in market dislocations, when diversification assumptions break down and the premium is rapidly paid back."
+      },
+      {
+        icon:"💰", type:"DIV SWAP", typeColor:"vol",
+        title:"Dividend Swaps",
+        sub:"Isolating dividend cash flows as a standalone asset class — the structured product hedger's tool",
+        tags:[["dividend swap","vol"],["SX5E divs","vol"],["autocallable","trs"],["COVID dividends","dn"],["realised divs","vol"]],
+        stats:[
+          {l:"Primary markets",v:"Eurostoxx 50, FTSE 100, S&P 500",c:"vol"},
+          {l:"Eurostoxx 50 div swap (2020 COVID)",v:"−60% from pre-crisis levels",c:"dn"},
+          {l:"Standard tenor",v:"1Y, 2Y, 5Y, 10Y annual",c:"vol"},
+          {l:"Settlement",v:"Realised dividends vs fixed strike",c:"mech"},
+        ],
+        body:[
+          `A <em>dividend swap</em> exchanges a fixed expected dividend payment (the dividend strike) for the actual realised dividends paid by an index or single stock over a specified period. The dividend receiver pays the fixed strike and receives the sum of all ordinary dividends paid by the index constituents during the year; the dividend payer receives the fixed strike and pays the realised dividends. Dividend swaps are cash-settled annually and are quoted in index points (e.g. Eurostoxx 50 2025 dividend strike of 130 index points means expected 2025 dividends total 130 index points).`,
+          `The primary institutional demand for dividend swaps comes from <em>structured product dealers</em>. When a bank sells an autocallable note (a popular retail structured product that pays a coupon if an index stays above a barrier, and whose value depends on the index not having collapsed at maturity), the bank is implicitly short dividends: dividends reduce the futures price of the index below spot, which affects the pricing of the embedded options. Dealers hedge this dividend exposure using dividend swaps — paying away the realised dividend risk to a swap counterparty in exchange for a fixed payment.`,
+          `The COVID-19 pandemic created the most dramatic dividend swap episode in history. In April–May 2020, European banks were instructed by the ECB to cancel dividend payments to preserve capital. Eurostoxx 50 near-dated dividend futures and swaps collapsed 60%+, from ~125 index points to ~50 index points — a catastrophic loss for anyone who had bought dividend exposure. Banks that had structured autocallables with multi-year dividend exposure and hedged with dividend swaps found their hedges paying out; unhedged exposures crystallised enormous losses. The episode permanently increased institutional focus on dividend risk as a distinct, manageable asset class.`,
+          `Beyond hedging, dividend swaps are traded as a macro instrument: long dividend swaps express a view that corporate earnings and dividends will be resilient; short dividend swaps hedge against recession-driven dividend cuts. The term structure of dividend swaps — comparing 1-year, 5-year, and 10-year dividend strikes — reflects market expectations of dividend growth (or contraction) over time and can signal changes in long-run corporate earnings expectations.`
+        ],
+        ki:"Dividend swaps convert an implicit risk embedded in every equity derivative into an explicit, traded instrument. Their existence reveals that 'equity risk' is not monolithic — it contains at least two separable components: price risk and dividend risk. Structured product dealers who fail to isolate and hedge dividend risk are taking an uncompensated bet on corporate payout policy. The COVID episode proved that dividend risk can be severe, sudden, and policy-driven — completely decorrelated from the broader market's eventual recovery."
+      },
+      {
+        icon:"🛢️", type:"COMM SWAP", typeColor:"eq",
+        title:"Commodity Swaps",
+        sub:"Price risk transfer in commodity markets — the oil producer's fixed-price hedge",
+        tags:[["commodity swap","eq"],["fixed-for-float","eq"],["oil producer","eq"],["airline","eq"],["WTI","eq"]],
+        cf:{
+          title:"Oil Producer Fixed-For-Floating Swap — 1M barrels/month, 1 year",
+          rows:[
+            {from:"Oil Producer", dir:"right", color:"#0a6a0a", leg:"Floating WTI spot price (monthly average)", to:"Bank Dealer"},
+            {from:"Bank Dealer",  dir:"left",  color:"#8a5a0a", leg:"Fixed $75/barrel (hedged price)", to:"Oil Producer"},
+          ]
+        },
+        body:[
+          `A <em>commodity swap</em> is structurally identical to an interest rate swap but references commodity prices rather than interest rates. The most common form is a fixed-for-floating swap: one party pays a fixed commodity price (the "swap price") per unit, and the other pays the average spot price over each period. The difference is cash-settled — no physical commodity changes hands. Commodity swaps allow producers to lock in revenues and consumers to lock in costs without entering physical futures markets.`,
+          `The classic use case is an oil producer with monthly production of 1 million barrels entering a 1-year fixed-for-floating swap at $75/barrel. Regardless of where oil prices actually settle each month, the producer receives $75/barrel — the floating price they actually sell their physical oil for is offset by the swap's cash flow. If WTI averages $60 in a month, the producer gets $60 from physical sales and $15 from the swap, netting $75. If WTI averages $90, the producer gets $90 from physical sales and pays $15 to the swap, still netting $75.`,
+          `Airlines hedge aviation fuel costs through commodity swaps: fixing the price of jet fuel (often using crude oil or heating oil as proxies, given limited jet fuel futures liquidity) for 6–24 months ahead. The 2008 spike in jet fuel to over $150/barrel and the subsequent collapse to $40 showed both the value (Southwest Airlines was nearly bankrupt without hedging) and danger (airlines that hedged at high prices were locked into expensive contracts when prices crashed) of commodity swaps.`
+        ],
+        ki:"Commodity swaps are capitalism's risk-transfer mechanism at its most direct: producers who can't afford price uncertainty sell that uncertainty to financial counterparties who can bear it. The oil producer's fixed swap allows them to plan capital expenditure with certainty; the airline's fuel hedge allows them to price tickets without jet fuel speculation. The bank in the middle aggregates these risks, diversifying across many clients and hedging the residual with futures."
+      },
+    ]
+  },
+  {
+    label:"Mechanics & Infrastructure",
+    color:"var(--mech)", line:"var(--mech-b)", fam:"f-mech",
+    entries:[
+      {
+        icon:"⚙️", type:"MECHANICS", typeColor:"mech",
+        title:"Notional, Fixed Leg, Floating Leg",
+        sub:"The structural elements that define every swap contract",
+        tags:[["notional","mech"],["fixed leg","irs"],["floating leg","rates"],["day count","mech"],["payment frequency","mech"]],
+        cmp:[
+          {cls:"mech", label:"Notional Principal", text:"The reference amount on which interest payments are calculated. NOT exchanged (except in XCCY swaps). $100M notional IRS means both legs calculate payments as if on $100M of principal, but only net interest flows. Determines the scale of P&L: 1 basis point move in swap rate on a $100M 10Y swap ≈ $9,000 (depends on DV01). Notional can amortise (declining) or accrete (growing) for specific hedging purposes."},
+          {cls:"irs",  label:"Fixed Leg", text:"Pays a predetermined fixed rate (the 'coupon rate' or 'swap rate'). Calculated as: Notional × Fixed Rate × Day Count Fraction. Day count conventions: 30/360 (30 days per month, 360 per year — common for USD swaps' fixed leg), Actual/360, Actual/365. Payment frequency: semi-annual most common for USD fixed leg. The fixed leg is priced at the par swap rate at inception to make PV(fixed) = PV(float)."},
+          {cls:"rates", label:"Floating Leg", text:"Pays a market-determined reference rate, reset at each period start. USD: compounded SOFR. EUR: €STR. GBP: compounded SONIA. JPY: TONA. Rate is set at the beginning of each period (in arrears for risk-free rates — the full period's compounded rate is known only at period end). Day count: Actual/360 most common for floating legs. The floating leg's PV always equals par (the notional) — a fundamental property enabling easy pricing."},
+        ],
+        body:[
+          `Every swap is defined by its <em>notional</em> (the scale), its <em>fixed leg</em> (the predetermined payment stream), and its <em>floating leg</em> (the market-referenced payment stream). Understanding these three elements, and their conventions (day count, payment frequency, business day adjustment), is the prerequisite for pricing or hedging any swap.`,
+          `The <em>par swap rate</em> is determined at inception by setting PV(fixed leg) = PV(floating leg). Because the floating leg's present value always equals the notional (a floating-rate bond always prices at par), the fixed leg's coupon must be set to the rate that also produces a PV equal to the notional — the par rate extracted from the discount curve. Post-inception, as market rates move, the fixed and floating legs develop different values — creating mark-to-market gains or losses.`,
+          `Swap confirmations (typically produced under an ISDA Master Agreement) specify: trade date, effective date, maturity date, fixed rate, floating rate index, day count conventions, payment frequency, currency, notional, calculation methodology, and settlement provisions. These details may appear mundane but are operationally critical: a swap with a 30/360 day count basis versus Actual/360 will have materially different cash flows on the fixed leg, particularly across months of different lengths.`
+        ],
+        ki:"The three structural elements of a swap — notional, fixed leg, floating leg — seem basic until you encounter a swap dispute caused by day count convention differences, business day adjustment disagreements, or floating rate definition changes (LIBOR to SOFR). Every basis point of difference in day count or compounding convention represents real money on large notionals. Swap documentation exists precisely to eliminate ambiguity about these apparently mundane details."
+      },
+      {
+        icon:"📏", type:"DV01", typeColor:"mech",
+        title:"DV01 and Swap Duration",
+        sub:"Measuring and managing the interest rate risk of a swap book",
+        tags:[["DV01","mech"],["PVBP","mech"],["swap duration","mech"],["rate sensitivity","irs"],["hedging","mech"]],
+        fmla:{
+          eq:`<span class="v">DV01</span> (Dollar Value of a Basis Point) <span class="op">=</span> |<span class="k">ΔPV</span>| per 1bp rate move
+
+For a fixed receiver (long rates): DV01 <span class="op">=</span> <span class="v">N × Duration × 0.0001</span>
+
+Modified Duration of swap ≈ Duration of fixed leg - Duration of float leg`,
+          note:`10Y IRS ($100M notional):\nApprox. DV01 = $100M × 9yrs × 0.0001 = $90,000/bp\n\nA 10bp rise in 10Y rates → ~$900,000 loss (fixed receiver)\n\nDV01 is additive: portfolio DV01 = sum of each swap's DV01\nFor DV01-neutral book: opposite-sign DV01s sum to zero`
+        },
+        dv01Vis: true,
+        body:[
+          `<em>DV01</em> (Dollar Value of a Basis Point, also called PVBP — Price Value of a Basis Point) is the most important risk metric for interest rate derivatives: it measures the change in a position's mark-to-market value for a 1 basis point (0.01%) parallel shift in interest rates. For a fixed-rate receiver in a 10-year IRS on $100M notional, DV01 is approximately $90,000 — the position loses $90,000 if rates rise 1bp, gains $90,000 if rates fall 1bp.`,
+          `DV01 is <em>additive</em> across positions, enabling portfolio-level interest rate risk management. A swap book's total DV01 is the sum of each individual swap's DV01 (with sign: fixed receivers have positive DV01 — they benefit from rate falls; fixed payers have negative DV01 — they benefit from rate rises). A market maker who wants a flat rate book seeks a portfolio with zero aggregate DV01, offsetting DV01-positive and DV01-negative swaps across the term structure.`,
+          `The term structure of DV01 requires management by <em>bucket</em> — each maturity tenor has its own DV01 that must be managed separately, since a 2Y rate and a 10Y rate can move independently. A portfolio with zero total DV01 but positive 2Y DV01 and negative 10Y DV01 is exposed to <em>curve risk</em> — the possibility that the yield curve steepens or flattens. Full interest rate risk management requires net-zero DV01 in each maturity bucket simultaneously, achieved through offsetting swaps across the curve.`
+        ],
+        ki:"DV01 is the interest rate trader's primary risk language — the common currency in which all rate positions are expressed, compared, and hedged. A swap book is managed in DV01: hedge when DV01 builds beyond limits, flatten across curve buckets to remove basis risk, and dynamically update as market moves change each position's duration. Understanding DV01 is the prerequisite for understanding any fixed income risk system."
+      },
+    ]
+  },
+  {
+    label:"Central Clearing",
+    color:"var(--clear)", line:"var(--clear-b)", fam:"f-clear",
+    entries:[
+      {
+        icon:"🔐", type:"CLEARING", typeColor:"clear",
+        title:"Central Clearing of Swaps — Post Dodd-Frank",
+        sub:"How the 2008 crisis response transformed OTC swaps from bilateral to cleared instruments",
+        tags:[["Dodd-Frank","clear"],["LCH SwapClear","clear"],["mandatory clearing","clear"],["CCP","clear"],["EMIR","clear"]],
+        stats:[
+          {l:"LCH SwapClear notional cleared",v:"~$400T+ annually",c:"clear"},
+          {l:"Cleared % of new IRS (US mandated)",v:">80%",c:"clear"},
+          {l:"Dodd-Frank Title VII",v:"Swaps regulation",c:"clear"},
+          {l:"EMIR (EU equivalent)",v:"2012 → mandatory clearing 2016",c:"clear"},
+        ],
+        cmp:[
+          {cls:"clear", label:"Pre-2008: Bilateral OTC", text:"Every swap was a bilateral contract between two counterparties. Counterparty credit risk was managed through ISDA/CSA collateral agreements — but weakly enforced. No regulator had visibility into aggregate exposures. AIG had written $440B in CDS without adequate collateral. No mechanism existed to identify when a single institution had built catastrophic systemic exposure. The system was opaque and fragile."},
+          {cls:"clear", label:"Post-Dodd-Frank: Mandatory Clearing", text:"The G20 2009 Pittsburgh agreement mandated central clearing for standardised OTC derivatives. In the US, Title VII of Dodd-Frank required CFTC/SEC designation of 'mandatory clearing' products. Interest rate swaps (plain vanilla USD, EUR, GBP IRS) and CDS indices (CDX IG, iTraxx) must be cleared through CFTC-registered Derivatives Clearing Organisations (DCOs) or equivalents. Bilateral IRS (uncleared) require UMR initial margin and daily VM."},
+          {cls:"irs",   label:"LCH SwapClear", text:"The dominant IRS clearing house globally. Part of LSEG group. Clears USD, EUR, GBP, JPY, AUD, and other currency IRS. Requires member initial margin (calculated by its Standardised Initial Margin Model — SIMM) and daily variation margin. Provides multilateral netting: a bank's $100B receive USD 5Y and $100B pay USD 5Y against different counterparties net to zero exposure at LCH. Netting efficiency: ~90%+ of gross exposure eliminated."},
+        ],
+        body:[
+          `The <em>mandatory clearing</em> mandate was the most consequential post-2008 regulatory change in OTC derivatives markets. The Dodd-Frank Act (US, 2010) and EMIR (EU, 2012) required standardised OTC swaps to be submitted to Central Counterparties (CCPs) rather than remaining as bilateral contracts. The CCP interposes itself between the original counterparties via <em>novation</em> — replacing one bilateral trade between A and B with two trades: A vs. CCP and CCP vs. B — and manages the resulting credit risk through margin requirements and a default waterfall.`,
+          `The efficiency gains from central clearing are substantial. <em>Multilateral netting</em>: a bank with $100B receive-fixed and $100B pay-fixed swaps against 20 different counterparties in the bilateral world has 20 separate credit exposures totalling $200B gross. Through LCH, all these net to zero — the bank has one net position at LCH, and its credit exposure is only to LCH (the CCP) rather than to 20 bilateral counterparties. This netting typically eliminates 80–90% of gross counterparty exposure. <em>Margin efficiency</em>: LCH applies portfolio margining across all a member's cleared swaps, recognising hedged positions — further reducing margin requirements.`,
+          `Mandatory clearing has shifted risk from many bilateral bilateral counterparty relationships to concentration in a small number of CCPs. LCH SwapClear is now one of the most systemically important financial market infrastructures in the world — a "too important to fail" institution that clears a substantial fraction of global interest rate derivatives. Regulators and economists have noted the irony: post-crisis reform reduced bilateral credit risk but created new systemic risk concentration at CCPs themselves, requiring stringent CCP stress-testing, resolution planning, and recovery frameworks.`
+        ],
+        ki:"Mandatory clearing solved the bilateral counterparty risk problem at the cost of concentrating risk in a small number of CCPs that are now too systemically important to be allowed to fail. LCH SwapClear processes more OTC derivatives than any other entity in history. Its default waterfall — initial margin, variation margin, default fund, and CCP equity — is the architecture of systemic risk management for the global interest rate market. If that architecture fails, the consequences would dwarf 2008."
+      },
+    ]
+  }
+];
+
+/* ─── RENDER ─── */
+let cnt = 0;
+
+function buildCF(cf) {
+  return `<div class="cashflow">
+    <div class="cf-title">${cf.title}</div>
+    ${cf.rows.map(r=>`
+    <div class="cf-row">
+      <div class="cf-party">${r.from}</div>
+      <div class="cf-arrow-area">
+        <div class="cf-arrow-line ${r.dir}" style="color:${r.color}"></div>
+        <div class="cf-leg-label" style="color:${r.color};border:1px solid ${r.color}33;background:${r.color}11">${r.leg}</div>
+      </div>
+      <div class="cf-to">${r.to}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function buildFmla(f) {
+  return `<div class="fmla">
+    <div class="fmla-eq">${f.eq}</div>
+    <pre class="fmla-note">${f.note}</pre>
+  </div>`;
+}
+
+function buildSofr() {
+  const rows = [
+    {yr:"2012",event:"LIBOR rigging scandal exposed",status:"Barclays fined £290M",cls:"warn"},
+    {yr:"2017",event:"FCA announces LIBOR end date",status:"Dec 2021 USD LIBOR",cls:"warn"},
+    {yr:"2018",event:"SOFR first published by NY Fed",status:"Secured O/N funding rate",cls:"done"},
+    {yr:"2021",event:"LIBOR cessation (GBP/EUR/CHF)",status:"SONIA / €STR live",cls:"done"},
+    {yr:"2022",event:"ARRC benchmark recommendation",status:"Term SOFR (CME) published",cls:"done"},
+    {yr:"2023",event:"USD LIBOR permanently ceased",status:"June 30, 2023",cls:"done"},
+    {yr:"2024+",event:"Residual LIBOR migration",status:"Synthetic LIBOR for legacy",cls:"live"},
+  ];
+  return `<div class="timeline-vis">
+    <div class="tv-head">LIBOR → SOFR Transition Timeline</div>
+    <div class="tv-row hdr"><div class="tc">Year</div><div class="tc">Event</div><div class="tc">Status</div></div>
+    ${rows.map(r=>`<div class="tv-row">
+      <div class="tc label">${r.yr}</div>
+      <div class="tc">${r.event}</div>
+      <div class="tc ${r.cls}">${r.status}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function buildDV01() {
+  const rows = [
+    {tenor:"2Y swap",dv01:"$100M × ~2yr dur × 0.01% ≈",val:"~$20,000/bp",w:20,color:"var(--irs)"},
+    {tenor:"5Y swap",dv01:"$100M × ~5yr dur × 0.01% ≈",val:"~$45,000/bp",w:45,color:"var(--irs)"},
+    {tenor:"10Y swap",dv01:"$100M × ~9yr dur × 0.01% ≈",val:"~$90,000/bp",w:90,color:"var(--irs)"},
+    {tenor:"20Y swap",dv01:"$100M × ~16yr dur × 0.01% ≈",val:"~$160,000/bp",w:100,color:"var(--xccy)"},
+    {tenor:"30Y swap",dv01:"$100M × ~22yr dur × 0.01% ≈",val:"~$215,000/bp",w:100,color:"var(--xccy)"},
+  ];
+  return `<div class="dv01-vis">
+    <div class="dv01-title">DV01 by Tenor — $100M Notional Swaps (Approximate)</div>
+    ${rows.map(r=>`<div class="dv01-row">
+      <div class="dv01-label">${r.tenor}</div>
+      <div class="dv01-track"><div class="dv01-fill" style="width:${r.w}%;background:${r.color}"></div></div>
+      <div class="dv01-val" style="color:${r.color}">${r.val}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sdiv = document.createElement('div');
+    sdiv.innerHTML = `<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line" style="background:${sec.line}"></div>
+    </div>`;
+    root.appendChild(sdiv);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.fam;
+
+    sec.entries.forEach(e => {
+      const idx = cnt++;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>` : '';
+      const cmpH = e.cmp ? `<div class="cmp c${Math.min(e.cmp.length,3)}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>` : '';
+      const cfH  = e.cf    ? buildCF(e.cf)    : '';
+      const fH   = e.fmla  ? buildFmla(e.fmla): '';
+      const sofrH= e.sofr  ? buildSofr()      : '';
+      const dv01H= e.dv01Vis ? buildDV01()    : '';
+
+      const tc = e.typeColor;
+      const body = e.body.map(p=>`<p>${p}</p>`).join('') +
+        cfH + fH + stH + cmpH + sofrH + dv01H +
+        `<div class="ki">
+          <div class="ki-num">${String(idx+1).padStart(2,'0')}</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+        <div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-type" style="color:var(--${tc});border-color:var(--${tc}-b);background:var(--${tc}-l)">${e.type}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

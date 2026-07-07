@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 3.4 Leverage</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Playfair+Display:ital,wght@0,700;0,900;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0c0e;--bg1:#0e1114;--bg2:#131619;--bg3:#191d21;
+  --border:#1e2428;--border2:#272e34;
+  --ink:#dde4ea;--ink2:#7e8e9a;--muted:#3e505e;--ghost:#131619;
+
+  /* leverage spectrum: green(safe) → amber(warning) → red(danger) */
+  --safe:   #2dd4a0;--safe-d:  #083228;--safe-b:  rgba(45,212,160,0.07);
+  --warn:   #f0a830;--warn-d:  #3c2808;--warn-b:  rgba(240,168,48,0.07);
+  --danger: #e8503a;--danger-d:#3c1008;--danger-b:rgba(232,80,58,0.07);
+  --margin: #6a9de8;--margin-d:#0e1e40;--margin-b:rgba(106,157,232,0.07);
+  --spiral: #c84ee8;--spiral-d:#280e38;--spiral-b:rgba(200,78,232,0.07);
+  --crypto: #38c8e8;--crypto-d:#082838;--crypto-b:rgba(56,200,232,0.07);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14.5px;line-height:1.72;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(14,20,24,0.8),transparent),repeating-linear-gradient(90deg,transparent,transparent 119px,rgba(30,36,40,0.4) 120px);pointer-events:none;z-index:0;}
+
+/* ── MASTHEAD ── */
+.masthead{position:relative;z-index:2;background:var(--bg1);border-bottom:2px solid var(--danger);}
+.mhd-inner{max-width:1080px;margin:0 auto;padding:52px 44px 0;display:grid;grid-template-columns:1fr auto;gap:44px;align-items:start;}
+.mhd-kicker{font-family:'DM Mono',monospace;font-size:9.5px;letter-spacing:0.26em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+.mhd-kicker::before{content:'▲';font-size:7px;color:var(--danger);}
+.mhd-title{font-family:'Playfair Display',serif;font-size:clamp(52px,7vw,96px);font-weight:900;letter-spacing:-0.03em;line-height:0.86;color:var(--ink);margin-bottom:12px;}
+.mhd-title .lever{color:var(--safe);}
+.mhd-sub{font-family:'DM Sans',sans-serif;font-style:italic;font-size:14px;color:var(--ink2);line-height:1.65;max-width:480px;font-weight:300;margin-bottom:28px;}
+
+/* leverage dial widget */
+.lev-dial{border:1px solid var(--border2);background:var(--bg2);overflow:hidden;min-width:240px;}
+.ld-hdr{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.ld-svg{display:block;width:100%;}
+.ld-rows{padding:0;}
+.ld-row{display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-bottom:1px solid var(--border);}
+.ld-row:last-child{border-bottom:none;}
+.ld-l{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);}
+.ld-v{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;}
+.ld-v.safe{color:var(--safe);}.ld-v.warn{color:var(--warn);}.ld-v.danger{color:var(--danger);}
+
+/* meter strip */
+.meter-strip{max-width:1080px;margin:0 auto;padding:0 44px;display:flex;gap:0;overflow-x:auto;border-top:1px solid var(--border);}
+.meter-item{padding:10px 18px;border-right:1px solid var(--border);flex-shrink:0;min-width:120px;}
+.meter-name{font-family:'DM Mono',monospace;font-size:8.5px;color:var(--muted);letter-spacing:0.08em;margin-bottom:3px;}
+.meter-val{font-family:'DM Mono',monospace;font-size:12.5px;font-weight:600;}
+
+/* ── PAGE ── */
+.page{position:relative;z-index:2;max-width:1080px;margin:0 auto;padding:34px 44px 100px;}
+.sec-hdr{display:flex;align-items:center;gap:13px;margin:30px 0 8px;}
+.sec-label{font-family:'DM Mono',monospace;font-size:9.5px;font-weight:500;letter-spacing:0.2em;text-transform:uppercase;white-space:nowrap;}
+.sec-line{flex:1;height:1px;}
+.controls{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap;align-items:center;}
+.ctrl{font-family:'DM Mono',monospace;font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;padding:6px 14px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.ctrl:hover{border-color:var(--safe);color:var(--safe);}
+.ctrl-right{margin-left:auto;font-family:'DM Mono',monospace;font-size:9.5px;color:var(--muted);letter-spacing:0.06em;}
+
+/* ── ENTRY ── */
+.entry{border:1px solid var(--border);background:var(--bg1);margin-bottom:4px;position:relative;overflow:hidden;transition:border-color 0.18s;}
+.entry::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;transition:width 0.2s;}
+.entry.open::before{width:4px;}
+.entry:hover{border-color:var(--border2);}
+.f-safe   .entry::before{background:var(--safe-d);  }.f-safe   .entry.open::before{background:var(--safe);}
+.f-warn   .entry::before{background:var(--warn-d);  }.f-warn   .entry.open::before{background:var(--warn);}
+.f-danger .entry::before{background:var(--danger-d);}.f-danger .entry.open::before{background:var(--danger);}
+.f-margin .entry::before{background:var(--margin-d);}.f-margin .entry.open::before{background:var(--margin);}
+.f-spiral .entry::before{background:var(--spiral-d);}.f-spiral .entry.open::before{background:var(--spiral);}
+.f-crypto .entry::before{background:var(--crypto-d);}.f-crypto .entry.open::before{background:var(--crypto);}
+
+.e-hdr{display:flex;align-items:center;cursor:pointer;user-select:none;min-height:58px;padding-left:4px;transition:background 0.14s;}
+.e-hdr:hover{background:var(--bg2);}
+.e-num{font-family:'DM Mono',monospace;font-size:9px;color:var(--ghost);width:44px;text-align:center;flex-shrink:0;letter-spacing:0.06em;}
+.e-icon{font-size:17px;width:46px;text-align:center;flex-shrink:0;border-right:1px solid var(--border);align-self:stretch;display:flex;align-items:center;justify-content:center;}
+.e-text{flex:1;padding:12px 16px;}
+.e-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--ink);line-height:1.2;}
+.e-sub{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--muted);margin-top:3px;letter-spacing:0.03em;font-weight:300;}
+.e-badge{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 9px;border:1px solid;flex-shrink:0;margin-right:14px;white-space:nowrap;}
+.e-toggle{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);width:44px;align-self:stretch;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--border);flex-shrink:0;transition:transform 0.24s,color 0.15s;}
+.entry.open .e-toggle{transform:rotate(90deg);}
+.f-safe   .entry.open .e-toggle{color:var(--safe);  }.f-warn  .entry.open .e-toggle{color:var(--warn);}
+.f-danger .entry.open .e-toggle{color:var(--danger);}.f-margin.entry.open .e-toggle{color:var(--margin);}
+.f-spiral .entry.open .e-toggle{color:var(--spiral);}.f-crypto.entry.open .e-toggle{color:var(--crypto);}
+
+/* ── BODY ── */
+.e-body{display:none;border-top:1px solid var(--border);background:var(--bg);padding:22px 22px 26px 90px;animation:bIn 0.2s ease;}
+.entry.open .e-body{display:block;}
+@keyframes bIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.e-body p{font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:300;line-height:1.88;color:var(--ink2);margin-bottom:14px;}
+.e-body p:last-of-type{margin-bottom:0;}
+.e-body p em{font-style:italic;color:var(--ink);font-weight:400;}
+.e-body p strong{font-weight:600;color:var(--ink);}
+
+/* formula */
+.fmla-block{margin-top:16px;padding:16px 20px;background:var(--bg2);border:1px solid var(--border2);border-left:3px solid var(--safe);display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;}
+.fmla-main{font-family:'DM Mono',monospace;font-size:13px;color:var(--ink);flex-shrink:0;line-height:1.65;}
+.fmla-main .a{color:var(--safe);}.fmla-main .b{color:var(--danger);}
+.fmla-main .c{color:var(--warn);}.fmla-main .op{color:var(--muted);}
+.fmla-note{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--muted);line-height:1.7;white-space:pre-line;}
+
+/* leverage spectrum visual */
+.lev-spectrum{margin-top:18px;border:1px solid var(--border);overflow:hidden;}
+.ls-head{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);background:var(--bg3);padding:7px 14px;border-bottom:1px solid var(--border);}
+.ls-row{display:grid;grid-template-columns:110px 1fr 120px;border-bottom:1px solid var(--border);}
+.ls-row:last-child{border-bottom:none;}
+.ls-label{padding:8px 12px;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink2);border-right:1px solid var(--border);}
+.ls-bar-wrap{padding:7px 12px;display:flex;align-items:center;gap:8px;border-right:1px solid var(--border);}
+.ls-bar{height:10px;border-radius:2px;}
+.ls-ratio{padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;text-align:right;}
+
+/* stats */
+.stats{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px;}
+.stat{flex:1;min-width:120px;padding:9px 12px;border:1px solid var(--border);background:var(--bg2);}
+.stat-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.stat-v{font-family:'DM Mono',monospace;font-size:12.5px;font-weight:700;line-height:1.2;}
+.stat-v.safe{color:var(--safe);}.stat-v.warn{color:var(--warn);}
+.stat-v.danger{color:var(--danger);}.stat-v.margin{color:var(--margin);}
+.stat-v.spiral{color:var(--spiral);}.stat-v.crypto{color:var(--crypto);}
+
+/* cmp grid */
+.cmp{display:grid;gap:8px;margin-top:18px;}
+.cmp.c2{grid-template-columns:1fr 1fr;}.cmp.c3{grid-template-columns:1fr 1fr 1fr;}
+.cc{padding:13px 15px;border:1px solid var(--border);background:var(--bg2);}
+.cc-l{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:7px;}
+.cc p{font-size:12.5px!important;line-height:1.62!important;margin-bottom:0!important;font-family:'DM Sans',sans-serif!important;font-weight:300!important;color:var(--ink2)!important;}
+.cc.safe  {background:var(--safe-b);  border-color:var(--safe-d);  }.cc.safe   .cc-l{color:var(--safe);}
+.cc.warn  {background:var(--warn-b);  border-color:var(--warn-d);  }.cc.warn   .cc-l{color:var(--warn);}
+.cc.danger{background:var(--danger-b);border-color:var(--danger-d);}.cc.danger .cc-l{color:var(--danger);}
+.cc.margin{background:var(--margin-b);border-color:var(--margin-d);}.cc.margin .cc-l{color:var(--margin);}
+.cc.spiral{background:var(--spiral-b);border-color:var(--spiral-d);}.cc.spiral .cc-l{color:var(--spiral);}
+.cc.crypto{background:var(--crypto-b);border-color:var(--crypto-d);}.cc.crypto .cc-l{color:var(--crypto);}
+
+/* amplification table */
+.amp-table{margin-top:18px;border:1px solid var(--border);overflow:auto;}
+.at-row{display:grid;border-bottom:1px solid var(--border);}
+.at-row:last-child{border-bottom:none;}
+.at-row.hdr .ac{background:var(--bg3);font-family:'DM Mono',monospace;font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+.ac{padding:8px 12px;border-right:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10.5px;color:var(--ink2);line-height:1.5;}
+.ac:last-child{border-right:none;}
+.ac.label{color:var(--ink);font-weight:600;font-family:'DM Sans',sans-serif;font-size:12px;}
+.ac.safe{color:var(--safe);}.ac.warn{color:var(--warn);}.ac.danger{color:var(--danger);}
+
+/* spiral steps */
+.spiral-vis{margin-top:18px;border:1px solid var(--border);overflow:hidden;}
+.sv-head{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);background:var(--bg3);padding:7px 14px;border-bottom:1px solid var(--border);}
+.sv-steps{display:flex;overflow-x:auto;}
+.sv-step{flex-shrink:0;min-width:140px;padding:14px;border-right:1px solid var(--border);position:relative;}
+.sv-step:last-child{border-right:none;}
+.sv-n{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--spiral);margin-bottom:4px;}
+.sv-title{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--ink);line-height:1.2;margin-bottom:3px;}
+.sv-note{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--muted);line-height:1.5;}
+.sv-arrow{position:absolute;right:-9px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--spiral);z-index:2;}
+
+/* key insight */
+.ki{margin-top:20px;padding:14px 18px;background:var(--bg2);border:1px solid var(--border2);display:flex;gap:12px;align-items:flex-start;}
+.ki-mark{font-family:'Playfair Display',serif;font-size:18px;font-weight:900;font-style:italic;flex-shrink:0;padding-top:1px;line-height:1;}
+.ki-text{font-family:'DM Sans',sans-serif;font-style:italic;font-size:14px;color:var(--ink);line-height:1.62;font-weight:300;}
+.f-safe   .ki-mark{color:var(--safe);  }.f-warn   .ki-mark{color:var(--warn);}
+.f-danger .ki-mark{color:var(--danger);}.f-margin .ki-mark{color:var(--margin);}
+.f-spiral .ki-mark{color:var(--spiral);}.f-crypto .ki-mark{color:var(--crypto);}
+
+/* tags */
+.tags{margin-top:16px;display:flex;flex-wrap:wrap;gap:5px;}
+.tag{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border:1px solid var(--border2);color:var(--muted);}
+.tag.safe  {border-color:var(--safe-d);  color:var(--safe);  }.tag.warn  {border-color:var(--warn-d);  color:var(--warn);}
+.tag.danger{border-color:var(--danger-d);color:var(--danger);}.tag.margin{border-color:var(--margin-d);color:var(--margin);}
+.tag.spiral{border-color:var(--spiral-d);color:var(--spiral);}.tag.crypto{border-color:var(--crypto-d);color:var(--crypto);}
+
+/* footer */
+.foot{position:relative;z-index:2;max-width:1080px;margin:0 auto;padding:18px 44px;border-top:1px solid var(--border);display:flex;justify-content:space-between;}
+.foot span{font-family:'DM Mono',monospace;font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);}
+
+@media(max-width:720px){
+  .mhd-inner{grid-template-columns:1fr;}.lev-dial{display:none;}
+  .meter-strip{padding:0 18px;}
+  .page,.foot{padding-left:18px;padding-right:18px;}.mhd-inner{padding:36px 18px 0;}
+  .e-body{padding-left:16px;}.cmp.c2,.cmp.c3{grid-template-columns:1fr;}
+  .e-badge{display:none;}
+}
+</style>
+</head>
+<body>
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 3.4 · Core Trading Foundations</div>
+      <div class="mhd-title"><span class="lever">Le</span>verage</div>
+      <div class="mhd-sub">Notional exposure divided by equity — the amplifier that multiplies both gains and losses. From Reg T to 100× crypto, from margin calls to deleveraging spirals. 11 topics.</div>
+    </div>
+    <div class="lev-dial">
+      <div class="ld-hdr">// Leverage = Notional / Equity</div>
+      <svg class="ld-svg" viewBox="0 0 240 90" height="90">
+        <!-- gauge arc -->
+        <path d="M30,80 A90,90,0,0,1,210,80" fill="none" stroke="#1e2428" stroke-width="14" stroke-linecap="round"/>
+        <path d="M30,80 A90,90,0,0,1,90,20"  fill="none" stroke="#2dd4a0" stroke-width="14" stroke-linecap="round"/>
+        <path d="M90,20 A90,90,0,0,1,170,14" fill="none" stroke="#f0a830" stroke-width="14" stroke-linecap="round"/>
+        <path d="M170,14 A90,90,0,0,1,210,80" fill="none" stroke="#e8503a" stroke-width="14" stroke-linecap="round"/>
+        <!-- needle at ~65% (moderate leverage) -->
+        <line x1="120" y1="80" x2="72" y2="25" stroke="#dde4ea" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="120" cy="80" r="5" fill="#131619" stroke="#dde4ea" stroke-width="1.5"/>
+        <text x="28" y="96" font-size="9" fill="#2dd4a0" font-family="monospace">1×</text>
+        <text x="106" y="13" font-size="9" fill="#f0a830" font-family="monospace">10×</text>
+        <text x="196" y="96" font-size="9" fill="#e8503a" font-family="monospace">100×</text>
+      </svg>
+      <div class="ld-rows">
+        <div class="ld-row"><span class="ld-l">Equity capital</span><span class="ld-v safe">$100,000</span></div>
+        <div class="ld-row"><span class="ld-l">Notional exposure</span><span class="ld-v warn">$500,000</span></div>
+        <div class="ld-row"><span class="ld-l">Leverage ratio</span><span class="ld-v danger">5×</span></div>
+        <div class="ld-row"><span class="ld-l">Wipeout move</span><span class="ld-v danger">−20%</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="meter-strip">
+    <div class="meter-item"><div class="meter-name">Reg T (US equities)</div><div class="meter-val" style="color:var(--safe)">2× max</div></div>
+    <div class="meter-item"><div class="meter-name">Portfolio margin</div><div class="meter-val" style="color:var(--warn)">~6×</div></div>
+    <div class="meter-item"><div class="meter-name">ES futures (nat.)</div><div class="meter-val" style="color:var(--warn)">~20×</div></div>
+    <div class="meter-item"><div class="meter-name">Options (OTM)</div><div class="meter-val" style="color:var(--danger)">50–200×</div></div>
+    <div class="meter-item"><div class="meter-name">Crypto perps (max)</div><div class="meter-val" style="color:var(--danger)">100×</div></div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">11 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>3.4 Leverage</span>
+</footer>
+
+<script>
+const sections = [
+  { label:"Fundamentals", color:"var(--safe)", line:"var(--safe-d)", fam:"f-safe", entries:[
+    { icon:"⚖️", badge:"DEFINITION", bc:"safe",
+      title:"Leverage = Notional Exposure / Equity",
+      sub:"The foundational ratio that defines how amplified a position is relative to invested capital",
+      tags:[["leverage ratio","safe"],["notional","safe"],["equity","safe"],["amplification","danger"]],
+      fmla:{
+        main:`<span class="a">Leverage</span> <span class="op">=</span> <span class="c">Notional Exposure</span> <span class="op">/</span> <span class="a">Equity Capital</span>
+
+<span class="b">Wipeout move %</span> <span class="op">=</span> 1 / <span class="a">Leverage</span>`,
+        note:`Example: $100K equity, $500K notional → 5× leverage\nWipeout: 100% / 5 = 20% adverse move wipes equity\n\nReturn on equity (if asset moves +R%):\n  Levered return = R% × Leverage`
+      },
+      ampTable: true,
+      body:[
+        `<em>Leverage</em> is the ratio of total market exposure (notional value of positions controlled) to the equity capital invested to control that exposure. A 5× leveraged investor controls $500,000 of assets with $100,000 of their own capital — the remaining $400,000 is borrowed (or synthetically provided through a derivative margin system). Every percentage point move in the underlying asset produces a five-percentage-point change in the equity, magnifying both gains and losses by the leverage factor.`,
+        `The most important single number derived from leverage is the <em>wipeout move</em> — the adverse price movement that would eliminate the entire equity position: 1 / leverage. At 5× leverage, a 20% adverse move wipes out the entire investment. At 10× leverage, a 10% adverse move does the same. At 100× leverage (available on some crypto exchanges), a 1% adverse move is fatal. This single calculation explains why the leverage choice is the single most consequential risk decision any leveraged investor makes — it determines the size of the loss that destroys the entire position, and therefore whether a temporary adverse price move is survivable or not.`,
+        `Leverage is not inherently reckless — it is a standard tool used by sophisticated institutions for legitimate economic purposes. A bank with 10× leverage is running a normal, regulated balance sheet. A mortgage borrower has 3–5× leverage on their home. A futures hedger using leverage to offset physical exposure is reducing, not increasing, total risk. Leverage becomes dangerous when it is applied speculatively (seeking to amplify directional bets) rather than as part of a hedged or income-generating strategy, and when the wipeout move is within reasonable range of normal daily price volatility.`
+      ],
+      ki:"Leverage is the fundamental amplifier of financial risk — it multiplies both the magnitude of gains and the magnitude of losses, and it simultaneously reduces the price move required to wipe out the entire investment. The wipeout move (1/leverage) is the single most important number any leveraged investor should calculate before entering a position: if a normal daily move in the asset is a material fraction of that number, the position is existentially precarious at any moment market conditions deteriorate."
+    },
+    { icon:"🏦", badge:"BROKER LEV", bc:"safe",
+      title:"Broker Leverage Ratios — Reg T and Portfolio Margin",
+      sub:"The US regulatory framework governing how much leverage retail and institutional investors can access in equity accounts",
+      tags:[["Reg T","margin"],["50% initial margin","margin"],["portfolio margin","warn"],["FINRA","margin"]],
+      levSpectrum:[
+        {label:"Reg T: Initial",  w:30, ratio:"2× (50% margin)", color:"var(--safe)"},
+        {label:"Reg T: Maint.",   w:22, ratio:"~3× (33% margin)", color:"var(--safe)"},
+        {label:"Portfolio Margin",w:60, ratio:"~6–7× (risk-based)", color:"var(--warn)"},
+        {label:"Prime brokerage", w:80, ratio:"4–8× (negotiated)", color:"var(--warn)"},
+      ],
+      stats:[{l:"Reg T initial margin (equities)",v:"50% (2× leverage max)",c:"margin"},{l:"Reg T maintenance margin",v:"25% (FINRA) / varies",c:"margin"},{l:"Portfolio margin minimum equity",v:"$100,000 required",c:"warn"},{l:"Pattern day trader requirement",v:"$25,000 minimum equity",c:"margin"}],
+      body:[
+        `In the United States, leverage on equity positions in brokerage accounts is governed primarily by <em>Regulation T (Reg T)</em>, promulgated by the Federal Reserve Board under the Securities Exchange Act of 1934. Reg T establishes the <strong>initial margin requirement</strong> for most equity purchases: a customer must deposit at least 50% of the purchase price, meaning the maximum allowable leverage is 2× (you can borrow up to 50% of the position's value). This 50% initial margin requirement has remained unchanged for decades, reflecting a regulatory judgment about the appropriate limit on retail leveraged equity speculation.`,
+        `The <strong>maintenance margin</strong> — the minimum equity level required to continue holding a position — is set by FINRA at a floor of 25% but is typically higher (30–35%) at most major brokers who impose their own "house" margin requirements above the regulatory minimum. If a portfolio falls below the maintenance margin level, the broker issues a margin call requiring the investor to deposit additional funds or sell positions to restore compliance — not to the maintenance level, but all the way back to the higher initial margin requirement, a detail that often surprises investors who haven't read the terms carefully.`,
+        `<strong>Portfolio margin</strong> is a risk-based margin system (available to accounts with $100,000+ in equity) that calculates required margin based on the theoretical loss of the entire portfolio across a range of stress scenarios, rather than applying fixed percentage requirements to each position individually. For portfolios with genuine hedged positions (e.g., long stock offset by puts, or diversified portfolios where positions are not perfectly correlated), portfolio margin typically allows significantly lower margin requirements — and therefore higher effective leverage — than Reg T, sometimes reaching 6–7× for well-hedged institutional-style books. This explains why sophisticated investors who actually manage their risk carefully get more leverage than those who don't.`
+      ],
+      ki:"Reg T's 2× leverage limit for retail equity investors is a regulatory judgment that has stood for 90 years — a remarkably stable policy choice. Portfolio margin's risk-based alternative shows the regulator's underlying logic: it's not leverage per se that is restricted, it's unhedged, poorly-managed leverage. A well-hedged portfolio with high effective leverage is treated more generously than an unhedged concentrated position with the same leverage, because the net risk profile is genuinely different."
+    },
+    { icon:"📊", badge:"CROSS-MARGIN", bc:"safe",
+      title:"Cross-Margin vs. Isolated Margin Accounts",
+      sub:"How collateral is shared or ring-fenced across positions in a leveraged account",
+      tags:[["cross-margin","margin"],["isolated margin","safe"],["portfolio margin","warn"],["account structure","margin"]],
+      cmp:[
+        {cls:"margin", label:"Cross-Margin (Shared Pool)", text:"All positions in the account share a single pool of collateral. Unrealised gains on one position can support a losing position, delaying margin calls. More capital-efficient for correlated books and genuine hedges. Risk: a single large loss can consume collateral intended to backstop other positions, cascading into simultaneous liquidation of an entire book from one bad trade. Standard structure for most institutional prime brokerage accounts."},
+        {cls:"safe",   label:"Isolated Margin (Ring-Fenced)", text:"Each position has its own dedicated collateral allocation. Loss on position A cannot affect position B. The maximum loss on any single trade is exactly the margin allocated to it — a defined, knowable number before entry. Capital-inefficient for genuinely hedged books (same hedge requires duplicated margin) but essential for speculative multi-position books where position A and position B are independent bets with no offsetting relationship."},
+        {cls:"warn",   label:"Reg T Margin Account Structure", text:"Standard US retail brokerage is effectively a cross-margin structure: all positions in the account collectively determine the margin requirement, and margin availability depends on the aggregate portfolio. A losing position reduces buying power for other positions. The broker can (and in extreme cases does) liquidate any position in the account to meet a margin call — not necessarily the position that caused the deficit."},
+      ],
+      body:[
+        `The choice between cross-margin and isolated margin structures determines not just how much leverage is available but — more critically — the failure mode when a trade goes wrong. In a cross-margin structure, the worst case is a cascade: one large loss removes the collateral supporting other positions, triggering their liquidations even though those positions themselves are profitable or neutral. In an isolated margin structure, the worst case is contained: one position is wiped out, and all others continue unaffected.`,
+        `For institutional desks running genuinely hedged books (long/short equity, delta-hedged options, multi-leg derivatives strategies), cross-margin is the correct choice: the hedge relationship between positions is exactly what makes the cross-margin efficiency legitimate. A market maker who is long one equity and short a correlated ETF has net risk far below the sum of the individual position risks — cross-margin captures this and requires proportionally lower margin, reflecting the genuine economic risk reduction.`,
+        `For retail traders running multiple speculative directional positions, isolated margin is generally the safer structure: it prevents one bad trade from destroying the entire account. The operational friction of pre-allocating specific margin to each trade is also a useful discipline — it forces explicit pre-trade sizing decisions rather than allowing positions to "borrow" from each other implicitly until a margin call reveals the overextension.`
+      ],
+      ki:"Cross-margin versus isolated margin is a choice about how failure propagates: contained and localized (isolated) versus potentially cascading and systemic (cross). For genuine hedges, cross-margin is rational and efficient. For independent speculative bets, isolated margin is the correct risk architecture — it ensures that a single terrible judgment doesn't destroy an otherwise well-managed book."
+    },
+  ]},
+  { label:"Leverage by Asset Class", color:"var(--warn)", line:"var(--warn-d)", fam:"f-warn", entries:[
+    { icon:"📋", badge:"FUTURES LEV", bc:"warn",
+      title:"Leverage in Futures — Natural via Margin",
+      sub:"How futures provide structural leverage without explicit borrowing",
+      tags:[["futures margin","warn"],["natural leverage","warn"],["initial margin","margin"],["ES futures","warn"]],
+      stats:[{l:"ES (S&P 500 E-mini) notional",v:"$50 × index ≈ $250K",c:"warn"},{l:"ES initial margin (approx)",v:"~$12,500 per contract",c:"margin"},{l:"Implied leverage (ES)",v:"~20× (250K / 12.5K)",c:"danger"},{l:"ZN (10Y note) leverage",v:"~25–30× on notional",c:"warn"}],
+      body:[
+        `Futures contracts provide <em>structural leverage</em> without the need for borrowing in the traditional sense. When you buy one ES (E-mini S&P 500) futures contract, you control $250,000 of index exposure (at S&P 5,000 × $50 multiplier) by posting approximately $12,500 of initial margin — roughly 20× leverage. You are not borrowing $237,500; you are posting a performance bond that guarantees your ability to meet daily mark-to-market obligations. The leverage emerges from the design of the contract, not from a loan.`,
+        `This is conceptually important: futures leverage is <em>recourse-based</em> rather than debt-based. If the market moves against you by 5% (a $12,500 loss on the $250,000 notional), you lose 100% of your margin — but you do not owe anything to a lender, because there was no loan. The clearing house collects the loss through variation margin calls, funded from your pre-posted margin. The system is designed so that the daily MTM mechanism prevents losses from accumulating beyond one day's margin — a key feature that distinguishes exchange-cleared futures risk from OTC leveraged positions.`,
+        `Commodity futures often carry even higher implicit leverage, because physical commodity prices can be more stable than equity indices despite their volatility reputation — a wheat futures contract might be 30–40× levered on notional. Agricultural and energy futures are dominated by commercial hedgers (farmers, refiners, airlines) for whom this leverage is offset by opposite physical exposure — their leverage reduces net risk rather than amplifying it. Speculative participants in commodity futures must be acutely aware that the leverage designed for commercial hedging is extremely high for a pure directional bet.`
+      ],
+      ki:"Futures leverage is the cleanest form of leverage in finance: structurally embedded, daily-settled, and without the credit relationship that makes traditional margin borrowing fragile. The 20× leverage in ES is not excessive for a long/short equity fund whose benchmark tracking permits it, but it is extremely dangerous for a directional speculator who is simply betting on market direction — the wipeout move is only 5%, well within normal daily equity volatility."
+    },
+    { icon:"📐", badge:"OPTIONS LEV", bc:"warn",
+      title:"Options Leverage",
+      sub:"How options provide contingent leverage that varies with moneyness and time to expiry",
+      tags:[["options leverage","warn"],["delta leverage","warn"],["OTM leverage","danger"],["gamma","warn"]],
+      fmla:{
+        main:`<span class="a">Options Leverage</span> <span class="op">=</span> <span class="c">Δ</span> <span class="op">×</span> <span class="c">S</span> <span class="op">/</span> <span class="a">Option Price</span>`,
+        note:`Δ = delta (0 to 1 for calls), S = spot price\n\nATM call example (S=$100, premium=$5, Δ=0.50):\nLeverage = 0.50 × $100 / $5 = 10×\n\nOTM call ($5 OTM, premium=$1, Δ=0.20):\nLeverage = 0.20 × $100 / $1 = 20×`
+      },
+      cmp:[
+        {cls:"safe",   label:"ATM Options — Moderate Leverage", text:"At-the-money options (delta ~0.50) typically provide 5–15× leverage on the underlying. As the stock moves, the option gains value — but at an accelerating rate (positive gamma) as it moves further in the money. ATM leverage is relatively predictable and stable compared to OTM options. The option buyer's maximum loss is always the premium paid, regardless of leverage."},
+        {cls:"warn",   label:"OTM Options — High Leverage", text:"Out-of-the-money options have low deltas (0.10–0.30) but also low premiums — producing higher mathematical leverage (delta × spot / premium). An OTM call with delta 0.20 priced at $1 on a $100 stock has 20× leverage. However, this leverage is contingent: if the option expires worthless (stock doesn't reach the strike), the entire premium is lost. OTM options behave like lottery tickets — high leverage, low probability of payout."},
+        {cls:"danger", label:"0DTE Options — Extreme Leverage", text:"Zero-days-to-expiration options have extremely high gamma near the strike and extremely low time value, producing effective leverage that can exceed 100× as they approach expiry. A 0DTE ATM call with $0.50 premium and delta 0.50 on a $100 stock has 100× leverage. Used by day traders for intraday directional bets — extremely dangerous as small moves can produce near-total losses in minutes."},
+      ],
+      body:[
+        `Options provide a unique form of leverage that is both powerful and more complex than futures or margin borrowing: it is <em>contingent and variable</em>. The leverage ratio of an option (sometimes called its "effective leverage" or "omega") changes continuously as the underlying price moves, as time passes, and as implied volatility changes.`,
+        `The effective leverage formula — delta × spot / option price — shows why OTM options carry higher mathematical leverage than ATM options: the numerator (delta × spot) is smaller for OTM options (lower delta), but the denominator (premium) is even smaller, since OTM options have no intrinsic value. A deeply OTM option can show 50× or 100× mathematical leverage. But this high leverage is deceptive: the underlying asset must move enough to make the option in-the-money before any of that leverage translates into profit. Most OTM options expire worthless, meaning their theoretical leverage is never realised.`,
+        `The most practically important aspect of options leverage is that it is <em>asymmetric</em>: the buyer's maximum loss is always and exactly the premium paid, regardless of leverage ratio. This is a fundamentally different risk profile from futures or margin leverage, where losses can exceed the initial investment. An option buyer can use 50× leverage and be fully protected against losses beyond their initial outlay — a property unique to long option positions and one of the primary reasons options are used for asymmetric risk-taking (large potential upside with fully defined, limited downside).`
+      ],
+      ki:"Options leverage is the most seductive form in finance because it combines apparently high leverage with the psychological comfort of a defined maximum loss. The trap is conflating mathematical leverage ratio with expected payoff: a 50× leveraged OTM option that expires worthless 90% of the time is not a good trade even if the 10% scenario is extremely profitable. Evaluating options by their expected value (probability-weighted payoff) rather than their leverage ratio is the essential analytical discipline."
+    },
+    { icon:"₿", badge:"CRYPTO LEV", bc:"crypto",
+      title:"Crypto Leverage — Up to 100× on Some Exchanges",
+      sub:"The most extreme leverage environment in modern finance — and why most of it is destroyed within days",
+      tags:[["crypto leverage","crypto"],["100x","danger"],["perp leverage","crypto"],["liquidation","danger"]],
+      stats:[{l:"Typical retail perp leverage used",v:"10–25× (per Binance data)",c:"crypto"},{l:"Max offered (Binance, Bybit)",v:"125× (BTC), 75× (ETH)",c:"danger"},{l:"Wipeout move at 100×",v:"1% adverse move = 100% loss",c:"danger"},{l:"Estimated % of 100× trades liquidated",v:">95% within 24 hours",c:"danger"}],
+      cmp:[
+        {cls:"crypto", label:"Mechanics", text:"Crypto perpetual and futures contracts offer maximum leverage far exceeding any regulated market: Binance, Bybit, and OKX offer up to 125× on BTC perpetuals. The mechanics are identical to all leveraged derivatives — post margin, control larger notional, face mark-to-market liquidation when equity falls below maintenance margin. The difference is the extreme ratio: at 125×, the liquidation distance is less than 0.8% of the asset price."},
+        {cls:"danger", label:"Why It Destroys Capital", text:"Crypto markets routinely experience intraday moves of 2–5%. At 20× leverage, a 5% move wipes the position. At 50×, a 2% move does. The combination of high maximum leverage, 24/7 markets with no circuit breakers, and volatile underlying assets creates an environment where high-leverage positions have an extremely short expected life. Academic analysis of Binance futures liquidation data consistently shows the vast majority of maximum-leverage positions are liquidated within hours, not days."},
+        {cls:"safe",   label:"Institutional vs. Retail Use", text:"Sophisticated crypto market participants — market-making desks, arbitrage funds, delta-neutral yield strategies — use crypto leverage, but typically at 2–10×, with precise hedging, automated risk management, and deep understanding of funding and liquidation mechanics. The 50–125× leverage offered by exchanges is primarily a retail product. Its persistence despite near-universal participant destruction reflects the exchange revenue model: more leverage → more liquidations → more insurance fund accumulation and fee revenue."},
+      ],
+      body:[
+        `Crypto derivatives markets offer leverage ratios that would be illegal in every major regulated financial market in the world — and for good reason. The maximum 125× leverage available on BTC perpetuals means that a position worth $125,000 in notional exposure requires only $1,000 of margin. A BTC price move of 0.8% against the position triggers liquidation. Given that BTC routinely moves 1–3% within any given hour, such positions have a median survival time measured in minutes.`,
+        `The persistence of 100× leverage products despite this statistical near-certainty of loss reflects a combination of factors: exchange business model incentives (liquidations generate revenue through insurance fund accumulation and fee income); regulatory arbitrage (offshore exchanges face minimal restrictions); behavioral finance factors (retail traders systematically overestimate their ability to time entries and exits, and find the prospect of 100× gains psychologically compelling despite the near-certain losses it produces in practice); and the genuine utility of high leverage for the tiny minority of sophisticated participants who use it for brief, precisely-timed arbitrage strategies where 24-hour survival is not the goal.`,
+        `The responsible use of crypto leverage — even for sophisticated participants — typically involves leverage ratios of 2–10×, maintained for hours to days rather than weeks, with pre-defined stop-loss levels that close the position well before the liquidation price, and with position sizes calibrated so that the maximum possible loss (at the stop level) represents a small, survivable fraction of total capital. At these leverage levels and risk management standards, crypto leverage is a reasonable trading tool; at 50–125×, it is a statistical path to rapid ruin for the overwhelming majority of users.`
+      ],
+      ki:"100× leverage on crypto perpetuals is not a trading tool — it is a product designed around its own failure. At 125× on BTC, any market maker with a 0.8% edge can systematically pick off every position and profit from the resulting liquidation cascade. The only question for a user of 100× leverage is not whether they will be liquidated, but when. The exchange's insurance fund, which grows with every such liquidation, is the clearest indicator of who systematically profits from retail leverage trading: the exchange itself."
+    },
+  ]},
+  { label:"Leverage Risk & System Dynamics", color:"var(--danger)", line:"var(--danger-d)", fam:"f-danger", entries:[
+    { icon:"📉", badge:"AMPLIFIED LOSS", bc:"danger",
+      title:"Risk of Leverage — Amplified Losses",
+      sub:"How leverage transforms normal market moves into existential position risks",
+      tags:[["amplified losses","danger"],["wipeout move","danger"],["ruin probability","danger"],["Kelly criterion","warn"]],
+      ampTable: true,
+      body:[
+        `The fundamental arithmetic of leveraged losses is asymmetric and compounding in a way that makes intuitive sense but is consistently underestimated by participants. A 50% loss on a leveraged position requires a 100% gain to recover to breakeven — a basic mathematical fact with profound implications. At 5× leverage, a 20% adverse market move (not unusual in an equity bear market) produces a 100% loss of equity — not a 20% loss, but a complete wipeout. At 10× leverage, the same destruction requires only a 10% adverse move.`,
+        `The <em>Kelly Criterion</em> — a mathematical framework for optimal bet sizing — is the most rigorous tool for understanding how leverage interacts with long-run capital growth. The Kelly framework shows that for any given edge (positive expected return) and variance (volatility of returns), there exists an optimal leverage ratio that maximizes long-run capital growth. Crucially, the Kelly-optimal leverage is always finite, even for highly favorable bets, and using leverage beyond the Kelly-optimal level reduces expected long-run returns compared to using less leverage — the "over-Kelly" region where leverage destroys value by making ruin too probable.`,
+        `Perhaps the most practically important insight from leverage arithmetic is the <em>gambler's ruin</em> property: at sufficiently high leverage, the probability of ruin (losing everything) approaches 1 over a sufficiently long time horizon, even for strategies with genuine positive expected returns. A leveraged position that can be wiped out by a 10% adverse move will eventually be wiped out if the asset's price fluctuates enough — and asset prices always eventually experience 10% drawdowns. The question is not whether ruin is possible at high leverage, but simply how long it takes.`
+      ],
+      ki:"Leverage does not change a strategy's expected return per unit of underlying asset — it changes how many bets you can take before ruin. A 10× leveraged trader who is wiped out by a normal 10% market drawdown cannot execute the other 9 trades they needed to realize the strategy's edge. The mathematics of leverage and ruin is the strongest argument for conservative position sizing: every increment of leverage above the Kelly-optimal level increases the probability of permanent capital impairment, which ends the ability to capture any future edge at all."
+    },
+    { icon:"📞", badge:"MARGIN CALL", bc:"margin",
+      title:"Margin Calls and Forced Liquidation",
+      sub:"The mechanical trigger that converts a temporary adverse move into a permanent realized loss",
+      tags:[["margin call","margin"],["maintenance margin","margin"],["forced selling","danger"],["timing","warn"]],
+      cmp:[
+        {cls:"margin", label:"Traditional Margin Call Process", text:"Account equity falls below maintenance margin → broker issues margin call → investor must deposit additional funds or close positions to restore account to initial margin level (not just maintenance — a detail investors often miss) → failure to meet by deadline → broker liquidates positions at market, without the investor's consent, at whatever price is available. Brokers have full discretion over which positions to liquidate."},
+        {cls:"danger", label:"Why Timing Destroys Value", text:"Margin calls concentrate at the worst possible moment: deep in a market decline, when prices are low and bid-ask spreads are wide. Forced selling at distressed prices locks in the maximum possible loss and prevents the investor from holding through a potential recovery. The greatest irony of leveraged investing: the mechanism designed to protect the lender (the margin call) systematically ensures the borrower sells at the bottom."},
+        {cls:"warn",   label:"Anticipating Margin Calls", text:"Sophisticated leveraged investors maintain a 'dry powder' reserve — liquid assets held outside the leveraged position specifically to meet margin calls without forced selling. This requires deliberately using less than maximum available leverage — leaving a buffer of unused margin capacity — so that adverse moves generate margin calls that can be met with fresh cash rather than forced liquidation of positions. The practice of maintaining margin buffers separates professional leveraged investors from those who operate at maximum leverage utilization."},
+      ],
+      body:[
+        `A <em>margin call</em> is a demand from a broker or clearing house that an investor deposit additional funds or collateral to bring their account's margin back to the required level. Margin calls occur when the mark-to-market value of a leveraged position falls enough that the equity in the account drops below the maintenance margin threshold. They are the primary mechanical mechanism through which leverage transforms a temporary market decline into a permanent realized loss.`,
+        `The timing problem with margin calls is structural and severe. Markets that produce margin calls are, by definition, markets that have recently moved sharply against the leveraged position. The act of meeting a margin call by selling positions — or having the broker do so by forced liquidation — concentrates the heaviest selling pressure exactly when prices are already depressed and market liquidity is often thinnest. This forced selling at distressed levels is not just individually damaging; at scale, it is a systemic amplifier of market declines (see deleveraging spirals, below).`,
+        `The distinction between the maintenance margin level and the initial margin level is operationally critical and consistently misunderstood by retail investors. When a margin call is triggered, the investor must restore the account to the <em>initial margin</em> level — not the maintenance level where the call was triggered. This means the required deposit is larger than the margin deficit that triggered the call. An account with $100,000 of positions requiring $30,000 initial margin and $20,000 maintenance margin that falls to $19,000 faces a margin call requiring restoration to $30,000 — an $11,000 deposit, not a $1,000 deposit.`
+      ],
+      ki:"The margin call is leverage's enforcement mechanism — the moment when the theoretical wipeout move becomes a concrete demand for cash that cannot be deferred. Its brutal timing logic — forced selling at the worst prices, at the worst moments — is not a market inefficiency or a broker's malice; it is the arithmetic consequence of using a tool (leverage) that removes the ability to simply hold through adversity. The lesson is not to avoid leverage but to always know your margin buffer and maintain enough unlevered liquidity to survive a realistic adverse scenario without forced selling."
+    },
+    { icon:"🌀", badge:"SPIRAL", bc:"spiral",
+      title:"Deleveraging Spirals in Markets",
+      sub:"How simultaneous margin calls across many participants amplify declines into systemic crises",
+      tags:[["deleveraging spiral","spiral"],["fire sale","danger"],["systemic risk","spiral"],["Brunnermeier-Pedersen","spiral"]],
+      spiralVis: true,
+      stats:[{l:"2008 GFC: US bank leverage",v:"25–40× before deleveraging",c:"danger"},{l:"LTCM (1998) leverage",v:"~25× before collapse",c:"danger"},{l:"March 2020 Covid shock",v:"Treasury basis trade spirals",c:"spiral"},{l:"Archegos (2021) leverage",v:">6× via TRS, hidden",c:"danger"}],
+      body:[
+        `A <em>deleveraging spiral</em> is one of the most destructive phenomena in financial markets: a self-reinforcing feedback loop in which falling asset prices trigger margin calls, which force asset sales, which cause further price declines, which trigger more margin calls, in a cascade that can transform an orderly correction into a systemic crisis. The mechanism was formalized by economists Markus Brunnermeier and Lasse Pedersen in their influential 2009 paper, though the phenomenon had been observed in every major financial crisis throughout history.`,
+        `The spiral has two distinct reinforcing channels. The <strong>loss spiral</strong>: falling asset prices reduce equity → to maintain leverage ratios (or because equity is lost entirely), levered participants must reduce positions → selling pressure → further price declines → more equity losses → more selling. The <strong>margin spiral</strong>: falling prices simultaneously reduce collateral values and increase volatility (which causes risk managers to raise margin requirements) → both effects reduce the amount any given equity can support in notional positions → further forced selling even without outright losses → additional downward price pressure. Both channels amplify the other simultaneously.`,
+        `Historical deleveraging spirals share common characteristics: they begin in a single market or asset class, spread to all liquid assets as participants sell their most liquid holdings to raise cash (regardless of whether those holdings are related to the original stress), are exacerbated by the synchronization of risk management models that all respond similarly to rising volatility, and end only when prices fall enough to attract new buyers at fundamentally attractive prices, central banks intervene as buyers of last resort, or the leveraged positions are completely wound down (eliminating the forced selling pressure).`,
+        `The March 2020 COVID shock illustrates the modern version of the Treasury basis trade spiral: large hedge funds had accumulated enormous leveraged long positions in US Treasury bonds financed via repo, simultaneously short Treasury futures as a basis trade. When liquidity crises hit, repo funding evaporated, triggering simultaneous forced selling of Treasuries — the world's "safest" asset — at the worst possible moment. Yields spiked as prices fell, exactly opposite to the "flight to safety" behavior that normally characterizes Treasury markets in crises. Only the Federal Reserve's extraordinary intervention (unlimited QE) stopped the spiral.`
+      ],
+      ki:"Deleveraging spirals are the clearest demonstration that leverage creates systemic, not just individual, risk. A single highly-leveraged investor who faces margin calls and sells assets is a normal, contained event. Thousands of similarly-positioned investors all facing the same margin calls from the same market move, all selling the same assets in the same window of time, creates a self-reinforcing wave of forced selling that can overwhelm the natural buyer base and produce asset price moves far beyond what any fundamental deterioration would justify. This is the mechanism behind every major financial crisis since at least the 1920s."
+    },
+  ]},
+];
+
+let cnt = 0;
+
+function buildAmpTable() {
+  const rows = [
+    ["1×","none",   "same as asset","same as asset","∞ (can always hold)"],
+    ["2×","50%",    "+2% return",   "−2% wipeout progress","−50% wipeout"],
+    ["5×","20%",    "+5% return",   "−5% wipeout progress","−20% wipeout"],
+    ["10×","10%",   "+10% return",  "−10% wipeout progress","−10% wipeout"],
+    ["20×","5%",    "+20% return",  "−20% wipeout progress","−5% wipeout"],
+    ["50×","2%",    "+50% return",  "−50% wipeout progress","−2% wipeout"],
+    ["100×","1%",   "+100% return", "−100% wipeout progress","−1% wipeout"],
+  ];
+  return `<div class="amp-table">
+    <div class="at-row hdr" style="grid-template-columns:60px 80px 130px 160px 130px">
+      ${["Leverage","Margin %","1% move return","10% move effect","Wipeout move"].map(c=>`<div class="ac">${c}</div>`).join('')}
+    </div>
+    ${rows.map((r,i)=>`<div class="at-row" style="grid-template-columns:60px 80px 130px 160px 130px">
+      <div class="ac label">${r[0]}</div>
+      <div class="ac ${i<2?'safe':i<4?'warn':'danger'}">${r[1]}</div>
+      <div class="ac">${r[2]}</div>
+      <div class="ac ${i<2?'safe':i<4?'warn':'danger'}">${r[3]}</div>
+      <div class="ac danger">${r[4]}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function buildLevSpectrum(rows) {
+  return `<div class="lev-spectrum">
+    <div class="ls-head">Leverage by Instrument / Regulatory Regime</div>
+    ${rows.map(r=>`<div class="ls-row">
+      <div class="ls-label">${r.label}</div>
+      <div class="ls-bar-wrap"><div class="ls-bar" style="width:${r.w}%;background:${r.color}"></div></div>
+      <div class="ls-ratio" style="color:${r.color}">${r.ratio}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function buildSpiral() {
+  const steps = [
+    {n:"01", title:"Asset prices fall", note:"Market decline, news event, or liquidity shock"},
+    {n:"02", title:"Equity erodes", note:"Leveraged book loses value faster than underlying"},
+    {n:"03", title:"Margin calls", note:"Brokers demand cash or collateral restoration"},
+    {n:"04", title:"Forced selling", note:"Positions liquidated at market — any price"},
+    {n:"05", title:"More selling pressure", note:"Supply overwhelms buyers; spreads widen"},
+    {n:"06", title:"Prices fall further", note:"→ Return to Step 01 (amplified)"},
+  ];
+  return `<div class="spiral-vis">
+    <div class="sv-head">Deleveraging Spiral — Self-Reinforcing Feedback Loop</div>
+    <div class="sv-steps">
+      ${steps.map((s,i)=>`<div class="sv-step" style="background:${i===0||i===5?'rgba(200,78,232,0.08)':''}">
+        <div class="sv-n">Step ${s.n}</div>
+        <div class="sv-title">${s.title}</div>
+        <div class="sv-note">${s.note}</div>
+        ${i<5?`<div class="sv-arrow">→</div>`:''}
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function render(){
+  const root=document.getElementById('root');
+  sections.forEach(sec=>{
+    const sh=document.createElement('div');
+    sh.innerHTML=`<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line" style="background:${sec.line}"></div>
+    </div>`;
+    root.appendChild(sh);
+    const wrap=document.createElement('div');
+    wrap.className=sec.fam;
+    sec.entries.forEach(e=>{
+      const idx=cnt++;
+      const bc=e.bc;
+      const tH=(e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH=e.stats?`<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>`:'';
+      const cmpH=e.cmp?`<div class="cmp c${e.cmp.length}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>`:'';
+      const fmlaH=e.fmla?`<div class="fmla-block"><div class="fmla-main">${e.fmla.main}</div><pre class="fmla-note">${e.fmla.note}</pre></div>`:'';
+      const ampH=e.ampTable?buildAmpTable():'';
+      const levH=e.levSpectrum?buildLevSpectrum(e.levSpectrum):'';
+      const spiralH=e.spiralVis?buildSpiral():'';
+      const body=e.body.map(p=>`<p>${p}</p>`).join('')+
+        fmlaH+ampH+levH+stH+cmpH+spiralH+
+        `<div class="ki"><div class="ki-mark">"</div><div class="ki-text">${e.ki}</div></div>
+        <div class="tags">${tH}</div>`;
+      const div=document.createElement('div');
+      div.className='entry';div.id=`e-${idx}`;
+      div.innerHTML=`
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-badge" style="color:var(--${bc});border-color:var(--${bc}-d);background:var(--${bc}-b)">${e.badge}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+function toggle(i){document.getElementById(`e-${i}`).classList.toggle('open');}
+function toggleAll(open){for(let i=0;i<cnt;i++){const el=document.getElementById(`e-${i}`);if(el)open?el.classList.add('open'):el.classList.remove('open');}}
+render();
+</script>
+</body>
+</html>

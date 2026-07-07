@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 2.6 Options</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #f9f8f1;
+  --bg1:      #f3f2eb;
+  --bg2:      #ebe9e0;
+  --bg3:      #e4e2d8;
+  --surface:  #dcd9ce;
+  --border:   #d0cbb8;
+  --border2:  #c0b9a4;
+
+  --chalk:    #1f2117;     /* main dark text */
+  --chalk2:   #4a4b3f;
+  --muted:    #6f6f5f;
+  --faint:    #a8a78f;
+
+  /* Accent colors (kept vibrant but with better light-theme backgrounds) */
+  --call:     #2e9e2e;     /* calls = green */
+  --call-d:   #1a5c1a;
+  --call-bg:  rgba(46,158,46,0.08);
+
+  --put:      #e03a3a;     /* puts = red */
+  --put-d:    #9c1f1f;
+  --put-bg:   rgba(224,58,58,0.08);
+
+  --greek:    #d4a017;     /* greeks = gold/amber */
+  --greek-d:  #8c6a0a;
+  --greek-bg: rgba(212,160,23,0.09);
+
+  --strat:    #2b8fd4;     /* strategies = sky blue */
+  --strat-d:  #1a5a8c;
+  --strat-bg: rgba(43,143,212,0.08);
+
+  --vol:      #b45ed4;     /* volatility = purple */
+  --vol-d:    #7a2e96;
+  --vol-bg:   rgba(180,94,212,0.08);
+
+  --inst:     #e07a2e;     /* instruments = orange */
+  --inst-d:   #9c4f10;
+  --inst-bg:  rgba(224,122,46,0.09);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--chalk);
+  font-family: 'Raleway', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.72;
+  overflow-x: hidden;
+}
+
+/* chalkboard texture */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: 
+    radial-gradient(ellipse at 20% 50%, rgba(30,35,15,0.4) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(20,25,10,0.3) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ═══ MASTHEAD ═══ */
+.masthead {
+  position: relative; z-index: 2;
+  padding: 0;
+  border-bottom: 1px solid var(--border2);
+}
+
+.mhd-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 52px 44px 40px;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 48px;
+  align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'Courier Prime', monospace;
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.mhd-kicker::before { content:''; width:24px; height:1px; background:var(--muted); }
+
+.mhd-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(52px,7vw,96px);
+  font-weight: 900;
+  line-height: 0.88;
+  letter-spacing: -0.03em;
+  color: var(--chalk);
+  margin-bottom: 8px;
+}
+.mhd-title em { font-style: italic; color: var(--call); }
+
+.mhd-sub {
+  font-family: 'Courier Prime', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 16px;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+}
+
+/* payoff preview widget */
+.payoff-preview {
+  border: 1px solid var(--border2);
+  background: var(--bg1);
+  padding: 0;
+  overflow: hidden;
+}
+.pp-title {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.pp-svg { width: 100%; height: 120px; display: block; }
+.pp-legend {
+  display: flex; gap: 16px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+.pp-leg {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 9px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.pp-dot { width:8px; height:3px; border-radius:2px; }
+
+/* category colour legend */
+.cat-legend {
+  max-width: 1080px; margin: 0 auto;
+  padding: 12px 44px;
+  display: flex; gap: 20px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.cl-item {
+  display: flex; align-items: center; gap: 7px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 9px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted);
+}
+.cl-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* ═══ PAGE ═══ */
+.page {
+  position: relative; z-index: 2;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 36px 44px 100px;
+}
+
+/* controls */
+.controls {
+  display: flex; gap: 8px;
+  margin-bottom: 32px; flex-wrap: wrap; align-items: center;
+}
+.ctrl {
+  font-family: 'Courier Prime', monospace;
+  font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 6px 14px; border: 1px solid var(--border2);
+  background: transparent; color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.ctrl:hover { border-color: var(--chalk2); color: var(--chalk); }
+.ctrl-right {
+  margin-left: auto;
+  font-family: 'Courier Prime', monospace;
+  font-size: 9px; color: var(--muted); letter-spacing: 0.06em;
+}
+
+/* section divider */
+.section-div {
+  display: flex; align-items: center; gap: 14px;
+  margin: 28px 0 8px;
+}
+.sd-label {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 20px; font-weight: 400;
+  white-space: nowrap;
+}
+.sd-line { flex: 1; height: 1px; }
+
+/* ═══ ENTRY ═══ */
+.entry {
+  border: 1px solid var(--border);
+  background: var(--bg1);
+  margin-bottom: 4px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.18s;
+}
+
+.entry::before {
+  content: '';
+  position: absolute; left:0; top:0; bottom:0; width:3px;
+  transition: width 0.2s;
+}
+.entry.open::before { width: 4px; }
+.entry:hover { border-color: var(--border2); }
+
+/* colour families */
+.c-call .entry::before   { background: var(--call-d); }
+.c-call .entry.open::before { background: var(--call); }
+.c-put  .entry::before   { background: var(--put-d); }
+.c-put  .entry.open::before { background: var(--put); }
+.c-both .entry::before   { background: linear-gradient(var(--call-d),var(--put-d)); }
+.c-both .entry.open::before { background: linear-gradient(var(--call),var(--put)); }
+.c-greek .entry::before  { background: var(--greek-d); }
+.c-greek .entry.open::before { background: var(--greek); }
+.c-strat .entry::before  { background: var(--strat-d); }
+.c-strat .entry.open::before { background: var(--strat); }
+.c-vol   .entry::before  { background: var(--vol-d); }
+.c-vol   .entry.open::before { background: var(--vol); }
+.c-inst  .entry::before  { background: var(--inst-d); }
+.c-inst  .entry.open::before { background: var(--inst); }
+.c-model .entry::before  { background: var(--greek-d); }
+.c-model .entry.open::before { background: var(--greek); }
+
+.e-hdr {
+  display: flex; align-items: center;
+  cursor: pointer; user-select: none;
+  min-height: 56px; padding-left: 4px;
+  transition: background 0.14s;
+}
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num {
+  font-family: 'Courier Prime', monospace;
+  font-size: 9px; color: var(--faint);
+  width: 46px; text-align: center; flex-shrink: 0;
+  letter-spacing: 0.06em;
+}
+
+.e-icon {
+  font-size: 16px; width: 44px;
+  text-align: center; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.e-text { flex: 1; padding: 11px 16px; }
+
+.e-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 17px; font-weight: 700;
+  color: var(--chalk); line-height: 1.2; letter-spacing: -0.01em;
+}
+
+.e-sub {
+  font-family: 'Courier Prime', monospace;
+  font-size: 9.5px; color: var(--muted);
+  margin-top: 3px; letter-spacing: 0.04em;
+}
+
+.e-tag {
+  font-family: 'Courier Prime', monospace;
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 3px 10px; border: 1px solid; margin-right: 14px;
+  flex-shrink: 0; white-space: nowrap;
+}
+
+.e-toggle {
+  font-family: 'Courier Prime', monospace;
+  font-size: 13px; color: var(--muted);
+  width: 44px; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  border-left: 1px solid var(--border); flex-shrink: 0;
+  transition: transform 0.24s, color 0.15s;
+}
+.entry.open .e-toggle { transform: rotate(90deg); }
+
+/* toggle colours by category */
+.c-call  .entry.open .e-toggle { color: var(--call); }
+.c-put   .entry.open .e-toggle { color: var(--put); }
+.c-both  .entry.open .e-toggle { color: var(--chalk2); }
+.c-greek .entry.open .e-toggle { color: var(--greek); }
+.c-strat .entry.open .e-toggle { color: var(--strat); }
+.c-vol   .entry.open .e-toggle { color: var(--vol); }
+.c-inst  .entry.open .e-toggle { color: var(--inst); }
+.c-model .entry.open .e-toggle { color: var(--greek); }
+
+/* ═══ BODY ═══ */
+.e-body {
+  display: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  padding: 22px 22px 26px 90px;
+  animation: bIn 0.2s ease;
+}
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p {
+  font-family: 'Raleway', sans-serif;
+  font-size: 13.5px; font-weight: 300;
+  line-height: 1.88; color: var(--chalk2);
+  margin-bottom: 13px;
+}
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--chalk); font-weight: 400; }
+.e-body p strong { font-weight: 600; color: var(--chalk); font-family: 'Raleway', sans-serif; }
+
+/* formula strip */
+.fmla {
+  margin-top: 16px;
+  padding: 13px 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--greek);
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;
+}
+.fmla-eq {
+  font-family: 'Courier Prime', monospace;
+  font-size: 13.5px; color: var(--chalk); flex-shrink: 0;
+  line-height: 1.7;
+}
+.fmla-eq .v { color: var(--greek); }
+.fmla-eq .c { color: var(--call); }
+.fmla-eq .p { color: var(--put); }
+.fmla-eq .op { color: var(--muted); }
+.fmla-note {
+  font-family: 'Courier Prime', monospace;
+  font-size: 10.5px; color: var(--muted);
+  line-height: 1.7; white-space: pre-line;
+}
+
+/* payoff diagram (SVG) */
+.payoff-box {
+  margin-top: 18px;
+  border: 1px solid var(--border2);
+  background: var(--bg1);
+  overflow: hidden;
+}
+.pb-title {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--muted); padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.pb-svg { width: 100%; height: 120px; display: block; }
+
+/* stat strip */
+.stats {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px;
+}
+.stat {
+  flex: 1; min-width: 120px;
+  padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2);
+}
+.stat-l {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 3px;
+}
+.stat-v {
+  font-family: 'Courier Prime', monospace;
+  font-size: 13px; font-weight: 700; line-height: 1.2; color: var(--chalk);
+}
+.stat-v.call  { color: var(--call); }
+.stat-v.put   { color: var(--put); }
+.stat-v.greek { color: var(--greek); }
+.stat-v.strat { color: var(--strat); }
+.stat-v.vol   { color: var(--vol); }
+.stat-v.inst  { color: var(--inst); }
+
+/* comparison grid */
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cmp.c3 { grid-template-columns: 1fr 1fr 1fr; }
+.cmp.c4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.cc {
+  padding: 12px 14px; border: 1px solid var(--border); background: var(--bg2);
+}
+.cc-l {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 6px;
+}
+.cc p { font-size: 12.5px !important; line-height: 1.6 !important; margin-bottom: 0 !important;
+        font-family: 'Raleway', sans-serif !important; font-weight: 300 !important; color: var(--chalk2) !important; }
+.cc.call { background: var(--call-bg); border-color: var(--call-d); }
+.cc.put  { background: var(--put-bg);  border-color: var(--put-d); }
+.cc.greek { background: var(--greek-bg); border-color: var(--greek-d); }
+.cc.strat { background: var(--strat-bg); border-color: var(--strat-d); }
+.cc.vol   { background: var(--vol-bg);   border-color: var(--vol-d); }
+.cc.inst  { background: var(--inst-bg);  border-color: var(--inst-d); }
+.cc.call .cc-l  { color: var(--call); }
+.cc.put  .cc-l  { color: var(--put); }
+.cc.greek .cc-l { color: var(--greek); }
+.cc.strat .cc-l { color: var(--strat); }
+.cc.vol   .cc-l { color: var(--vol); }
+.cc.inst  .cc-l { color: var(--inst); }
+
+/* data table */
+.dtable { margin-top: 18px; border: 1px solid var(--border); overflow: auto; }
+.drow { display: grid; border-bottom: 1px solid var(--border); }
+.drow:last-child { border-bottom: none; }
+.drow.hdr .dc {
+  background: var(--bg3);
+  font-family: 'Courier Prime', monospace;
+  font-size: 8.5px; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700;
+}
+.dc {
+  padding: 8px 12px; border-right: 1px solid var(--border);
+  font-family: 'Courier Prime', monospace; font-size: 10.5px;
+  color: var(--chalk2); line-height: 1.5;
+}
+.dc:last-child { border-right: none; }
+.dc.label { color: var(--chalk); font-weight: 700; font-family: 'Raleway', sans-serif; font-size: 12px; }
+.dc.call  { color: var(--call); }
+.dc.put   { color: var(--put); }
+.dc.greek { color: var(--greek); }
+.dc.ok    { color: var(--call); }
+.dc.warn  { color: var(--put); }
+
+/* greeks matrix */
+.greeks-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px; margin-top: 18px;
+}
+.greek-cell {
+  padding: 13px 14px;
+  border: 1px solid var(--border); background: var(--bg2);
+}
+.gc-name {
+  font-family: 'Playfair Display', serif;
+  font-style: italic; font-size: 22px;
+  color: var(--greek); line-height: 1; margin-bottom: 4px;
+}
+.gc-sym {
+  font-family: 'Courier Prime', monospace;
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+}
+.gc-def {
+  font-family: 'Raleway', sans-serif;
+  font-size: 11.5px; font-weight: 300; color: var(--chalk2);
+  line-height: 1.6;
+}
+.gc-val {
+  font-family: 'Courier Prime', monospace;
+  font-size: 10px; color: var(--greek-d);
+  margin-top: 6px; letter-spacing: 0.04em;
+}
+.greek-cell.second-order { border-color: var(--border2); background: var(--bg3); }
+.greek-cell.second-order .gc-name { color: var(--chalk2); font-size: 18px; }
+
+/* key insight */
+.ki {
+  margin-top: 20px; display: flex; gap: 0;
+  border: 1px solid var(--border2); overflow: hidden;
+}
+.ki-bar { width: 4px; flex-shrink: 0; }
+.ki-inner { flex: 1; padding: 13px 17px; background: var(--bg2); }
+.ki-label {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 5px;
+}
+.ki-text {
+  font-family: 'Playfair Display', serif;
+  font-style: italic; font-size: 14.5px;
+  color: var(--chalk); line-height: 1.6;
+}
+.c-call  .ki-bar { background: var(--call); }
+.c-put   .ki-bar { background: var(--put); }
+.c-both  .ki-bar { background: linear-gradient(var(--call),var(--put)); }
+.c-greek .ki-bar { background: var(--greek); }
+.c-strat .ki-bar { background: var(--strat); }
+.c-vol   .ki-bar { background: var(--vol); }
+.c-inst  .ki-bar { background: var(--inst); }
+.c-model .ki-bar { background: var(--greek); }
+
+/* tags */
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted);
+}
+.tag.call  { border-color: var(--call-d);  color: var(--call); }
+.tag.put   { border-color: var(--put-d);   color: var(--put); }
+.tag.greek { border-color: var(--greek-d); color: var(--greek); }
+.tag.strat { border-color: var(--strat-d); color: var(--strat); }
+.tag.vol   { border-color: var(--vol-d);   color: var(--vol); }
+.tag.inst  { border-color: var(--inst-d);  color: var(--inst); }
+
+/* footer */
+.foot {
+  position: relative; z-index: 2;
+  max-width: 1080px; margin: 0 auto;
+  padding: 18px 44px; border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between;
+}
+.foot span {
+  font-family: 'Courier Prime', monospace; font-size: 9.5px;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .payoff-preview { display: none; }
+  .page, .foot, .cat-legend { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding-left: 18px; padding-right: 18px; }
+  .e-body { padding-left: 16px; }
+  .cmp.c2,.cmp.c3,.cmp.c4 { grid-template-columns: 1fr; }
+  .greeks-grid { grid-template-columns: 1fr 1fr; }
+  .e-tag { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ MASTHEAD ═══ -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 2.6 · Asset Classes</div>
+      <div class="mhd-title">Op<em>tions</em></div>
+      <div class="mhd-sub">
+        Rights without obligations — the richest instrument in finance.<br>
+        Calls, puts, Greeks, vol surfaces, strategies, and the VIX.<br>
+        24 topics · complete reference.
+      </div>
+    </div>
+    <!-- payoff preview SVG -->
+    <div class="payoff-preview">
+      <div class="pp-title">Basic Payoff Profiles at Expiration</div>
+      <svg class="pp-svg" viewBox="0 0 280 120">
+        <!-- axes -->
+        <line x1="20" y1="100" x2="260" y2="100" stroke="#2e3018" stroke-width="1"/>
+        <line x1="140" y1="10"  x2="140" y2="110" stroke="#2e3018" stroke-width="1"/>
+        <!-- zero line -->
+        <line x1="20" y1="70" x2="260" y2="70" stroke="#2a2c18" stroke-width="0.5" stroke-dasharray="3,3"/>
+        <!-- long call -->
+        <polyline points="20,70 140,70 260,20" stroke="#5ec45e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- long put -->
+        <polyline points="20,20 140,70 260,70" stroke="#e05050" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- labels -->
+        <text x="232" y="28" font-size="9" fill="#5ec45e" font-family="monospace">Long Call</text>
+        <text x="22"  y="28" font-size="9" fill="#e05050" font-family="monospace">Long Put</text>
+        <text x="133" y="118" font-size="8" fill="#6a6858" font-family="monospace">K</text>
+        <text x="14"  y="74"  font-size="8" fill="#6a6858" font-family="monospace">0</text>
+      </svg>
+      <div class="pp-legend">
+        <div class="pp-leg"><div class="pp-dot" style="background:#5ec45e"></div>Long Call</div>
+        <div class="pp-leg"><div class="pp-dot" style="background:#e05050"></div>Long Put</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cat-legend">
+  <div class="cl-item"><div class="cl-swatch" style="background:var(--call)"></div>Calls</div>
+  <div class="cl-item"><div class="cl-swatch" style="background:var(--put)"></div>Puts</div>
+  <div class="cl-item"><div class="cl-swatch" style="background:var(--greek)"></div>Greeks / Pricing</div>
+  <div class="cl-item"><div class="cl-swatch" style="background:var(--strat)"></div>Strategies</div>
+  <div class="cl-item"><div class="cl-swatch" style="background:var(--vol)"></div>Volatility</div>
+  <div class="cl-item"><div class="cl-swatch" style="background:var(--inst)"></div>Instruments</div>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">24 entries · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>2.6 Options</span>
+</footer>
+
+<script>
+/* ─── SVG PAYOFF HELPERS ─── */
+function payoffSVG(lines, labels=[]) {
+  const linesHtml = lines.map(l =>
+    `<polyline points="${l.pts}" stroke="${l.color}" stroke-width="${l.w||2}"
+     fill="none" stroke-dasharray="${l.dash||''}" stroke-linecap="round" stroke-linejoin="round"/>`
+  ).join('');
+  const labelsHtml = labels.map(l =>
+    `<text x="${l.x}" y="${l.y}" font-size="8" fill="${l.color||'#6a6858'}" font-family="monospace">${l.t}</text>`
+  ).join('');
+  return `
+  <svg class="pb-svg" viewBox="0 0 280 120">
+    <line x1="20" y1="100" x2="260" y2="100" stroke="#2e3018" stroke-width="1"/>
+    <line x1="140" y1="10"  x2="140" y2="110" stroke="#2e3018" stroke-width="1"/>
+    <line x1="20"  y1="70"  x2="260" y2="70"  stroke="#2a2c18" stroke-width="0.5" stroke-dasharray="3,3"/>
+    ${linesHtml}
+    <text x="133" y="118" font-size="8" fill="#6a6858" font-family="monospace">K</text>
+    <text x="14"  y="74"  font-size="8" fill="#6a6858" font-family="monospace">0</text>
+    ${labelsHtml}
+  </svg>`;
+}
+
+/* ─── DATA ─── */
+const sections = [
+  /* ══ FUNDAMENTALS ══ */
+  {
+    label: "Fundamental Concepts",
+    color: "var(--chalk2)",
+    lineColor: "var(--border2)",
+    cat: "c-both",
+    entries: [
+      {
+        icon:"📞", tag:"CALL", tagColor:"call",
+        title:"Call Options",
+        sub:"The right to buy the underlying at the strike price",
+        tags:[["call","call"],["long","call"],["rights",""],["exercise","call"]],
+        payoff: { title:"Long Call Payoff at Expiration",
+          lines:[{pts:"20,70 140,70 260,20",color:"#5ec45e"}],
+          labels:[{x:220,y:28,t:"Profit ↑",color:"#5ec45e"},{x:148,y:68,t:"K",color:"#6a6858"}]},
+        stats:[
+          {l:"Max loss (buyer)",v:"Premium paid",c:"put"},
+          {l:"Max gain (buyer)",v:"Unlimited",c:"call"},
+          {l:"Breakeven",v:"Strike + Premium",c:""},
+          {l:"Seller's max gain",v:"Premium received",c:"call"},
+        ],
+        cmp:[
+          {cls:"call",label:"Long Call (Buyer)",text:"Pays premium upfront. Right (not obligation) to buy at strike. Benefits from underlying rising. Delta: 0→1. Max loss = premium. Used for leveraged bullish exposure or hedging short stock."},
+          {cls:"",label:"Short Call (Seller/Writer)",text:"Receives premium. Obligation to sell at strike if exercised. Benefits if underlying stays below strike. Theta positive. Unlimited upside risk (naked) or capped (covered call). Requires margin."},
+        ],
+        body:[
+          `A <em>call option</em> grants the buyer the right — but not the obligation — to purchase the underlying asset at the <em>strike price</em> on or before the expiration date. The buyer pays a premium for this right; the seller receives the premium in exchange for bearing the potential obligation to deliver the underlying. Calls profit when the underlying asset rises above the strike plus the premium paid.`,
+          `The economic logic of a call: it is a leveraged bet on price appreciation with defined maximum loss. Buying a call on a $100 stock for $5 (one contract = 100 shares, so $500 cost) gives exposure to 100 shares for $500 — versus $10,000 to buy the stock outright. If the stock reaches $120 at expiry, the call is worth $20 ($2,000) — a 300% return on the $500 investment versus 20% on the $10,000 stock position. If the stock is below $100 at expiry, the entire $500 is lost — but nothing more.`,
+          `Calls are used for three broad purposes: <strong>speculation</strong> (leveraged upside exposure), <strong>hedging</strong> (covering short stock positions or hedging against missed upside on a portfolio), and <strong>income</strong> (writing covered calls against long stock — the covered call strategy). The option writer (seller) faces the mirror-image risk: unlimited potential loss if writing naked calls, offset by the premium received which they keep if the option expires worthless.`
+        ],
+        ki:"A call option turns a directional view into a defined-risk position. The buyer's maximum loss is the premium paid; the seller's maximum gain is the premium received. This asymmetry — capped downside for the buyer, uncapped downside for the naked seller — is the fundamental economic structure of every options market."
+      },
+      {
+        icon:"📉", tag:"PUT", tagColor:"put",
+        title:"Put Options",
+        sub:"The right to sell the underlying at the strike price",
+        tags:[["put","put"],["long put","put"],["protective","strat"],["insurance","put"]],
+        payoff:{ title:"Long Put Payoff at Expiration",
+          lines:[{pts:"20,20 140,70 260,70",color:"#e05050"}],
+          labels:[{x:22,y:28,t:"Profit ↑",color:"#e05050"},{x:148,y:68,t:"K",color:"#6a6858"}]},
+        stats:[
+          {l:"Max loss (buyer)",v:"Premium paid",c:"put"},
+          {l:"Max gain (buyer)",v:"Strike − Premium (stock → 0)",c:"call"},
+          {l:"Breakeven",v:"Strike − Premium",c:""},
+          {l:"Use case",v:"Downside hedge / bear trade",c:"put"},
+        ],
+        body:[
+          `A <em>put option</em> grants the buyer the right to <em>sell</em> the underlying asset at the strike price on or before expiration. Puts profit when the underlying falls below the strike — they are intrinsically bearish instruments (or, when held against a long stock position, portfolio insurance). The put buyer's maximum loss is the premium paid; the maximum gain is the strike price minus the premium (achieved if the stock falls to zero).`,
+          `The most common institutional use of puts is <em>portfolio insurance</em>: a fund manager who holds $100M in equities and fears a market decline buys put options on the S&P 500 index. If the market falls 20%, the puts pay off, partially or fully offsetting the portfolio loss. This insurance is not free — the premium represents the cost of protection, analogous to an insurance policy premium. The persistently elevated cost of downside puts (reflected in the "volatility skew" — downside puts trade at higher implied vol than equivalent upside calls) reflects continuous institutional demand for portfolio protection.`,
+          `Put options also create a natural mechanism for <em>short selling with defined risk</em>. A trader who thinks a stock will fall can buy puts and risks only the premium — versus short selling the stock, which requires borrowing shares, paying a borrow fee, and has theoretically unlimited loss potential if the stock rises. Long puts are therefore the preferred bearish instrument for risk-conscious market participants.`
+        ],
+        ki:"Put options are the financial system's insurance mechanism — the instrument that converts unlimited downside into a defined maximum loss. The existence of a liquid put market is essential for institutional investors to manage tail risk, for market makers to hedge their exposures, and for risk-takers to make bearish bets with defined downside. Without puts, the only way to be short is to borrow and sell — a far more operationally complex and unlimited-risk approach."
+      },
+      {
+        icon:"🌍", tag:"STYLE", tagColor:"",
+        title:"American vs. European Options",
+        sub:"When you can exercise — and why it matters more for puts than calls",
+        tags:[["american",""],["european",""],["early exercise","call"],["dividends","greek"]],
+        cmp:[
+          {cls:"call",label:"American Style",text:"Exercisable any time before and including expiration. Traded on US equity option exchanges (CBOE etc.). Early exercise rarely optimal for calls (better to sell the option). Early exercise can be rational for puts (to capture intrinsic value immediately) and for calls just before ex-dividend date."},
+          {cls:"put",label:"European Style",text:"Exercisable ONLY at expiration. Most index options (SPX, VIX). OTC options globally. Cannot be exercised early regardless of profit. Worth slightly less than equivalent American for most scenarios. Settlement: cash-settled (index options) or physical (stock options)."},
+        ],
+        body:[
+          `The distinction between American and European exercise determines <em>when</em> the option can be exercised — not where it trades. American options can be exercised any time up to and including expiry; European options only at expiry.`,
+          `For call options on non-dividend-paying stocks, early exercise is <em>almost never optimal</em>: the option has time value (the possibility of further gains) that is lost by exercising early. The American feature adds minimal extra value for calls. For put options, however, early exercise can be rational when the put is deep in the money: if a put is worth $50 of intrinsic value and the time value is negligible, the holder can exercise now to receive $50 and reinvest rather than waiting for expiry.`,
+          `Dividends change the calculus for calls: if a stock is about to pay a large dividend, the call may be worth exercising just before the ex-dividend date to capture the dividend (the stock price will fall by approximately the dividend amount on ex-date, reducing the call's value). This is the primary case where early exercise of an American call is rational. All major US-listed equity options (CBOE) are American-style; index options on SPX and most OTC options are European-style.`
+        ],
+        ki:"The American vs. European distinction sounds simple but has real pricing implications. American options are worth at least as much as European options (the early exercise right cannot be a negative). For puts and dividend-paying stock calls, this difference can be significant. The practical rule: for non-dividend-paying stocks, treat American calls as European for pricing; for puts and dividend situations, the early exercise premium matters and must be modelled explicitly."
+      },
+      {
+        icon:"💰", tag:"MONEYNESS", tagColor:"greek",
+        title:"Strike, Expiration, Premium & Moneyness",
+        sub:"The three defining parameters of any option — and where they sit relative to spot",
+        tags:[["strike","greek"],["ITM","call"],["ATM",""],["OTM","put"],["premium","greek"],["expiration",""]],
+        fmla:{
+          eq:`Call ITM: <span class="c">Spot</span> <span class="op">&gt;</span> <span class="v">Strike</span>   |   Put ITM: <span class="c">Spot</span> <span class="op">&lt;</span> <span class="v">Strike</span>
+ATM: Spot <span class="op">≈</span> Strike   |   OTM: opposite of ITM`,
+          note:`Intrinsic value (call) = max(Spot − Strike, 0)\nTime value = Premium − Intrinsic value\nPremium = Intrinsic value + Time value`
+        },
+        table:{
+          cols:["Moneyness","Call","Put","Delta ~","Intrinsic Value","Time Value"],
+          rows:[
+            ["Deep ITM","Spot >> Strike","Spot << Strike","0.85–1.0","High","Low"],
+            ["Slightly ITM","Spot > Strike","Spot < Strike","0.55–0.85","Some","Moderate"],
+            ["ATM","Spot ≈ Strike","Spot ≈ Strike","~0.50","~0","Maximum"],
+            ["Slightly OTM","Spot < Strike","Spot > Strike","0.15–0.45","Zero","Declining"],
+            ["Deep OTM","Spot << Strike","Spot >> Strike","0.0–0.15","Zero","Minimal"],
+          ]
+        },
+        body:[
+          `An option's three defining parameters are: the <em>strike price</em> (the pre-agreed price at which exercise occurs), the <em>expiration date</em> (when the right expires), and the <em>premium</em> (the current market price of the option). Together these three define the option's economic identity. <em>Moneyness</em> describes the relationship between the current underlying price and the strike.`,
+          `<em>In-the-money (ITM)</em> options have intrinsic value — a call is ITM when spot > strike; a put is ITM when spot < strike. <em>At-the-money (ATM)</em> options have strike approximately equal to spot — these have the highest time value (optionality value) because the outcome is most uncertain. <em>Out-of-the-money (OTM)</em> options have no intrinsic value — they are pure time value bets on the underlying reaching the strike before expiry.`,
+          `<em>Time value</em> is the component of an option's price attributable to time remaining until expiry and volatility uncertainty — the chance that OTM options move into the money, or that ITM options gain further value. Time value is greatest for ATM options, decays toward zero for deep ITM and OTM options, and erodes relentlessly as expiry approaches (theta decay). The interplay between intrinsic value and time value determines the option's total premium and is central to all options trading decisions.`
+        ],
+        ki:"Moneyness is the most important single concept for understanding how an option will behave. ATM options have maximum time value and maximum uncertainty — they are where implied volatility has the most price impact. Deep ITM options behave like the underlying itself; deep OTM options are lottery tickets — highly levered, mostly time value, decaying toward zero as expiry approaches."
+      },
+    ]
+  },
+  /* ══ GREEKS ══ */
+  {
+    label: "The Greeks",
+    color: "var(--greek)",
+    lineColor: "var(--greek-d)",
+    cat: "c-greek",
+    entries: [
+      {
+        icon:"Δ", tag:"GREEKS", tagColor:"greek",
+        title:"Options Greeks — Delta, Gamma, Theta, Vega, Rho",
+        sub:"How options prices change with the underlying, time, volatility, and rates",
+        tags:[["delta","greek"],["gamma","greek"],["theta","greek"],["vega","greek"],["rho","greek"]],
+        greeksGrid: true,
+        body:[
+          `The <em>Greeks</em> are partial derivatives of the option's price with respect to different market variables — they quantify how sensitively an option responds to changes in the underlying price, time, volatility, and interest rates. They are the essential toolkit for hedging, risk management, and understanding options behaviour. Each Greek describes one dimension of an option's risk profile.`,
+          `<strong>Delta (Δ)</strong> measures the rate of change of the option's price per $1 move in the underlying. A call with delta 0.60 is expected to gain $0.60 if the stock rises $1. Delta ranges from 0 to 1 for calls (0 to −1 for puts). ATM options have delta ≈ 0.50. Delta also approximates the probability that the option will expire in the money (though this is not exact). <em>Delta hedging</em> — buying or selling the underlying to offset the option's delta — is the fundamental risk management technique for options market makers.`,
+          `<strong>Gamma (Γ)</strong> measures the rate of change of delta per $1 move in the underlying — it is the second derivative of price with respect to underlying. High gamma means delta changes rapidly, making the position sensitive to large moves in either direction. ATM options near expiry have the highest gamma. Long options positions are "long gamma" — they benefit from large moves. Short options are "short gamma" — they benefit from small moves but suffer from large ones. Managing gamma exposure is a primary concern for options desks.`,
+          `<strong>Theta (Θ)</strong> measures time decay — the erosion of the option's price per day of elapsed time, with all else held constant. Long options positions lose value as time passes (negative theta for buyers); short options benefit from time decay (positive theta for sellers). ATM options have the highest absolute theta. Options sellers earn theta; options buyers fight it. The tension between gamma and theta is the core dynamic of all options: long gamma benefits from moves; long theta benefits from no movement.`,
+          `<strong>Vega (ν)</strong> measures sensitivity to changes in implied volatility. A long option with vega of 0.15 gains $0.15 in value if implied vol rises by 1 percentage point. All long options are long vega (benefit from higher vol); short options are short vega. Vega is highest for long-dated ATM options and approaches zero for short-dated or deep ITM/OTM options. <strong>Rho (ρ)</strong> measures sensitivity to interest rate changes — minor for short-dated options but significant for LEAPS and long-dated options.`
+        ],
+        ki:"The Greeks transform an option from a mysterious nonlinear instrument into a set of measurable, hedgeable risks. Delta tells you your directional exposure; gamma tells you how that exposure changes; theta tells you your daily cost of holding; vega tells you your volatility exposure. Together they define the complete risk profile — and each can be hedged individually, allowing sophisticated options books to be built with precisely targeted risk exposures."
+      },
+      {
+        icon:"Λ", tag:"2ND ORDER", tagColor:"greek",
+        title:"Vanna, Volga, Charm — Second-Order Greeks",
+        sub:"The higher-order sensitivities that matter for vol trading and hedging",
+        tags:[["vanna","greek"],["volga","greek"],["charm","greek"],["second order",""],["vol trading","vol"]],
+        cmp:[
+          {cls:"greek",label:"Vanna (∂Δ/∂σ = ∂ν/∂S)",text:"How delta changes when vol changes (or how vega changes when underlying moves). Critical for vol traders who delta-hedge: when vol moves, your delta hedge needs to change. Large vanna in skewed markets. Particularly important for OTM options and risk reversals."},
+          {cls:"greek",label:"Volga / Vomma (∂ν/∂σ²)",text:"How vega changes as implied vol changes. Long options are long volga — they gain vega as vol rises (convex in vol). Drives demand for OTM options which have higher volga than ATM. Crucial for pricing and hedging volatility derivatives (variance swaps, VIX products)."},
+          {cls:"greek",label:"Charm / Delta Decay (∂Δ/∂t)",text:"How delta changes as time passes. As expiry approaches, ATM options' delta converges to 0 or 1; OTM options' delta decays toward 0. Charm causes delta hedges to need continuous adjustment even if spot doesn't move. Particularly important for options nearing expiry."},
+        ],
+        body:[
+          `Second-order Greeks — <em>vanna</em>, <em>volga</em>, and <em>charm</em> — measure how the first-order Greeks themselves change with market variables. While the first-order Greeks suffice for simple directional positions, sophisticated options books require second-order awareness: a delta-hedged, vega-neutral book may still have significant vanna exposure, meaning its hedges break down when vol and spot move together.`,
+          `<em>Vanna</em> is perhaps the most commercially important second-order Greek in equity markets. When equity markets fall sharply, implied volatility typically rises simultaneously. Vanna describes the feedback between these two: as spot falls and vol rises together, delta changes more than first-order delta alone would predict. Options dealers who are short vanna (a natural consequence of selling OTM puts to yield-seeking clients) face losses in market dislocations that combine falling spot with rising vol — exactly the scenario of a crash. This is why dealer gamma/vanna positioning has become a significant topic in options market analysis.`,
+          `<em>Volga</em> (vol of vol) is central to understanding why the volatility smile exists. Options with high volga — primarily OTM options — are worth more than Black-Scholes predicts because they gain vega as vol rises, and they are typically bought precisely when vol rises. The demand for this convexity pushes OTM option implied vols above ATM vols, creating the characteristic smile.`
+        ],
+        ki:"Second-order Greeks become primary in extreme markets. In a normal market, delta and vega management suffice. In a crash — where spot falls sharply while vol spikes — vanna becomes the dominant risk: positions that appeared hedged in normal conditions suddenly show large P&L swings. Understanding vanna/volga dynamics is the difference between managing a desk through a crisis and being blindsided by it."
+      },
+    ]
+  },
+  /* ══ PRICING / MODEL ══ */
+  {
+    label: "Pricing & Parity",
+    color: "var(--greek)",
+    lineColor: "var(--greek-d)",
+    cat: "c-model",
+    entries: [
+      {
+        icon:"⚖️", tag:"PARITY", tagColor:"greek",
+        title:"Put-Call Parity",
+        sub:"The fundamental no-arbitrage relationship linking call and put prices",
+        tags:[["put-call parity","greek"],["no-arbitrage","call"],["synthetic","strat"],["forward",""]],
+        fmla:{
+          eq:`<span class="c">C</span> <span class="op">−</span> <span class="p">P</span> <span class="op">=</span> <span class="v">S</span> <span class="op">−</span> <span class="v">K·e<sup>−rT</sup></span>`,
+          note:`C = Call price\nP = Put price\nS = Spot price\nK = Strike price\nr = risk-free rate\nT = time to expiry\n\nAlternative: C + PV(K) = P + S\n(Call + Bond = Put + Stock)`
+        },
+        body:[
+          `<em>Put-call parity</em> is the most fundamental no-arbitrage relationship in options — it links the prices of a call, a put, the underlying stock, and a risk-free bond with the same strike and expiry. If the relationship is violated, an arbitrage exists: buy the cheap combination, sell the expensive one, and lock in a riskless profit.`,
+          `The intuition: a portfolio consisting of a long call and a short put with the same strike and expiry has the same payoff as a long forward position on the underlying (you profit from price rises and lose from price falls, just like owning the stock). The price of this portfolio must equal the price of a forward — which is the current stock price minus the present value of the strike. Any deviation creates an arbitrage.`,
+          `Put-call parity is also the foundation for constructing <em>synthetic positions</em>: a synthetic long stock = long call + short put (same strike/expiry); a synthetic short stock = short call + long put. These synthetics are used extensively by options market makers and institutional traders to replicate positions more cheaply or with different operational characteristics (e.g., avoiding stock borrowing costs by using put-call parity to create a synthetic long).`
+        ],
+        ki:"Put-call parity is options arbitrage's gravitational law — it holds with remarkable precision in liquid markets because any violation is immediately and profitably closed. Its primary practical use is not academic: it defines the relationships between calls, puts, and the underlying that traders use to build synthetic positions, identify arbitrage opportunities, and understand how vol skew relates between calls and puts."
+      },
+      {
+        icon:"📐", tag:"BLACK-SCHOLES", tagColor:"greek",
+        title:"Black-Scholes Model",
+        sub:"The foundational options pricing model — and its six assumptions",
+        tags:[["Black-Scholes","greek"],["BSM","greek"],["log-normal",""],["risk-neutral",""],["1973","greek"]],
+        fmla:{
+          eq:`<span class="c">C</span> <span class="op">=</span> <span class="v">S·N(d₁)</span> <span class="op">−</span> <span class="v">K·e<sup>−rT</sup>·N(d₂)</span>
+
+d₁ <span class="op">=</span> [ln(S/K) + (r + σ²/2)T] / [σ√T]
+d₂ <span class="op">=</span> d₁ <span class="op">−</span> σ√T`,
+          note:`S = spot  K = strike  r = risk-free rate\nT = time  σ = volatility  N(·) = CDF of std normal\n\nAssumptions: log-normal returns, constant vol,\nno dividends, no transaction costs, continuous\ntrading, no arbitrage, European exercise only.`
+        },
+        body:[
+          `The <em>Black-Scholes model</em> (1973, Fischer Black, Myron Scholes, Robert Merton) was the first closed-form solution to options pricing — and arguably the most consequential equation in financial history. It derives the fair price of a European option given five inputs: current stock price, strike, time to expiry, risk-free interest rate, and volatility. The model is derived under the <em>risk-neutral measure</em>: the expected return of the stock is irrelevant — only volatility matters, because perfect dynamic hedging in continuous time eliminates all directional risk.`,
+          `The six key assumptions of Black-Scholes are its sources of both power and limitation: (1) returns are log-normally distributed; (2) volatility is constant; (3) no transaction costs or taxes; (4) no dividends; (5) continuous trading is possible; (6) no arbitrage. In reality, all six are violated: returns are fat-tailed (not log-normal); volatility varies over time and strike (the vol smile contradicts assumption 2); transaction costs exist; stocks pay dividends; trading is discrete. Each violation has spawned an extension to Black-Scholes: stochastic volatility models (Heston), jump-diffusion models (Merton), local volatility models (Dupire), etc.`,
+          `Despite its limitations, Black-Scholes remains the market's lingua franca. Options are quoted in <em>implied volatility</em> — the sigma that, when plugged into Black-Scholes, returns the current market price. This convention allows traders to compare options across strikes and maturities on a common scale (vol) and identify relative value without being distracted by absolute premium levels. The model is wrong in its assumptions but right as a <em>quoting convention and risk-management framework</em> — its Greeks (delta, gamma, vega, theta) are used universally for hedging, even when more sophisticated models are used for pricing.`
+        ],
+        ki:"Black-Scholes is simultaneously the most important financial model ever devised and the model everyone knows is wrong. Its value lies not in the accuracy of its assumptions (all violated) but in providing a coherent, consistent quoting convention (implied vol) and risk framework (Greeks). The search for 'a better Black-Scholes' is the central project of quantitative finance — and 50 years on, no model has displaced it as the market's default language."
+      },
+    ]
+  },
+  /* ══ VOLATILITY ══ */
+  {
+    label: "Volatility",
+    color: "var(--vol)",
+    lineColor: "var(--vol-d)",
+    cat: "c-vol",
+    entries: [
+      {
+        icon:"📊", tag:"IMPLIED VOL", tagColor:"vol",
+        title:"Implied Volatility",
+        sub:"The market's forward-looking uncertainty estimate — extracted from option prices",
+        tags:[["implied vol","vol"],["IV rank","vol"],["IV percentile","vol"],["vol crush","put"]],
+        stats:[
+          {l:"VIX (S&P 500 30-day IV)",v:"Historical avg ~20%",c:"vol"},
+          {l:"Earnings vol crush (typical)",v:"40–60% drop in IV",c:"put"},
+          {l:"High IV threshold",v:"IV Rank >50",c:"vol"},
+          {l:"Implied vs Realised",v:"IV typically > RV (vol premium)",c:"greek"},
+        ],
+        body:[
+          `<em>Implied volatility (IV)</em> is the volatility parameter that, when input into Black-Scholes, produces the option's observed market price. It is the market's collective forward-looking estimate of how much the underlying will move over the option's life — expressed as an annualised percentage standard deviation. Unlike historical (realised) volatility, which measures past price movements, implied volatility is forward-looking: it reflects what options buyers and sellers expect to happen, incorporating all available information including scheduled events (earnings, FOMC meetings) and sentiment.`,
+          `Implied volatility is the most important metric for options traders because it determines relative value. An option may be "cheap" not because its premium is low but because its IV is low relative to expected realised volatility. The <em>volatility premium</em> — the empirically observed tendency for implied volatility to exceed realised volatility on average — is the source of systematic profit for volatility sellers: by selling options, one effectively sells insurance at a premium that historically exceeds the claims (actual moves). This is why short-vol strategies (selling straddles, iron condors, covered calls) can be systematically profitable — until they aren't, in tail risk events.`,
+          `<em>IV Rank (IVR)</em> and <em>IV Percentile</em> are contextual measures: IVR compares current IV to its 52-week range (IVR = (Current IV − 52W Low) / (52W High − 52W Low)); IV Percentile shows what percentage of the past year's IV readings were below the current level. Both normalise IV to tell you whether it is "high" or "low" relative to history — crucial because IV levels vary enormously across tickers and time periods. The rule of thumb: sell options when IV is high (selling expensive insurance); buy options when IV is low (cheap insurance to hold through a potential spike).`
+        ],
+        ki:"Implied volatility is the price of uncertainty — the market's collective answer to 'how much will this move?' Vol selling (selling options when IV is high) is the most systematically profitable options strategy over time because IV chronically exceeds realised vol. But vol selling has fat-tail risk: the strategy profits slowly and loses catastrophically. Understanding when to sell vol and when to stop is the central skill of a volatility trader."
+      },
+      {
+        icon:"🏔️", tag:"VOL SURFACE", tagColor:"vol",
+        title:"Volatility Surface & Skew",
+        sub:"How implied volatility varies across strikes and expirations — the smile, smirk, and term structure",
+        tags:[["vol surface","vol"],["skew","vol"],["term structure","vol"],["vol smile","vol"],["put skew","put"]],
+        body:[
+          `The <em>volatility surface</em> is the three-dimensional map of implied volatility across all strikes (x-axis) and expirations (y-axis). If Black-Scholes were correct, the surface would be flat — every option on the same underlying would have the same implied vol. In reality, the surface is steeply curved: implied vol varies significantly across both strike and expiry, and these variations encode the market's view of tail risks, term structure, and directional sentiment.`,
+          `The <em>volatility skew</em> (also called "smirk" in equity markets) describes how implied vol varies across strikes for a fixed expiry. In equity index options, the skew is consistently negative: OTM puts trade at significantly higher implied vol than ATM options, which trade at higher vol than OTM calls. This reflects: (1) persistent demand for downside protection (investors buy puts as portfolio insurance, bidding up their vol); (2) supply-demand imbalance (fewer natural sellers of OTM puts than buyers); (3) jump-to-default risk that is asymmetric (large drops are more sudden and severe than equivalent rises). The skew inverts the smile of FX markets (where both OTM calls and puts are elevated) into a one-sided smirk.`,
+          `The <em>term structure of volatility</em> describes how ATM implied vol varies across expiries. In calm markets, term structure is typically upward-sloping (longer-dated options have higher vol — more time uncertainty). When markets are stressed, term structure inverts: near-term vol spikes above long-term vol as traders pay up for immediate protection. The shape of the vol term structure is used to infer when vol is expected to normalise — a steeply inverted structure suggests the market expects current stress to be temporary.`
+        ],
+        ki:"The volatility surface is the options market's complete forecast of future price uncertainty across all strikes and timeframes. Its shape encodes: (1) directional fear (skew — which way the market is most worried about); (2) tail risk pricing (smile — are extreme moves in both directions expensive?); and (3) temporal uncertainty (term structure — is near-term or long-term uncertainty greater?). Reading the surface is reading the market's collective anxiety."
+      },
+    ]
+  },
+  /* ══ STRATEGIES ══ */
+  {
+    label: "Options Strategies",
+    color: "var(--strat)",
+    lineColor: "var(--strat-d)",
+    cat: "c-strat",
+    entries: [
+      {
+        icon:"📈", tag:"INCOME", tagColor:"strat",
+        title:"Covered Call",
+        sub:"Long stock + short call — capping upside for premium income",
+        tags:[["covered call","strat"],["income","strat"],["collar","strat"],["assignment risk","put"]],
+        payoff:{title:"Covered Call Payoff",
+          lines:[
+            {pts:"20,30 140,30 260,70",color:"#60b4e8"},
+            {pts:"20,30 260,30",color:"#5ec45e",w:1,dash:"4,3"}
+          ],
+          labels:[{x:198,y:80,t:"Capped upside",color:"#60b4e8"},{x:198,y:26,t:"Long stock",color:"#5ec45e"}]},
+        body:[
+          `A <em>covered call</em> is created by holding (or buying) 100 shares of stock and simultaneously selling one call option against those shares. The premium received from selling the call reduces the effective cost basis of the stock and generates income. In exchange, the investor gives up potential upside above the strike — if the stock rises above the strike, the shares are likely called away at the strike price (assigned), capping the gain.`,
+          `The covered call is the most widely used options strategy among equity investors, particularly popular among retired investors and income-seeking funds. It is "covered" because the short call obligation (to deliver shares if exercised) is covered by actual share ownership — unlike a "naked" short call which has unlimited loss potential. The strategy works best in flat to mildly bullish markets where the premium income compensates for the capped upside. In strongly bullish markets, the covered call underperforms simple stock ownership (the investor regrets selling the call); in declining markets, the premium provides only partial cushion.`,
+          `A key risk is <em>assignment risk</em>: if the stock rises sharply above the strike and the option is exercised before expiry (American options), the investor's shares are called away at the strike, missing further upside and potentially triggering a taxable event. For this reason, tax-sensitive investors should carefully consider strike selection and whether to use American-style (equity) or European-style options for covered call strategies.`
+        ],
+        ki:"The covered call monetises the investor's willingness to sell the stock at a specific price — converting an uncertain future sale into a definite income today. The trade-off is giving up upside above the strike. Used systematically over time, covered calls reduce portfolio volatility and improve risk-adjusted returns in flat or range-bound markets — at the cost of underperforming in strong bull markets."
+      },
+      {
+        icon:"🛡️", tag:"HEDGE", tagColor:"put",
+        title:"Protective Put",
+        sub:"Long stock + long put — portfolio insurance with defined downside",
+        tags:[["protective put","put"],["portfolio insurance","put"],["collar",""],["hedge cost","put"]],
+        body:[
+          `A <em>protective put</em> (or "married put") combines long stock with a long put option — creating a position with defined maximum loss regardless of how far the stock falls. The put acts as insurance: it pays off if the stock declines below the strike. The cost is the put premium, which reduces the position's overall return even if the stock rises. The breakeven requires the stock to rise by at least the premium paid.`,
+          `The protective put is the template for all portfolio insurance strategies. Institutional variations include buying puts on an index (S&P 500 puts) to protect an equity portfolio without selling each stock individually — cheaper and more operationally efficient. The cost of protection — the put premium — represents the "insurance premium" of the strategy. In high-vol environments, protective puts are expensive; in low-vol environments, they are relatively cheap.`,
+          `A <em>collar</em> extends the protective put by simultaneously selling an OTM call to finance some or all of the put cost. The result: the position is protected below the put strike and capped above the call strike — the investor has accepted a range of outcomes in exchange for protection at lower net cost. Collars are popular for executives who hold concentrated stock positions and need protection without triggering a taxable sale.`
+        ],
+        ki:"The protective put converts a stock's unlimited downside into a defined maximum loss — at the cost of a premium that reduces net returns. The economic question is always whether the insurance cost is worth the protection. In practice, buying protective puts systematically is expensive and drags long-term performance; they are most valuable as episodic hedges before known risk events or when IV is low (cheap insurance)."
+      },
+      {
+        icon:"↔️", tag:"NEUTRAL", tagColor:"strat",
+        title:"Straddle & Strangle",
+        sub:"Long vol plays: profit from large moves in either direction",
+        tags:[["straddle","strat"],["strangle","strat"],["long vol","vol"],["earnings","strat"],["ATM",""]],
+        payoff:{title:"Long Straddle Payoff",
+          lines:[{pts:"20,30 140,80 260,30",color:"#60b4e8"}],
+          labels:[{x:20,y:28,t:"Profit if big move",color:"#60b4e8"},{x:192,y:28,t:"(either direction)",color:"#60b4e8"},{x:130,y:90,t:"ATM cost",color:"#e05050"}]},
+        cmp:[
+          {cls:"strat",label:"Straddle",text:"Buy ATM call + ATM put (same strike, same expiry). Maximum time value. Profits if underlying moves significantly in either direction. More expensive than strangle. Break-even: strike ± total premium. Best for earnings plays where direction unknown."},
+          {cls:"strat",label:"Strangle",text:"Buy OTM call + OTM put (different strikes). Cheaper than straddle (less time value). Requires larger move to profit. Same directional agnosticism. Wider range of total loss (between the two strikes). More forgiving entry; worse risk/reward vs straddle for high-conviction vol plays."},
+        ],
+        body:[
+          `A <em>straddle</em> is the simultaneous purchase of an ATM call and an ATM put with the same strike and expiry — a pure bet on volatility rather than direction. The position profits if the underlying moves significantly in either direction by more than the total premium paid. If the underlying stays near the strike at expiry, both options expire nearly worthless and the full premium is lost.`,
+          `Straddles are the canonical instrument for expressing a view on volatility without a directional view. They are the dominant strategy around earnings announcements: a trader who believes the post-earnings move will be larger than the implied move (the move the options market is pricing) buys a straddle before the announcement, regardless of direction. If the stock moves ±15% but the options were only pricing a ±8% move, the straddle pays off substantially.`,
+          `<em>Short straddles</em> (selling the straddle) express the opposite view: the underlying will not move enough to make the options profitable. This is the archetypal short-vol, theta-collecting strategy — a seller earns maximum premium when the stock stays near the strike. Short straddles are dangerous: the maximum gain is the premium received, but the potential loss is unlimited on the call side and substantial on the put side if the stock moves violently.`
+        ],
+        ki:"Straddles and strangles separate the direction question from the magnitude question — they are pure volatility instruments. The buyer asks: 'Will the actual move exceed the implied move?' The seller asks: 'Will the actual move be smaller than what the market is pricing?' The answer determines who profits. In earnings seasons, the ability to forecast whether a move will exceed the implied move is the highest-value skill in equity options."
+      },
+      {
+        icon:"📐", tag:"SPREADS", tagColor:"strat",
+        title:"Vertical Spreads — Bull Call, Bear Put, etc.",
+        sub:"Defined-risk directional plays: reduced premium, capped gain and loss",
+        tags:[["bull call spread","strat"],["bear put spread","strat"],["debit spread","strat"],["credit spread","strat"]],
+        payoff:{title:"Bull Call Spread Payoff",
+          lines:[{pts:"20,70 100,70 180,30 260,30",color:"#5ec45e"}],
+          labels:[{x:190,y:28,t:"Max profit",color:"#5ec45e"},{x:14,y:68,t:"Max loss",color:"#e05050"}]},
+        cmp:[
+          {cls:"call",label:"Bull Call Spread (Debit)",text:"Buy lower strike call, sell higher strike call. Same expiry. Net debit (costs money upfront). Profits if underlying rises above lower strike. Max gain: difference in strikes − net debit. Max loss: net debit. Reduces premium cost vs naked long call."},
+          {cls:"put",label:"Bear Put Spread (Debit)",text:"Buy higher strike put, sell lower strike put. Net debit. Profits if underlying falls below higher strike. Max gain: difference in strikes − net debit. Max loss: net debit. Leveraged bearish play with defined risk."},
+          {cls:"strat",label:"Credit Spreads (Bull Put, Bear Call)",text:"Sell the near-money option, buy the farther OTM option as protection. Net credit received. Bull put spread: profits if stock stays above lower strike. Bear call spread: profits if stock stays below higher strike. Popular theta-collecting strategy."},
+        ],
+        body:[
+          `<em>Vertical spreads</em> combine two options of the same type (both calls or both puts) with the same expiry but different strike prices. They define both the maximum gain and maximum loss, making them a core strategy for traders who want directional exposure with limited and known risk. The premium from the short leg offsets part of the long leg's cost, reducing the net debit (or creating a net credit).`,
+          `<em>Debit spreads</em> (pay to enter) are directional plays: the trader expects the underlying to move in a specific direction. A bull call spread profits in a moderate bull move; a bear put spread profits in a moderate bear move. They sacrifice unlimited profit potential (versus buying a naked option) in exchange for reduced premium cost and therefore lower breakeven requirements.`,
+          `<em>Credit spreads</em> (receive premium to enter) are the workhorse strategies of systematic options sellers. A bull put credit spread sells a put at a higher strike and buys protection at a lower strike — collecting a net credit and profiting if the stock stays above the short strike. The position profits from time decay and downward moves in IV. The maximum loss is the difference between strikes minus the credit received. Credit spreads are popular because they have a high probability of profit (the stock simply must not violate the short strike) and are fully defined risk.`
+        ],
+        ki:"Vertical spreads are the entry point for defined-risk options trading. They solve the options buyer's biggest problem (high premium cost, high breakeven requirement) by selling a further OTM option to offset cost. Every more complex strategy — iron condors, butterflies — is built from combinations of vertical spreads."
+      },
+      {
+        icon:"🦅", tag:"CONDOR", tagColor:"strat",
+        title:"Iron Condor",
+        sub:"Sell a bull put spread + sell a bear call spread — profit from a range-bound market",
+        tags:[["iron condor","strat"],["range-bound","strat"],["neutral","strat"],["theta","greek"],["IV crush","vol"]],
+        payoff:{title:"Iron Condor Payoff",
+          lines:[{pts:"20,40 60,40 80,70 200,70 220,40 260,40",color:"#60b4e8"}],
+          labels:[{x:90,y:68,t:"Max profit zone",color:"#5ec45e"},{x:14,y:38,t:"Max loss",color:"#e05050"},{x:222,y:38,t:"Max loss",color:"#e05050"}]},
+        stats:[
+          {l:"Structure",v:"Bull put spread + bear call spread",c:"strat"},
+          {l:"Profit condition",v:"Stock stays within inner strikes",c:"call"},
+          {l:"Max profit",v:"Net premium received",c:"strat"},
+          {l:"Max loss",v:"Strike width − net premium",c:"put"},
+        ],
+        body:[
+          `An <em>iron condor</em> is constructed by simultaneously selling a bull put spread (below current price) and a bear call spread (above current price). The result is a position that collects premium and profits if the underlying stays within a defined range between the four strikes at expiry. It is the quintessential neutral, range-bound strategy — benefiting from time decay and IV contraction when the underlying is non-directional.`,
+          `The four strikes define three zones: below the put spread (maximum loss); between the put spread and the call spread (maximum profit — the "tent"); above the call spread (maximum loss again). The maximum profit is the net premium received; the maximum loss is the width of either spread minus the net credit. Iron condors have a high probability of profit (the stock simply must stay within a range) but limited reward-to-risk ratio.`,
+          `Iron condors thrive in low-volatility, range-bound environments and after earnings when IV compresses. They struggle when the underlying makes a significant move in either direction. <em>Management</em> is crucial: successful condor traders close positions early (at 50% of max profit) to avoid gamma risk near expiry, and have predefined rules for adjusting or closing when the underlying threatens a strike.`
+        ],
+        ki:"The iron condor encodes the vol seller's fundamental thesis: the market will not move as much as options imply. It is not a directional bet but a bet that the passage of time and IV compression will work in your favour before the underlying reaches either of your short strikes. Its vulnerability is the sudden large move — the iron condor's nemesis."
+      },
+      {
+        icon:"🦋", tag:"BUTTERFLY", tagColor:"strat",
+        title:"Butterfly Spread",
+        sub:"Maximum profit at a specific price — a precision strike on where you expect expiry",
+        tags:[["butterfly","strat"],["long fly","strat"],["iron butterfly","strat"],["pinning","strat"]],
+        payoff:{title:"Long Call Butterfly Payoff",
+          lines:[{pts:"20,60 80,60 140,30 200,60 260,60",color:"#60b4e8"}],
+          labels:[{x:128,y:28,t:"Peak at ATM",color:"#5ec45e"},{x:14,y:58,t:"Max loss",color:"#e05050"}]},
+        body:[
+          `A <em>butterfly spread</em> consists of three strikes: buy one option at the lower strike, sell two at the middle strike (the "body"), and buy one at the upper strike (the "wings"). All same expiry, same type (or the "iron butterfly" version using both calls and puts). The payoff profile peaks at the middle strike and decays to a small loss everywhere else. It is the precision instrument of options strategies — best used when you have a specific price target for expiry.`,
+          `The butterfly captures <em>time value collapse</em> at a specific strike. If a stock is at $100 and you believe it will finish near $100 at expiry, a butterfly centred at $100 maximises this view: you profit most if the stock ends exactly at the middle strike. The position has low net premium cost (the two short middle options largely finance the two long wings) and defined, limited risk everywhere.`,
+          `<em>Iron butterflies</em> (sell ATM straddle + buy OTM strangle as protection) have a similar payoff profile but are often more practical to execute. They are popular around earnings: if a stock typically moves 5% on earnings but options are pricing an 8% move, an iron butterfly centred on the current price captures the expected lack of movement — the short straddle collects premium, the long strangle provides protection.`
+        ],
+        ki:"The butterfly is options trading's sniper rifle: maximum profit at a single point, zero profit anywhere else. Its precision makes it ideal for trading 'pinning' (stocks gravitating toward a popular strike at expiry due to dealer delta hedging) or for taking a very specific price target view. Its limitation is that being right directionally but wrong on magnitude produces the same loss as being completely wrong."
+      },
+      {
+        icon:"📅", tag:"CALENDAR", tagColor:"strat",
+        title:"Calendar Spread & Ratio Spreads",
+        sub:"Trading time decay differentials and vol term structure",
+        tags:[["calendar spread","strat"],["ratio spread","strat"],["time spread","strat"],["vol term structure","vol"]],
+        cmp:[
+          {cls:"strat",label:"Calendar Spread",text:"Buy long-dated option, sell same-strike near-dated option. Profits from faster time decay of near option vs long option. Long vega, positive theta (short-term). Best when IV low and expected to rise. Profits if stock stays near strike and near option expires worthless."},
+          {cls:"vol",label:"Ratio Spread",text:"Buy 1 option, sell 2 (or more) OTM options. Creates a position with a 'sweet spot' for modest moves and pain for large moves. Net credit typically received. Short gamma for large moves — dangerous if stock moves violently past the short strikes. Common: 1x2 call ratio for financing upside exposure."},
+        ],
+        body:[
+          `A <em>calendar spread</em> (time spread) involves selling a near-dated option and buying a longer-dated option at the same strike. Because near-dated options decay faster (theta is higher for short-dated ATM options), the sold option loses value faster than the purchased option — generating profit if the underlying stays near the strike. Calendar spreads are long vega: they profit if implied volatility rises after entry.`,
+          `The term structure of volatility is central to calendar spreads. If near-dated IV is high relative to longer-dated IV (inverted term structure — common in crises), selling the near-dated option captures elevated near-term vol while buying longer-dated protection at lower vol. When the near option expires and vol normalises, the trade profits from both vol mean-reversion and theta decay.`,
+          `<em>Ratio spreads</em> modify the simple long/short ratio: buying 1 option and selling 2+ options at different strikes. They typically produce a net credit and create a payoff that profits in a specific range but has uncapped (or very large) losses beyond a certain point. They are used to reduce the cost of directional options positions — for example, buying a call and selling two higher-strike calls to finance the trade — but require careful risk management given the naked short component above the strikes.`
+        ],
+        ki:"Calendar spreads trade the shape of the vol term structure — they profit when the vol surface is steep (near-dated vol high, long-dated vol low) and when this steepness normalises. Ratio spreads trade the price of vol at different strikes — effectively selling expensive wings to finance cheaper ATM optionality. Both require understanding not just direction but the three-dimensional structure of volatility."
+      },
+      {
+        icon:"🌱", tag:"LEAPS", tagColor:"strat",
+        title:"LEAPS",
+        sub:"Long-term equity anticipation securities — options with 1–3 year expirations",
+        tags:[["LEAPS","strat"],["long-dated","strat"],["synthetic stock","call"],["leverage","strat"]],
+        stats:[
+          {l:"LEAPS expiry",v:"1–3 years out",c:"strat"},
+          {l:"Delta (deep ITM LEAPS)",v:"0.70–0.90",c:"call"},
+          {l:"LEAPS vs stock: leverage",v:"~3–10× at same cost",c:"strat"},
+          {l:"Theta vs short-dated",v:"Much slower daily decay",c:"greek"},
+        ],
+        body:[
+          `<em>LEAPS (Long-Term Equity Anticipation Securities)</em> are exchange-listed options with expirations extending 1–3 years into the future. They allow investors to take long-term directional positions with the leverage of options but with far less time pressure than standard options. A LEAPS call on a stock at 70% of the stock's cost (deep ITM) will have a delta of ~0.85 — it behaves almost like owning the stock, but for ~70% of the cost, and with defined downside.`,
+          `LEAPS are used as <em>stock substitutes</em> — replacing a long stock position with a deep ITM LEAPS call to reduce capital committed while maintaining similar directional exposure. Warren Buffett's long-term approach to investing in franchises is conceptually analogous to LEAPS: you want exposure to a great business for years without putting all your capital at risk in the near term. The LEAPS call (deeply in the money, high delta, slow theta) approximates this in an options structure.`,
+          `LEAPS are also used by income investors in a modified covered call structure: instead of owning stock and selling short-dated calls against it, an investor buys an ITM LEAPS call (as a stock substitute) and sells near-term OTM calls against it — the "poor man's covered call." This generates income from the short calls while maintaining upside exposure through the LEAPS, with lower capital outlay than owning the stock directly.`
+        ],
+        ki:"LEAPS turn options from short-term tactical instruments into long-term strategic ones. They solve the options buyer's biggest enemy — theta decay — by giving time on your side. A LEAPS call decays far more slowly per day than a near-term call, allowing a long-term view to play out without the constant race against the clock that defines short-dated options trading."
+      },
+    ]
+  },
+  /* ══ INSTRUMENTS ══ */
+  {
+    label: "Specialised Instruments & Metrics",
+    color: "var(--inst)",
+    lineColor: "var(--inst-d)",
+    cat: "c-inst",
+    entries: [
+      {
+        icon:"📋", tag:"CHAINS", tagColor:"inst",
+        title:"Options Chains & Open Interest",
+        sub:"Reading the options market's snapshot — where money is positioned",
+        tags:[["options chain","inst"],["open interest","inst"],["volume",""],["put/call ratio","put"]],
+        stats:[
+          {l:"Open interest = total outstanding contracts",v:"Not volume",c:"inst"},
+          {l:"Put/call ratio >1",v:"More puts than calls",c:"put"},
+          {l:"High OI strike = 'pin' risk at expiry",c:"inst",v:"Options pinning"},
+          {l:"Max pain = stock price at max expiry losses",c:"inst",v:"Controversial theory"},
+        ],
+        body:[
+          `An <em>options chain</em> displays all available options for a given underlying — organised by expiry and strike, showing bid, ask, last price, implied vol, volume, and open interest for both calls (typically left) and puts (right). Reading an options chain efficiently is a core skill: the chain reveals where the market is positioned, where liquidity is concentrated, and what the market is implying about risk.`,
+          `<em>Open interest (OI)</em> is the total number of outstanding (unclosed) contracts for each option. High OI at a specific strike indicates significant market positioning — either hedging or speculative. Strikes with very high OI become significant near expiry because dealer delta-hedging activity around those strikes creates a tendency for the stock to gravitate toward (be "pinned" at) the high-OI strike — a phenomenon driven by the fact that dealers must continuously buy and sell shares to hedge their gamma as the stock crosses back and forth through the strike.`,
+          `The <em>put/call ratio</em> (total put OI or volume divided by call OI or volume) is a sentiment indicator: a high ratio (many more puts than calls) suggests bearish sentiment or heavy hedging demand. At extremes, put/call ratio is a contrarian indicator — extreme fear (very high P/C) often coincides with market lows. The <em>CBOE Equity Put/Call Ratio</em> is tracked as a real-time sentiment signal by market technicians.`
+        ],
+        ki:"The options chain is the market's snapshot of positioning and expectations. High open interest at a strike is not random — it represents real money with a stake in the outcome, and at expiry, it influences where the stock actually goes. Understanding how to read OI and volume concentration turns the options chain from a menu into a map of market risk."
+      },
+      {
+        icon:"⚡", tag:"VIX", tagColor:"vol",
+        title:"CBOE VIX Methodology",
+        sub:"The market's fear gauge — 30-day implied vol of the S&P 500",
+        tags:[["VIX","vol"],["CBOE","inst"],["fear gauge","vol"],["variance swap","vol"],["implied vol","vol"]],
+        fmla:{
+          eq:`VIX <span class="op">=</span> 100 × √[ <span class="v">(2/T) Σ ΔK/K²·e^(rT)·Q(K)</span> ]`,
+          note:`T = time to expiry\nK = option strike\nQ(K) = midpoint of bid-ask for option at strike K\nΔK = half-distance between adjacent strikes\nSummed over all out-of-the-money SPX options\n\nVIX ≠ 30-day ATM vol — it is a model-free estimate\nof the square root of 30-day variance expectation.`
+        },
+        stats:[
+          {l:"VIX historical average",v:"~20",c:"vol"},
+          {l:"VIX all-time high",v:"89.53 (Mar 2020)",c:"put"},
+          {l:"VIX below 15",v:"Low fear / complacency",c:"call"},
+          {l:"VIX above 30",v:"Elevated fear / crisis",c:"put"},
+        ],
+        body:[
+          `The <em>CBOE Volatility Index (VIX)</em> — commonly called the "fear gauge" — measures the market's expectation of 30-day volatility in the S&P 500, derived from the prices of SPX options across a wide range of strikes. Unlike a simple ATM implied vol, the VIX methodology aggregates vol information from many strikes (a model-free approach), producing a measure more closely related to the theoretical price of a 30-day variance swap. It is quoted as an annualised volatility percentage: VIX = 20 means the market expects the S&P to move approximately ±20% annualised, or roughly ±5.8% over 30 days.`,
+          `The VIX methodology uses a chain of OTM SPX options (puts below the forward price, calls above) and weights each by its contribution to the total variance of the index. This model-free approach means the VIX captures the full shape of the vol surface — including the skew and smile — not just the ATM level. The VIX interpolates between the two nearest monthly expirations to produce a consistent 30-day measure.`,
+          `The VIX has spawned an entire product ecosystem: VIX futures (CBOE, launched 2004), VIX options (launched 2006), and VIX-based ETPs (VXX, UVXY, SVXY). These products allow investors to trade volatility as an asset class — going long vol ahead of anticipated crises or short vol to collect roll yield in calm markets. The VXX (long VIX futures) famously provides poor long-term performance due to the persistent roll cost of buying VIX futures in contango. The XIV (short VIX) was profitable for years — until February 2018 (Volmageddon), when a single spike in VIX caused it to lose 93% overnight.`
+        ],
+        ki:"The VIX is the market's single most-watched risk indicator — not a prediction of the future, but a consensus estimate of uncertainty. Its term structure (VIX vs VIX3M vs longer-dated VIX futures) is as informative as its level: a steep VIX futures curve in backwardation means the market expects current stress to dissipate quickly; contango means it expects sustained elevated uncertainty. The VIX is not a put — it does not protect a portfolio directly — but it is the purest measure of how expensive option protection costs."
+      },
+      {
+        icon:"🎯", tag:"0DTE", tagColor:"inst",
+        title:"0DTE — Zero Days to Expiration Options",
+        sub:"Same-day expiring options that have transformed equity market microstructure",
+        tags:[["0DTE","inst"],["gamma","greek"],["intraday","inst"],["S&P 500",""],["dealer hedging","greek"]],
+        stats:[
+          {l:"0DTE share of SPX volume (2023)",v:"~50%+",c:"inst"},
+          {l:"0DTE available on SPX",v:"Every trading day",c:"inst"},
+          {l:"Gamma at 0DTE (ATM)",v:"Extremely high",c:"greek"},
+          {l:"CBOE introduced daily expiries",v:"2022",c:"inst"},
+        ],
+        body:[
+          `<em>Zero days to expiration (0DTE) options</em> are contracts that expire on the same trading day they are purchased. With the CBOE offering SPX options expiring every trading day (since 2022) and XSP (mini-SPX) expanding further, 0DTE options have grown from a curiosity to representing over 50% of SPX daily options volume — a structural transformation of how options markets operate.`,
+          `0DTE options have extraordinary gamma profiles: with zero time remaining, an ATM 0DTE option has extremely high gamma — delta changes rapidly as the underlying moves. This creates intense hedging pressure on options dealers. When dealers sell 0DTE calls to buyers expecting the market to rise, dealers must delta-hedge by buying the index as it rises and selling as it falls — amplifying the market's moves. When dealers are net long gamma (they bought options), they act as stabilisers. When net short gamma (sold options), they become amplifiers. The net gamma exposure of dealer books — now directly tied to 0DTE positioning — has become a key variable in understanding intraday S&P 500 volatility dynamics.`,
+          `Who uses 0DTE options? <strong>Day traders</strong> seeking leveraged intraday exposure to market moves without overnight risk. <strong>Institutional income generators</strong> who sell 0DTE options to collect premium that expires the same day. <strong>Event traders</strong> who buy 0DTE options around FOMC decisions, NFP releases, or CPI prints to express a high-conviction directional view that will be resolved intraday. The market impact of mass institutional selling of 0DTE options creates a structural "pinning" pressure that has measurably reduced intraday S&P volatility in calm conditions — while creating the potential for sharp gamma-driven moves when the index strays far from common 0DTE strikes.`
+        ],
+        ki:"0DTE options have transformed market microstructure in ways regulators and academics are still mapping. By concentrating enormous notional options exposure into single trading days, they have made dealer gamma positioning a primary driver of intraday S&P volatility — more important on many days than any fundamental news. Understanding 0DTE flow is now a prerequisite for understanding why the S&P moves the way it does intraday."
+      },
+      {
+        icon:"🔮", tag:"FLEX/FUTURES", tagColor:"inst",
+        title:"Options on Futures, FLEX Options & Weeklies",
+        sub:"The full landscape of specialised option contract types",
+        tags:[["options on futures","inst"],["FLEX options","inst"],["weekly options","inst"],["CME",""],["customised","inst"]],
+        cmp:[
+          {cls:"inst",label:"Options on Futures",text:"Options on commodity, index, and rate futures (CME, ICE). Physical or cash-settled into the futures contract. Options on crude oil futures, gold futures, S&P 500 futures (ES options). Margin requirements different from equity options. Active around OPEC, FOMC events."},
+          {cls:"strat",label:"FLEX Options",text:"Customisable exchange-listed options (CBOE FLEX) — negotiable strike, expiry, exercise style. Used by institutions needing non-standard expirations or strikes not available in standard chains. Retain exchange clearing benefits (no bilateral counterparty risk) with OTC-like customisation. Minimum $10M notional."},
+          {cls:"vol",label:"Weekly Options (Weeklys)",text:"Expire each Friday (or Mon/Wed/Fri for major indices). Launched by CBOE in 2010. High theta, high gamma near expiry. Popular for income strategies (selling weekly premium) and event-driven trading. Now account for ~35% of all equity options volume. Precursor to 0DTE expansion."},
+        ],
+        body:[
+          `The options landscape extends well beyond standard monthly equity options into a rich ecosystem of specialised instruments. <em>Options on futures</em> are among the most actively traded in the world: crude oil, gold, agricultural commodities, equity index futures (ES, NQ), and interest rate futures (Eurodollar, Treasury futures) all have liquid options markets. These allow commodity producers, portfolio managers, and speculators to express views on futures prices with defined risk — and are priced using modifications of Black-Scholes (Black's model for futures options, the Black-76 model) that treat the futures price rather than spot as the underlying.`,
+          `<em>FLEX (Flexible Exchange) options</em> are exchange-listed options where the buyer and seller negotiate custom terms: any strike, any expiry up to three years, and choice of American or European exercise style. Despite the customisation, FLEX options are cleared through the OCC (Options Clearing Corporation), retaining the counterparty risk benefits of exchange clearing. They are used by institutional investors who need options aligned with specific fund structures, unusual expiry dates (e.g., matching a bond maturity), or very large notional sizes that would be disruptive in standard markets.`,
+          `<em>Weekly options</em>, introduced in 2010 and now covering hundreds of underlyings, expire every Friday (or multiple days per week for the most liquid indices). They were the precursor to 0DTE options and introduced the now-familiar dynamics of high-gamma, fast-decaying options being used for income generation and event trading. The rapid growth of weeklies fundamentally shifted options trading toward shorter-dated, higher-frequency strategies — compressing what was once a monthly rhythm into a weekly and now daily one.`
+        ],
+        ki:"The expansion from monthly to weekly to daily expirations is one of the most significant structural shifts in options markets over the past 15 years. Each shortening of the expiry cycle has created new trading opportunities, changed the gamma landscape for dealers, and raised new questions about market stability. The 0DTE regime — where the majority of SPX options volume expires the same day — represents the endpoint of this cycle and a genuinely new market structure whose full implications are still playing out."
+      },
+    ]
+  }
+];
+
+/* ═══ RENDER ═══ */
+let globalCnt = 0;
+
+function mkSVG(d) {
+  if (!d) return '';
+  return `<div class="payoff-box">
+    <div class="pb-title">${d.title}</div>
+    ${payoffSVG(d.lines, d.labels||[])}
+  </div>`;
+}
+
+function mkFmla(f) {
+  if (!f) return '';
+  return `<div class="fmla">
+    <div class="fmla-eq">${f.eq}</div>
+    <pre class="fmla-note">${f.note}</pre>
+  </div>`;
+}
+
+function mkGreeks() {
+  const gs = [
+    {name:"Delta",sym:"Δ — Price Sensitivity",def:"Rate of change of option price per $1 move in underlying. Range: 0–1 (calls), 0 to −1 (puts). ATM ≈ 0.50.",val:"Δ = ∂V/∂S",sec:false},
+    {name:"Gamma",sym:"Γ — Convexity",def:"Rate of change of delta per $1 move in underlying. Highest for ATM near expiry. Long options: positive gamma.",val:"Γ = ∂²V/∂S²",sec:false},
+    {name:"Theta",sym:"Θ — Time Decay",def:"Daily erosion of option premium, all else equal. Negative for option buyers (lose value). Positive for sellers. Highest for ATM near expiry.",val:"Θ = ∂V/∂t",sec:false},
+    {name:"Vega",sym:"ν — Vol Sensitivity",def:"Change in option price per 1% change in implied vol. Long options: long vega (benefit from rising vol). Highest for long-dated ATM.",val:"ν = ∂V/∂σ",sec:false},
+    {name:"Rho",sym:"ρ — Rate Sensitivity",def:"Change in option price per 1% change in interest rates. Matters for LEAPS; negligible for short-dated. Positive for calls, negative for puts.",val:"ρ = ∂V/∂r",sec:false},
+    {name:"Vanna",sym:"∂Δ/∂σ — Delta-Vol",def:"How delta changes when vol changes. Critical in skewed markets. Large for OTM options. Forces delta re-hedge when vol moves.",val:"∂Δ/∂σ = ∂ν/∂S",sec:true},
+    {name:"Volga",sym:"∂ν/∂σ — Vol Convexity",def:"How vega changes when vol changes. Long options are long volga. Drives OTM vol smile — OTM options gain vega as vol rises.",val:"∂²V/∂σ²",sec:true},
+    {name:"Charm",sym:"∂Δ/∂t — Delta Decay",def:"How delta changes as time passes. Forces delta-hedge adjustment even without underlying move. Largest near expiry for ATM options.",val:"∂²V/∂S∂t",sec:true},
+  ];
+  return `<div class="greeks-grid">${gs.map(g=>`
+    <div class="greek-cell${g.sec?' second-order':''}">
+      <div class="gc-name">${g.name}</div>
+      <div class="gc-sym">${g.sym}</div>
+      <div class="gc-def">${g.def}</div>
+      <div class="gc-val">${g.val}</div>
+    </div>`).join('')}</div>`;
+}
+
+function mkStats(arr) {
+  if (!arr) return '';
+  return `<div class="stats">${arr.map(s=>`<div class="stat">
+    <div class="stat-l">${s.l}</div>
+    <div class="stat-v ${s.c}">${s.v}</div>
+  </div>`).join('')}</div>`;
+}
+
+function mkCmp(arr, cols) {
+  if (!arr) return '';
+  const n = cols || arr.length;
+  return `<div class="cmp c${Math.min(n,4)}">${arr.map(c=>`<div class="cc ${c.cls}">
+    <div class="cc-l">${c.label}</div><p>${c.text}</p>
+  </div>`).join('')}</div>`;
+}
+
+function mkTable(t) {
+  if (!t) return '';
+  const n = t.cols.length;
+  const cols = t.cols.map((c,i) => {
+    const w = i===0?'140px':'1fr';
+    return w;
+  }).join(' ');
+  return `<div class="dtable">
+    <div class="drow hdr" style="grid-template-columns:140px repeat(${n-1},1fr)">
+      ${t.cols.map(c=>`<div class="dc">${c}</div>`).join('')}
+    </div>
+    ${t.rows.map(r=>`<div class="drow" style="grid-template-columns:140px repeat(${n-1},1fr)">
+      ${r.map((c,i)=>`<div class="dc ${i===0?'label':''}">${c}</div>`).join('')}
+    </div>`).join('')}
+  </div>`;
+}
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sdiv = document.createElement('div');
+    sdiv.className = `section-div ${sec.cat}`;
+    sdiv.innerHTML = `
+      <div class="sd-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sd-line" style="background:${sec.lineColor}"></div>`;
+    root.appendChild(sdiv);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.cat;
+
+    sec.entries.forEach(e => {
+      const idx = globalCnt++;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+      const body =
+        e.body.map(p=>`<p>${p}</p>`).join('') +
+        (e.greeksGrid ? mkGreeks() : '') +
+        mkFmla(e.fmla) +
+        mkSVG(e.payoff) +
+        mkStats(e.stats) +
+        mkCmp(e.cmp) +
+        mkTable(e.table) +
+        `<div class="ki">
+          <div class="ki-bar"></div>
+          <div class="ki-inner">
+            <div class="ki-label">Key Insight</div>
+            <div class="ki-text">${e.ki}</div>
+          </div>
+        </div>` +
+        `<div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-tag" style="color:var(--${e.tagColor||'chalk2'});border-color:var(--${e.tagColor||'chalk2'}-d,var(--border2))">${e.tag}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<globalCnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

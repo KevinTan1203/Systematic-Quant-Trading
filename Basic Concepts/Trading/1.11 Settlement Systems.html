@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 1.11 Settlement Systems</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* dark technical palette */
+  --bg:        #070a0f;
+  --bg1:       #0b0f18;
+  --bg2:       #101520;
+  --bg3:       #151c28;
+  --surface:   #1a2232;
+  --border:    #1e2a40;
+  --border2:   #263550;
+  --ink:       #dce6f4;
+  --ink2:      #8a9ab8;
+  --muted:     #485870;
+  --faint:     #1e2a3a;
+
+  /* status colours */
+  --settled:   #22c55e;   /* green  = success */
+  --fail:      #ef4444;   /* red    = failure */
+  --pending:   #f59e0b;   /* amber  = in-flight */
+  --legacy:    #6366f1;   /* indigo = traditional */
+  --new:       #06b6d4;   /* cyan   = modern/new */
+  --crypto:    #a855f7;   /* purple = crypto */
+
+  /* dim versions */
+  --settled-d: #14532d;
+  --fail-d:    #7f1d1d;
+  --pending-d: #78350f;
+  --legacy-d:  #312e81;
+  --new-d:     #0e4a5a;
+  --crypto-d:  #4a1d96;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* circuit grid background */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(30,42,64,0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30,42,64,0.5) 1px, transparent 1px),
+    linear-gradient(rgba(30,42,64,0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30,42,64,0.15) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ═══ HEADER ═══ */
+.masthead {
+  position: relative;
+  z-index: 2;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 56px 40px 0;
+}
+
+.mhd-top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 40px;
+  align-items: start;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border2);
+}
+
+.mhd-kicker {
+  font-family: 'Space Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* blinking status dot */
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--settled);
+  animation: blink 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+.mhd-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(38px, 5.5vw, 64px);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  margin-bottom: 6px;
+}
+
+.mhd-title-2 {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(16px, 2.5vw, 26px);
+  font-weight: 400;
+  color: var(--new);
+  letter-spacing: 0.04em;
+  margin-bottom: 14px;
+}
+
+.mhd-sub {
+  font-family: 'Crimson Pro', serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink2);
+  max-width: 520px;
+  line-height: 1.65;
+}
+
+/* settlement timeline widget */
+.timeline-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border2);
+  overflow: hidden;
+  min-width: 240px;
+}
+
+.tw-header {
+  font-family: 'Space Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--bg2);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tw-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.tw-row:last-child { border-bottom: none; }
+
+.tw-era {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  width: 56px;
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+}
+
+.tw-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+  background: var(--faint);
+}
+
+.tw-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.tw-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9.5px;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+/* scroll hint */
+.scroll-hint {
+  font-family: 'Space Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.scroll-hint::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ═══ PAGE ═══ */
+.page {
+  position: relative; z-index: 2;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 32px 40px 100px;
+}
+
+/* controls */
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ctrl {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.16s;
+}
+.ctrl:hover { border-color: var(--new); color: var(--new); background: rgba(6,182,212,0.06); }
+
+.ctrl-right {
+  margin-left: auto;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* ═══ ENTRY ═══ */
+.entry {
+  border: 1px solid var(--border);
+  background: var(--bg1);
+  margin-bottom: 4px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.18s;
+}
+
+/* left accent bar */
+.entry::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  transition: width 0.2s, background 0.2s;
+}
+.entry.open::before { width: 4px; }
+
+/* colour by type */
+.t-dvp::before       { background: var(--settled-d); }
+.t-dvp.open::before  { background: var(--settled); }
+.t-fop::before       { background: var(--pending-d); }
+.t-fop.open::before  { background: var(--pending); }
+.t-fail::before      { background: var(--fail-d); }
+.t-fail.open::before { background: var(--fail); }
+.t-t1::before        { background: var(--new-d); }
+.t-t1.open::before   { background: var(--new); }
+.t-rtgs::before      { background: var(--legacy-d); }
+.t-rtgs.open::before { background: var(--legacy); }
+.t-net::before       { background: var(--settled-d); }
+.t-net.open::before  { background: var(--settled); }
+.t-dlt::before       { background: var(--new-d); }
+.t-dlt.open::before  { background: var(--new); }
+.t-chain::before     { background: var(--crypto-d); }
+.t-chain.open::before{ background: var(--crypto); }
+.t-stable::before    { background: var(--crypto-d); }
+.t-stable.open::before { background: var(--crypto); }
+
+.entry:hover { border-color: var(--border2); }
+
+.e-hdr {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  min-height: 58px;
+  transition: background 0.14s;
+}
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 8.5px;
+  color: var(--faint);
+  width: 44px;
+  text-align: center;
+  flex-shrink: 0;
+  letter-spacing: 0.05em;
+}
+
+/* status indicator block */
+.e-status {
+  width: 54px;
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-right: 1px solid var(--border);
+  padding: 6px 0;
+}
+
+.e-status-icon { font-size: 16px; }
+
+.e-status-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 7.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.t-dvp  .e-status-label { color: var(--settled); }
+.t-fop  .e-status-label { color: var(--pending); }
+.t-fail .e-status-label { color: var(--fail); }
+.t-t1   .e-status-label { color: var(--new); }
+.t-rtgs .e-status-label { color: var(--legacy); }
+.t-net  .e-status-label { color: var(--settled); }
+.t-dlt  .e-status-label { color: var(--new); }
+.t-chain .e-status-label { color: var(--crypto); }
+.t-stable .e-status-label { color: var(--crypto); }
+
+.e-text { flex: 1; padding: 12px 16px; }
+
+.e-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.e-sub {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 3px;
+  letter-spacing: 0.04em;
+  font-weight: 400;
+}
+
+/* badge chips in header */
+.e-badges {
+  display: flex;
+  gap: 5px;
+  padding-right: 14px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 200px;
+}
+
+.badge {
+  font-family: 'Space Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.badge.settled { color: var(--settled); border-color: var(--settled-d); background: rgba(34,197,94,0.07); }
+.badge.fail    { color: var(--fail);    border-color: var(--fail-d);    background: rgba(239,68,68,0.07); }
+.badge.pending { color: var(--pending); border-color: var(--pending-d); background: rgba(245,158,11,0.07); }
+.badge.legacy  { color: var(--legacy);  border-color: var(--legacy-d);  background: rgba(99,102,241,0.07); }
+.badge.new     { color: var(--new);     border-color: var(--new-d);     background: rgba(6,182,212,0.07); }
+.badge.crypto  { color: var(--crypto);  border-color: var(--crypto-d);  background: rgba(168,85,247,0.07); }
+
+.e-toggle {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  color: var(--muted);
+  width: 44px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--border);
+  flex-shrink: 0;
+  transition: transform 0.24s, color 0.16s;
+}
+.t-dvp.open  .e-toggle { transform:rotate(90deg); color: var(--settled); }
+.t-fop.open  .e-toggle { transform:rotate(90deg); color: var(--pending); }
+.t-fail.open .e-toggle { transform:rotate(90deg); color: var(--fail); }
+.t-t1.open   .e-toggle { transform:rotate(90deg); color: var(--new); }
+.t-rtgs.open .e-toggle { transform:rotate(90deg); color: var(--legacy); }
+.t-net.open  .e-toggle { transform:rotate(90deg); color: var(--settled); }
+.t-dlt.open  .e-toggle { transform:rotate(90deg); color: var(--new); }
+.t-chain.open  .e-toggle { transform:rotate(90deg); color: var(--crypto); }
+.t-stable.open .e-toggle { transform:rotate(90deg); color: var(--crypto); }
+
+/* ═══ BODY ═══ */
+.e-body {
+  display: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  padding: 22px 22px 26px 98px;
+  animation: bIn 0.2s ease;
+}
+.entry.open .e-body { display: block; }
+
+@keyframes bIn {
+  from { opacity:0; transform:translateY(-4px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+.e-body p {
+  font-family: 'Crimson Pro', serif;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.86;
+  color: var(--ink2);
+  margin-bottom: 14px;
+}
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+.e-body p strong { font-weight: 600; color: var(--ink); font-family: 'Space Grotesk', sans-serif; font-size: 14px; }
+
+/* ── FLOW DIAGRAM ── */
+.flow-diagram {
+  margin-top: 18px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  flex-wrap: wrap;
+}
+
+.flow-node {
+  flex: 1;
+  min-width: 100px;
+  padding: 12px 14px;
+  border-right: 1px solid var(--border);
+  position: relative;
+  background: var(--bg1);
+}
+.flow-node:last-child { border-right: none; }
+
+.flow-node::after {
+  content: '→';
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+  z-index: 2;
+}
+.flow-node:last-child::after { display: none; }
+
+.fn-step {
+  font-family: 'Space Mono', monospace;
+  font-size: 7.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.fn-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.25;
+  margin-bottom: 3px;
+}
+
+.fn-note {
+  font-family: 'Space Mono', monospace;
+  font-size: 9.5px;
+  color: var(--muted);
+  line-height: 1.5;
+  font-weight: 300;
+}
+
+.flow-node.settled { background: rgba(34,197,94,0.06);  border-right-color: var(--settled-d); }
+.flow-node.fail    { background: rgba(239,68,68,0.06);  border-right-color: var(--fail-d); }
+.flow-node.pending { background: rgba(245,158,11,0.06); border-right-color: var(--pending-d); }
+.flow-node.legacy  { background: rgba(99,102,241,0.06); border-right-color: var(--legacy-d); }
+.flow-node.new-    { background: rgba(6,182,212,0.06);  border-right-color: var(--new-d); }
+.flow-node.crypto  { background: rgba(168,85,247,0.06); border-right-color: var(--crypto-d); }
+
+/* ── COMPARISON ── */
+.cmp {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+.cmp.col2 { grid-template-columns: 1fr 1fr; }
+.cmp.col3 { grid-template-columns: 1fr 1fr 1fr; }
+
+.cc {
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  background: var(--bg1);
+}
+.cc-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+.cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important;
+         font-family: 'Space Grotesk', sans-serif !important; font-weight: 300 !important; color: var(--ink2) !important; }
+
+.cc.settled { background: rgba(34,197,94,0.05);  border-color: var(--settled-d); }
+.cc.fail    { background: rgba(239,68,68,0.05);  border-color: var(--fail-d); }
+.cc.pending { background: rgba(245,158,11,0.05); border-color: var(--pending-d); }
+.cc.legacy  { background: rgba(99,102,241,0.05); border-color: var(--legacy-d); }
+.cc.new-    { background: rgba(6,182,212,0.05);  border-color: var(--new-d); }
+.cc.crypto  { background: rgba(168,85,247,0.05); border-color: var(--crypto-d); }
+
+.cc.settled .cc-label { color: var(--settled); }
+.cc.fail    .cc-label { color: var(--fail); }
+.cc.pending .cc-label { color: var(--pending); }
+.cc.legacy  .cc-label { color: var(--legacy); }
+.cc.new-    .cc-label { color: var(--new); }
+.cc.crypto  .cc-label { color: var(--crypto); }
+
+/* ── STAT ROW ── */
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 18px;
+}
+.stat {
+  flex: 1;
+  min-width: 130px;
+  padding: 10px 13px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+}
+.stat-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.stat-val {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.stat-val.settled { color: var(--settled); }
+.stat-val.fail    { color: var(--fail); }
+.stat-val.pending { color: var(--pending); }
+.stat-val.legacy  { color: var(--legacy); }
+.stat-val.new-    { color: var(--new); }
+.stat-val.crypto  { color: var(--crypto); }
+
+/* ── NETTING VISUAL ── */
+.netting-vis {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.nv-header {
+  font-family: 'Space Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--bg2);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.nv-row {
+  display: grid;
+  grid-template-columns: 1fr 60px 1fr;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Space Mono', monospace;
+  font-size: 10.5px;
+}
+.nv-row:last-child { border-bottom: none; }
+.nv-cell {
+  padding: 8px 12px;
+  border-right: 1px solid var(--border);
+  color: var(--ink2);
+  line-height: 1.45;
+}
+.nv-cell:last-child { border-right: none; }
+.nv-cell.center {
+  text-align: center;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nv-cell.win  { color: var(--settled); }
+.nv-cell.loss { color: var(--fail); }
+.nv-row.total .nv-cell { background: var(--bg2); font-weight: 700; }
+
+/* ── KEY INSIGHT ── */
+.key-insight {
+  margin-top: 20px;
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border2);
+  overflow: hidden;
+}
+.ki-bar {
+  width: 4px;
+  flex-shrink: 0;
+}
+.ki-content {
+  flex: 1;
+  padding: 14px 18px;
+  background: var(--bg2);
+}
+.ki-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.ki-text {
+  font-family: 'Crimson Pro', serif;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink);
+  line-height: 1.62;
+}
+
+.t-dvp   .ki-bar { background: var(--settled); }
+.t-fop   .ki-bar { background: var(--pending); }
+.t-fail  .ki-bar { background: var(--fail); }
+.t-t1    .ki-bar { background: var(--new); }
+.t-rtgs  .ki-bar { background: var(--legacy); }
+.t-net   .ki-bar { background: var(--settled); }
+.t-dlt   .ki-bar { background: var(--new); }
+.t-chain .ki-bar { background: var(--crypto); }
+.t-stable .ki-bar { background: var(--crypto); }
+
+/* ── TAGS ── */
+.tags {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.tag {
+  font-family: 'Space Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+}
+.tag.settled { border-color: var(--settled-d); color: var(--settled); }
+.tag.fail    { border-color: var(--fail-d);    color: var(--fail); }
+.tag.pending { border-color: var(--pending-d); color: var(--pending); }
+.tag.legacy  { border-color: var(--legacy-d);  color: var(--legacy); }
+.tag.new-    { border-color: var(--new-d);     color: var(--new); }
+.tag.crypto  { border-color: var(--crypto-d);  color: var(--crypto); }
+
+/* ── FOOTER ── */
+.foot {
+  position: relative; z-index: 2;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 18px 40px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.foot span {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* status legend strip */
+.legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  background: var(--bg1);
+}
+.leg-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Space Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.leg-dot {
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .masthead, .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-top { grid-template-columns: 1fr; }
+  .timeline-widget { display: none; }
+  .e-body { padding-left: 16px; }
+  .cmp.col2, .cmp.col3 { grid-template-columns: 1fr; }
+  .flow-diagram { flex-direction: column; }
+  .flow-node::after { display: none; }
+  .e-badges { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ MASTHEAD ═══ -->
+<div class="masthead">
+  <div class="mhd-top">
+    <div>
+      <div class="mhd-kicker">
+        <div class="status-dot"></div>
+        Chapter 1 · Section 1.11 · Market Infrastructure
+      </div>
+      <div class="mhd-title">Settlement</div>
+      <div class="mhd-title-2">Systems</div>
+      <div class="mhd-sub">The unglamorous but critical infrastructure that ensures every trade actually completes — from T+2 DVP to on-chain atomic settlement.</div>
+    </div>
+
+    <!-- settlement timeline widget -->
+    <div class="timeline-widget">
+      <div class="tw-header">Settlement Cycle Evolution</div>
+      <div class="tw-row">
+        <div class="tw-era">Pre-1995</div>
+        <div class="tw-bar"><div class="tw-fill" style="width:100%;background:#ef4444"></div></div>
+        <div class="tw-label" style="color:#ef4444">T+5</div>
+      </div>
+      <div class="tw-row">
+        <div class="tw-era">1995–2017</div>
+        <div class="tw-bar"><div class="tw-fill" style="width:60%;background:#f59e0b"></div></div>
+        <div class="tw-label" style="color:#f59e0b">T+3</div>
+      </div>
+      <div class="tw-row">
+        <div class="tw-era">2017–2024</div>
+        <div class="tw-bar"><div class="tw-fill" style="width:40%;background:#6366f1"></div></div>
+        <div class="tw-label" style="color:#6366f1">T+2</div>
+      </div>
+      <div class="tw-row">
+        <div class="tw-era">2024+</div>
+        <div class="tw-bar"><div class="tw-fill" style="width:20%;background:#06b6d4"></div></div>
+        <div class="tw-label" style="color:#06b6d4">T+1</div>
+      </div>
+      <div class="tw-row">
+        <div class="tw-era">Future</div>
+        <div class="tw-bar"><div class="tw-fill" style="width:5%;background:#a855f7"></div></div>
+        <div class="tw-label" style="color:#a855f7">T+0 / Atomic</div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint">9 topics · click any entry to expand</div>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div class="page">
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--settled)"></div>Standard / Safe</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--pending)"></div>Conditional / Risk</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--fail)"></div>Failure / Problem</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--legacy)"></div>Traditional Infrastructure</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--new)"></div>Modern Reform</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--crypto)"></div>Crypto / DLT</div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">9 settlement concepts</span>
+  </div>
+
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>1.11 Settlement Systems</span>
+</footer>
+
+<script>
+const entries = [
+  {
+    tClass: "t-dvp",
+    icon: "✅", statusLabel: "DVP",
+    title: "DVP — Delivery Versus Payment",
+    sub: "The foundational principle of safe securities settlement: securities only released when cash is confirmed received",
+    badges: [{ label: "Core Mechanism", cls: "settled" }, { label: "Principal Protection", cls: "settled" }],
+    tags: [["DVP","settled"],["settlement","settled"],["DTCC","legacy"],["principal risk","fail"],["simultaneous","settled"]],
+    stats: [
+      { l: "G30 recommendation", v: "DVP since 1989", c: "legacy" },
+      { l: "Failure mode prevented", v: "Principal loss on default", c: "settled" },
+      { l: "DVP model 1 (RTGS)", v: "Gross, trade-by-trade", c: "legacy" },
+      { l: "DVP model 3 (net)", v: "End-of-day net settlement", c: "settled" },
+    ],
+    flow: [
+      { step:"01", label:"Trade Executed", note:"Buyer and seller agree price on exchange", cls:"" },
+      { step:"02", label:"Instructions Submitted", note:"Both parties instruct their custodians", cls:"" },
+      { step:"03", label:"CCP Novation", note:"CCP becomes buyer to every seller", cls:"legacy" },
+      { step:"04", label:"DVP Link", note:"Cash leg and securities leg locked together", cls:"settled" },
+      { step:"05", label:"Simultaneous Release", note:"Securities and cash exchange atomically", cls:"settled" },
+      { step:"06", label:"Settled", note:"Both parties hold new positions", cls:"settled" },
+    ],
+    body: [
+      `<em>Delivery Versus Payment (DVP)</em> is the settlement mechanism that ensures a securities transfer occurs simultaneously with the corresponding cash payment — neither leg is released unless both are confirmed. It is the single most important concept in securities settlement, eliminating the principal risk (the risk of losing the full value of the securities or cash) that would exist if one leg were delivered before the other. Without DVP, a seller who delivers securities before receiving cash faces the full loss of those securities if the buyer subsequently defaults.`,
+      `DVP was formalised as a global standard following the Group of Thirty (G30) report on "Clearance and Settlement in the World's Securities Markets" (1989), written in the aftermath of the 1987 market crash, which exposed dangerous settlement vulnerabilities. The report's third recommendation — that all markets adopt DVP by 1992 — became the global standard for securities settlement infrastructure. Today, every major developed market securities settlement system operates on DVP principles; failures to achieve DVP are settlement system failures, not design features.`,
+      `DVP comes in three technical models, reflecting different approaches to timing and netting. <strong>DVP Model 1</strong> settles each trade individually in real time (gross settlement) — both legs are finalized trade-by-trade throughout the day, as in the UK's CREST system. This eliminates all settlement risk but requires substantial intraday liquidity. <strong>DVP Model 2</strong> settles securities on a gross basis throughout the day but nets cash at end of day — reducing liquidity requirements while retaining most of the protection. <strong>DVP Model 3</strong> nets both legs at end of day — most capital-efficient but carrying intraday replacement cost risk until final settlement. The DTCC's NSCC (equities) uses a Model 3 approach; most government bond settlement uses Model 1 or 2.`,
+      `The practical importance of DVP became vivid in the 1974 Herstatt Bank failure — a landmark in settlement risk history. Herstatt had received Deutsche mark payments from FX counterparties in Germany before German banking hours ended, but was then shut down by regulators before paying the corresponding USD legs in New York. Counterparties who had delivered DM received nothing in return. This was pre-DVP settlement in its most destructive form. The episode directly motivated the development of both DVP principles in securities markets and the CLS system in FX — two of the most important settlement infrastructure innovations of the modern era.`
+    ],
+    ki: "DVP is the settlement world's equivalent of escrow — neither party releases their asset until they've confirmed the other has delivered. It transforms settlement from a sequence of separate bilateral risks into a single atomic exchange. Every other settlement improvement — T+1, RTGS, DLT — is an enhancement on top of this foundational principle."
+  },
+  {
+    tClass: "t-fop",
+    icon: "↗️", statusLabel: "FOP",
+    title: "FOP — Free of Payment",
+    sub: "Securities transferred without simultaneous cash exchange — deliberate principal risk accepted",
+    badges: [{ label: "No Cash Link", cls: "pending" }, { label: "Principal Risk", cls: "fail" }],
+    tags: [["FOP","pending"],["collateral",""],["stock loan",""],["repo",""],["principal risk","fail"]],
+    cmp: [
+      { cls:"settled", label:"DVP (Standard)", text:"Securities and cash move simultaneously. No principal risk. Standard for all buy/sell transactions. Requires both legs to be confirmed before either is released. The safe default." },
+      { cls:"pending", label:"FOP (Free of Payment)", text:"Securities move without linked cash payment. Full principal risk accepted. Intentional: used for collateral transfers, securities loans, gifts, internal book-transfers, margin posting, and repo transactions where cash moves separately." },
+    ],
+    body: [
+      `<em>Free of Payment (FOP)</em> is the deliberate transfer of securities without a simultaneous linked cash payment. Despite the name suggesting something free, FOP settlement carries the maximum principal risk — if the receiving party defaults after receiving the securities, the delivering party has lost the full value of those securities with no corresponding cash received. FOP is not an inferior alternative to DVP; it is used in specific circumstances where the economics of a transaction require securities to move independently of cash.`,
+      `The most common FOP use cases in institutional finance are: <strong>Collateral transfers</strong> — posting government bonds or equities as margin collateral to a clearing house or counterparty. The collateral moves FOP; the obligation it secures is the bilateral agreement, not a simultaneous cash payment. <strong>Securities lending and repo</strong> — the opening leg of a securities loan moves the borrowed security FOP from the lender to the borrower; the cash collateral posted by the borrower moves separately through a cash payment system. The two legs are economically linked but technically separate. <strong>Internal book transfers</strong> — moving securities between two accounts at the same custodian (no cash involved; just an internal record change). <strong>Gifts and inheritances</strong> — transferring securities without consideration.`,
+      `The risk management around FOP transactions requires heightened counterparty credit diligence. Because there is no DVP mechanism protecting either party, the delivering party must trust the receiving party's credit. In practice, FOP transactions are almost always accompanied by strong legal agreements (Global Master Securities Lending Agreements, Global Master Repo Agreements, ISDA collateral schedules) that define what happens in the event of a counterparty default — including the right to close out positions and apply netting. The risk is not eliminated; it is shifted from settlement infrastructure to legal documentation and counterparty credit assessment.`
+    ],
+    ki: "FOP is not a bug in settlement systems — it is a deliberate feature for specific use cases where securities need to move independently of cash. The counterparty risk accepted in FOP transactions is managed through legal agreements, not settlement infrastructure. Understanding when FOP is appropriate (and when it introduces unnecessary principal risk) is a core competency in securities operations."
+  },
+  {
+    tClass: "t-fail",
+    icon: "❌", statusLabel: "FAIL",
+    title: "Settlement Fails & Buy-Ins",
+    sub: "When settlement doesn't happen on time — and the contractual remedy",
+    badges: [{ label: "Operational Risk", cls: "fail" }, { label: "CSDR", cls: "legacy" }],
+    tags: [["settlement fail","fail"],["buy-in","fail"],["fail penalty","fail"],["CSDR","legacy"],["short selling",""]],
+    stats: [
+      { l: "EU settlement fails (CSDR target)", v: "<1% of value", c: "settled" },
+      { l: "US equity fail rate (typical)", v: "~0.5–1.5%", c: "pending" },
+      { l: "CSDR mandatory buy-in penalty", v: "0.01–1.0% per day", c: "fail" },
+      { l: "US Treasury fail charge", v: "3% annualised (per day)", c: "fail" },
+    ],
+    cmp: [
+      { cls:"fail",    label:"Settlement Fail", text:"On the settlement date (T+2 or T+1), the selling party fails to deliver securities, or the buying party fails to deliver cash. The trade does not settle. Causes: short position not covered; securities held at wrong custodian; operational error; broker failure." },
+      { cls:"pending", label:"Cascading Fails", text:"A fail by Party A ripples: Party B expected those securities to deliver to Party C. Party B now also fails. Fail cascades can affect dozens of counterparties in chains of securities lending, repo, and settlement dependencies — amplifying what began as one operational error." },
+      { cls:"legacy",  label:"Buy-In", text:"The contractual remedy: the non-failing party purchases replacement securities in the market at the current price and charges the cost to the failing party. The fail is resolved but the failing party bears any adverse price movement since the original trade date. EU CSDR mandates buy-ins after specified fail periods." },
+    ],
+    body: [
+      `A <em>settlement fail</em> occurs when a securities transaction does not complete on its designated settlement date — typically because the seller cannot deliver the securities (a "long" fail if they thought they owned them; a "naked short" fail if they never owned them) or the buyer cannot deliver cash. Fails are not defaults — they do not necessarily indicate credit stress — but they impose real costs: the failing party typically owes a cash penalty per day of delay, and the non-failing party bears replacement cost risk if market prices move adversely between the original trade date and eventual settlement.`,
+      `Settlement fails have systemic implications beyond bilateral inconvenience. A securities dealer who fails to receive securities cannot deliver them to the next party in the settlement chain — creating a cascading fail that can propagate through dozens of counterparties who each had planned to use those securities. In government bond markets (where repo transactions create long daisy chains of securities lending), a single fail at one end of the chain can freeze billions in planned transactions. The US Treasury market experiences periodic "fail episodes" — notably during periods of high demand for specific on-the-run securities, where the security becomes so scarce in the repo market that it cannot be borrowed to cover short positions.`,
+      `The primary regulatory response to settlement fails in Europe is the <em>Central Securities Depositories Regulation (CSDR)</em>, which introduced mandatory buy-in provisions and daily cash penalties for failing parties. The mandatory buy-in framework — where a non-failing party can trigger a compulsory purchase of replacement securities at the failing party's expense after a specified period (2–7 business days depending on instrument type) — was intended to create strong financial incentives against failing. In practice, the buy-in framework proved operationally complex and potentially procyclical (in illiquid markets, mandatory buy-ins could amplify price distortions), leading the EU to delay and modify its implementation repeatedly. The US Treasury market uses a simpler "fail charge" of 3% annualised per day on the failing amount — a more targeted disincentive.`
+    ],
+    ki: "Settlement fails are the cracks in the financial system's plumbing — individually annoying, collectively dangerous. The risk is not just bilateral; it is systemic: a single fail propagates through chains of dependent transactions, potentially freezing significant portions of the securities lending and repo markets. The regulatory response (CSDR, fail charges) correctly identifies that fails must carry real economic consequences to be deterred, but the implementation challenge lies in avoiding rules that make crises worse by triggering forced buy-ins in illiquid markets."
+  },
+  {
+    tClass: "t-t1",
+    icon: "⚡", statusLabel: "T+1",
+    title: "T+1 Migration — US 2024",
+    sub: "The most significant change to US securities settlement in a generation",
+    badges: [{ label: "SEC Rule", cls: "new-" }, { label: "May 2024", cls: "new-" }],
+    tags: [["T+1","new-"],["SEC","legacy"],["DTCC","legacy"],["settlement reform","new-"],["operational impact","pending"]],
+    stats: [
+      { l: "US T+1 implementation date", v: "28 May 2024", c: "new-" },
+      { l: "Canada T+1 (simultaneous)", v: "27 May 2024", c: "new-" },
+      { l: "UK/EU T+1 target", v: "2027 (proposed)", c: "pending" },
+      { l: "Fail rate change (early data)", v: "Modestly increased initially", c: "pending" },
+      { l: "Margin savings estimate", v: "~$2–3B in CCP margin", c: "settled" },
+    ],
+    cmp: [
+      { cls:"settled", label:"Benefits of T+1", text:"Reduced counterparty risk window by 50% vs T+2 (one less overnight). Lower CCP margin requirements (risk period shorter). Less capital tied up in unsettled trades. Faster return of funds to investors. Aligns with crypto's T+0 narrative direction." },
+      { cls:"pending", label:"Challenges of T+1", text:"Affirmation/confirmation must happen same day by 9 PM ET. International investors face FX timing pressure (need USD funded overnight). Securities lending recalls must complete faster. Back-office staffing needs realignment across time zones. India/Asia: T+1 already live (NSE since 2023)." },
+      { cls:"fail",    label:"Who Struggled", text:"Non-US institutional investors: settling FX to fund USD purchases becomes same-day requirement. Securities lenders: recall timelines compressed. Prime brokers: portfolio margining calculations accelerated. Custodians: same-day processing of corporate action instructions." },
+    ],
+    body: [
+      `On 28 May 2024, the United States migrated its equity and corporate bond markets from T+2 (two business-day settlement) to T+1 (one business-day settlement) — the most significant operational change to US securities markets in a generation. The rule change, adopted by the SEC in February 2023, required the full securities settlement ecosystem — exchanges, broker-dealers, custodians, clearing houses (DTCC/NSCC), and institutional investors — to compress their post-trade processing workflows by 50%.`,
+      `The primary motivation for T+1 was the 2021 GameStop episode, which exposed the consequences of the T+2 settlement cycle. During extreme volatility, the NSCC required several broker-dealers (most infamously Robinhood) to post dramatically increased margin to cover unsettled trades — margin calculated over the full T+2 risk window. Robinhood's need to post $3 billion in margin (later negotiated down) forced it to restrict buying in GameStop and other meme stocks, triggering furious public and congressional backlash. T+1 reduces the risk window for CCP margin calculations, potentially cutting required margin by $2–3 billion industrywide during normal conditions (more during stressed markets).`,
+      `The T+1 migration required coordinated operational changes across hundreds of firms globally. <em>Trade affirmation</em> — the process by which both parties to a trade confirm their trade details match — moved from a 24-hour-plus process to a same-day requirement: all trades must be affirmed by 9 PM ET on trade date to settle the next day. Firms that fail to affirm face same-day settlement fails. This created particular pressure on international investors in Asian and European time zones who complete trades during US market hours but have operations running during their own business hours — not the US evening. Securities lending operations also faced operational compression: recall timelines for lent securities (needed back for settlement) shrank from potentially 2 business days to overnight.`
+    ],
+    ki: "T+1 is not just an operational change — it is a statement of direction: financial markets are moving toward shorter settlement cycles, eventually reaching T+0 atomic settlement. Each shortening reduces counterparty risk exposure and CCP margin requirements, but compresses the operational window for error correction. The tension between settlement speed and operational resilience is the permanent challenge of settlement reform."
+  },
+  {
+    tClass: "t-rtgs",
+    icon: "🏦", statusLabel: "RTGS",
+    title: "Real-Time Gross Settlement (RTGS)",
+    sub: "The central bank plumbing that moves cash between banks with finality — in real time",
+    badges: [{ label: "Central Bank", cls: "legacy" }, { label: "Final Settlement", cls: "settled" }],
+    tags: [["RTGS","legacy"],["Fedwire","legacy"],["TARGET2","legacy"],["CHAPS","legacy"],["finality","settled"]],
+    stats: [
+      { l: "Fedwire (US) daily volume", v: "~$4–5 trillion", c: "legacy" },
+      { l: "TARGET2 (Eurozone) daily", v: "~€2 trillion", c: "legacy" },
+      { l: "CHAPS (UK) daily", v: "~£400 billion", c: "legacy" },
+      { l: "Settlement finality", v: "Irrevocable on receipt", c: "settled" },
+    ],
+    cmp: [
+      { cls:"legacy", label:"Fedwire (US Federal Reserve)", text:"Operates 21.5 hours/day. Irrevocable, real-time USD transfers between banks with Fed accounts. Backbone of US dollar interbank settlement. Used for securities DVP (Fedwire Securities), high-value payments, and Fed open market operations." },
+      { cls:"legacy", label:"TARGET2 (ECB)", text:"Trans-European Automated Real-time Gross Settlement Express Transfer. Settles EUR between Eurozone central banks and commercial banks. Being replaced by T2 (upgraded architecture). Settlement across 20 EU member states on single platform." },
+      { cls:"new-",   label:"CHAPS → New Payment Architecture (UK)", text:"UK sterling RTGS operated by Bank of England. Under renewal: New Payments Architecture (NPA) moving UK retail payments to ISO 20022 standard. RTGS renewal programme rebuilding core Bank of England settlement infrastructure." },
+    ],
+    body: [
+      `<em>Real-Time Gross Settlement (RTGS)</em> systems are the central bank-operated payment networks that provide the ultimate, irrevocable settlement of large-value interbank payments and securities transactions. They are the bedrock of every country's financial system — every securities settlement, foreign exchange payment, and interbank transfer ultimately flows through an RTGS system for final cash settlement. RTGS settlement is <em>final</em>: once a payment is made through Fedwire, TARGET2, or CHAPS, it cannot be reversed. This finality distinguishes central bank money from commercial bank money.`,
+      `The "gross" in RTGS means each transaction settles individually and in full — not netted against offsetting transactions. A bank that sends $1 billion via Fedwire must have $1 billion in its Federal Reserve account at that moment. This real-time liquidity requirement distinguishes RTGS from net settlement systems (which allow banks to accumulate a smaller net position throughout the day). RTGS eliminates the settlement risk of net systems (where participants face exposure to each other's net positions throughout the day) at the cost of requiring much higher intraday liquidity. Central banks facilitate this by providing intraday credit (repo facilities) against collateral, allowing banks to temporarily overdraft their reserve accounts to fund RTGS payments.`,
+      `RTGS systems are also the mechanism for monetary policy transmission. The Federal Reserve's open market operations — buying or selling Treasury securities to manage bank reserves — are conducted through Fedwire. Interest on Reserve Balances (IORB) — the rate the Fed pays on reserve balances held at the Fed — is the anchor for the entire federal funds rate system. TARGET2 imbalances became a politically sensitive measure of capital flight within the Eurozone during the 2011–2012 European debt crisis: large TARGET2 claims by the Bundesbank against southern European central banks reflected capital flowing from periphery to core, directly measurable in RTGS flow data.`,
+      `The next generation of RTGS systems (Fedwire's planned overhaul, TARGET2's replacement by T2, Bank of England's RTGS renewal) are incorporating ISO 20022 message standards — richer, more structured payment data that enables better analytics, fraud detection, and straight-through processing. The Bank of England's RTGS renewal project is explicitly designed to be compatible with potential future innovations including DLT-based settlement — building the plumbing to accommodate atomic settlement even if the full transition to DLT never materialises.`
+    ],
+    ki: "RTGS is the most critical infrastructure in finance that almost no one in finance thinks about — until it fails. Fedwire processes $4–5 trillion per day with extraordinary reliability; a Fedwire outage would freeze the entire US financial system within hours. RTGS is where central bank money and commercial bank money connect: everything that matters in settlement ultimately flows through this invisible but indispensable infrastructure."
+  },
+  {
+    tClass: "t-net",
+    icon: "🔗", statusLabel: "NET",
+    title: "Netting & Novation",
+    sub: "Reducing gross settlement obligations to a small net — the efficiency engine of clearing",
+    badges: [{ label: "CCP Function", cls: "settled" }, { label: "Risk Reduction", cls: "settled" }],
+    tags: [["netting","settled"],["novation","settled"],["NSCC","legacy"],["multilateral net","settled"],["close-out netting",""]],
+    netting: true,
+    body: [
+      `<em>Netting</em> is the process of combining multiple payment or delivery obligations between the same counterparties into a single net obligation — dramatically reducing the gross amount of securities and cash that must physically change hands at settlement. <em>Novation</em> is the legal mechanism that enables central clearing: the original bilateral trade between Buyer A and Seller B is replaced by two new contracts — Buyer A vs. CCP and CCP vs. Seller B — with the CCP stepping between them. Together, netting and novation transform thousands of bilateral gross exposures into a fraction of their original size.`,
+      `<em>Bilateral netting</em> is the simplest form: if Bank A owes Bank B $100 million on one trade and Bank B owes Bank A $80 million on another, bilateral netting produces a single net obligation of $20 million from Bank A to Bank B — an 80% reduction in gross settlement flow. <em>Multilateral netting</em> — the system used by the DTCC's National Securities Clearing Corporation (NSCC) for US equities — nets all trades among all participants simultaneously. The result is that each participant has a single net position per security across all counterparties: instead of settling thousands of individual trades, each firm settles one net delivery or receipt per security per day.`,
+      `The efficiency of multilateral netting is staggering. The NSCC nets US equity trades down to approximately 1–3% of their gross value — meaning $1 trillion in daily trading generates only $10–30 billion in net settlement obligations. This 97–99% reduction in settlement flow dramatically reduces: systemic risk (fewer individual settlement obligations mean fewer potential fail points); liquidity requirements (participants need far less cash and securities on hand to settle); and operational complexity (far fewer individual transactions to process).`,
+      `<em>Close-out netting</em> is a related concept specifically for OTC derivatives: upon a default event, all outstanding trades between two ISDA Master Agreement counterparties are immediately terminated, valued at current market prices, and netted to a single net payment — eliminating the bankruptcy risk of cherry-picking. Close-out netting is the most commercially critical legal provision in OTC derivatives documentation, reducing bilateral credit exposure by 80–95% and allowing banks to show net rather than gross derivatives exposures on their balance sheets under Basel capital rules.`
+    ],
+    ki: "Netting is financial market engineering at its most elegant — transforming a web of bilateral obligations that would require enormous gross settlement flows into a tiny fraction of that amount. The NSCC's 97–99% netting efficiency is one of the great unheralded achievements of financial market infrastructure. Without it, the settlement infrastructure would need to be 50× its current capacity to handle the same trading volume."
+  },
+  {
+    tClass: "t-dlt",
+    icon: "🔬", statusLabel: "DLT",
+    title: "DLT — Blockchain Settlement Experiments",
+    sub: "The promise of atomic DVP on distributed ledgers — and why it has been harder than expected",
+    badges: [{ label: "Experimental", cls: "new-" }, { label: "Regulatory Sandbox", cls: "pending" }],
+    tags: [["DLT","new-"],["blockchain","crypto"],["atomic settlement","new-"],["T+0","new-"],["SDX",""],["Project Guardian",""]],
+    stats: [
+      { l: "SDX (SIX Digital Exchange) live", v: "2021 — first regulated DLT exchange", c: "new-" },
+      { l: "ECB Project Jura (DLT settlement)", v: "2021 pilot", c: "new-" },
+      { l: "MAS Project Guardian", v: "2022 tokenised bond pilot", c: "new-" },
+      { l: "HK HKMA Project Ensemble", v: "2024 wCBDC for tokenised assets", c: "new-" },
+    ],
+    cmp: [
+      { cls:"new-",   label:"The Promise", text:"Atomic DVP: securities and cash transfer simultaneously on the same ledger — no settlement lag, no counterparty risk between legs. T+0. Smart contracts automate corporate actions, coupon payments, redemptions. Programmable money enables conditional settlement logic impossible in legacy systems." },
+      { cls:"pending", label:"Current Reality", text:"Most pilots involve permissioned blockchains (not public chains). Regulatory uncertainty about legal finality of on-chain transactions. Interoperability between DLT systems and legacy RTGS unresolved. Need for 'delivery' of legacy assets onto chain (tokenisation). Limited scale; few moved beyond proof-of-concept." },
+      { cls:"fail",    label:"Why It's Hard", text:"Legal framework for DLT finality varies by jurisdiction. Existing market participants have enormous investments in legacy infrastructure. Network effects: liquidity concentrates in the incumbent system. On-chain settlement requires on-chain cash (DLT-CBDC or tokenised commercial bank money) — the cash side remains off-chain in most pilots." },
+    ],
+    body: [
+      `<em>Distributed Ledger Technology (DLT)</em> — blockchain and related technologies — promises to transform securities settlement by enabling atomic, simultaneous delivery versus payment on a single shared ledger, eliminating the settlement lag that creates counterparty risk in traditional T+2 or T+1 systems. If both the security and the cash exist as digital tokens on the same ledger, a smart contract can simultaneously debit the buyer's cash token and credit the seller's cash token while simultaneously transferring the security token — true T+0 atomic settlement with no principal risk.`,
+      `The experiments have been numerous and well-funded. The SIX Digital Exchange (SDX) in Switzerland became the world's first regulated DLT-based financial market infrastructure in 2021, enabling the issuance and settlement of tokenised bonds in Swiss francs using a permissioned blockchain. The European Central Bank's Project Jura (2021) tested settlement of tokenised securities using wholesale CBDC on a DLT platform, achieving simultaneous securities and cash transfer across borders. The Monetary Authority of Singapore's Project Guardian (2022) piloted tokenised government bond transactions between major banks. Hong Kong's Project Ensemble (2024) experimented with wholesale CBDC for tokenised asset settlement.`,
+      `The gap between the pilots and production reality reflects fundamental unsolved challenges. First, the <em>legal finality problem</em>: settlement finality requires clear legal recognition that an on-chain transaction is irrevocable — this varies by jurisdiction and requires specific legislative intervention (Switzerland's DLT Act of 2021 is a model). Second, the <em>cash problem</em>: atomic on-chain DVP requires that cash also exist as a digital token on the same ledger — either a wholesale CBDC or tokenised commercial bank money. Most central banks have not yet issued wholesale CBDCs for production use. Third, the <em>interoperability problem</em>: existing securities (in DTCC, Euroclear, Clearstream) exist in legacy systems; moving them onto DLT requires either full tokenisation (enormous migration effort) or "bridge" mechanisms between DLT and legacy systems that reintroduce settlement risk.`
+    ],
+    ki: "DLT promises to solve the settlement problem by removing the 'time gap' between the two legs of a trade — if both legs exist on the same ledger, they can swap atomically. The technology works in pilots; the barriers are legal, operational, and political. DLT settlement will come, but it will require a decade-long infrastructure transition that only regulatory mandates can accelerate meaningfully."
+  },
+  {
+    tClass: "t-chain",
+    icon: "⛓️", statusLabel: "ON-CHAIN",
+    title: "Crypto Settlement — On-Chain, Near-Instant",
+    sub: "How blockchain networks achieve T+0 finality — and why it introduces new risks",
+    badges: [{ label: "Crypto", cls: "crypto" }, { label: "Permissionless", cls: "crypto" }],
+    tags: [["on-chain","crypto"],["blockchain finality","crypto"],["Bitcoin","crypto"],["Ethereum","crypto"],["confirmation time","crypto"]],
+    stats: [
+      { l: "Bitcoin finality (6 confirmations)", v: "~60 minutes", c: "crypto" },
+      { l: "Ethereum finality (post-merge)", v: "~13 minutes", c: "crypto" },
+      { l: "Solana finality", v: "~400 milliseconds", c: "crypto" },
+      { l: "Layer 2 (Lightning, Arbitrum)", v: "Near-instant, finality on L1", c: "new-" },
+    ],
+    cmp: [
+      { cls:"settled", label:"What's Better vs TradFi", text:"No settlement intermediaries. Permissionless — anyone with a wallet can settle directly. True T+0 for on-chain assets. No need for CCP, custodian, or clearing house for on-chain trades. Settlement happens on the same ledger as ownership record — no reconciliation needed." },
+      { cls:"fail",    label:"What's Worse or Different", text:"Probabilistic finality (Bitcoin, some chains): settlement isn't final until N confirmations, which takes time. Irreversibility is a double-edged sword: no recourse if keys lost, fraud, or error. Smart contract bugs cause billions in losses annually. Gas fees vary dramatically. MEV (miner extractable value) creates front-running risk." },
+      { cls:"crypto",  label:"Finality Models", text:"Bitcoin: probabilistic (risk reduces with each block confirmation). Ethereum post-merge: economic finality after ~2 epochs (~13 min). Solana: single-slot finality via PoH. Layer 2s: fast execution finality, then settle to L1 for economic security. Each model trades speed vs certainty."},
+    ],
+    body: [
+      `Blockchain networks achieve settlement in a fundamentally different way from traditional securities markets. On a public blockchain, there is no central custodian, no CCP, no settlement system operator. The ledger is replicated across thousands of nodes; each participant controls their assets via private keys; transactions are broadcast to the network and included in blocks by validators or miners. When a transaction is confirmed in a block, ownership has transferred — the ledger is the definitive record and there is no other authority to consult or approve.`,
+      `The concept of <em>finality</em> varies critically by blockchain architecture. <strong>Probabilistic finality</strong> (Bitcoin): each block added on top of a transaction makes it increasingly expensive to reverse, but technically reversible until the chain grows long enough that reorganisation is economically infeasible. Six Bitcoin confirmations (~60 minutes) is considered the standard for high-value transaction finality. <strong>Economic finality</strong> (Ethereum post-merge): after two epochs (~13 minutes), the Ethereum protocol reaches "finality" — reversing the transaction would require destroying at least one-third of all staked ETH (~$30–40 billion), making reversal economically irrational. <strong>Absolute finality</strong>: some newer chains (certain BFT-based systems) achieve near-instant absolute finality where a confirmed transaction cannot be reversed under any network conditions.`,
+      `Crypto's settlement advantages are real but come with distinct risks. The absence of a central counterparty guarantor means there is no entity to compensate you for errors, fraud, or technical failures. Smart contract bugs — code that behaves differently than intended — have caused billions in losses: the 2016 DAO hack ($60M), the 2022 Wormhole bridge exploit ($320M), and dozens of smaller incidents demonstrate that on-chain settlement removes human intermediary risk and introduces code risk. <em>MEV (Maximal Extractable Value)</em> — the ability of block validators to reorder, include, or exclude transactions for profit — creates a form of front-running that is structural to how public blockchains operate, introducing a new category of trading cost absent from traditional markets.`
+    ],
+    ki: "Crypto settlement proves that T+0 permissionless settlement is technologically possible — but replaces counterparty risk with smart contract risk and key management risk. The absence of intermediaries is both the feature and the bug: no custodian to help you recover from an error; no CCP to absorb your counterparty's default. Crypto settlement is better in some dimensions (speed, access, cost) and worse in others (recourse, reversibility, safety nets). It is not simply 'better' or 'worse' — it is a different risk profile."
+  },
+  {
+    tClass: "t-stable",
+    icon: "💲", statusLabel: "STABLE",
+    title: "Stablecoin Settlement Rails",
+    sub: "Programmable dollars on blockchains — a bridge between crypto efficiency and fiat stability",
+    badges: [{ label: "Crypto + Fiat", cls: "crypto" }, { label: "Emerging Rail", cls: "new-" }],
+    tags: [["stablecoin","crypto"],["USDC","crypto"],["USDT","crypto"],["settlement rail","new-"],["tokenised money","new-"]],
+    stats: [
+      { l: "Total stablecoin market cap", v: "~$160–170B (2024)", c: "crypto" },
+      { l: "USDT (Tether) dominance", v: "~$112B (largest)", c: "crypto" },
+      { l: "USDC (Circle) second", v: "~$34B (most regulated)", c: "new-" },
+      { l: "Daily stablecoin transfer volume", v: ">$30–50B", c: "crypto" },
+    ],
+    cmp: [
+      { cls:"settled", label:"Fiat-Backed (USDC, USDT)", text:"1:1 redeemable for USD. Backed by cash equivalents and short-term Treasuries. USDC: regulated, monthly attestations. USDT: less transparent, historic reserve controversies. Used for trading, settlement, remittance, DeFi. Inherits blockchain speed; theoretically maintains USD stability." },
+      { cls:"crypto",  label:"Algorithmic / Hybrid (now mostly defunct)", text:"Terra/LUNA collapsed 2022 — most significant algorithmic stablecoin failure. Lost $40B+ in value in days. Showed that algorithmic price maintenance without hard collateral backing is fatally fragile. DAI: partially overcollateralised crypto-backed, partially real-world asset-backed." },
+      { cls:"new-",    label:"Tokenised Deposits / Regulated Stablecoins", text:"Emerging category: tokenised commercial bank deposits (JPM Coin, HSBC Orion). Represent actual bank liability on chain. EU MiCA regulation (2024) creates legal framework for 'e-money tokens'. Potential to become the on-chain cash leg for DLT-based DVP settlement." },
+    ],
+    body: [
+      `<em>Stablecoins</em> are blockchain-native tokens pegged to a fiat currency (predominantly USD) — they combine the programmability and settlement speed of blockchain infrastructure with the price stability of traditional money. For settlement purposes, stablecoins solve the most fundamental problem of using public blockchains for financial transactions: the extreme price volatility of native crypto assets (ETH, BTC) makes them unsuitable as settlement currency for anything except purely crypto-native transactions. A USD stablecoin allows blockchain settlement to be denominated in dollars without exposure to crypto price risk.`,
+      `The two dominant stablecoins — <em>USDT (Tether)</em> and <em>USDC (Circle)</em> — have become significant settlement infrastructure in crypto markets. Tether, launched 2014, is the dominant stablecoin by market cap (~$112B) and daily trading volume, facilitating settlement across virtually every crypto exchange globally. USDC, launched by Circle in 2018, is more regulated and transparent, with monthly independent attestations of its reserve composition (short-term Treasuries and cash held at regulated US financial institutions). USDC became the stablecoin of choice for institutions and regulated entities precisely because of this transparency.`,
+      `The March 2023 USDC "de-peg" episode illustrated stablecoin settlement risk in practice. When Silicon Valley Bank (which held ~$3.3B of USDC's reserves) failed over a weekend, Circle disclosed the exposure before redemption could proceed — causing USDC to temporarily trade at $0.87 rather than $1.00. The peg was restored when the US government guaranteed SVB deposits, but the episode demonstrated that a "stable" coin is only as stable as its reserve assets and custodians — it inherits the credit risk of the financial institutions backing it.`,
+      `The most significant longer-term development is the emergence of <em>regulated stablecoins</em> and <em>tokenised deposits</em> as potential on-chain cash legs for institutional settlement. JPMorgan's JPM Coin (tokenised JPM deposits, used for intraday repo and payment between JPM clients), HSBC's Orion platform (tokenised gold and bond settlement), and the EU's MiCA regulatory framework for e-money tokens are all building the legal and operational infrastructure for stablecoins to become legitimate, regulated settlement rails. If these succeed, they complete the circuit for DLT-based DVP: tokenised securities on one side, tokenised bank money on the other, settled atomically via smart contract.`
+    ],
+    ki: "Stablecoins are the most important financial innovation in the payment and settlement space in decades — not because they are cryptocurrencies, but because they are the first viable form of programmable money at scale. Their ability to combine blockchain settlement speed with fiat price stability makes them the necessary bridge between the crypto-native world and the traditional financial system. The regulatory battle over who controls stablecoin issuance — banks, regulated fintechs, or existing crypto issuers — will determine who controls the settlement rails of the next financial era."
+  }
+];
+
+/* ═══ NETTING TABLE ═══ */
+const nettingData = {
+  title: "Multilateral Netting Example — 3 banks, 3 securities",
+  header: ["Bank", "Gross Buys (Securities)", "Gross Sells (Securities)", "Net Settlement", "Flow Reduction"],
+  rows: [
+    ["Bank A", "$500M buys, 3 different stocks", "$420M sells, 2 stocks", "$80M net buy (2 stocks)", "84%"],
+    ["Bank B", "$380M buys, 2 stocks", "$450M sells, 3 stocks", "$70M net sell (1 stock)", "91%"],
+    ["Bank C", "$620M buys, 4 stocks", "$630M sells, 4 stocks", "$10M net sell (1 stock)", "99%"],
+    ["TOTAL", "$1.5B gross buy flow", "$1.5B gross sell flow", "$160M net settlement", "~89% reduction"],
+  ]
+};
+
+/* ═══ RENDER ═══ */
+let cnt = 0;
+
+function buildNettingTable() {
+  return `
+    <div class="netting-vis">
+      <div class="nv-header">${nettingData.title}</div>
+      <div class="nv-row" style="background:var(--bg3)">
+        ${nettingData.header.map(h=>`<div class="nv-cell" style="font-family:'Space Mono',monospace;font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted)">${h}</div>`).join('')}
+      </div>
+      ${nettingData.rows.map((r,i) => {
+        const isTotal = i === nettingData.rows.length - 1;
+        return `<div class="nv-row ${isTotal ? 'total' : ''}">
+          <div class="nv-cell label">${r[0]}</div>
+          <div class="nv-cell win">${r[1]}</div>
+          <div class="nv-cell loss">${r[2]}</div>
+          <div class="nv-cell" style="color:var(--new)">${r[3]}</div>
+          <div class="nv-cell" style="color:var(--settled)">${r[4]}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+    const bH = (e.badges||[]).map(b=>`<span class="badge ${b.cls}">${b.label}</span>`).join('');
+
+    const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`
+      <div class="stat">
+        <div class="stat-label">${s.l}</div>
+        <div class="stat-val ${s.c}">${s.v}</div>
+      </div>`).join('')}</div>` : '';
+
+    const flowH = e.flow ? `<div class="flow-diagram">${e.flow.map(f=>`
+      <div class="flow-node ${f.cls}">
+        <div class="fn-step">Step ${f.step}</div>
+        <div class="fn-label">${f.label}</div>
+        <div class="fn-note">${f.note}</div>
+      </div>`).join('')}</div>` : '';
+
+    const cmpH = e.cmp ? `<div class="cmp col${e.cmp.length}">${e.cmp.map(c=>`
+      <div class="cc ${c.cls}">
+        <div class="cc-label">${c.label}</div>
+        <p>${c.text}</p>
+      </div>`).join('')}</div>` : '';
+
+    const netH = e.netting ? buildNettingTable() : '';
+
+    const body = e.body.map(p=>`<p>${p}</p>`).join('') + flowH + stH + cmpH + netH
+      + `<div class="key-insight">
+           <div class="ki-bar"></div>
+           <div class="ki-content">
+             <div class="ki-label">Key Insight</div>
+             <div class="ki-text">${e.ki}</div>
+           </div>
+         </div>`
+      + `<div class="tags">${tH}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${String(i+1).padStart(2,'0')}</span>
+        <div class="e-status">
+          <div class="e-status-icon">${e.icon}</div>
+          <div class="e-status-label">${e.statusLabel}</div>
+        </div>
+        <div class="e-text">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        <div class="e-badges">${bH}</div>
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-body">${body}</div>`;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

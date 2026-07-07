@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 2.12 Perpetuals</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Fira+Code:wght@300;400;500;600&family=Inter:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #060808;
+  --bg1:       #0a0e0c;
+  --bg2:       #0f1412;
+  --bg3:       #141a18;
+  --border:    #1a2420;
+  --border2:   #243430;
+
+  --ink:       #d4ede4;
+  --ink2:      #7a9c8c;
+  --muted:     #3a5448;
+  --ghost:     #111816;
+
+  /* CRT phosphor palette */
+  --grn:       #39e87a;   /* phosphor green — long / bullish */
+  --grn-d:     #0a3018;
+  --grn-b:     rgba(57,232,122,0.06);
+
+  --mag:       #e83984;   /* magenta — short / bearish */
+  --mag-d:     #3a0820;
+  --mag-b:     rgba(232,57,132,0.06);
+
+  --amb:       #e8a839;   /* amber — liquidation / warning */
+  --amb-d:     #3a2408;
+  --amb-b:     rgba(232,168,57,0.06);
+
+  --blu:       #39a8e8;   /* steel blue — neutral metrics */
+  --blu-d:     #082038;
+  --blu-b:     rgba(57,168,232,0.06);
+
+  --vio:       #9d39e8;   /* violet — funding / arb */
+  --vio-d:     #200838;
+  --vio-b:     rgba(157,57,232,0.06);
+
+  --neu:       #4a6e60;   /* neutral accent */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.72;
+  overflow-x: hidden;
+}
+
+/* phosphor scanline overlay */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent, transparent 2px,
+    rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 3px
+  );
+  pointer-events: none; z-index: 999;
+}
+
+/* ── LIVE FEED STRIP ── */
+.live-feed {
+  background: var(--grn-d);
+  border-bottom: 1px solid var(--grn);
+  height: 30px; overflow: hidden;
+  display: flex; align-items: center;
+  position: relative; z-index: 10;
+}
+
+.live-feed-label {
+  font-family: 'Fira Code', monospace;
+  font-size: 9px; letter-spacing: 0.16em;
+  color: var(--grn); padding: 0 14px;
+  border-right: 1px solid var(--grn-d);
+  white-space: nowrap; flex-shrink: 0;
+  text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.feed-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--grn);
+  animation: pulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 5px var(--grn);
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.feed-scroll-wrap { flex: 1; overflow: hidden; }
+.feed-inner {
+  display: flex; gap: 40px; white-space: nowrap;
+  animation: feedScroll 35s linear infinite;
+  padding: 0 24px;
+}
+@keyframes feedScroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+.feed-item {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px; letter-spacing: 0.06em;
+  display: flex; align-items: center; gap: 8px;
+}
+.feed-item .sym { color: var(--ink2); }
+.feed-item .price { color: var(--ink); font-weight: 500; }
+.feed-item .liq-long  { color: var(--grn); }
+.feed-item .liq-short { color: var(--mag); }
+.feed-item .liq-size  { color: var(--amb); }
+.feed-item .funding   { color: var(--vio); }
+
+/* ── MASTHEAD ── */
+.masthead {
+  position: relative; z-index: 2;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border2);
+}
+
+.mhd-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 48px 44px 0;
+  display: grid; grid-template-columns: 1fr 280px;
+  gap: 44px; align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'Fira Code', monospace;
+  font-size: 9.5px; letter-spacing: 0.24em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mhd-kicker::before { content: '>'; color: var(--grn); }
+
+.mhd-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(42px, 6vw, 76px);
+  font-weight: 700; letter-spacing: -0.04em;
+  line-height: 0.88; color: var(--ink);
+  margin-bottom: 12px;
+}
+.mhd-title .hi { color: var(--grn); }
+.mhd-title .lo { color: var(--mag); }
+
+.mhd-sub {
+  font-family: 'Inter', sans-serif;
+  font-style: italic; font-size: 13.5px;
+  color: var(--ink2); line-height: 1.65;
+  max-width: 480px; font-weight: 300;
+}
+
+/* perp stats panel */
+.perp-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  overflow: hidden;
+}
+.pp-hdr {
+  font-family: 'Fira Code', monospace;
+  font-size: 8px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 7px 13px; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.pp-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 13px; border-bottom: 1px solid var(--border);
+}
+.pp-row:last-child { border-bottom: none; }
+.pp-label { font-family: 'Fira Code', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.05em; }
+.pp-val { font-family: 'Fira Code', monospace; font-size: 11px; font-weight: 600; }
+.pp-val.grn { color: var(--grn); }
+.pp-val.mag { color: var(--mag); }
+.pp-val.amb { color: var(--amb); }
+.pp-val.blu { color: var(--blu); }
+.pp-val.vio { color: var(--vio); }
+
+/* funding rate sparkline */
+.sparkline-wrap {
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border);
+}
+.spark-label {
+  font-family: 'Fira Code', monospace;
+  font-size: 8px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 5px;
+}
+.spark-svg { width: 100%; height: 32px; }
+
+/* ── PAGE ── */
+.page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 32px 44px 100px; }
+
+.sec-hdr {
+  display: flex; align-items: center; gap: 12px;
+  margin: 28px 0 8px;
+}
+.sec-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.sec-line { flex: 1; height: 1px; }
+
+.controls { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
+.ctrl {
+  font-family: 'Fira Code', monospace;
+  font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 6px 14px; border: 1px solid var(--border2);
+  background: transparent; color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.ctrl:hover { border-color: var(--grn); color: var(--grn); }
+.ctrl-right { margin-left: auto; font-family: 'Fira Code', monospace; font-size: 9.5px; color: var(--muted); letter-spacing: 0.05em; }
+
+/* ── ENTRY ── */
+.entry {
+  border: 1px solid var(--border);
+  background: var(--bg1);
+  margin-bottom: 4px; position: relative; overflow: hidden;
+  transition: border-color 0.18s;
+}
+.entry::before {
+  content: ''; position: absolute; left:0; top:0; bottom:0; width:3px;
+  transition: width 0.2s;
+}
+.entry.open::before { width: 4px; }
+.entry:hover { border-color: var(--border2); }
+
+.f-grn   .entry::before { background: var(--grn-d); } .f-grn   .entry.open::before { background: var(--grn); }
+.f-mag   .entry::before { background: var(--mag-d); } .f-mag   .entry.open::before { background: var(--mag); }
+.f-amb   .entry::before { background: var(--amb-d); } .f-amb   .entry.open::before { background: var(--amb); }
+.f-blu   .entry::before { background: var(--blu-d); } .f-blu   .entry.open::before { background: var(--blu); }
+.f-vio   .entry::before { background: var(--vio-d); } .f-vio   .entry.open::before { background: var(--vio); }
+
+.e-hdr {
+  display: flex; align-items: center;
+  cursor: pointer; user-select: none;
+  min-height: 58px; padding-left: 4px;
+  transition: background 0.14s;
+}
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num {
+  font-family: 'Fira Code', monospace;
+  font-size: 9px; color: var(--ghost);
+  width: 44px; text-align: center; flex-shrink: 0; letter-spacing: 0.06em;
+}
+.e-icon {
+  font-size: 17px; width: 46px; text-align: center; flex-shrink: 0;
+  border-right: 1px solid var(--border); align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+}
+.e-text { flex: 1; padding: 12px 16px; }
+.e-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px; font-weight: 600; color: var(--ink);
+  line-height: 1.2; letter-spacing: -0.01em;
+}
+.e-sub {
+  font-family: 'Fira Code', monospace;
+  font-size: 9.5px; color: var(--muted); margin-top: 3px;
+  letter-spacing: 0.03em; font-weight: 300;
+}
+.e-badge {
+  font-family: 'Fira Code', monospace;
+  font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 3px 9px; border: 1px solid; flex-shrink: 0;
+  margin-right: 14px; white-space: nowrap;
+}
+.e-toggle {
+  font-family: 'Fira Code', monospace; font-size: 12px; color: var(--muted);
+  width: 44px; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+  border-left: 1px solid var(--border); flex-shrink: 0;
+  transition: transform 0.24s, color 0.15s;
+}
+.entry.open .e-toggle { transform: rotate(90deg); }
+.f-grn .entry.open .e-toggle { color: var(--grn); }
+.f-mag .entry.open .e-toggle { color: var(--mag); }
+.f-amb .entry.open .e-toggle { color: var(--amb); }
+.f-blu .entry.open .e-toggle { color: var(--blu); }
+.f-vio .entry.open .e-toggle { color: var(--vio); }
+
+/* ── BODY ── */
+.e-body {
+  display: none; border-top: 1px solid var(--border);
+  background: var(--bg); padding: 22px 22px 26px 90px;
+  animation: bIn 0.2s ease;
+}
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p {
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px; font-weight: 300;
+  line-height: 1.88; color: var(--ink2); margin-bottom: 14px;
+}
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+.e-body p strong { font-weight: 600; color: var(--ink); }
+
+/* code / formula */
+.code-block {
+  margin-top: 16px; padding: 14px 18px;
+  background: var(--bg2); border: 1px solid var(--border2);
+  font-family: 'Fira Code', monospace;
+  font-size: 11.5px; line-height: 1.8; color: var(--ink2);
+  overflow-x: auto;
+}
+.code-block .k  { color: var(--grn); }
+.code-block .v  { color: var(--amb); }
+.code-block .m  { color: var(--mag); }
+.code-block .b  { color: var(--blu); }
+.code-block .vi { color: var(--vio); }
+.code-block .c  { color: var(--muted); font-style: italic; }
+
+/* stats */
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.stat { flex: 1; min-width: 115px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2); }
+.stat-l { font-family: 'Fira Code', monospace; font-size: 7.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.stat-v { font-family: 'Fira Code', monospace; font-size: 12.5px; font-weight: 600; line-height: 1.2; }
+.stat-v.grn { color: var(--grn); } .stat-v.mag { color: var(--mag); }
+.stat-v.amb { color: var(--amb); } .stat-v.blu { color: var(--blu); }
+.stat-v.vio { color: var(--vio); }
+
+/* cmp grid */
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cmp.c3 { grid-template-columns: 1fr 1fr 1fr; }
+.cc { padding: 12px 14px; border: 1px solid var(--border); background: var(--bg2); }
+.cc-l { font-family: 'Fira Code', monospace; font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 6px; }
+.cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Inter', sans-serif !important; font-weight: 300 !important; color: var(--ink2) !important; }
+.cc.grn { background: var(--grn-b); border-color: var(--grn-d); } .cc.grn .cc-l { color: var(--grn); }
+.cc.mag { background: var(--mag-b); border-color: var(--mag-d); } .cc.mag .cc-l { color: var(--mag); }
+.cc.amb { background: var(--amb-b); border-color: var(--amb-d); } .cc.amb .cc-l { color: var(--amb); }
+.cc.blu { background: var(--blu-b); border-color: var(--blu-d); } .cc.blu .cc-l { color: var(--blu); }
+.cc.vio { background: var(--vio-b); border-color: var(--vio-d); } .cc.vio .cc-l { color: var(--vio); }
+
+/* data table */
+.dtable { margin-top: 18px; border: 1px solid var(--border); overflow: auto; }
+.drow { display: grid; border-bottom: 1px solid var(--border); }
+.drow:last-child { border-bottom: none; }
+.drow.hdr .dc { background: var(--bg3); font-family: 'Fira Code', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.dc { padding: 8px 12px; border-right: 1px solid var(--border); font-family: 'Fira Code', monospace; font-size: 10.5px; color: var(--ink2); line-height: 1.5; }
+.dc:last-child { border-right: none; }
+.dc.label { color: var(--ink); font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 12px; }
+.dc.grn { color: var(--grn); } .dc.mag { color: var(--mag); }
+.dc.amb { color: var(--amb); } .dc.blu { color: var(--blu); }
+
+/* liq cascade visual */
+.liq-vis { margin-top: 18px; border: 1px solid var(--border); overflow: hidden; }
+.liq-head { font-family: 'Fira Code', monospace; font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); background: var(--bg3); padding: 7px 13px; border-bottom: 1px solid var(--border); }
+.liq-row { display: grid; grid-template-columns: 90px 1fr 90px; border-bottom: 1px solid var(--border); }
+.liq-row:last-child { border-bottom: none; }
+.liq-price { padding: 7px 12px; font-family: 'Fira Code', monospace; font-size: 10.5px; color: var(--ink2); border-right: 1px solid var(--border); }
+.liq-bar-wrap { padding: 6px 10px; display: flex; align-items: center; gap: 8px; border-right: 1px solid var(--border); }
+.liq-bar { height: 10px; border-radius: 1px; }
+.liq-usd { padding: 7px 12px; font-family: 'Fira Code', monospace; font-size: 10px; color: var(--muted); text-align: right; }
+
+/* funding rate chart */
+.funding-chart { margin-top: 18px; border: 1px solid var(--border); overflow: hidden; }
+.fc-head { font-family: 'Fira Code', monospace; font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); background: var(--bg3); padding: 7px 13px; border-bottom: 1px solid var(--border); }
+.fc-svg { width: 100%; height: 80px; display: block; }
+
+/* key insight */
+.ki {
+  margin-top: 20px; padding: 14px 18px;
+  background: var(--bg2); border: 1px solid var(--border2);
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.ki-mark {
+  font-family: 'Fira Code', monospace; font-size: 10px;
+  font-weight: 600; letter-spacing: 0.08em;
+  flex-shrink: 0; padding-top: 2px; line-height: 1;
+}
+.ki-text {
+  font-family: 'Inter', sans-serif; font-style: italic;
+  font-size: 14px; color: var(--ink); line-height: 1.62; font-weight: 300;
+}
+.f-grn .ki-mark { color: var(--grn); } .f-mag .ki-mark { color: var(--mag); }
+.f-amb .ki-mark { color: var(--amb); } .f-blu .ki-mark { color: var(--blu); }
+.f-vio .ki-mark { color: var(--vio); }
+
+/* tags */
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-family: 'Fira Code', monospace; font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 7px; border: 1px solid var(--border2); color: var(--muted); }
+.tag.grn { border-color: var(--grn-d); color: var(--grn); }
+.tag.mag { border-color: var(--mag-d); color: var(--mag); }
+.tag.amb { border-color: var(--amb-d); color: var(--amb); }
+.tag.blu { border-color: var(--blu-d); color: var(--blu); }
+.tag.vio { border-color: var(--vio-d); color: var(--vio); }
+
+/* footer */
+.foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+.foot span { font-family: 'Fira Code', monospace; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .perp-panel { display: none; }
+  .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding: 36px 18px 0; }
+  .e-body { padding-left: 16px; }
+  .cmp.c2,.cmp.c3 { grid-template-columns: 1fr; }
+  .e-badge { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- LIVE FEED -->
+<div class="live-feed">
+  <div class="live-feed-label"><div class="feed-dot"></div> LIVE FEED</div>
+  <div class="feed-scroll-wrap">
+    <div class="feed-inner" id="feedInner"></div>
+  </div>
+</div>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 2.12 · Digital Assets · Crypto-Native Instruments</div>
+      <div class="mhd-title">PERP<span class="hi">ET</span><span class="lo">U</span>ALS</div>
+      <div class="mhd-sub">Perpetual swaps — the dominant crypto derivative. No expiry, no delivery, just funding rates and liquidation engines running 24/7 at 100× leverage.</div>
+    </div>
+    <div class="perp-panel">
+      <div class="pp-hdr">// BTC-PERP snapshot</div>
+      <div class="sparkline-wrap">
+        <div class="spark-label">Funding rate (8h) — 30 day</div>
+        <svg class="spark-svg" viewBox="0 0 254 32" fill="none">
+          <line x1="0" y1="16" x2="254" y2="16" stroke="#1a2420" stroke-width="1"/>
+          <polyline points="0,14 10,13 20,15 30,11 40,9 50,10 60,14 70,16 80,18 90,20 100,22 110,24 120,20 130,15 140,12 150,10 160,13 170,16 180,14 190,12 200,10 210,11 220,13 230,14 240,15 254,14"
+            stroke="#9d39e8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="pp-row"><span class="pp-label">Mark price</span><span class="pp-val blu">$63,482</span></div>
+      <div class="pp-row"><span class="pp-label">Index price</span><span class="pp-val grn">$63,451</span></div>
+      <div class="pp-row"><span class="pp-label">Basis (perp − spot)</span><span class="pp-val grn">+$31 (+0.049%)</span></div>
+      <div class="pp-row"><span class="pp-label">Funding rate (8h)</span><span class="pp-val vio">+0.0082%</span></div>
+      <div class="pp-row"><span class="pp-label">Open interest</span><span class="pp-val amb">$14.2B</span></div>
+      <div class="pp-row"><span class="pp-label">L/S ratio (24h)</span><span class="pp-val grn">51.2% / 48.8%</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">11 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>2.12 Perpetuals (Crypto-Native)</span>
+</footer>
+
+<script>
+/* ── live feed data ── */
+const feedData = [
+  {type:'liq',  sym:'BTC-PERP', side:'LONG',  price:'63,210', size:'$2.4M'},
+  {type:'fund', sym:'ETH-PERP', rate:'+0.0061%', interval:'8h'},
+  {type:'liq',  sym:'SOL-PERP', side:'SHORT', price:'168.40', size:'$340K'},
+  {type:'price',sym:'BTC-PERP', price:'63,482', chg:'+0.12%'},
+  {type:'liq',  sym:'BNB-PERP', side:'LONG',  price:'597.20', size:'$890K'},
+  {type:'fund', sym:'BTC-PERP', rate:'+0.0082%', interval:'8h'},
+  {type:'liq',  sym:'ETH-PERP', side:'LONG',  price:'3,461',  size:'$1.8M'},
+  {type:'price',sym:'SOL-PERP', price:'168.95', chg:'+1.8%'},
+  {type:'liq',  sym:'AVAX-PERP',side:'SHORT', price:'38.10',  size:'$215K'},
+  {type:'fund', sym:'SOL-PERP', rate:'+0.0120%', interval:'8h'},
+  {type:'liq',  sym:'BTC-PERP', side:'SHORT', price:'63,800', size:'$5.1M'},
+  {type:'price',sym:'ETH-PERP', price:'3,481', chg:'+0.4%'},
+  {type:'liq',  sym:'ARB-PERP', side:'LONG',  price:'0.8820', size:'$180K'},
+  {type:'fund', sym:'ETH-PERP', rate:'-0.0014%', interval:'8h'},
+  {type:'liq',  sym:'DOGE-PERP',side:'LONG',  price:'0.1421', size:'$290K'},
+];
+
+function buildFeedItem(d) {
+  if (d.type === 'liq') {
+    const sideClass = d.side === 'LONG' ? 'liq-long' : 'liq-short';
+    return `<div class="feed-item">
+      <span class="sym">${d.sym}</span>
+      <span class="${sideClass}">LIQ ${d.side}</span>
+      <span class="price">${d.price}</span>
+      <span class="liq-size">${d.size}</span>
+    </div>`;
+  }
+  if (d.type === 'fund') {
+    const c = parseFloat(d.rate) >= 0 ? 'liq-long' : 'liq-short';
+    return `<div class="feed-item">
+      <span class="sym">${d.sym}</span>
+      <span class="funding">FUNDING</span>
+      <span class="${c}">${d.rate}</span>
+      <span class="sym">/${d.interval}</span>
+    </div>`;
+  }
+  return `<div class="feed-item">
+    <span class="sym">${d.sym}</span>
+    <span class="price">${d.price}</span>
+    <span class="liq-long">${d.chg}</span>
+  </div>`;
+}
+
+const fi = document.getElementById('feedInner');
+const all = [...feedData, ...feedData]; // duplicate for seamless loop
+all.forEach(d => { fi.innerHTML += buildFeedItem(d); });
+
+/* ── sections data ── */
+const sections = [
+  {
+    label: 'Mechanics & Pricing',
+    color: 'var(--grn)', line: 'var(--grn-d)', fam: 'f-grn',
+    entries: [
+      {
+        icon: '♾️', badge: 'MECHANICS', badgeColor: 'grn',
+        title: 'Perpetual Swap Mechanics',
+        sub: 'How a futures contract works with no expiry date — and no convergence problem',
+        tags: [['perpetual swap','grn'],['no expiry','grn'],['crypto derivative','grn'],['leverage','amb']],
+        code: `<span class="c">// Perpetual swap: the most-traded crypto instrument</span>
+<span class="k">Notional exposure</span> = Position Size × Entry Price
+<span class="k">PnL (long)</span>       = (Mark Price − Entry Price) × Size
+<span class="k">PnL (short)</span>      = (Entry Price − Mark Price) × Size
+
+<span class="c">// Leverage: control large notional with small margin</span>
+<span class="k">Margin required</span>  = Notional / Leverage
+<span class="b">Example:</span> 1 BTC perp at $63,000, 10× leverage
+         → $6,300 margin controls $63,000 notional`,
+        body: [
+          `A <em>perpetual swap</em> ("perp") is a derivative contract that behaves like a futures contract — it tracks the price of an underlying asset (BTC, ETH, SOL, etc.) and allows leveraged long and short positions — but has no expiry date. Unlike a quarterly futures contract, which must be rolled or settled at expiration, a perp can be held indefinitely. This makes perps far more convenient for leveraged traders who want continuous exposure without managing rolling costs or expiry logistics, and explains why perps account for the majority of all crypto derivatives volume globally.`,
+          `The core mechanics mirror traditional futures. When you open a long BTC perp at $63,000, your profit or loss is calculated mark-to-market in real time: if BTC moves to $65,000, you profit $2,000 per contract (before fees and funding). Positions are <em>leveraged</em> — 10× leverage means $6,300 of margin controls $63,000 of notional exposure. The leverage multiplier is the same double-edged sword as in traditional futures: gains and losses are both multiplied, so a 10× leveraged long loses 100% of margin on a 10% adverse price move.`,
+          `The perpetual swap was invented by BitMEX (launched 2016, designed by Arthur Hayes and Ben Delo) and is now the dominant instrument across every major crypto exchange — Binance, Bybit, OKX, Deribit, Hyperliquid, and the CME (which offers Micro Bitcoin and Ether futures with similar mechanics). The global open interest in crypto perps routinely exceeds $25–30 billion, with daily volumes exceeding $100 billion across all venues. In a market that runs 24 hours a day, 365 days a year, across exchanges in every time zone with no closing bell, perps are the instrument of choice for professional and retail crypto traders alike.`,
+          `The absence of an expiry date solves one problem but creates another: without delivery convergence, what prevents the perp price from drifting permanently away from the spot price? The answer is the <em>funding rate mechanism</em> — the innovation that makes perpetual swaps economically viable.`
+        ],
+        ki: 'The perpetual swap is one of the most genuinely innovative financial instruments of the past decade — solving the practical limitation of expiry-date futures for a market that never closes. Its success reflects a genuine product-market fit: crypto markets operate 24/7 with a global, retail-heavy user base that wants leveraged exposure without the friction of rolling quarterly contracts. The perp is to crypto what equity CFDs are to retail FX trading — leveraged access to an asset class without owning the underlying.'
+      },
+      {
+        icon: '💸', badge: 'FUNDING', badgeColor: 'vio',
+        title: 'Funding Rate Mechanism',
+        sub: 'The periodic payment that keeps perp prices anchored to spot — and creates a tradeable yield',
+        tags: [['funding rate','vio'],['8h interval','vio'],['convergence','grn'],['long pays short','vio']],
+        code: `<span class="c">// Funding rate formula (simplified, Binance-style)</span>
+<span class="k">Funding Rate</span> = <span class="v">Premium Index</span> + clamp(<span class="vi">Interest Rate</span> − <span class="v">Premium Index</span>, −0.05%, +0.05%)
+
+<span class="k">Premium Index</span> = (Mark Price − Index Price) / Index Price
+
+<span class="c">// Settlement: every 8 hours (00:00, 08:00, 16:00 UTC)</span>
+<span class="c">// Payment: longs pay shorts if rate positive; reverse if negative</span>
+
+<span class="b">Example:</span>
+  Mark = $63,482   Index = $63,451
+  Premium = +0.049%
+  Funding rate ≈ +0.0082% per 8h
+  → Long BTC $1M pays $820 every 8 hours
+  → Annualised: +0.0082% × 3 × 365 = <span class="k">+8.97%/year</span>`,
+        body: [
+          `The <em>funding rate</em> is the mechanism that prevents perpetual swap prices from drifting permanently above or below the underlying spot price. Every 8 hours (on most exchanges; some use 1-hour or 4-hour intervals), a payment is exchanged directly between long and short position holders — with no payment to the exchange itself. When the perp trades above spot (positive premium — reflecting excess demand for longs), the funding rate is positive: longs pay shorts. This creates a direct financial incentive for new short sellers to enter (collecting funding) and for overleveraged longs to reduce positions (paying funding), mechanically pushing the perp price back toward spot.`,
+          `The funding rate has two components. The <em>premium index</em> (or "basis component") reflects the current gap between the mark price and the spot index price — a large positive premium produces a large positive funding rate. The <em>interest rate component</em> is a small, fixed per-period rate (typically 0.01% per 8 hours, or ~11% annualized) representing the theoretical cost of holding the leveraged position in the underlying fiat-denominated economy — analogous to the financing cost embedded in traditional futures pricing. The total funding rate is the sum of these components, clamped to a maximum of ±0.75% per 8 hours to prevent extreme funding during violent market moves.`,
+          `The funding rate is one of the most important real-time signals in crypto markets. Persistently high positive funding (longs paying >0.05% per 8 hours, or >50% annualised) signals that leveraged longs are extremely crowded — a classic condition preceding sharp corrections as those longs get squeezed out. Persistently negative funding signals the reverse: extreme short crowding, often a precondition for a short squeeze rally. Experienced traders monitor funding rates across multiple exchanges and assets as a sentiment indicator comparable to the put/call ratio in traditional equity options markets.`
+        ],
+        fundChart: true,
+        ki: 'The funding rate mechanism is perpetual swaps\' most elegant design feature — it aligns the financial incentives of long and short holders to continuously arbitrage the perp price back toward spot, without any central authority intervening. The funding rate is simultaneously: a real-time sentiment gauge (high positive = extreme long crowding), a tradeable yield source (harvest funding by going short when rates are high), and the mechanism that makes perpetual swaps economically stable indefinitely without expiry dates.'
+      },
+      {
+        icon: '🎯', badge: 'MARK/INDEX', badgeColor: 'blu',
+        title: 'Mark Price vs. Index Price',
+        sub: 'Two reference prices for the same asset — and why the distinction prevents manipulation-driven liquidations',
+        tags: [['mark price','blu'],['index price','blu'],['manipulation protection','amb'],['oracle','blu']],
+        stats: [
+          {l:'Index price source',      v:'Multi-exchange spot VWAP', c:'blu'},
+          {l:'Mark price formula',      v:'Index + EMA(funding basis)', c:'blu'},
+          {l:'Liquidations triggered by',v:'Mark price (not last trade)', c:'amb'},
+          {l:'Max mark-index deviation', v:'Typically ±0.5–1% before insurance', c:'amb'},
+        ],
+        cmp: [
+          {cls:'blu', label:'Index Price', text:'The "true" spot price of the underlying asset, calculated as a volume-weighted average (or median) of spot prices from multiple reputable spot exchanges (e.g. Binance, Coinbase, Kraken, OKX for BTC index). The multi-exchange averaging makes it very resistant to manipulation on any single venue — to move the index price significantly requires simultaneously moving spot prices on multiple large exchanges, which is extraordinarily capital-intensive.'},
+          {cls:'grn', label:'Mark Price', text:'The price used for all real-time PnL calculations and liquidation triggers. Computed as the index price plus a decaying exponential moving average (EMA) of the basis (funding premium). The mark price tracks spot via the index but smooths out momentary spikes in the perp market itself — a brief, 1-second wick in the perp order book cannot trigger liquidations because mark price won\'t move with it.'},
+          {cls:'amb', label:'Why the Distinction Matters', text:'If liquidations were triggered by the last-traded price in the perp market, a well-funded attacker could briefly "wick" the price down (using a small sell order that momentarily moves an illiquid book) to trigger a cascade of long liquidations, then cover their short at the artificially depressed price. Using a manipulation-resistant mark price derived from a multi-exchange spot index makes this attack prohibitively expensive.'},
+        ],
+        body: [
+          `The distinction between <em>mark price</em> and <em>index price</em> is one of crypto perp markets' most important market microstructure safeguards — and one of the least appreciated by retail participants. The fundamental problem it solves: if liquidation decisions (the forced closing of under-margined positions) were based on the perp's own last-traded price, the market would be extraordinarily vulnerable to manipulation-triggered liquidation cascades.`,
+          `The <em>index price</em> is the spot reference — a robust, manipulation-resistant composite of BTC (or ETH, SOL, etc.) prices across multiple major spot exchanges, typically volume-weighted or median-averaged. Because it reflects actual buying and selling of the underlying asset on multiple independent venues, it requires genuinely moving the underlying market to change meaningfully.`,
+          `The <em>mark price</em> is the exchange-specific price used for unrealised PnL calculations and liquidation triggers. It is typically the index price plus an exponential moving average of the funding premium — meaning it tracks the index price closely over time but cannot be instantly moved by a large perp order. This design ensures that a momentary, large sell order in the perp book (a "wick") does not show up in the mark price at the same speed, preventing the wick from triggering liquidations. Traders are liquidated when their mark-price-based equity falls below the maintenance margin threshold — not when the last trade price does.`
+        ],
+        ki: 'Mark price is crypto perp markets\' anti-manipulation circuit breaker. Without it, the "wick hunting" phenomenon — where large players briefly push prices to trigger stops and liquidations — would be far more severe and profitable. The multi-exchange index price oracle underpinning the mark price is one of the most important pieces of market infrastructure in crypto, and its failure (flash crashes, oracle manipulation attacks on smaller exchanges) is consistently one of the largest sources of unexpected liquidations.'
+      },
+    ]
+  },
+  {
+    label: 'Risk & Safety Architecture',
+    color: 'var(--amb)', line: 'var(--amb-d)', fam: 'f-amb',
+    entries: [
+      {
+        icon: '⚡', badge: 'LIQUIDATION', badgeColor: 'amb',
+        title: 'Liquidation Engines',
+        sub: 'How exchanges forcibly close under-margined positions — and why cascades happen',
+        tags: [['liquidation','amb'],['maintenance margin','amb'],['cascade','mag'],['ADL','amb']],
+        code: `<span class="c">// Liquidation trigger (isolated margin example)</span>
+<span class="k">Maintenance Margin Rate</span>  = 0.5%   <span class="c">// e.g. 0.5% for BTC perp</span>
+<span class="k">Liquidation Price (long)</span> = Entry × (1 − 1/Leverage + MMR)
+
+<span class="b">Example:</span> Long BTC at $63,000, 10× leverage
+  Margin = $6,300 (10% of notional)
+  Maint. margin = $63,000 × 0.5% = $315
+  <span class="v">Liq price</span> ≈ $63,000 × (1 − 0.10 + 0.005) = <span class="m">$57,015</span>
+
+<span class="c">// BTC falls 9.5% → position liquidated, trader loses entire margin</span>
+<span class="c">// Bankrupt if mark price < bankruptcy price → insurance fund absorbs</span>`,
+        liqVis: true,
+        cmp: [
+          {cls:'amb', label:'Standard Liquidation Process', text:'When mark price reaches the liquidation price, the exchange\'s liquidation engine takes over the position. The engine attempts to close the position in the open market at the best available price. If it can close above the bankruptcy price (the price at which the trader\'s equity hits zero), the remaining margin is partially returned. If it cannot close at a profit, the insurance fund covers the shortfall to protect the counterparty.'},
+          {cls:'mag', label:'Cascade Dynamics', text:'Liquidations beget liquidations. A sharp price fall → longs liquidated → liquidation engine sells more → price falls further → more longs hit liquidation prices → more selling → cascade. Liquidation heatmaps (showing the total notional of leveraged positions near specific price levels) have become one of the most-watched crypto trading tools precisely because large concentrations of liquidations at specific levels create predictable, mechanical price moves.'},
+          {cls:'grn', label:'Auto-Deleveraging (ADL)', text:'A last-resort mechanism when the insurance fund is depleted: the exchange forcibly closes the most-profitable opposite-side positions against the insolvent position at the bankruptcy price. ADL effectively transfers losses from the insolvent trader to the most-profitable counter-traders — deeply unpopular, since it punishes successful traders for others\' failures. Major exchanges have dramatically increased insurance funds to minimize ADL occurrences.'},
+        ],
+        body: [
+          `The <em>liquidation engine</em> is the exchange's automated risk management system that continuously monitors every open position's margin ratio and intervenes when a trader's equity falls below the required maintenance margin. Liquidation is triggered when the mark price reaches the position's liquidation price — the price at which the trader's remaining margin equals the minimum required maintenance margin. At this point, the trader loses control of their position.`,
+          `Crypto liquidations are often sudden and total. Unlike margin calls in traditional brokerage accounts (where the client has time to deposit additional funds or partially reduce positions), crypto perp liquidations on many exchanges are instant and binary: the moment the mark price touches the liquidation level, the position is taken over by the liquidation engine with no warning and no grace period. The speed of this system is by design — in a 24/7 market with extreme volatility, exchanges cannot afford to wait for client responses before closing under-margined positions, lest the loss grow larger than the available margin.`,
+          `The most dangerous phenomenon for market stability is the <em>liquidation cascade</em>. Because large concentrations of leveraged longs cluster at technically significant price levels (support zones, round numbers), a sharp move through these levels triggers sequential waves of liquidation selling. Each wave of forced selling pushes the price further, triggering the next wave. During the March 2020 COVID crash and the May 2021 crypto crash, liquidation cascades accelerated intraday moves to extreme velocity — at peak cascade speed in May 2021, over $8 billion of long positions were liquidated within 24 hours, mechanically amplifying a market decline into a near-vertical crash.`
+        ],
+        ki: 'Liquidation cascades are crypto perps\' most distinctive systemic risk — an emergent, mechanical phenomenon that transforms a moderate price decline into a near-vertical crash whenever leveraged long positioning is concentrated at levels above a technically significant support zone. The Liquidation Heatmap (visualizing the dollar value of open positions near specific price levels) has become an essential tool for crypto traders precisely because these cascades are predictable: large clusters of leveraged positions at specific prices create magnets — prices are drawn toward them, the cascade executes, and the price often stabilizes or reverses sharply once the liquidation cluster is cleared.'
+      },
+      {
+        icon: '🛡️', badge: 'INS. FUND', badgeColor: 'grn',
+        title: 'Insurance Funds',
+        sub: 'The reserve buffer that prevents one trader\'s bankruptcy from becoming every trader\'s loss',
+        tags: [['insurance fund','grn'],['clawback prevention','grn'],['ADL','amb'],['socialized loss','mag']],
+        stats: [
+          {l:'Binance USDT insurance fund',   v:'$300–400M+ (historical peak)',  c:'grn'},
+          {l:'Bybit insurance fund',          v:'~$200M (ongoing)',              c:'grn'},
+          {l:'Source of insurance funds',     v:'Liquidation surplus (margin left after liq)', c:'grn'},
+          {l:'Depleted when',                 v:'Market moves so fast liq = below bankruptcy', c:'amb'},
+        ],
+        body: [
+          `The <em>insurance fund</em> is a pool of capital maintained by the exchange, built up over time from the surplus margin remaining after successful liquidations, that absorbs the losses when a liquidation executes below the bankrupt trader's bankruptcy price — i.e., when the liquidation engine cannot close the position at a price that covers all losses from the trader's margin alone.`,
+          `The problem the insurance fund solves: in a standard futures market, if a trader's position goes bankrupt (the loss exceeds their margin), someone has to absorb that loss. Without an insurance fund, this loss would be "socialised" across the winning side of the position — profitable traders would have their gains reduced (or "clawed back") proportionally to cover the bankrupt trader's shortfall. This socialized loss mechanism, used by early crypto exchanges, was deeply unpopular — it meant a profitable trade could have its gains arbitrarily reduced based on other traders' bad risk management.`,
+          `Insurance funds are funded by the margin "surplus" from standard liquidations: when the liquidation engine closes a position above the bankruptcy price, the difference between the liquidation proceeds and the bankruptcy price (which would have wiped out the entire margin) goes into the insurance fund. Healthy, growing insurance funds signal that the exchange's liquidation engine is generally running efficiently — most liquidations are being closed before positions go fully bankrupt. A rapidly shrinking insurance fund signals a severe market dislocation where the engine cannot keep pace with the speed of price moves.`,
+          `Major exchanges (Binance, Bybit, OKX) maintain insurance funds in the hundreds of millions of dollars — large enough to absorb typical liquidation shortfalls across even extremely volatile market conditions. However, these funds can in principle be depleted by a sufficiently severe, fast, correlated cascade — the scenario that triggers ADL (Auto-Deleveraging), where instead of the insurance fund absorbing losses, the exchange forcibly closes the most profitable counter-positions. ADL events are rare but represent a systemic risk that has become more manageable as insurance fund sizes have grown substantially since 2020.`
+        ],
+        ki: 'The insurance fund is the mechanism that makes individual position bankruptcy a contained event rather than a systemic one. Without it, every trader in a perp market would face the risk of having profitable positions clawed back at any moment to cover a stranger\'s bad leverage decision — a deeply anti-social outcome that would destroy participation. Insurance fund size relative to open interest is one of the most important measures of a perp exchange\'s structural safety: a large, well-funded insurance fund means a well-designed liquidation engine; a small or shrinking one is a systemic red flag.'
+      },
+    ]
+  },
+  {
+    label: 'Market Dynamics & Signals',
+    color: 'var(--blu)', line: 'var(--blu-d)', fam: 'f-blu',
+    entries: [
+      {
+        icon: '📊', badge: 'PERP BASIS', badgeColor: 'blu',
+        title: 'Basis in Perps — Premium and Discount to Spot',
+        sub: 'The spread between perp price and spot as a real-time sentiment indicator',
+        tags: [['perp basis','blu'],['premium','grn'],['discount','mag'],['sentiment','blu']],
+        code: `<span class="c">// Perp basis (annualised % convention)</span>
+<span class="k">Basis %</span>     = (Perp Price − Spot Price) / Spot Price × 100
+<span class="k">Ann. basis</span>  = Basis % × (365 × 24 / Hours_in_period)
+
+<span class="b">Readings:</span>
+  +10–20% annualised  → <span class="k">Neutral-bullish</span> (typical bull market)
+  +50–100%+           → <span class="m">Extreme optimism</span> (crowded longs, correction risk)
+  Negative basis      → <span class="m">Bearish / fear</span> (shorts paying to borrow longs)
+  Near zero           → <span class="b">Neutral / indecision</span>`,
+        body: [
+          `The <em>basis</em> in perp markets — the difference between the perpetual futures price and the underlying spot price — is one of the most informative real-time sentiment indicators in crypto. Because funding rates automatically adjust to pull the perp price toward spot over time, the current basis directly reflects the current imbalance of buying versus selling pressure in the leveraged derivatives market: a perp trading above spot signals excess demand for leveraged longs; a perp trading below spot signals excess demand for leveraged shorts (or institutional cash-and-carry selling pressure).`,
+          `In practice, the perp basis fluctuates continuously around zero and is measured by its annualised equivalent for comparability. During healthy bull markets, perp premiums of 10–25% annualised are typical — reflecting demand from leveraged bulls who are willing to pay a financing cost for upside exposure. During euphoric market tops, annualised premiums can reach 50–100%+, signalling an extremely crowded long positioning that historically precedes sharp corrections (the funding cost eventually becomes unsustainable for leveraged longs, forcing position reduction, which itself contributes to the price correction).`,
+          `Negative basis — perps trading below spot — is the mirror: it typically emerges during bear markets, high fear environments, or during sudden price shocks when leveraged longs rush to close positions and the resulting perp market overshooting to the downside creates a discount. Negative funding during a crash can create a powerful short-term "buy signal" from a mean-reversion perspective, since the negative funding itself incentivises new long entries (shorts are paying longs for the privilege of being short) and eventually forces short covering.`,
+          `The basis on <em>dated quarterly futures</em> (where the price difference converges to zero at expiry) is a closely watched institutional sentiment indicator: a very steep basis (quarterly futures well above spot) signals strong demand for leveraged long exposure from sophisticated participants; a compressed or inverted basis (quarterly futures below spot) signals institutional distribution or bearish positioning. The curve shape across multiple contract maturities — the "futures term structure" — extends basis analysis into a full forward curve.`
+        ],
+        ki: 'Perp basis is the crypto market\'s real-time pulse on leveraged sentiment — it tells you whether the derivatives market is leaning long or short relative to the underlying spot market, and by how much. Extreme positive basis signals maximum bullish crowding and elevated correction risk; extreme negative basis signals maximum bearish crowding and potential for short squeezes. Monitoring basis alongside funding rates gives a complete picture of derivatives market positioning.'
+      },
+      {
+        icon: '📈', badge: 'OI', badgeColor: 'blu',
+        title: 'Open Interest Dynamics',
+        sub: 'The total notional of outstanding perp positions — and what changes in OI reveal about conviction',
+        tags: [['open interest','blu'],['OI analysis','blu'],['leverage','amb'],['conviction','blu']],
+        dtable: {
+          cols: ['Price', 'OI Change', 'Interpretation', 'Conviction'],
+          rows: [
+            ['↑ Rising', '↑ Rising',  'New longs entering — bulls adding leveraged exposure', 'Strong bullish conviction'],
+            ['↑ Rising', '↓ Falling', 'Short covering (shorts buying to close) — less confident buying', 'Weak / short squeeze'],
+            ['↓ Falling', '↑ Rising', 'New shorts entering — bears adding leveraged exposure', 'Strong bearish conviction'],
+            ['↓ Falling', '↓ Falling','Long liquidations (longs forced out) — panic selling', 'Capitulation / flush'],
+          ]
+        },
+        body: [
+          `<em>Open interest (OI)</em> in perp markets measures the total USD notional value (or contract count) of all outstanding positions — the sum of all open long positions (which equals the sum of all open short positions, since every long has a corresponding short counterparty). OI is a direct measure of capital committed to leveraged positions in the market at any given moment.`,
+          `The relationship between price direction and OI change is the most important OI analysis framework. <strong>Rising price + rising OI</strong> is the classic signal of genuine buying conviction: new long positions are being opened as the price rises — this is "real" buying, not just short covering, and suggests sustainable upward momentum with increasing capital commitment. <strong>Rising price + falling OI</strong> indicates short covering — the price rises as shorts close their positions (buying to close), but no new longs are entering. This type of rally tends to be weaker and more prone to reversal once the short covering is exhausted.`,
+          `<strong>Falling price + rising OI</strong> signals new short position entries — bears with real conviction are opening fresh leveraged short exposure. This is the mirror of the bullish conviction pattern and suggests organised, confident selling. <strong>Falling price + falling OI</strong> is the liquidation/capitulation pattern — existing longs are being forced out (liquidated or stopping out voluntarily), with the associated forced selling accelerating the price decline. This pattern often precedes trend reversals because it represents the exhaustion of the weakest hands.`,
+          `OI levels themselves also matter. Extremely elevated total OI (relative to historical norms or market cap) signals a highly leveraged market where any sudden price move will trigger large-scale liquidations — a fragile, "coiled spring" condition. After a major liquidation cascade dramatically reduces OI, the market is "deleveraged" — the vulnerable positions are gone, and the survivors tend to be better-capitalised, less reflexive traders, creating a more stable price environment. Watching for OI to peak and then begin falling after a long rally period is one of the more reliable leading indicators of a leveraged market top.`
+        ],
+        ki: 'Open interest is the leverage barometer of the perp market — it tells you not just which direction the market is leaning but how much capital is at risk behind that lean. A market with $30B in open interest is far more fragile than one with $10B, because more capital means larger liquidation clusters at every price level. When OI is very high and funding is very positive, the market is "loaded" with longs: the conditions are set for a cascade if any significant selling pressure arrives. Watching OI compress after a cascade is like watching a loaded spring release — it signals the dangerous positioning has been cleared.'
+      },
+      {
+        icon: '⚖️', badge: 'L/S RATIO', badgeColor: 'blu',
+        title: 'Long/Short Ratios',
+        sub: 'Who is positioned long vs short — and why the ratio is a contrarian signal at extremes',
+        tags: [['long short ratio','blu'],['sentiment','blu'],['contrarian','mag'],['positioning','blu']],
+        stats: [
+          {l:'Extreme long ratio (>70% longs)',  v:'Contrarian SELL signal — crowded longs', c:'mag'},
+          {l:'Extreme short ratio (>65% shorts)', v:'Contrarian BUY signal — short squeeze risk', c:'grn'},
+          {l:'Source',                            v:'Binance, Coinglass, exchange APIs',         c:'blu'},
+          {l:'Distinction',                       v:'Account ratio vs. position ratio (different!)', c:'amb'},
+        ],
+        body: [
+          `The <em>long/short ratio</em> is a real-time measure of how many market participants (by account or by position size) are currently positioned long versus short in a specific perp market. Unlike OI (which measures the total capital committed), the L/S ratio measures directional sentiment — when 70% of accounts are long, the market is heavily tilted in one direction.`,
+          `Two important variants exist and are often conflated. The <em>account L/S ratio</em> shows the percentage of accounts (traders) that hold a net long or net short position — this is a count-based measure that gives equal weight to a $1,000 position and a $10,000,000 position. The <em>position L/S ratio</em> (or "large trader ratio") weights by position size, showing the directional tilt of large-scale participants specifically. These two measures can diverge significantly: retail traders (many small accounts) may be predominantly short while institutional or "whale" traders (few but large accounts) are overwhelmingly long — the position ratio captures the meaningful sentiment signal; the account ratio captures the retail sentiment.`,
+          `The L/S ratio is most useful as a <em>contrarian indicator at extremes</em>. When 75%+ of accounts are long, the bullish consensus is so widespread that it implies most potential buyers have already bought — there's less incremental buying power remaining, while the eventual selling pressure from all those longs (whenever they decide to exit) is enormous. Extreme long consensus historically precedes corrections; extreme short consensus precedes squeezes. The practical trading approach: monitor L/S for extreme readings (>70% either direction), combine with funding rate and OI data for confirmation, and use the extreme as a warning to tighten risk management rather than as a precise timing signal (extremes can persist longer than expected).`
+        ],
+        ki: 'The long/short ratio is the perp market\'s polling data — and like political polling, it\'s most useful at extremes, where the consensus has become so one-sided that the counter-move becomes the higher-probability outcome. When 75% of traders are long, 75% of them eventually become sellers. The contrarian utility of extreme L/S readings is well-established in crypto; the trap is acting on mild imbalances (55/45) that don\'t carry the same predictive weight.'
+      },
+    ]
+  },
+  {
+    label: 'Strategy & Structure',
+    color: 'var(--vio)', line: 'var(--vio-d)', fam: 'f-vio',
+    entries: [
+      {
+        icon: '💰', badge: 'ARBTRAGE', badgeColor: 'vio',
+        title: 'Funding Arbitrage',
+        sub: 'Delta-neutral yield harvesting: go long spot, short perp, collect the funding rate',
+        tags: [['funding arb','vio'],['cash and carry','vio'],['delta neutral','grn'],['annualised yield','vio']],
+        code: `<span class="c">// Funding arbitrage — BTC cash-and-carry example</span>
+<span class="k">Position:</span>  Long 1 BTC spot ($63,000) + Short 1 BTC perp ($63,031)
+<span class="k">Basis:</span>     +$31 (perp premium, 0.049%)
+<span class="k">Funding:</span>   +0.0082% per 8h paid by longs to shorts
+
+<span class="c">// Revenue per 8h:</span>
+<span class="v">Funding income</span> = $63,031 × 0.0082% = $5.17 per 8h
+<span class="v">Annualised</span>     = $5.17 × 3 × 365 = <span class="k">$5,661/year on $63K = 8.98% APR</span>
+
+<span class="c">// Risks: funding rate can turn negative, spot custody risk,</span>
+<span class="c">//        exchange counterparty risk, margin call on short leg</span>`,
+        cmp: [
+          {cls:'vio', label:'Trade Construction', text:'Buy spot BTC (or hold existing BTC), simultaneously short an equal notional of BTC perpetual. The long spot position and short perp are equal and opposite in BTC terms — the combined position has zero delta (immune to BTC price moves). The only net economic exposure is the basis (the perp premium) and the funding rate received on the short perp position. Net yield = annualised funding rate − transaction costs − borrow/custody costs.'},
+          {cls:'grn', label:'Why It\'s Not a Free Lunch', text:'Funding rates can turn negative (especially during sharp market downturns), instantly reversing the trade from income-generating to income-consuming. Exchange counterparty risk: if the exchange holding the perp short goes bankrupt (e.g. FTX), the short position\'s value disappears even as the spot BTC remains. Margin management: the short perp position requires margin; in a rising market, the short requires additional margin as unrealised losses grow (offset by gains on spot, but cash flow management is required).'},
+          {cls:'amb', label:'Institutional Scale', text:'At institutional scale (hundreds of millions of notional), funding arb is one of the most popular crypto hedge fund strategies — effectively making the fund the "bank" of the leveraged trader community, collecting the premium they pay for leveraged exposure. During peak 2021 bull market conditions, annualised funding yields on BTC and ETH exceeded 50–100%, making this trade extraordinarily profitable. Funds with low-cost custody (e.g. ETF shares, regulated prime brokers) can access this yield at very low operational risk.'},
+        ],
+        body: [
+          `<em>Funding arbitrage</em> (the "crypto cash-and-carry trade") is a market-neutral strategy that captures the persistently positive funding rates in perpetual swap markets. When perp prices trade at a premium to spot (as they do during most bull-market periods), longs continuously pay shorts a funding rate. By taking both sides simultaneously — long spot BTC and short BTC perp — the trader creates a delta-neutral position that is immune to BTC price moves while collecting the funding rate as pure yield.`,
+          `The mechanics are clean. If BTC is at $63,000 spot and the perpetual is at $63,031 (a $31 premium), you buy spot at $63,000 and sell the perp short at $63,031, locking in the $31 basis and collecting funding every 8 hours. If BTC rises to $70,000, your spot gains $7,000 and your short loses $7,000 — net zero. If BTC falls to $55,000, your spot loses $8,000 and your short gains $8,000 — again net zero. The only P&L comes from the funding payments received and any change in the basis (if the perp premium widens or narrows relative to your entry level).`,
+          `The trade has become institutionally significant enough that structured products around it exist — "delta-neutral yield funds," "crypto carry funds," and exchange-issued products that implement the strategy at scale and distribute the funding yield to investors. The primary risks are funding rate mean-reversion (the yield can disappear or turn negative), exchange counterparty risk on the perp leg, and operational complexity of managing the combined position across spot custody and derivative margin accounts.`
+        ],
+        ki: 'Funding arbitrage is the closest thing to a systematic risk premium in crypto markets — a structural, persistent yield paid by leveraged long speculators to those willing to absorb their financing needs. In traditional markets, this role is filled by banks offering leveraged products; in decentralised crypto markets, anyone with spot holdings can become the "bank" and collect the carry. The trade degrades when the market turns bearish (funding goes negative) and becomes extremely lucrative when the market is euphoric (funding goes parabolic). Understanding and managing the funding regime cycle is the core skill of a funding arb trader.'
+      },
+      {
+        icon: '🔧', badge: 'MARGIN', badgeColor: 'amb',
+        title: 'Cross-Margin vs. Isolated Margin',
+        sub: 'Two ways to allocate collateral — risk management choice with very different failure modes',
+        tags: [['cross margin','amb'],['isolated margin','grn'],['margin mode','amb'],['portfolio margin','vio']],
+        cmp: [
+          {cls:'grn', label:'Isolated Margin', text:'Each position has its own ring-fenced margin pool. If the position is liquidated, only the margin allocated to that specific position is lost — the rest of the account is unaffected. The maximum loss on any single trade is precisely known before entry. Preferred by: retail traders, traders who want defined risk per trade, and traders with multiple simultaneous positions in different market directions (where cross-margin could create dangerous correlated exposure).'},
+          {cls:'amb', label:'Cross-Margin (Portfolio Margin)', text:'All positions in an account share a single margin pool. Any unrealised profit on one position can automatically support a losing position elsewhere, delaying liquidation. Enables higher effective leverage across the portfolio and prevents a marginally under-margined position from liquidating when other positions are profitable. Risk: a single catastrophic loss in one position can drain the entire account, liquidating all other positions simultaneously — a "wipeout" rather than a contained loss.'},
+          {cls:'vio', label:'Portfolio Margin (Institutional)', text:'Advanced cross-margin that accounts for the correlation and hedging relationships between positions (long spot + short perp = lower net risk than two directional positions). Offered by Deribit, Bybit, and other institutional exchanges. Allows much lower margin requirements for genuinely hedged books. Requires risk model sophistication to use safely — if correlations break down in a crisis, the model may understate actual risk substantially.'},
+        ],
+        body: [
+          `The choice between <em>isolated margin</em> and <em>cross-margin</em> is one of the most fundamental risk management decisions for any perp trader, with very different failure modes that are not always obvious to participants.`,
+          `<em>Isolated margin</em> is conceptually simple and conservative: you allocate a fixed amount of collateral to each position. If the position loses that collateral, you are liquidated for that position — and only that position. Your other positions, other assets, and remaining account balance are completely unaffected. This capped-loss property is the dominant reason experienced traders prefer isolated margin: it makes position sizing explicit and prevents a single bad trade from cascading into full account destruction.`,
+          `<em>Cross-margin</em> is more capital-efficient but introduces portfolio-level failure risk. When all positions share a single margin pool, the exchange sees your total equity rather than individual position equity — a profitable ETH long can cushion a losing BTC short, and vice versa. For a genuinely market-neutral or hedged book (e.g. funding arb, where you hold offsetting long spot and short perp), cross-margin is natural and appropriate: the positions are genuinely linked. But for a collection of unrelated directional bets, cross-margin means a single large loss can consume capital that was intended to backstop other positions, creating a cascade liquidation of your entire portfolio from a single bad trade.`,
+          `The practical rule used by experienced traders: use isolated margin for speculative directional positions where you want defined risk; use cross-margin only for genuinely correlated or hedged position pairs where the shared margin pool reflects genuine economic offsetting. Never use cross-margin as a substitute for proper position sizing — the "extra breathing room" it provides comes at the cost of allowing losses to grow larger before liquidation.`
+        ],
+        ki: 'Margin mode is a risk architecture decision with asymmetric consequences: isolated margin trades a small amount of capital efficiency for bounded, predictable losses; cross-margin gains capital efficiency at the risk of correlated blowup. The optimal choice depends entirely on whether your positions are genuinely correlated (cross-margin appropriate) or independent (isolated margin appropriate). Many retail traders lose entire accounts to cross-margin "wipeouts" that would have been contained losses under isolated margin — a structural risk that should be explicitly taught, not discovered experientially.'
+      },
+      {
+        icon: '🌐', badge: 'XEXCH', badgeColor: 'vio',
+        title: 'Cross-Exchange Perp Basis',
+        sub: 'Price divergence for identical perp contracts across different venues — and why it persists',
+        tags: [['cross exchange','vio'],['basis arb','vio'],['exchange fragmentation','vio'],['funding divergence','vio']],
+        dtable: {
+          cols: ['Exchange', 'BTC-PERP', 'Funding (8h)', 'Basis vs Spot'],
+          rows: [
+            ['Binance',      '$63,482', '+0.0082%', '+$31 (+0.049%)'],
+            ['Bybit',        '$63,490', '+0.0091%', '+$39 (+0.062%)'],
+            ['OKX',          '$63,475', '+0.0078%', '+$24 (+0.038%)'],
+            ['Hyperliquid',  '$63,488', '+0.0085%', '+$37 (+0.059%)'],
+            ['Deribit',      '$63,477', '+0.0074%', '+$26 (+0.041%)'],
+          ]
+        },
+        body: [
+          `<em>Cross-exchange perp basis</em> refers to the simultaneous price differences for identical perpetual swap contracts (e.g., BTC-USDT-PERP) across different exchanges. In theory, competition and arbitrage should keep all exchanges quoting essentially the same price. In practice, persistent small cross-exchange differences exist — and these differences are tradeable.`,
+          `The cross-exchange basis arises from several structural factors. <strong>Different index compositions</strong>: each exchange computes its own index price (the spot composite that anchors the mark price) from a different mix of spot exchanges, resulting in slightly different spot references and therefore slightly different perp prices. <strong>Different funding mechanisms</strong>: exchanges have different funding rate formulas, interest rate components, and settlement intervals — creating slightly different funding rates that in turn create slightly different equilibrium price levels for their perp contracts. <strong>Capital friction</strong>: moving capital between exchanges to arbitrage cross-exchange basis requires blockchain transfers (for crypto collateral) or wire transfers (for fiat), both of which take hours to days and incur costs — creating a persistent friction band within which cross-exchange basis cannot be instantly eliminated.`,
+          `Cross-exchange basis trading is a specialist arbitrage strategy that monitors perp prices and funding rates across all major venues simultaneously and executes offsetting positions when spreads exceed transaction and transfer costs. The key operational challenge is the settlement mismatch: if you are long BTC perp on Binance and short BTC perp on Bybit, your unrealised PnL is symmetric, but your cash flows (funding, margins) are on two separate systems. If one exchange experiences a sudden price spike, the short leg marks against you and requires additional margin before you can transfer capital from the other exchange to cover it — this intraday margin management is the primary operational challenge of cross-exchange arb at scale.`,
+          `During market stress events (exchange outages, liquidity crises, exchange-specific news like FTX's collapse), cross-exchange basis can widen dramatically as capital rushes to or from specific venues. The FTX collapse in November 2022 produced enormous cross-exchange basis as FTT (FTX's exchange token) collapsed, customers attempted to withdraw, and perp prices on FTX briefly disconnected from global prices before trading halted entirely — a reminder that cross-exchange basis can suddenly become cross-exchange insolvency risk.`
+        ],
+        ki: 'Cross-exchange perp basis is a map of market fragmentation in action — showing how the same asset can trade at different prices across venues that cannot be instantly arbitraged due to capital transfer friction. In normal conditions, these differences are small (basis of 0.01–0.1%) and the risk-adjusted returns to arb are modest. In stress conditions — exchange insolvency, regulatory action, liquidity events — cross-exchange basis can become a warning signal of impending exchange failure, making it not just a trading signal but a counterparty risk indicator.'
+      },
+    ]
+  }
+];
+
+/* ── RENDER ── */
+let cnt = 0;
+
+function buildLiqVis() {
+  const rows = [
+    {price:'$65,000', size:180, usd:'$340M longs', col:'var(--grn)'},
+    {price:'$64,000', size:240, usd:'$520M longs', col:'var(--grn)'},
+    {price:'$63,000', size:90,  usd:'CURRENT PRICE', col:'var(--blu)'},
+    {price:'$62,000', size:320, usd:'$680M longs', col:'var(--amb)'},
+    {price:'$61,000', size:410, usd:'$890M longs', col:'var(--amb)'},
+    {price:'$59,500', size:580, usd:'$1.2B longs — CASCADE ZONE', col:'var(--mag)'},
+  ];
+  return `<div class="liq-vis">
+    <div class="liq-head">Illustrative BTC-PERP Liquidation Heatmap — Clustered Longs</div>
+    ${rows.map(r=>`<div class="liq-row">
+      <div class="liq-price">${r.price}</div>
+      <div class="liq-bar-wrap">
+        <div class="liq-bar" style="width:${r.size}px;max-width:100%;background:${r.col}"></div>
+      </div>
+      <div class="liq-usd" style="color:${r.col}">${r.usd}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function buildFundChart() {
+  return `<div class="funding-chart">
+    <div class="fc-head">BTC Funding Rate (8h) — Regime Changes</div>
+    <svg class="fc-svg" viewBox="0 0 600 80">
+      <line x1="0"   y1="40" x2="600" y2="40" stroke="#1a2420" stroke-width="1"/>
+      <line x1="0"   y1="40" x2="600" y2="40" stroke="#243430" stroke-width="0.5" stroke-dasharray="3,3"/>
+      <text x="4" y="36" font-size="8" fill="#3a5448" font-family="monospace">0%</text>
+      <!-- positive funding = green bars above zero -->
+      <rect x="10"  y="20" width="18" height="20" fill="rgba(57,232,122,0.5)"/>
+      <rect x="32"  y="15" width="18" height="25" fill="rgba(57,232,122,0.6)"/>
+      <rect x="54"  y="10" width="18" height="30" fill="rgba(57,232,122,0.7)"/>
+      <rect x="76"  y="5"  width="18" height="35" fill="rgba(57,232,122,0.8)"/>
+      <rect x="98"  y="8"  width="18" height="32" fill="rgba(57,232,122,0.7)"/>
+      <!-- negative funding = red bars below zero -->
+      <rect x="120" y="40" width="18" height="18" fill="rgba(232,57,132,0.6)"/>
+      <rect x="142" y="40" width="18" height="25" fill="rgba(232,57,132,0.7)"/>
+      <rect x="164" y="40" width="18" height="12" fill="rgba(232,57,132,0.5)"/>
+      <!-- recovery -->
+      <rect x="186" y="32" width="18" height="8"  fill="rgba(57,232,122,0.4)"/>
+      <rect x="208" y="25" width="18" height="15" fill="rgba(57,232,122,0.5)"/>
+      <rect x="230" y="20" width="18" height="20" fill="rgba(57,232,122,0.6)"/>
+      <rect x="252" y="22" width="18" height="18" fill="rgba(57,232,122,0.55)"/>
+      <rect x="274" y="24" width="18" height="16" fill="rgba(57,232,122,0.5)"/>
+      <!-- euphoria -->
+      <rect x="296" y="2"  width="18" height="38" fill="rgba(57,232,122,0.9)"/>
+      <rect x="318" y="4"  width="18" height="36" fill="rgba(57,232,122,0.85)"/>
+      <!-- crash / cascade -->
+      <rect x="340" y="40" width="18" height="30" fill="rgba(232,57,132,0.8)"/>
+      <rect x="362" y="40" width="18" height="22" fill="rgba(232,57,132,0.7)"/>
+      <!-- stabilization -->
+      <rect x="384" y="36" width="18" height="4"  fill="rgba(57,232,122,0.3)"/>
+      <rect x="406" y="30" width="18" height="10" fill="rgba(57,232,122,0.4)"/>
+      <rect x="428" y="26" width="18" height="14" fill="rgba(57,232,122,0.5)"/>
+      <rect x="450" y="24" width="18" height="16" fill="rgba(57,232,122,0.55)"/>
+      <rect x="472" y="26" width="18" height="14" fill="rgba(57,232,122,0.5)"/>
+      <rect x="494" y="28" width="18" height="12" fill="rgba(57,232,122,0.48)"/>
+      <rect x="516" y="26" width="18" height="14" fill="rgba(57,232,122,0.52)"/>
+      <!-- labels -->
+      <text x="45"  y="70" font-size="8" fill="#3a5448" font-family="monospace">Bull run</text>
+      <text x="128" y="70" font-size="8" fill="#3a5448" font-family="monospace">Bear</text>
+      <text x="300" y="70" font-size="8" fill="#3a5448" font-family="monospace">Euphoria</text>
+      <text x="344" y="70" font-size="8" fill="#3a5448" font-family="monospace">Crash</text>
+      <text x="435" y="70" font-size="8" fill="#3a5448" font-family="monospace">Recovery</text>
+    </svg>
+  </div>`;
+}
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sh = document.createElement('div');
+    sh.innerHTML = `<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line" style="background:${sec.line}"></div>
+    </div>`;
+    root.appendChild(sh);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.fam;
+
+    sec.entries.forEach(e => {
+      const idx = cnt++;
+      const bc = e.badgeColor;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>` : '';
+      const cmpH = e.cmp ? `<div class="cmp c${e.cmp.length}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>` : '';
+      const codeH = e.code ? `<div class="code-block">${e.code}</div>` : '';
+      const liqH = e.liqVis ? buildLiqVis() : '';
+      const fcH  = e.fundChart ? buildFundChart() : '';
+      const dtH  = e.dtable ? `<div class="dtable">
+        <div class="drow hdr" style="grid-template-columns:repeat(${e.dtable.cols.length},1fr)">
+          ${e.dtable.cols.map(c=>`<div class="dc">${c}</div>`).join('')}
+        </div>
+        ${e.dtable.rows.map(r=>`<div class="drow" style="grid-template-columns:repeat(${e.dtable.cols.length},1fr)">
+          ${r.map((c,i)=>`<div class="dc ${i===0?'label':''}">${c}</div>`).join('')}
+        </div>`).join('')}
+      </div>` : '';
+
+      const body = e.body.map(p=>`<p>${p}</p>`).join('') +
+        codeH + liqH + fcH + stH + cmpH + dtH +
+        `<div class="ki">
+          <div class="ki-mark">//</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+        <div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-badge" style="color:var(--${bc});border-color:var(--${bc}-d);background:var(--${bc}-b)">${e.badge}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for (let i = 0; i < cnt; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>
