@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Financial Markets — 1.11 Settlement Systems</title>
+<title>Financial Markets — 3.10 Liquidation</title>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -24,13 +24,13 @@
   --pos-d:    #0e3a20;
   --pos-b:    rgba(77,217,130,0.07);
 
+  --neg:      #e8645d;   /* liquidation red */
+  --neg-d:    #4a1814;
+  --neg-b:    rgba(232,100,93,0.07);
+
   --risk:     #e8a83d;
   --risk-d:   #4a3308;
   --risk-b:   rgba(232,168,61,0.07);
-
-  --settle:   #3da8e8;   /* blue for settlement */
-  --settle-d: #082e4a;
-  --settle-b: rgba(61,168,232,0.07);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -48,8 +48,8 @@ body::before {
   content: '';
   position: fixed; inset: 0;
   background-image:
-    linear-gradient(rgba(61,168,232,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(61,168,232,0.025) 1px, transparent 1px);
+    linear-gradient(rgba(232,100,93,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,100,93,0.025) 1px, transparent 1px);
   background-size: 60px 60px;
   pointer-events: none; z-index: 0;
 }
@@ -74,7 +74,7 @@ body::before {
   margin-bottom: 16px;
   display: flex; align-items: center; gap: 10px;
 }
-.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--settle); }
+.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--neg); }
 
 .mhd-title {
   font-family: 'Archivo', sans-serif;
@@ -83,7 +83,7 @@ body::before {
   line-height: 0.88; color: var(--ink);
   margin-bottom: 14px;
 }
-.mhd-title .eq { color: var(--settle); }
+.mhd-title .eq { color: var(--neg); }
 
 .mhd-sub {
   font-family: 'Source Serif 4', serif;
@@ -119,7 +119,7 @@ body::before {
 }
 .bg-row:last-child { border-bottom: none; }
 .bg-label { color: var(--muted); }
-.bg-val { font-weight: 700; color: var(--settle); }
+.bg-val.neg { color: var(--neg); }
 
 .meter-strip {
   max-width: 1080px; margin: 0 auto;
@@ -127,9 +127,10 @@ body::before {
   display: flex; gap: 0; overflow-x: auto;
   border-top: 1px solid var(--border);
 }
-.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 155px; }
+.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 150px; }
 .meter-name { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 3px; }
-.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; color: var(--settle); }
+.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; }
+.meter-val.neg { color: var(--neg); }
 
 .page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 34px 44px 100px; }
 
@@ -139,7 +140,7 @@ body::before {
 
 .controls { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
 .ctrl { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
-.ctrl:hover { border-color: var(--settle); color: var(--settle); }
+.ctrl:hover { border-color: var(--neg); color: var(--neg); }
 .ctrl-right { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; }
 
 .entry { border: 1px solid var(--border); background: var(--bg1); margin-bottom: 4px; position: relative; overflow: hidden; transition: border-color 0.18s; }
@@ -147,9 +148,8 @@ body::before {
 .entry.open::before { width: 4px; }
 .entry:hover { border-color: var(--border2); }
 
-.c-core   .entry::before { background: var(--pos-d); } .c-core   .entry.open::before { background: var(--pos); }
-.c-risk   .entry::before { background: var(--risk-d); } .c-risk   .entry.open::before { background: var(--risk); }
-.c-innov  .entry::before { background: var(--settle-d); } .c-innov  .entry.open::before { background: var(--settle); }
+.c-mech   .entry::before { background: var(--neg-d); } .c-mech   .entry.open::before { background: var(--neg); }
+.c-crypto .entry::before { background: var(--risk-d); } .c-crypto .entry.open::before { background: var(--risk); }
 
 .e-hdr { display: flex; align-items: center; cursor: pointer; user-select: none; min-height: 58px; padding-left: 4px; transition: background 0.14s; }
 .e-hdr:hover { background: var(--bg2); }
@@ -166,9 +166,8 @@ body::before {
 
 .e-toggle { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; align-self: stretch; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--border); flex-shrink: 0; transition: transform 0.24s, color 0.15s; }
 .entry.open .e-toggle { transform: rotate(90deg); }
-.c-core .entry.open .e-toggle { color: var(--pos); }
-.c-risk .entry.open .e-toggle { color: var(--risk); }
-.c-innov .entry.open .e-toggle { color: var(--settle); }
+.c-mech .entry.open .e-toggle { color: var(--neg); }
+.c-crypto .entry.open .e-toggle { color: var(--risk); }
 
 .e-body { display: none; border-top: 1px solid var(--border); background: var(--bg); padding: 22px 22px 26px 90px; animation: bIn 0.2s ease; }
 .entry.open .e-body { display: block; }
@@ -179,7 +178,7 @@ body::before {
 .e-body p em     { font-style: italic; color: var(--ink); }
 .e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Archivo', sans-serif; font-size: 13.5px; }
 
-.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--settle); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--neg); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
 .fmla-main { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--ink); flex-shrink: 0; line-height: 1.6; }
 .fmla-note { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
 
@@ -187,14 +186,14 @@ body::before {
 .stat { flex: 1; min-width: 130px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2); }
 .stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
 .stat-v { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
-.stat-v.settle { color: var(--settle); }
+.stat-v.neg { color: var(--neg); }
 
 .cmp { display: grid; gap: 8px; margin-top: 18px; }
 .cmp.c2 { grid-template-columns: 1fr 1fr; }
 .cc { padding: 13px 15px; border: 1px solid var(--border); background: var(--bg2); }
 .cc-l { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
 .cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Archivo', sans-serif !important; font-weight: 400 !important; color: var(--ink2) !important; }
-.cc.settle { background: var(--settle-b); border-color: var(--settle-d); } .cc.settle .cc-l { color: var(--settle); }
+.cc.neg { background: var(--neg-b); border-color: var(--neg-d); } .cc.neg .cc-l { color: var(--neg); }
 
 .ki { margin-top: 20px; padding: 14px 18px; background: var(--bg2); border: 1px solid var(--border2); display: flex; gap: 14px; align-items: flex-start; }
 .ki-glyph { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; flex-shrink: 0; padding-top: 2px; }
@@ -202,7 +201,7 @@ body::before {
 
 .tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
 .tag { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
-.tag.settle { border-color: var(--settle-d); color: var(--settle); }
+.tag.neg { border-color: var(--neg-d); color: var(--neg); }
 
 .foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
 .foot span { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
@@ -223,27 +222,27 @@ body::before {
 <div class="masthead">
   <div class="mhd-inner">
     <div>
-      <div class="mhd-kicker">Section 1.11 · Market Infrastructure</div>
-      <div class="mhd-title">Settlement Systems<span class="eq"> =</span></div>
-      <div class="mhd-sub">The final step where securities and cash actually change hands — the culmination of every trade. 9 topics.</div>
+      <div class="mhd-kicker">Section 3.10 · Risk Management</div>
+      <div class="mhd-title">Liquidation<span class="eq"> =</span></div>
+      <div class="mhd-sub">The forced closure of leveraged positions when margin requirements are breached — one of the most critical risks in trading. 9 topics.</div>
     </div>
     <div class="basis-gauge">
-      <div class="bg-hdr">// Settlement Models</div>
+      <div class="bg-hdr">// Liquidation Trigger</div>
       <div class="bg-formula">
-        DVP • FOP • RTGS • Netting
+        Margin Ratio <span class="neg">&lt;</span> Maintenance Margin
       </div>
       <div class="bg-rows">
-        <div class="bg-row"><span class="bg-label">U.S. Equities</span><span class="bg-val settle">T+1 (2024)</span></div>
-        <div class="bg-row"><span class="bg-label">DVP Model</span><span class="bg-val settle">Principal risk mitigation</span></div>
-        <div class="bg-row"><span class="bg-label">Crypto</span><span class="bg-val settle">Near-instant on-chain</span></div>
+        <div class="bg-row"><span class="bg-label">Initial Margin</span><span class="bg-val">e.g. 10%</span></div>
+        <div class="bg-row"><span class="bg-label">Maintenance Margin</span><span class="bg-val neg">e.g. 5%</span></div>
+        <div class="bg-row"><span class="bg-label">Liquidation Price</span><span class="bg-val neg">Calculated threshold</span></div>
       </div>
     </div>
   </div>
   <div class="meter-strip">
-    <div class="meter-item"><div class="meter-name">DVP</div><div class="meter-val settle">Delivery vs Payment</div></div>
-    <div class="meter-item"><div class="meter-name">T+1 (US)</div><div class="meter-val settle">May 2024 migration</div></div>
-    <div class="meter-item"><div class="meter-name">Settlement Fails</div><div class="meter-val risk">Buy-in pressure</div></div>
-    <div class="meter-item"><div class="meter-name">DLT / Blockchain</div><div class="meter-val settle">Experimental rails</div></div>
+    <div class="meter-item"><div class="meter-name">Margin Call</div><div class="meter-val neg">Warning</div></div>
+    <div class="meter-item"><div class="meter-name">Crypto Liquidation</div><div class="meter-val neg">Cascades common</div></div>
+    <div class="meter-item"><div class="meter-name">ADL / Socialized Loss</div><div class="meter-val neg">Backstop mechanism</div></div>
+    <div class="meter-item"><div class="meter-name">Clawback</div><div class="meter-val neg">Rare but severe</div></div>
   </div>
 </div>
 
@@ -259,131 +258,138 @@ body::before {
 
 <footer class="foot">
   <span>Financial Markets · Revision Notes</span>
-  <span>1.11 Settlement Systems</span>
+  <span>3.10 Liquidation</span>
 </footer>
 
 <script>
 const sections = [
   {
-    label:"Core Settlement Principles",
-    color:"var(--pos)",
-    line:"var(--pos-d)",
-    fam:"c-core",
+    label:"Liquidation Fundamentals",
+    color:"var(--neg)",
+    line:"var(--neg-d)",
+    fam:"c-mech",
     entries:[
-      {
-        icon:"🔄",
-        fmla:"DVP",
-        title:"DVP — Delivery Versus Payment",
-        sub:"The gold standard for risk reduction",
-        tags:[["dvp","settle"]],
-        body:[
-          `<strong>Delivery Versus Payment (DVP)</strong> ensures that securities are delivered only if payment is received simultaneously (or vice versa). This eliminates principal risk — the risk that one party delivers securities but does not receive cash, or pays cash but does not receive securities. Most modern CSDs and CCPs use DVP models.`
-        ],
-        ki:"DVP is one of the most important post-trade risk mitigations in financial markets."
-      },
-      {
-        icon:"📤",
-        fmla:"FOP",
-        title:"FOP — Free of Payment",
-        sub:"Securities transfer without cash leg",
-        tags:[["fop","settle"]],
-        body:[
-          `<strong>Free of Payment (FOP)</strong> transfers involve moving securities without a simultaneous cash payment. Common in internal transfers, custody moves, or collateral pledging. FOP carries higher risk and is usually restricted to trusted counterparties or internal accounts.`
-        ],
-        ki:"FOP is operationally simpler but riskier — it should only be used when there is strong trust or collateralization."
-      },
       {
         icon:"⚠️",
-        fmla:"Fails & Buy-ins",
-        title:"Settlement Fails and Buy-ins",
-        sub:"Consequences of failed settlements",
-        tags:[["settlement fails","risk"],["buy-in","risk"]],
-        body:[
-          `A settlement fail occurs when a trade does not settle on the intended date. Persistent fails can trigger mandatory buy-ins (forced purchase in the market) by the receiving party, especially under new regulations. High fail rates can signal liquidity stress or operational problems.`
+        fmla:"Margin Call → Liq",
+        title:"Margin Call → Liquidation Sequence",
+        sub:"The typical progression when equity declines",
+        tags:[["margin call","neg"],["liquidation","neg"]],
+        stats:[
+          {l:"Initial Margin",v:"Required to open position",c:"neg"},
+          {l:"Maintenance Margin",v:"Minimum to keep position open",c:"neg"},
+          {l:"Margin Call",v:"Warning when approaching maintenance",c:"risk"},
+          {l:"Liquidation",v:"Forced closure when breached",c:"neg"},
         ],
-        ki:"Settlement discipline rules (including mandatory buy-ins) are designed to keep markets functioning smoothly."
-      }
-    ]
-  },
-  {
-    label:"Settlement Cycles & Models",
-    color:"var(--settle)",
-    line:"var(--settle-d)",
-    fam:"c-clear",
-    entries:[
-      {
-        icon:"📆",
-        fmla:"T+1 Migration",
-        title:"T+1 Settlement Cycle",
-        sub:"The shift to faster settlement",
-        tags:[["t+1","settle"]],
         body:[
-          `In May 2024, the U.S. equity market moved from T+2 to T+1 settlement. Shorter cycles reduce counterparty risk, margin requirements, and systemic risk, but require tighter operational processes and higher liquidity. Many other markets are evaluating similar moves.`
+          `When account equity falls due to adverse price moves, the sequence usually begins with a <strong>margin call</strong> — a warning from the broker or exchange that additional funds are needed. If the trader does not deposit more collateral, the position enters the <strong>liquidation</strong> phase, where the platform automatically closes part or all of the position to bring the account back above the maintenance margin threshold.`,
+          `This process protects the exchange and other users from counterparty credit risk but can be devastating for the leveraged trader, often occurring at the worst possible prices.`
         ],
-        ki:"The move to T+1 reflects a global trend toward faster, safer post-trade processes."
+        ki:"Liquidation is not a bug — it is a deliberate risk-control mechanism that prioritizes system stability over individual positions."
       },
       {
-        icon:"⚡",
-        fmla:"RTGS",
-        title:"Real-Time Gross Settlement (RTGS)",
-        sub:"Immediate final settlement",
-        tags:[["rtgs","settle"]],
+        icon:"📉",
+        fmla:"Liq Price",
+        title:"Liquidation Price Calculation",
+        sub:"The exact price at which forced closure occurs",
+        tags:[["liquidation price","neg"]],
+        fmla2:{
+          main:`Liq Price = f(Entry Price, Leverage, Maintenance Margin %)`,
+          note:`Higher leverage = closer liquidation price\nCross margin uses entire account balance\nIsolated margin uses only allocated margin`
+        },
         body:[
-          `<strong>Real-Time Gross Settlement (RTGS)</strong> systems settle payments individually and in real time (e.g., Fedwire, TARGET2). Each transaction is final and irrevocable upon processing. RTGS eliminates settlement risk but requires more liquidity than netting systems.`
+          `The liquidation price is the price level at which the position’s margin ratio hits the maintenance margin requirement. It is calculated based on entry price, position size, leverage, and the exchange’s maintenance margin percentage. Traders should always know their liquidation price before entering a leveraged position.`
         ],
-        ki:"RTGS is the safest but most liquidity-intensive form of settlement."
+        ki:"Knowing your exact liquidation price is as important as knowing your entry price."
       },
       {
         icon:"🔀",
-        fmla:"Netting",
-        title:"Netting and Novation",
-        sub:"Efficiency through multilateral offsetting",
-        tags:[["netting","clear"],["novation","clear"]],
-        body:[
-          `Netting reduces the number and value of obligations through multilateral offsetting. Combined with novation (where the CCP becomes counterparty), it dramatically lowers systemic risk and liquidity needs.`
+        fmla:"Cross vs Isolated",
+        title:"Cross vs Isolated Margin Liquidation",
+        sub:"How margin mode affects risk",
+        tags:[["cross margin","risk"],["isolated margin","risk"]],
+        cmp:[
+          {cls:"neg", label:"Cross Margin", text:"All positions share the same margin pool. One losing position can liquidate others. Higher capital efficiency but risk of total account wipeout."},
+          {cls:"neg", label:"Isolated Margin", text:"Each position has its own dedicated margin. Liquidation of one position does not affect others. Better risk containment at the cost of lower capital efficiency."},
         ],
-        ki:"Netting is one of the most powerful risk and efficiency tools in modern financial infrastructure."
+        body:[
+          `In <strong>cross margin</strong>, the entire account balance supports all positions. This maximizes capital efficiency but creates contagion risk. In <strong>isolated margin</strong>, each position is ring-fenced with its own allocated margin, limiting the impact of any single liquidation.`
+        ],
+        ki:"Isolated margin is generally safer for beginners, while experienced traders sometimes prefer cross margin for better capital utilization."
+      },
+      {
+        icon:"✂️",
+        fmla:"Partial / Full",
+        title:"Partial vs Full Liquidation",
+        sub:"How platforms close positions",
+        tags:[["partial liquidation","neg"]],
+        body:[
+          `Many modern platforms (especially in crypto) use <strong>partial liquidation</strong> — closing only enough of the position to bring the margin ratio back above the maintenance level. This is less punitive than full liquidation. However, in severe cases or on traditional brokers, <strong>full liquidation</strong> may occur.`
+        ],
+        ki:"Partial liquidation gives traders a chance to recover, but repeated partial liqs can still erode equity significantly."
       }
     ]
   },
   {
-    label:"Innovation & Crypto Settlement",
+    label:"Crypto Liquidation Systems",
     color:"var(--risk)",
     line:"var(--risk-d)",
-    fam:"c-innov",
+    fam:"c-crypto",
     entries:[
       {
-        icon:"🔗",
-        fmla:"DLT Experiments",
-        title:"Blockchain / DLT Settlement Experiments",
-        sub:"Tokenization and atomic settlement",
-        tags:[["dlt","settle"],["tokenization","settle"]],
+        icon:"🌊",
+        fmla:"Cascade Risk",
+        title:"Liquidation Cascades",
+        sub:"When one liquidation triggers many more",
+        tags:[["cascade","risk"]],
         body:[
-          `Distributed Ledger Technology (DLT) and blockchain experiments aim for atomic settlement (simultaneous exchange of cash and asset legs). Projects by major banks, stock exchanges, and central banks (e.g., Project Jasper, Project Ubin, regulated stablecoins) are testing faster, more transparent settlement.`
+          `A liquidation cascade occurs when the forced selling (or buying for shorts) from one liquidation pushes the price further against other leveraged traders, triggering their liquidations in a self-reinforcing spiral. These events are especially common in crypto perpetual markets and can cause extreme price spikes or crashes in short periods.`
         ],
-        ki:"DLT promises near-instant, programmable settlement but faces significant regulatory, legal, and scalability hurdles."
+        ki:"Liquidation cascades are one of the primary drivers of flash crashes and extreme volatility in leveraged markets."
       },
       {
-        icon:"₿",
-        fmla:"On-chain",
-        title:"Crypto Settlement (On-Chain)",
-        sub:"Near-instant finality in decentralized systems",
-        tags:[["crypto settlement","settle"]],
+        icon:"🔄",
+        fmla:"ADL",
+        title:"Auto-Deleveraging (ADL)",
+        sub:"Socialized loss mechanism when insurance fund is insufficient",
+        tags:[["auto-deleveraging","risk"],["ADL","risk"]],
         body:[
-          `Crypto assets on public blockchains (Bitcoin, Ethereum, Solana, etc.) offer near-instant or minutes-long final settlement. Layer-2 solutions and appchains further improve speed and cost. However, they lack the legal finality and regulatory protections of traditional systems.`
+          `When the insurance fund cannot cover a bankrupt position, many crypto exchanges activate <strong>Auto-Deleveraging (ADL)</strong>. Profitable traders on the winning side have a portion of their positions automatically reduced (deleveraged) at the bankruptcy price to absorb the loss. Priority is usually given to highest-profit / highest-leverage winning traders.`
         ],
-        ki:"Crypto demonstrates what atomic, near-instant settlement can look like, but at the cost of volatility and regulatory uncertainty."
+        ki:"ADL transfers losses from bankrupt accounts to profitable ones, preserving the overall integrity of the platform."
       },
       {
-        icon:"💎",
-        fmla:"Stablecoins",
-        title:"Stablecoin Settlement Rails",
-        sub:"Emerging bridge between TradFi and crypto",
-        tags:[["stablecoins","settle"]],
+        icon:"🛡️",
+        fmla:"Insurance Fund",
+        title:"Insurance Fund Usage",
+        sub:"The primary buffer against bankruptcies",
+        tags:[["insurance fund","risk"]],
         body:[
-          `Stablecoins (especially USD-pegged) are increasingly used as settlement rails for both crypto-native and traditional transactions. They combine the speed of blockchain with the stability of fiat currencies and are being integrated into institutional workflows.`
+          `Most crypto derivative exchanges maintain an <strong>insurance fund</strong> built from liquidation fees and penalties. When a position is liquidated at a price worse than the bankruptcy price, the insurance fund covers the shortfall. Only when the fund is depleted does the exchange move to ADL or other recovery mechanisms.`
         ],
-        ki:"Stablecoins may become the first widely adopted bridge between traditional finance and blockchain settlement."
+        ki:"A robust insurance fund is a key indicator of exchange health and reduces the likelihood of socialized losses."
+      },
+      {
+        icon:"📜",
+        fmla:"Clawback",
+        title:"Clawback Provisions",
+        sub:"Retroactive recovery from profitable traders",
+        tags:[["clawback","risk"]],
+        body:[
+          `In extreme cases, some platforms reserve the right to apply <strong>clawback</strong> provisions — retroactively reducing profits from winning traders to cover losses from bankrupt positions. This is rare but represents the ultimate risk of trading on centralized leveraged platforms.`
+        ],
+        ki:"Clawback breaks the promise that settled profits are final and should be viewed as a tail risk."
+      },
+      {
+        icon:"⚖️",
+        fmla:"Socialized Loss",
+        title:"Socialized Loss Mechanisms",
+        sub:"Spreading losses across all users",
+        tags:[["socialized loss","risk"]],
+        body:[
+          `Socialized loss mechanisms (including ADL and clawback) distribute the cost of unrecoverable bankruptcies across the broader user base — typically profitable traders on the opposite side of the liquidated positions. While necessary for platform solvency, they introduce uncertainty and can erode trust. Many newer exchanges aim to minimize or eliminate socialized losses through better risk engines and larger insurance funds.`
+        ],
+        ki:"Socialized loss is the price of participating in highly leveraged markets when extreme events exceed the insurance fund."
       }
     ]
   }

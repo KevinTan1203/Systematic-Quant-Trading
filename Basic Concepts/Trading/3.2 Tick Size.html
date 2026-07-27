@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 3.2 Tick Size</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0c0e0d;
+  --bg1:      #111413;
+  --bg2:      #161a18;
+  --bg3:      #1c211e;
+  --surface:  #14201b;
+  --border:   #1e2622;
+  --border2:  #28342e;
+
+  --ink:      #e0e8e2;
+  --ink2:     #8a988e;
+  --muted:    #485a50;
+  --faint:    #18201c;
+
+  --pos:      #4dd982;
+  --pos-d:    #0e3a20;
+  --pos-b:    rgba(77,217,130,0.07);
+
+  --neg:      #e8645d;
+  --neg-d:    #4a1814;
+  --neg-b:    rgba(232,100,93,0.07);
+
+  --risk:     #e8a83d;
+  --risk-d:   #4a3308;
+  --risk-b:   rgba(232,168,61,0.07);
+
+  --tick:     #3da8e8;   /* primary tick color — blue */
+  --tick-d:   #082e4a;
+  --tick-b:   rgba(61,168,232,0.07);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Archivo', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(61,168,232,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61,168,232,0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none; z-index: 0;
+}
+
+.masthead {
+  position: relative; z-index: 2;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border2);
+}
+
+.mhd-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 52px 44px 0;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 44px; align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--tick); }
+
+.mhd-title {
+  font-family: 'Archivo', sans-serif;
+  font-size: clamp(44px, 6.5vw, 84px);
+  font-weight: 800; letter-spacing: -0.04em;
+  line-height: 0.88; color: var(--ink);
+  margin-bottom: 14px;
+}
+.mhd-title .eq { color: var(--tick); }
+
+.mhd-sub {
+  font-family: 'Source Serif 4', serif;
+  font-style: italic; font-size: 14px;
+  color: var(--ink2); line-height: 1.65;
+  max-width: 480px; font-weight: 400;
+  margin-bottom: 28px;
+}
+
+.basis-gauge {
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  overflow: hidden; min-width: 260px;
+}
+.bg-hdr {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 8px 14px; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.bg-formula {
+  padding: 18px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px; text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.bg-formula .tick { color: var(--tick); }
+.bg-rows { padding: 0; }
+.bg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+}
+.bg-row:last-child { border-bottom: none; }
+.bg-label { color: var(--muted); }
+.bg-val { font-weight: 700; }
+.bg-val.tick { color: var(--tick); }
+
+.meter-strip {
+  max-width: 1080px; margin: 0 auto;
+  padding: 0 44px;
+  display: flex; gap: 0; overflow-x: auto;
+  border-top: 1px solid var(--border);
+}
+.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 130px; }
+.meter-name { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 3px; }
+.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; }
+.meter-val.tick { color: var(--tick); }
+
+.page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 34px 44px 100px; }
+
+.sec-hdr { display: flex; align-items: center; gap: 14px; margin: 30px 0 8px; }
+.sec-label { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
+.sec-line { flex: 1; height: 1px; }
+
+.controls { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
+.ctrl { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.ctrl:hover { border-color: var(--tick); color: var(--tick); }
+.ctrl-right { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; }
+
+.entry { border: 1px solid var(--border); background: var(--bg1); margin-bottom: 4px; position: relative; overflow: hidden; transition: border-color 0.18s; }
+.entry::before { content: ''; position: absolute; left:0; top:0; bottom:0; width:3px; transition: width 0.2s; }
+.entry.open::before { width: 4px; }
+.entry:hover { border-color: var(--border2); }
+
+.c-mech   .entry::before { background: var(--pos-d); } .c-mech   .entry.open::before { background: var(--pos); }
+.c-var    .entry::before { background: var(--tick-d); } .c-var    .entry.open::before { background: var(--tick); }
+.c-reg    .entry::before { background: var(--risk-d); } .c-reg    .entry.open::before { background: var(--risk); }
+.c-impact .entry::before { background: var(--comm-d); } .c-impact .entry.open::before { background: var(--comm); }
+
+.e-hdr { display: flex; align-items: center; cursor: pointer; user-select: none; min-height: 58px; padding-left: 4px; transition: background 0.14s; }
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--faint); width: 44px; text-align: center; flex-shrink: 0; letter-spacing: 0.06em; }
+
+.e-icon { font-size: 17px; width: 46px; text-align: center; flex-shrink: 0; border-right: 1px solid var(--border); align-self: stretch; display: flex; align-items: center; justify-content: center; }
+
+.e-text { flex: 1; padding: 12px 16px; }
+.e-title { font-family: 'Archivo', sans-serif; font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.2; letter-spacing: -0.01em; }
+.e-sub { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); margin-top: 3px; letter-spacing: 0.03em; font-weight: 300; }
+
+.e-fmla { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink2); padding: 4px 12px; border: 1px solid var(--border2); background: var(--bg2); margin-right: 14px; flex-shrink: 0; white-space: nowrap; max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+
+.e-toggle { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; align-self: stretch; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--border); flex-shrink: 0; transition: transform 0.24s, color 0.15s; }
+.entry.open .e-toggle { transform: rotate(90deg); }
+.c-mech   .entry.open .e-toggle { color: var(--pos); }
+.c-var    .entry.open .e-toggle { color: var(--tick); }
+.c-reg    .entry.open .e-toggle { color: var(--risk); }
+.c-impact .entry.open .e-toggle { color: var(--comm); }
+
+.e-body { display: none; border-top: 1px solid var(--border); background: var(--bg); padding: 22px 22px 26px 90px; animation: bIn 0.2s ease; }
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p { font-family: 'Source Serif 4', serif; font-size: 14px; font-weight: 400; line-height: 1.86; color: var(--ink2); margin-bottom: 14px; }
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); }
+.e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Archivo', sans-serif; font-size: 13.5px; }
+
+.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--tick); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.fmla-main { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--ink); flex-shrink: 0; line-height: 1.6; }
+.fmla-main .tick { color: var(--tick); }
+.fmla-note { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.stat { flex: 1; min-width: 120px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2); }
+.stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.stat-v { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.stat-v.tick { color: var(--tick); }
+
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cmp.c3 { grid-template-columns: 1fr 1fr 1fr; }
+.cc { padding: 13px 15px; border: 1px solid var(--border); background: var(--bg2); }
+.cc-l { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
+.cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Archivo', sans-serif !important; font-weight: 400 !important; color: var(--ink2) !important; }
+.cc.tick { background: var(--tick-b); border-color: var(--tick-d); } .cc.tick .cc-l { color: var(--tick); }
+
+.dtable { margin-top: 18px; border: 1px solid var(--border); overflow: auto; }
+.drow { display: grid; border-bottom: 1px solid var(--border); }
+.drow:last-child { border-bottom: none; }
+.drow.hdr .dc { background: var(--bg3); font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.dc { padding: 8px 12px; border-right: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink2); line-height: 1.5; }
+.dc:last-child { border-right: none; }
+.dc.label { color: var(--ink); font-weight: 600; font-family: 'Archivo', sans-serif; font-size: 12px; }
+.dc.tick { color: var(--tick); }
+
+.ki { margin-top: 20px; padding: 14px 18px; background: var(--bg2); border: 1px solid var(--border2); display: flex; gap: 14px; align-items: flex-start; }
+.ki-glyph { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; flex-shrink: 0; padding-top: 2px; }
+.ki-text { font-family: 'Source Serif 4', serif; font-style: italic; font-size: 14.5px; color: var(--ink); line-height: 1.62; }
+.c-mech   .ki-glyph { color: var(--pos); }
+.c-var    .ki-glyph { color: var(--tick); }
+.c-reg    .ki-glyph { color: var(--risk); }
+.c-impact .ki-glyph { color: var(--comm); }
+
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
+.tag.tick { border-color: var(--tick-d); color: var(--tick); }
+
+.foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+.foot span { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .basis-gauge { display: none; }
+  .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding: 36px 18px 0; }
+  .meter-strip { padding: 0 18px; }
+  .e-body { padding-left: 16px; }
+  .cmp.c2,.cmp.c3 { grid-template-columns: 1fr; }
+  .e-fmla { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 3.2 · Core Trading Foundations</div>
+      <div class="mhd-title">Tick Size<span class="eq"> =</span></div>
+      <div class="mhd-sub">The smallest allowable price increment. It defines market granularity, liquidity provision, and the economics of high-frequency trading. 6 topics.</div>
+    </div>
+    <div class="basis-gauge">
+      <div class="bg-hdr">// Tick Size Definition</div>
+      <div class="bg-formula">
+        <span class="tick">Minimum Price Increment</span>
+      </div>
+      <div class="bg-rows">
+        <div class="bg-row"><span class="bg-label">Equities (most US stocks)</span><span class="bg-val tick">$0.01</span></div>
+        <div class="bg-row"><span class="bg-label">ES Futures (S&amp;P 500)</span><span class="bg-val tick">0.25 points ($12.50)</span></div>
+        <div class="bg-row"><span class="bg-label">BTC Perpetual (Binance)</span><span class="bg-val tick">$0.1 or 0.01%</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="meter-strip">
+    <div class="meter-item"><div class="meter-name">AAPL Tick</div><div class="meter-val tick">$0.01</div></div>
+    <div class="meter-item"><div class="meter-name">/ES Tick</div><div class="meter-val tick">0.25 pts</div></div>
+    <div class="meter-item"><div class="meter-name">CL (Crude) Tick</div><div class="meter-val tick">$0.01 ($10)</div></div>
+    <div class="meter-item"><div class="meter-name">Tick-to-Trade Latency</div><div class="meter-val tick">Sub-μs (HFT)</div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">6 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>3.2 Tick Size</span>
+</footer>
+
+<script>
+const sections = [
+  {
+    label:"Foundational Mechanics",
+    color:"var(--pos)",
+    line:"var(--pos-d)",
+    fam:"c-mech",
+    entries:[
+      {
+        icon:"📏",
+        fmla:"Minimum Price Increment",
+        title:"Definition of Tick Size",
+        sub:"The smallest allowable price movement for an asset",
+        tags:[["tick size","tick"],["minimum increment","tick"],["price granularity","tick"]],
+        fmla2:{
+          main:`<span class="tick">Tick Size</span> = Minimum allowed price change`,
+          note:`Also called: minimum price variation (MPV)\nDetermines quote precision and trading economics`
+        },
+        stats:[
+          {l:"Purpose",v:"Prevents meaningless fractional quotes",c:"tick"},
+          {l:"Exchanges set",v:"To balance liquidity vs. competition",c:"tick"},
+          {l:"Smaller tick",v:"More price levels, narrower spreads possible",c:"tick"},
+        ],
+        body:[
+          `<em>Tick size</em> is the smallest increment by which the price of a security or contract can move. It is set by the exchange or regulator and acts as the fundamental unit of price granularity in that market.`,
+          `A smaller tick size allows for more precise pricing and potentially tighter bid-ask spreads, but it can also lead to excessive quote traffic and thinner liquidity at each individual price level. A larger tick size reduces quote clutter but may result in wider spreads and less efficient price discovery.`,
+          `Tick size directly influences trader behavior: market makers earn the "tick" as a minimum profit on round-trip trades, high-frequency strategies optimize around capturing or providing liquidity at tick levels, and the overall market microstructure is built on top of this foundational constraint.`
+        ],
+        ki:"Tick size is the invisible ruler of market microstructure. Every quote, every spread, and every high-frequency strategy ultimately operates within the grid defined by the exchange’s minimum price increment."
+      }
+    ]
+  },
+  {
+    label:"Asset-Class Variations",
+    color:"var(--tick)",
+    line:"var(--tick-d)",
+    fam:"c-var",
+    entries:[
+      {
+        icon:"📈",
+        fmla:"US Equities: $0.01",
+        title:"Tick Size by Asset Class",
+        sub:"How minimum increments differ across markets",
+        tags:[["equities","tick"],["futures","tick"],["crypto","tick"]],
+        stats:[
+          {l:"US Equities (post-decimalization)",v:"$0.01 (most stocks)",c:"tick"},
+          {l:"S&amp;P 500 E-mini (/ES)",v:"0.25 index points ($12.50)",c:"tick"},
+          {l:"Crude Oil (CL)",v:"$0.01 per barrel ($10 per contract)",c:"tick"},
+          {l:"BTC Perpetual",v:"$0.1 or 0.001% (venue dependent)",c:"tick"},
+        ],
+        cmp:[
+          {cls:"tick", label:"Equities", text:"Most U.S. stocks trade at a $0.01 tick. Pre-2001 decimalization, many traded in 1/16ths or 1/8ths of a dollar. Smaller tick enabled tighter spreads but increased quote volume dramatically."},
+          {cls:"tick", label:"Futures", text:"Varies widely by contract. Index futures like /ES use 0.25 point ticks; interest rate futures use smaller increments (e.g., /ZN uses 1/64th). Energy and agricultural contracts often use $0.01 or fractional cents scaled to contract size."},
+          {cls:"tick", label:"Crypto & FX", text:"Often use percentage-based or very small absolute ticks due to high price levels or continuous 24/7 trading. Many venues allow sub-penny precision for major pairs and coins."},
+        ],
+        body:[
+          `Tick sizes are highly market-specific and reflect liquidity, price level, and tradition. U.S. equities standardized on $0.01 after decimalization in 2001. Futures contracts use ticks scaled to economic significance (e.g., one tick in crude oil equals $10 per contract).`,
+          `Crypto perpetuals and spot markets often feature extremely fine ticks (sometimes 8+ decimal places) to accommodate high price volatility and 24/7 trading. Foreign exchange markets similarly use small pip increments (typically 0.0001 for most pairs).`,
+          `The choice of tick size represents a trade-off: too large and spreads stay artificially wide; too small and liquidity fragments across too many price levels, making it harder for large orders to execute without moving the market.`
+        ],
+        ki:"There is no universal 'correct' tick size — each market finds its own equilibrium based on participant sophistication, average trade size, and price volatility."
+      },
+      {
+        icon:"🔬",
+        fmla:"Sub-penny pricing",
+        title:"Sub-Penny Trading & Quote Stuffing",
+        sub:"Trading and quoting below the official tick",
+        tags:[["sub-penny","tick"],["quote stuffing","risk"],["HFT","tick"]],
+        body:[
+          `While most retail-facing exchanges enforce a $0.01 minimum tick for U.S. equities, sophisticated participants (especially HFT firms) can effectively achieve sub-penny pricing through order routing and midpoint matching in dark pools or through certain exchange order types.`,
+          `Quote stuffing refers to the high-frequency practice of rapidly placing and canceling large numbers of quotes (sometimes millions per second) to overwhelm competitors’ systems, probe for liquidity, or slow down other market participants. Smaller tick sizes amplify the potential for such activity.`,
+          `Regulators monitor these behaviors closely because excessive quote stuffing can degrade market quality and create unfair advantages for firms with the lowest latency infrastructure.`
+        ],
+        ki:"Sub-penny execution is possible in certain venues, but visible quote ticks remain constrained. This creates a two-tiered market where displayed liquidity follows the tick while hidden or routed liquidity can achieve finer pricing."
+      }
+    ]
+  },
+  {
+    label:"Regulation & Policy",
+    color:"var(--risk)",
+    line:"var(--risk-d)",
+    fam:"c-reg",
+    entries:[
+      {
+        icon:"⚖️",
+        fmla:"2016 SEC Pilot",
+        title:"Tick Size Pilot Program",
+        sub:"SEC experiment to widen ticks for small-cap stocks",
+        tags:[["SEC pilot","risk"],["tick size pilot","tick"],["market quality","tick"]],
+        stats:[
+          {l:"Period",v:"2016–2018",c:"risk"},
+          {l:"Target",v:"Small-cap stocks (Phase 2 test groups)",c:"tick"},
+          {l:"Pilot design",v:"Widen tick from $0.01 to $0.05",c:"tick"},
+          {l:"Outcome",v:"Mixed — wider spreads, mixed liquidity effects",c:"risk"},
+        ],
+        body:[
+          `The SEC Tick Size Pilot Program (2016–2018) was a large-scale experiment that widened the minimum tick size from $0.01 to $0.05 for a group of small-capitalization stocks. The goal was to study whether larger ticks would improve market quality for less-liquid names by encouraging more market-maker participation and increasing displayed liquidity depth.`,
+          `Results were nuanced. Wider ticks generally led to higher quoted spreads and larger trade sizes, but mixed effects on overall liquidity and execution quality. Some studies found modest improvements in market-maker profitability and stability for small caps, while others noted reduced price efficiency.`,
+          `The pilot ultimately expired without permanent implementation, but it remains a key reference point in ongoing debates about optimal tick size design.`
+        ],
+        ki:"The Tick Size Pilot demonstrated that tick size is a powerful lever for market structure. Widening it can help certain illiquid securities but risks harming price discovery and increasing transaction costs for others."
+      }
+    ]
+  },
+  {
+    label:"Trading & Market Quality",
+    color:"var(--comm)",
+    line:"var(--comm-d)",
+    fam:"c-impact",
+    entries:[
+      {
+        icon:"⚡",
+        fmla:"Latency / Tick",
+        title:"Tick-to-Trade Ratio",
+        sub:"How many ticks a high-frequency strategy can capture per second",
+        tags:[["tick-to-trade","tick"],["HFT latency","tick"],["market microstructure","tick"]],
+        body:[
+          `The <em>tick-to-trade ratio</em> (or tick-to-trade latency) measures how quickly a trading system can detect a market event (such as a price move of one tick) and respond with an order. In modern HFT, this cycle operates in microseconds or even sub-microsecond regimes.`,
+          `A high tick-to-trade performance advantage allows firms to capture the first-mover position at new price levels, provide liquidity more effectively, or detect and react to large order flow before slower participants.`,
+          `Exchanges invest heavily in co-location, FPGA/ASIC acceleration, and microwave networking precisely to optimize this metric.`
+        ],
+        ki:"In high-frequency trading, the ability to act on the next tick faster than competitors is often more valuable than directional alpha."
+      },
+      {
+        icon:"📊",
+        fmla:"Spread & Liquidity",
+        title:"Impact on Spreads and Market Quality",
+        sub:"How tick size shapes bid-ask spreads, depth, and volatility",
+        tags:[["bid-ask spread","tick"],["market quality","tick"],["liquidity","tick"]],
+        stats:[
+          {l:"Smaller tick",v:"Tighter possible spreads, more quote traffic",c:"tick"},
+          {l:"Larger tick",v:"Wider minimum spreads, potentially deeper displayed size",c:"tick"},
+          {l:"Optimal tick",v:"Balances competition and profitability for makers",c:"risk"},
+        ],
+        cmp:[
+          {cls:"tick", label:"Positive Effects of Appropriate Tick", text:"Encourages market making, reduces quote clutter, improves depth at best levels, supports profitability for liquidity providers."},
+          {cls:"risk", label:"Negative Effects of Poor Tick Choice", text:"Too small → excessive fragmentation and HFT arms race. Too large → artificially wide spreads and poor price discovery."},
+        ],
+        body:[
+          `Tick size has first-order effects on market quality. When the tick is too large relative to natural price volatility, bid-ask spreads become artificially wide. When too small, liquidity fragments across many price levels and excessive quoting activity can occur.`,
+          `Empirical studies generally show that tick size should scale with price level and volatility. Modern exchanges sometimes implement dynamic tick sizes or “tick size bands” that adjust based on the instrument’s price to maintain an economically meaningful minimum increment.`,
+          `For traders, understanding the tick regime of each instrument is essential for choosing appropriate order types, sizing limit orders, and estimating realistic transaction costs.`
+        ],
+        ki:"The best tick size is the one that is just large enough to compensate liquidity providers for their risk, but small enough to allow tight, competitive spreads. Getting this balance right is a core challenge of market microstructure design."
+      }
+    ]
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sdiv = document.createElement('div');
+    sdiv.innerHTML = `<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line" style="background:${sec.line}"></div>
+    </div>`;
+    root.appendChild(sdiv);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.fam;
+
+    sec.entries.forEach(e => {
+      const idx = cnt++;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>` : '';
+      const cmpH = e.cmp ? `<div class="cmp c${e.cmp.length}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>` : '';
+      const fmlaH = e.fmla2 ? `<div class="fmla-block"><div class="fmla-main">${e.fmla2.main}</div><pre class="fmla-note">${e.fmla2.note}</pre></div>` : '';
+
+      const body = e.body.map(p=>`<p>${p}</p>`).join('') + fmlaH + stH + cmpH +
+        `<div class="ki">
+          <div class="ki-glyph">//</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+        <div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-fmla">${e.fmla}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

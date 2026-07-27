@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 3.6 Funding Rates (Crypto-Specific)</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0c0e0d;
+  --bg1:      #111413;
+  --bg2:      #161a18;
+  --bg3:      #1c211e;
+  --surface:  #14201b;
+  --border:   #1e2622;
+  --border2:  #28342e;
+
+  --ink:      #e0e8e2;
+  --ink2:     #8a988e;
+  --muted:    #485a50;
+  --faint:    #18201c;
+
+  --pos:      #4dd982;
+  --pos-d:    #0e3a20;
+  --pos-b:    rgba(77,217,130,0.07);
+
+  --neg:      #e8645d;
+  --neg-d:    #4a1814;
+  --neg-b:    rgba(232,100,93,0.07);
+
+  --risk:     #e8a83d;
+  --risk-d:   #4a3308;
+  --risk-b:   rgba(232,168,61,0.07);
+
+  --crypto:   #e83d9e;   /* crypto funding — magenta */
+  --crypto-d: #4a0830;
+  --crypto-b: rgba(232,61,158,0.07);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Archivo', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(232,61,158,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,61,158,0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none; z-index: 0;
+}
+
+.masthead {
+  position: relative; z-index: 2;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border2);
+}
+
+.mhd-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 52px 44px 0;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 44px; align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--crypto); }
+
+.mhd-title {
+  font-family: 'Archivo', sans-serif;
+  font-size: clamp(44px, 6.5vw, 84px);
+  font-weight: 800; letter-spacing: -0.04em;
+  line-height: 0.88; color: var(--ink);
+  margin-bottom: 14px;
+}
+.mhd-title .eq { color: var(--crypto); }
+
+.mhd-sub {
+  font-family: 'Source Serif 4', serif;
+  font-style: italic; font-size: 14px;
+  color: var(--ink2); line-height: 1.65;
+  max-width: 520px; font-weight: 400;
+  margin-bottom: 28px;
+}
+
+.basis-gauge {
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  overflow: hidden; min-width: 260px;
+}
+.bg-hdr {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 8px 14px; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.bg-formula {
+  padding: 18px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px; text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.bg-formula .perp { color: var(--crypto); }
+.bg-rows { padding: 0; }
+.bg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+}
+.bg-row:last-child { border-bottom: none; }
+.bg-label { color: var(--muted); }
+.bg-val { font-weight: 700; }
+.bg-val.pos { color: var(--pos); }
+.bg-val.neg { color: var(--neg); }
+
+.meter-strip {
+  max-width: 1080px; margin: 0 auto;
+  padding: 0 44px;
+  display: flex; gap: 0; overflow-x: auto;
+  border-top: 1px solid var(--border);
+}
+.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 155px; }
+.meter-name { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 3px; }
+.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; }
+.meter-val.pos { color: var(--pos); }
+.meter-val.neg { color: var(--neg); }
+
+.page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 34px 44px 100px; }
+
+.sec-hdr { display: flex; align-items: center; gap: 14px; margin: 30px 0 8px; }
+.sec-label { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
+.sec-line { flex: 1; height: 1px; }
+
+.controls { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
+.ctrl { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.ctrl:hover { border-color: var(--crypto); color: var(--crypto); }
+.ctrl-right { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; }
+
+.entry { border: 1px solid var(--border); background: var(--bg1); margin-bottom: 4px; position: relative; overflow: hidden; transition: border-color 0.18s; }
+.entry::before { content: ''; position: absolute; left:0; top:0; bottom:0; width:3px; transition: width 0.2s; }
+.entry.open::before { width: 4px; }
+.entry:hover { border-color: var(--border2); }
+
+.c-mech   .entry::before { background: var(--pos-d); } .c-mech   .entry.open::before { background: var(--pos); }
+.c-dyn    .entry::before { background: var(--crypto-d); } .c-dyn    .entry.open::before { background: var(--crypto); }
+.c-strat  .entry::before { background: var(--comm-d); } .c-strat  .entry.open::before { background: var(--comm); }
+.c-ext    .entry::before { background: var(--risk-d); } .c-ext    .entry.open::before { background: var(--risk); }
+
+.e-hdr { display: flex; align-items: center; cursor: pointer; user-select: none; min-height: 58px; padding-left: 4px; transition: background 0.14s; }
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--faint); width: 44px; text-align: center; flex-shrink: 0; letter-spacing: 0.06em; }
+
+.e-icon { font-size: 17px; width: 46px; text-align: center; flex-shrink: 0; border-right: 1px solid var(--border); align-self: stretch; display: flex; align-items: center; justify-content: center; }
+
+.e-text { flex: 1; padding: 12px 16px; }
+.e-title { font-family: 'Archivo', sans-serif; font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.2; letter-spacing: -0.01em; }
+.e-sub { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); margin-top: 3px; letter-spacing: 0.03em; font-weight: 300; }
+
+.e-fmla { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink2); padding: 4px 12px; border: 1px solid var(--border2); background: var(--bg2); margin-right: 14px; flex-shrink: 0; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+
+.e-toggle { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; align-self: stretch; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--border); flex-shrink: 0; transition: transform 0.24s, color 0.15s; }
+.entry.open .e-toggle { transform: rotate(90deg); }
+.c-mech   .entry.open .e-toggle { color: var(--pos); }
+.c-dyn    .entry.open .e-toggle { color: var(--crypto); }
+.c-strat  .entry.open .e-toggle { color: var(--comm); }
+.c-ext    .entry.open .e-toggle { color: var(--risk); }
+
+.e-body { display: none; border-top: 1px solid var(--border); background: var(--bg); padding: 22px 22px 26px 90px; animation: bIn 0.2s ease; }
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p { font-family: 'Source Serif 4', serif; font-size: 14px; font-weight: 400; line-height: 1.86; color: var(--ink2); margin-bottom: 14px; }
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); }
+.e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Archivo', sans-serif; font-size: 13.5px; }
+
+.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--crypto); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.fmla-main { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--ink); flex-shrink: 0; line-height: 1.6; }
+.fmla-main .perp { color: var(--crypto); }
+.fmla-note { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.stat { flex: 1; min-width: 130px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2); }
+.stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.stat-v { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.stat-v.pos { color: var(--pos); }
+.stat-v.neg { color: var(--neg); }
+.stat-v.crypto { color: var(--crypto); }
+
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cc { padding: 13px 15px; border: 1px solid var(--border); background: var(--bg2); }
+.cc-l { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
+.cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Archivo', sans-serif !important; font-weight: 400 !important; color: var(--ink2) !important; }
+.cc.pos { background: var(--pos-b); border-color: var(--pos-d); } .cc.pos .cc-l { color: var(--pos); }
+.cc.neg { background: var(--neg-b); border-color: var(--neg-d); } .cc.neg .cc-l { color: var(--neg); }
+.cc.crypto { background: var(--crypto-b); border-color: var(--crypto-d); } .cc.crypto .cc-l { color: var(--crypto); }
+
+.ki { margin-top: 20px; padding: 14px 18px; background: var(--bg2); border: 1px solid var(--border2); display: flex; gap: 14px; align-items: flex-start; }
+.ki-glyph { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; flex-shrink: 0; padding-top: 2px; }
+.ki-text { font-family: 'Source Serif 4', serif; font-style: italic; font-size: 14.5px; color: var(--ink); line-height: 1.62; }
+.c-mech .ki-glyph { color: var(--pos); }
+.c-dyn .ki-glyph { color: var(--crypto); }
+.c-strat .ki-glyph { color: var(--comm); }
+.c-ext .ki-glyph { color: var(--risk); }
+
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
+.tag.crypto { border-color: var(--crypto-d); color: var(--crypto); }
+.tag.pos { border-color: var(--pos-d); color: var(--pos); }
+.tag.neg { border-color: var(--neg-d); color: var(--neg); }
+
+.foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+.foot span { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .basis-gauge { display: none; }
+  .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding: 36px 18px 0; }
+  .meter-strip { padding: 0 18px; }
+  .e-body { padding-left: 16px; }
+  .cmp.c2 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 3.6 · Crypto Markets</div>
+      <div class="mhd-title">Funding Rates<span class="eq"> =</span></div>
+      <div class="mhd-sub">The continuous payment mechanism that anchors perpetual futures to spot prices in crypto markets — without expiration. 8 topics.</div>
+    </div>
+    <div class="basis-gauge">
+      <div class="bg-hdr">// Funding Rate Formula</div>
+      <div class="bg-formula">
+        <span class="perp">Perp Price</span> − <span class="perp">Spot</span> → <span class="perp">Funding Rate</span>
+      </div>
+      <div class="bg-rows">
+        <div class="bg-row"><span class="bg-label">Positive Funding</span><span class="bg-val pos">Longs pay Shorts</span></div>
+        <div class="bg-row"><span class="bg-label">Negative Funding</span><span class="bg-val neg">Shorts pay Longs</span></div>
+        <div class="bg-row"><span class="bg-label">Typical Interval</span><span class="bg-val">Every 8 hours</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="meter-strip">
+    <div class="meter-item"><div class="meter-name">BTC Funding (calm)</div><div class="meter-val pos">+0.01% / 8h</div></div>
+    <div class="meter-item"><div class="meter-name">BTC Funding (euphoria)</div><div class="meter-val pos">+0.15% / 8h</div></div>
+    <div class="meter-item"><div class="meter-name">ETH Funding (fear)</div><div class="meter-val neg">−0.08% / 8h</div></div>
+    <div class="meter-item"><div class="meter-name">Annualized (extreme)</div><div class="meter-val pos">>150%</div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">8 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>3.6 Funding Rates</span>
+</footer>
+
+<script>
+const sections = [
+  {
+    label:"Foundational Mechanics",
+    color:"var(--pos)",
+    line:"var(--pos-d)",
+    fam:"c-mech",
+    entries:[
+      {
+        icon:"🔄",
+        fmla:"Perp − Spot → Funding",
+        title:"Perpetual Swap Funding Mechanism",
+        sub:"How perpetual contracts maintain price alignment without expiry",
+        tags:[["funding rate","crypto"],["perpetual futures","crypto"],["convergence","pos"]],
+        fmla2:{
+          main:`<span class="perp">Funding Rate</span> = f(Perp Price − Spot Price)`,
+          note:`Positive funding → longs pay shorts\nNegative funding → shorts pay longs\nPaid every 8 hours on most venues (Binance, Bybit, OKX, etc.)`
+        },
+        stats:[
+          {l:"Purpose",v:"Replace expiry convergence with continuous payments",c:"pos"},
+          {l:"Interval",v:"8 hours (most platforms)",c:"crypto"},
+          {l:"Payment",v:"Directly between long and short holders",c:"crypto"},
+        ],
+        body:[
+          `Unlike traditional futures that converge to spot at expiry, <em>perpetual swaps</em> (perps) have no expiration date. To prevent perpetual divergence between the futures price and the underlying spot price, exchanges introduced the <em>funding rate mechanism</em>.`,
+          `The funding rate is a periodic payment exchanged directly between long and short position holders. It is calculated based on the premium (or discount) of the perpetual contract relative to the spot price, often averaged over a short window before each funding timestamp. If the perpetual trades at a premium to spot, the funding rate turns positive and longs pay shorts. This creates a financial incentive for participants to sell the expensive perp (or buy spot), pushing the price back toward equilibrium.`,
+          `The mechanism is elegant in its simplicity: it turns the basis itself into a self-correcting economic signal. Funding rates act as a real-time “toll” that longs must pay during bullish periods and that shorts must pay during bearish periods, continuously anchoring the synthetic perpetual price to the real spot market.`
+        ],
+        ki:"Funding rates are crypto’s ingenious substitute for the natural convergence mechanism of expiring futures contracts. By making the cost of holding an imbalanced position explicit and recurring, they maintain a dynamic equilibrium between perpetual price and spot price 24/7."
+      },
+      {
+        icon:"⚖️",
+        fmla:"Longs ↔ Shorts",
+        title:"Payment Direction & Economics",
+        sub:"Positive vs Negative Funding — who pays whom and why",
+        tags:[["positive funding","pos"],["negative funding","neg"]],
+        stats:[
+          {l:"Positive Funding",v:"Perp > Spot → Longs pay Shorts",c:"pos"},
+          {l:"Negative Funding",v:"Perp < Spot → Shorts pay Longs",c:"neg"},
+          {l:"Typical Calm Range",v:"±0.01% to ±0.03% per 8h",c:"crypto"},
+          {l:"Extreme Bull",v:"+0.10% to +0.30% per 8h",c:"pos"},
+        ],
+        body:[
+          `When market sentiment is bullish and leveraged longs dominate, the perpetual price usually trades above spot. This generates <strong>positive funding</strong>: longs pay shorts. The payment is proportional to position size and can be thought of as a “carry cost” of being long in euphoric conditions.`,
+          `Conversely, during fear or deleveraging phases, the perpetual can trade at a discount, producing <strong>negative funding</strong> where shorts pay longs. This rewards those willing to hold long exposure when sentiment is most pessimistic.`,
+          `Because funding is paid every 8 hours (typically at 00:00, 08:00, 16:00 UTC on major exchanges), it creates a predictable cash flow stream. For large positions, even modest funding rates compound into significant annualized yields or costs.`
+        ],
+        ki:"Funding direction is one of the purest real-time readouts of leveraged positioning and crowd sentiment in crypto markets."
+      }
+    ]
+  },
+  {
+    label:"Dynamics & Sentiment",
+    color:"var(--crypto)",
+    line:"var(--crypto-d)",
+    fam:"c-dyn",
+    entries:[
+      {
+        icon:"📈",
+        fmla:"Funding as Sentiment Gauge",
+        title:"Funding Rate as Sentiment Indicator",
+        sub:"Reading market psychology through perpetual premium",
+        tags:[["sentiment","crypto"],["leveraged positioning","crypto"]],
+        body:[
+          `Because funding rates are directly tied to the basis between perp and spot, they serve as an excellent real-time sentiment and positioning indicator. Persistently positive funding suggests strong bullish conviction and heavy long leverage. Sustained negative funding indicates capitulation or defensive short positioning.`,
+          `Traders monitor not just the current rate but also the trend and persistence of funding. A sudden spike in positive funding during a price rally often signals that the move is becoming overcrowded. Conversely, deeply negative funding during a crash can mark capitulation and potential reversal zones.`
+        ],
+        ki:"When funding rates become extreme, they often function as a contrarian signal — the more expensive it becomes to stay long (or short), the closer the market may be to a reversal."
+      },
+      {
+        icon:"🌡️",
+        fmla:"Vol vs Calm",
+        title:"Funding in Volatile vs Calm Markets",
+        sub:"How market regimes affect funding behavior",
+        tags:[["volatility","crypto"],["market regimes","risk"]],
+        cmp:[
+          {cls:"pos", label:"Calm / Trending Markets", text:"Funding tends to be modestly positive during steady uptrends as longs are willing to pay a carry cost for exposure. Rates usually stay in a manageable +0.005% to +0.04% range per 8h."},
+          {cls:"crypto", label:"High Volatility / Mania", text:"During parabolic rallies or short squeezes, funding can spike dramatically (>0.1% per 8h, sometimes exceeding 0.3%). These periods create extraordinary carry for basis traders but also increase the risk of violent unwinds."},
+          {cls:"neg", label:"Fear / Capitulation", text:"Deep negative funding occurs during rapid deleveraging events when longs are being liquidated and shorts dominate. These phases often coincide with local bottoms as the cost of being short becomes punitive."},
+        ],
+        body:[
+          `In calm, low-volatility environments, funding rates tend to remain low and relatively stable. In high-volatility regimes — especially during strong directional moves — funding becomes much more extreme as one side of the market becomes heavily imbalanced.`
+        ],
+        ki:"Extreme funding is rarely sustainable. Markets eventually exhaust the side paying the highest carry, often leading to sharp reversals."
+      }
+    ]
+  },
+  {
+    label:"Trading Strategies",
+    color:"var(--comm)",
+    line:"var(--comm-d)",
+    fam:"c-strat",
+    entries:[
+      {
+        icon:"🔀",
+        fmla:"Long Spot + Short Perp",
+        title:"Funding Rate Arbitrage (Cash & Carry)",
+        sub:"The classic delta-neutral strategy in crypto",
+        tags:[["cash and carry","crypto"],["basis trade","pos"]],
+        fmla2:{
+          main:`Long Spot + Short Perp = Delta-neutral + Funding Yield`,
+          note:`Profit = Funding received − Financing costs − Slippage\nMost profitable when funding is persistently positive`
+        },
+        stats:[
+          {l:"Typical Annualized Yield (calm)",v:"8–25%",c:"pos"},
+          {l:"Euphoric Periods",v:"50–200%+ annualized",c:"pos"},
+          {l:"Risks",v:"Funding flip, liquidation cascade, exchange downtime",c:"risk"},
+        ],
+        body:[
+          `The most popular funding-rate strategy is the <strong>cash-and-carry</strong> (or basis) trade: buy spot Bitcoin (or ETH), simultaneously short an equal notional amount of perpetual futures, and collect the funding payments. Because the position is roughly delta-neutral, the trader’s primary return comes from the funding rate rather than directional price movement.`,
+          `This trade works best in strongly bullish markets where funding remains consistently positive. During these periods, sophisticated funds have earned double-digit to triple-digit annualized returns with relatively low volatility — provided they can manage financing costs (borrowing stablecoins or using spot margin) and execution slippage.`
+        ],
+        ki:"The funding arbitrage trade turned the perpetual basis into one of the most reliable yield sources in crypto during bull markets — but it is not risk-free. Funding can flip, and deleveraging events can create temporary mark-to-market losses even on delta-neutral positions."
+      },
+      {
+        icon:"🔄",
+        fmla:"Cross-Exchange",
+        title:"Cross-Exchange Funding Disparities",
+        sub:"Arbitraging differences between venues",
+        tags:[["cross-exchange","crypto"],["arbitrage","pos"]],
+        body:[
+          `Different exchanges can have meaningfully different funding rates for the same asset at the same time due to variations in user base, leverage levels, and liquidity. Professional traders monitor and exploit these disparities by holding long perp on the exchange with lower (or more negative) funding and short on the one with higher positive funding, while hedging spot exposure.`
+        ],
+        ki:"Cross-exchange funding arbitrage adds another layer of sophistication — and operational complexity — to basis trading."
+      }
+    ]
+  },
+  {
+    label:"Extremes & Risk",
+    color:"var(--risk)",
+    line:"var(--risk-d)",
+    fam:"c-ext",
+    entries:[
+      {
+        icon:"🚨",
+        fmla:"Extreme Funding = Signal",
+        title:"Extreme Funding as Contrarian Signal",
+        sub:"When funding becomes punitive, reversals often follow",
+        tags:[["contrarian","risk"],["overleveraged","crypto"]],
+        body:[
+          `When funding rates reach extreme levels (e.g. +0.15% to +0.30% per 8h), the cost of holding leveraged long positions becomes prohibitive. This often marks the final speculative blow-off phase of a rally. History shows many major local tops have been accompanied by extremely elevated positive funding, followed by sharp corrections as longs are forced to deleverage or choose to take profit.`,
+          `The same dynamic works in reverse for deeply negative funding during crashes.`
+        ],
+        ki:"Extreme funding is one of the best real-time indicators that a market move has become overcrowded and is vulnerable to reversal."
+      }
+    ]
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sdiv = document.createElement('div');
+    sdiv.innerHTML = `<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line" style="background:${sec.line}"></div>
+    </div>`;
+    root.appendChild(sdiv);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.fam;
+
+    sec.entries.forEach(e => {
+      const idx = cnt++;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>` : '';
+      const cmpH = e.cmp ? `<div class="cmp c${e.cmp.length}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>` : '';
+      const fmlaH = e.fmla2 ? `<div class="fmla-block"><div class="fmla-main">${e.fmla2.main}</div><pre class="fmla-note">${e.fmla2.note}</pre></div>` : '';
+
+      const body = e.body.map(p=>`<p>${p}</p>`).join('') + fmlaH + stH + cmpH +
+        `<div class="ki">
+          <div class="ki-glyph">//</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+        <div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-fmla">${e.fmla}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

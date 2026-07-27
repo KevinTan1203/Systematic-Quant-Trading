@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Financial Markets — 1.11 Settlement Systems</title>
+<title>Financial Markets — 3.7 P&L Calculation</title>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -24,13 +24,17 @@
   --pos-d:    #0e3a20;
   --pos-b:    rgba(77,217,130,0.07);
 
+  --neg:      #e8645d;
+  --neg-d:    #4a1814;
+  --neg-b:    rgba(232,100,93,0.07);
+
   --risk:     #e8a83d;
   --risk-d:   #4a3308;
   --risk-b:   rgba(232,168,61,0.07);
 
-  --settle:   #3da8e8;   /* blue for settlement */
-  --settle-d: #082e4a;
-  --settle-b: rgba(61,168,232,0.07);
+  --pnl:      #d9bd4d;   /* gold for P&L */
+  --pnl-d:    #3a3008;
+  --pnl-b:    rgba(217,189,77,0.07);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -48,8 +52,8 @@ body::before {
   content: '';
   position: fixed; inset: 0;
   background-image:
-    linear-gradient(rgba(61,168,232,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(61,168,232,0.025) 1px, transparent 1px);
+    linear-gradient(rgba(217,189,77,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(217,189,77,0.025) 1px, transparent 1px);
   background-size: 60px 60px;
   pointer-events: none; z-index: 0;
 }
@@ -74,7 +78,7 @@ body::before {
   margin-bottom: 16px;
   display: flex; align-items: center; gap: 10px;
 }
-.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--settle); }
+.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--pnl); }
 
 .mhd-title {
   font-family: 'Archivo', sans-serif;
@@ -83,7 +87,7 @@ body::before {
   line-height: 0.88; color: var(--ink);
   margin-bottom: 14px;
 }
-.mhd-title .eq { color: var(--settle); }
+.mhd-title .eq { color: var(--pnl); }
 
 .mhd-sub {
   font-family: 'Source Serif 4', serif;
@@ -119,7 +123,9 @@ body::before {
 }
 .bg-row:last-child { border-bottom: none; }
 .bg-label { color: var(--muted); }
-.bg-val { font-weight: 700; color: var(--settle); }
+.bg-val { font-weight: 700; }
+.bg-val.pos { color: var(--pos); }
+.bg-val.neg { color: var(--neg); }
 
 .meter-strip {
   max-width: 1080px; margin: 0 auto;
@@ -127,9 +133,11 @@ body::before {
   display: flex; gap: 0; overflow-x: auto;
   border-top: 1px solid var(--border);
 }
-.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 155px; }
+.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 150px; }
 .meter-name { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 3px; }
-.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; color: var(--settle); }
+.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; }
+.meter-val.pos { color: var(--pos); }
+.meter-val.neg { color: var(--neg); }
 
 .page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 34px 44px 100px; }
 
@@ -139,7 +147,7 @@ body::before {
 
 .controls { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
 .ctrl { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
-.ctrl:hover { border-color: var(--settle); color: var(--settle); }
+.ctrl:hover { border-color: var(--pnl); color: var(--pnl); }
 .ctrl-right { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; }
 
 .entry { border: 1px solid var(--border); background: var(--bg1); margin-bottom: 4px; position: relative; overflow: hidden; transition: border-color 0.18s; }
@@ -147,9 +155,10 @@ body::before {
 .entry.open::before { width: 4px; }
 .entry:hover { border-color: var(--border2); }
 
-.c-core   .entry::before { background: var(--pos-d); } .c-core   .entry.open::before { background: var(--pos); }
-.c-risk   .entry::before { background: var(--risk-d); } .c-risk   .entry.open::before { background: var(--risk); }
-.c-innov  .entry::before { background: var(--settle-d); } .c-innov  .entry.open::before { background: var(--settle); }
+.c-mech   .entry::before { background: var(--pos-d); } .c-mech   .entry.open::before { background: var(--pos); }
+.c-attr   .entry::before { background: var(--pnl-d); } .c-attr   .entry.open::before { background: var(--pnl); }
+.c-adv    .entry::before { background: var(--risk-d); } .c-adv    .entry.open::before { background: var(--risk); }
+.c-prac   .entry::before { background: var(--comm-d); } .c-prac   .entry.open::before { background: var(--comm); }
 
 .e-hdr { display: flex; align-items: center; cursor: pointer; user-select: none; min-height: 58px; padding-left: 4px; transition: background 0.14s; }
 .e-hdr:hover { background: var(--bg2); }
@@ -166,9 +175,10 @@ body::before {
 
 .e-toggle { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; align-self: stretch; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--border); flex-shrink: 0; transition: transform 0.24s, color 0.15s; }
 .entry.open .e-toggle { transform: rotate(90deg); }
-.c-core .entry.open .e-toggle { color: var(--pos); }
-.c-risk .entry.open .e-toggle { color: var(--risk); }
-.c-innov .entry.open .e-toggle { color: var(--settle); }
+.c-mech .entry.open .e-toggle { color: var(--pos); }
+.c-attr .entry.open .e-toggle { color: var(--pnl); }
+.c-adv .entry.open .e-toggle { color: var(--risk); }
+.c-prac .entry.open .e-toggle { color: var(--comm); }
 
 .e-body { display: none; border-top: 1px solid var(--border); background: var(--bg); padding: 22px 22px 26px 90px; animation: bIn 0.2s ease; }
 .entry.open .e-body { display: block; }
@@ -179,7 +189,7 @@ body::before {
 .e-body p em     { font-style: italic; color: var(--ink); }
 .e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Archivo', sans-serif; font-size: 13.5px; }
 
-.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--settle); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--pnl); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
 .fmla-main { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--ink); flex-shrink: 0; line-height: 1.6; }
 .fmla-note { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
 
@@ -187,14 +197,16 @@ body::before {
 .stat { flex: 1; min-width: 130px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2); }
 .stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
 .stat-v { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
-.stat-v.settle { color: var(--settle); }
+.stat-v.pos { color: var(--pos); }
+.stat-v.neg { color: var(--neg); }
+.stat-v.pnl { color: var(--pnl); }
 
 .cmp { display: grid; gap: 8px; margin-top: 18px; }
 .cmp.c2 { grid-template-columns: 1fr 1fr; }
 .cc { padding: 13px 15px; border: 1px solid var(--border); background: var(--bg2); }
 .cc-l { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
 .cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Archivo', sans-serif !important; font-weight: 400 !important; color: var(--ink2) !important; }
-.cc.settle { background: var(--settle-b); border-color: var(--settle-d); } .cc.settle .cc-l { color: var(--settle); }
+.cc.pnl { background: var(--pnl-b); border-color: var(--pnl-d); } .cc.pnl .cc-l { color: var(--pnl); }
 
 .ki { margin-top: 20px; padding: 14px 18px; background: var(--bg2); border: 1px solid var(--border2); display: flex; gap: 14px; align-items: flex-start; }
 .ki-glyph { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; flex-shrink: 0; padding-top: 2px; }
@@ -202,7 +214,7 @@ body::before {
 
 .tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
 .tag { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
-.tag.settle { border-color: var(--settle-d); color: var(--settle); }
+.tag.pnl { border-color: var(--pnl-d); color: var(--pnl); }
 
 .foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
 .foot span { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
@@ -223,27 +235,27 @@ body::before {
 <div class="masthead">
   <div class="mhd-inner">
     <div>
-      <div class="mhd-kicker">Section 1.11 · Market Infrastructure</div>
-      <div class="mhd-title">Settlement Systems<span class="eq"> =</span></div>
-      <div class="mhd-sub">The final step where securities and cash actually change hands — the culmination of every trade. 9 topics.</div>
+      <div class="mhd-kicker">Section 3.7 · Portfolio & Risk Management</div>
+      <div class="mhd-title">P&amp;L Calculation<span class="eq"> =</span></div>
+      <div class="mhd-sub">The complete framework for measuring, attributing, and explaining trading performance — from realized gains to Greeks attribution. 11 topics.</div>
     </div>
     <div class="basis-gauge">
-      <div class="bg-hdr">// Settlement Models</div>
+      <div class="bg-hdr">// Core P&amp;L Split</div>
       <div class="bg-formula">
-        DVP • FOP • RTGS • Netting
+        Total P&amp;L = Realized + Unrealized
       </div>
       <div class="bg-rows">
-        <div class="bg-row"><span class="bg-label">U.S. Equities</span><span class="bg-val settle">T+1 (2024)</span></div>
-        <div class="bg-row"><span class="bg-label">DVP Model</span><span class="bg-val settle">Principal risk mitigation</span></div>
-        <div class="bg-row"><span class="bg-label">Crypto</span><span class="bg-val settle">Near-instant on-chain</span></div>
+        <div class="bg-row"><span class="bg-label">Realized P&amp;L</span><span class="bg-val pos">Closed positions</span></div>
+        <div class="bg-row"><span class="bg-label">Unrealized P&amp;L</span><span class="bg-val">MTM on open positions</span></div>
+        <div class="bg-row"><span class="bg-label">Attribution</span><span class="bg-val pnl">By strategy / factor / greek</span></div>
       </div>
     </div>
   </div>
   <div class="meter-strip">
-    <div class="meter-item"><div class="meter-name">DVP</div><div class="meter-val settle">Delivery vs Payment</div></div>
-    <div class="meter-item"><div class="meter-name">T+1 (US)</div><div class="meter-val settle">May 2024 migration</div></div>
-    <div class="meter-item"><div class="meter-name">Settlement Fails</div><div class="meter-val risk">Buy-in pressure</div></div>
-    <div class="meter-item"><div class="meter-name">DLT / Blockchain</div><div class="meter-val settle">Experimental rails</div></div>
+    <div class="meter-item"><div class="meter-name">Daily P&amp;L</div><div class="meter-val pnl">$248,750</div></div>
+    <div class="meter-item"><div class="meter-name">Carry Contribution</div><div class="meter-val pos">+42%</div></div>
+    <div class="meter-item"><div class="meter-name">Realized / Unrealized</div><div class="meter-val">60% / 40%</div></div>
+    <div class="meter-item"><div class="meter-name">TC Impact</div><div class="meter-val neg">-18 bps</div></div>
   </div>
 </div>
 
@@ -252,138 +264,163 @@ body::before {
   <div class="controls">
     <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
     <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
-    <span class="ctrl-right">9 topics · click to expand</span>
+    <span class="ctrl-right">11 topics · click to expand</span>
   </div>
   <div id="root"></div>
 </div>
 
 <footer class="foot">
   <span>Financial Markets · Revision Notes</span>
-  <span>1.11 Settlement Systems</span>
+  <span>3.7 P&amp;L Calculation</span>
 </footer>
 
 <script>
 const sections = [
   {
-    label:"Core Settlement Principles",
+    label:"Foundational Concepts",
     color:"var(--pos)",
     line:"var(--pos-d)",
-    fam:"c-core",
+    fam:"c-mech",
     entries:[
       {
-        icon:"🔄",
-        fmla:"DVP",
-        title:"DVP — Delivery Versus Payment",
-        sub:"The gold standard for risk reduction",
-        tags:[["dvp","settle"]],
-        body:[
-          `<strong>Delivery Versus Payment (DVP)</strong> ensures that securities are delivered only if payment is received simultaneously (or vice versa). This eliminates principal risk — the risk that one party delivers securities but does not receive cash, or pays cash but does not receive securities. Most modern CSDs and CCPs use DVP models.`
+        icon:"💰",
+        fmla:"Realized + Unrealized",
+        title:"Realized vs Unrealized P&L",
+        sub:"The fundamental split in performance measurement",
+        tags:[["realized pnl","pnl"],["unrealized pnl","pnl"],["mtm","pnl"]],
+        fmla2:{
+          main:`Total P&amp;L = <span style="color:#4dd982">Realized</span> + <span style="color:#d9bd4d">Unrealized (MTM)</span>`,
+          note:`Realized: locked-in from closed positions or cash flows\nUnrealized: current market value change on open positions`
+        },
+        stats:[
+          {l:"Realized P&amp;L",v:"From executed trades (sales, expirations, settlements)",c:"pos"},
+          {l:"Unrealized P&amp;L",v:"Mark-to-Market on open positions",c:"pnl"},
+          {l:"Accounting Standard",v:"Mark-to-Market (MTM) for trading books",c:"pnl"},
         ],
-        ki:"DVP is one of the most important post-trade risk mitigations in financial markets."
+        body:[
+          `<em>Realized P&amp;L</em> represents profits or losses that have been crystallized through closing a position, delivery, expiration, or receipt of cash flows (coupons, dividends, funding payments). Once realized, the P&amp;L is "locked in" and no longer subject to market fluctuations.`,
+          `<em>Unrealized P&amp;L</em> (also called Mark-to-Market or MTM) reflects the current theoretical profit or loss on open positions if they were closed at prevailing market prices. Trading desks and funds use MTM accounting to reflect true economic performance on a daily basis rather than waiting for positions to be closed.`,
+          `Mark-to-market accounting is the industry standard for trading portfolios because it provides a transparent, timely view of performance and risk. It forces recognition of gains and losses as market prices move, preventing the buildup of hidden losses.`
+        ],
+        ki:"Realized P&amp;L tells you what you have already made. Unrealized P&amp;L tells you what you are currently worth. Together they give the complete performance picture."
       },
       {
-        icon:"📤",
-        fmla:"FOP",
-        title:"FOP — Free of Payment",
-        sub:"Securities transfer without cash leg",
-        tags:[["fop","settle"]],
+        icon:"📅",
+        fmla:"Daily Attribution",
+        title:"Daily P&amp;L Attribution",
+        sub:"Breaking down performance on a daily basis",
+        tags:[["daily pnl","pnl"],["attribution","pnl"]],
         body:[
-          `<strong>Free of Payment (FOP)</strong> transfers involve moving securities without a simultaneous cash payment. Common in internal transfers, custody moves, or collateral pledging. FOP carries higher risk and is usually restricted to trusted counterparties or internal accounts.`
+          `Daily P&amp;L attribution decomposes the day’s performance into understandable drivers: price moves, carry (funding, dividends, roll yield), new trades, position changes, and market events. Sophisticated systems attribute P&amp;L at the trade, strategy, book, and desk level in near real-time.`,
+          `Accurate daily attribution is essential for portfolio managers to understand what actually drove results and to detect issues such as style drift, unintended risk exposure, or execution problems.`
         ],
-        ki:"FOP is operationally simpler but riskier — it should only be used when there is strong trust or collateralization."
-      },
-      {
-        icon:"⚠️",
-        fmla:"Fails & Buy-ins",
-        title:"Settlement Fails and Buy-ins",
-        sub:"Consequences of failed settlements",
-        tags:[["settlement fails","risk"],["buy-in","risk"]],
-        body:[
-          `A settlement fail occurs when a trade does not settle on the intended date. Persistent fails can trigger mandatory buy-ins (forced purchase in the market) by the receiving party, especially under new regulations. High fail rates can signal liquidity stress or operational problems.`
-        ],
-        ki:"Settlement discipline rules (including mandatory buy-ins) are designed to keep markets functioning smoothly."
+        ki:"Good attribution turns raw P&amp;L numbers into actionable intelligence."
       }
     ]
   },
   {
-    label:"Settlement Cycles & Models",
-    color:"var(--settle)",
-    line:"var(--settle-d)",
-    fam:"c-clear",
+    label:"P&amp;L Attribution",
+    color:"var(--pnl)",
+    line:"var(--pnl-d)",
+    fam:"c-attr",
     entries:[
       {
-        icon:"📆",
-        fmla:"T+1 Migration",
-        title:"T+1 Settlement Cycle",
-        sub:"The shift to faster settlement",
-        tags:[["t+1","settle"]],
+        icon:"📊",
+        fmla:"Strategy / Factor / Sector",
+        title:"P&amp;L by Strategy, Factor & Sector",
+        sub:"Multi-dimensional performance decomposition",
+        tags:[["attribution","pnl"],["factor pnl","pnl"]],
         body:[
-          `In May 2024, the U.S. equity market moved from T+2 to T+1 settlement. Shorter cycles reduce counterparty risk, margin requirements, and systemic risk, but require tighter operational processes and higher liquidity. Many other markets are evaluating similar moves.`
+          `Modern trading operations attribute P&amp;L across multiple dimensions simultaneously: by strategy (e.g., statistical arbitrage, macro, relative value), by risk factor (momentum, value, carry, volatility), by sector or asset class, and by trader or book. This allows senior management to identify which parts of the portfolio are driving performance and which are underperforming.`
         ],
-        ki:"The move to T+1 reflects a global trend toward faster, safer post-trade processes."
+        ki:"Factor attribution reveals whether returns are coming from genuine skill or simply from riding favorable market regimes."
       },
       {
-        icon:"⚡",
-        fmla:"RTGS",
-        title:"Real-Time Gross Settlement (RTGS)",
-        sub:"Immediate final settlement",
-        tags:[["rtgs","settle"]],
-        body:[
-          `<strong>Real-Time Gross Settlement (RTGS)</strong> systems settle payments individually and in real time (e.g., Fedwire, TARGET2). Each transaction is final and irrevocable upon processing. RTGS eliminates settlement risk but requires more liquidity than netting systems.`
+        icon:"📈",
+        fmla:"Carry vs Price",
+        title:"Carry P&amp;L vs Price P&amp;L",
+        sub:"Decomposing returns into yield and capital appreciation",
+        tags:[["carry","pnl"],["price return","pnl"]],
+        stats:[
+          {l:"Carry P&amp;L",v:"Funding, dividends, roll yield, coupon income",c:"pos"},
+          {l:"Price P&amp;L",v:"Pure mark-to-market price changes",c:"pnl"},
         ],
-        ki:"RTGS is the safest but most liquidity-intensive form of settlement."
+        body:[
+          `Carry P&amp;L represents the predictable, time-based return from holding a position (e.g., positive funding on crypto perps, bond coupon income, futures roll yield). Price P&amp;L captures directional or relative price movements.`,
+          `Distinguishing between the two is critical — a strategy that appears highly profitable may actually be earning mostly carry while taking significant directional risk that has not yet materialized.`
+        ],
+        ki:"Sustainable trading businesses focus on strategies with attractive carry characteristics rather than relying solely on price appreciation."
       },
       {
-        icon:"🔀",
-        fmla:"Netting",
-        title:"Netting and Novation",
-        sub:"Efficiency through multilateral offsetting",
-        tags:[["netting","clear"],["novation","clear"]],
+        icon:"Δ",
+        fmla:"Greeks Attribution",
+        title:"Greeks P&amp;L Attribution",
+        sub:"Explaining P&amp;L through risk sensitivities",
+        tags:[["greeks","pnl"],["risk attribution","pnl"]],
         body:[
-          `Netting reduces the number and value of obligations through multilateral offsetting. Combined with novation (where the CCP becomes counterparty), it dramatically lowers systemic risk and liquidity needs.`
+          `For derivatives portfolios, P&amp;L is attributed to changes in the Greeks: delta (directional), gamma (convexity), vega (volatility), theta (time decay), and rho (interest rates). This “risk-based” attribution helps traders understand whether profits came from correct directional views, volatility positioning, or other risk exposures.`
         ],
-        ki:"Netting is one of the most powerful risk and efficiency tools in modern financial infrastructure."
+        ki:"Greeks attribution turns P&amp;L explain into a risk management tool."
       }
     ]
   },
   {
-    label:"Innovation & Crypto Settlement",
+    label:"Advanced & Reporting",
     color:"var(--risk)",
     line:"var(--risk-d)",
-    fam:"c-innov",
+    fam:"c-adv",
     entries:[
       {
-        icon:"🔗",
-        fmla:"DLT Experiments",
-        title:"Blockchain / DLT Settlement Experiments",
-        sub:"Tokenization and atomic settlement",
-        tags:[["dlt","settle"],["tokenization","settle"]],
+        icon:"📋",
+        fmla:"PnL Explain",
+        title:"P&amp;L Explain Report",
+        sub:"Reconciling theoretical vs actual P&amp;L",
+        tags:[["pnl explain","pnl"],["risk report","pnl"]],
         body:[
-          `Distributed Ledger Technology (DLT) and blockchain experiments aim for atomic settlement (simultaneous exchange of cash and asset legs). Projects by major banks, stock exchanges, and central banks (e.g., Project Jasper, Project Ubin, regulated stablecoins) are testing faster, more transparent settlement.`
+          `The <em>P&amp;L Explain</em> (or P&amp;L Attribution Report) is a daily reconciliation that compares the actual recorded P&amp;L with the P&amp;L predicted by applying risk sensitivities (Greeks) to market moves. Large unexplained residuals indicate missing risk factors, model errors, or data issues. Top-tier desks aim for >95% explained P&amp;L on a daily basis.`
         ],
-        ki:"DLT promises near-instant, programmable settlement but faces significant regulatory, legal, and scalability hurdles."
+        ki:"A clean P&amp;L explain is a hallmark of a well-controlled trading operation."
       },
       {
-        icon:"₿",
-        fmla:"On-chain",
-        title:"Crypto Settlement (On-Chain)",
-        sub:"Near-instant finality in decentralized systems",
-        tags:[["crypto settlement","settle"]],
+        icon:"💸",
+        fmla:"Transaction Costs",
+        title:"Transaction Cost Impact on P&amp;L",
+        sub:"The hidden drag on performance",
+        tags:[["transaction costs","pnl"],["slippage","pnl"]],
         body:[
-          `Crypto assets on public blockchains (Bitcoin, Ethereum, Solana, etc.) offer near-instant or minutes-long final settlement. Layer-2 solutions and appchains further improve speed and cost. However, they lack the legal finality and regulatory protections of traditional systems.`
+          `Transaction costs (commissions, exchange fees, bid-ask spread, slippage, and market impact) can significantly erode gross P&amp;L. Sophisticated firms track implementation shortfall and TCA (Transaction Cost Analysis) to measure execution quality and continuously refine trading algorithms.`
         ],
-        ki:"Crypto demonstrates what atomic, near-instant settlement can look like, but at the cost of volatility and regulatory uncertainty."
+        ki:"In high-turnover strategies, transaction costs often determine whether a strategy is viable."
+      }
+    ]
+  },
+  {
+    label:"Accounting & Consolidation",
+    color:"var(--comm)",
+    line:"var(--comm-d)",
+    fam:"c-prac",
+    entries:[
+      {
+        icon:"📒",
+        fmla:"FIFO vs LIFO",
+        title:"FIFO vs LIFO Accounting",
+        sub:"Impact on realized P&amp;L reporting",
+        tags:[["fifo","pnl"],["lifo","pnl"],["accounting","pnl"]],
+        body:[
+          `FIFO (First In, First Out) and LIFO (Last In, First Out) are two common methods for assigning cost basis when closing partial positions. FIFO tends to realize older costs first, while LIFO uses the most recent. The choice affects reported realized P&amp;L, especially in volatile markets or when tax implications matter.`
+        ],
+        ki:"The accounting method chosen can materially change the timing and appearance of reported profits."
       },
       {
-        icon:"💎",
-        fmla:"Stablecoins",
-        title:"Stablecoin Settlement Rails",
-        sub:"Emerging bridge between TradFi and crypto",
-        tags:[["stablecoins","settle"]],
+        icon:"🌍",
+        fmla:"Multi-Currency",
+        title:"Multi-Currency P&amp;L Consolidation",
+        sub:"Handling FX translation and consolidation",
+        tags:[["multi-currency","pnl"],["fx pnl","pnl"]],
         body:[
-          `Stablecoins (especially USD-pegged) are increasingly used as settlement rails for both crypto-native and traditional transactions. They combine the speed of blockchain with the stability of fiat currencies and are being integrated into institutional workflows.`
+          `Global trading books often hold positions in multiple currencies. P&amp;L must be calculated in local currency and then translated to the reporting currency (usually USD). FX translation gains/losses and hedging of these exposures add another layer of complexity to consolidated P&amp;L reporting.`
         ],
-        ki:"Stablecoins may become the first widely adopted bridge between traditional finance and blockchain settlement."
+        ki:"Accurate multi-currency P&amp;L requires separating trading P&amp;L from FX translation effects."
       }
     ]
   }
