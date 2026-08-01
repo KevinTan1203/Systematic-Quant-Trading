@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 2.15 Prediction Markets</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#faf7f2; --bg2:#f2ede4; --bg3:#e8e0d0; --surface:#fff;
+    --border:#d8d0c0; --border2:#c4bba8; --ink:#1a1510; --ink2:#3a3028;
+    --muted:#7a7060; --faint:#b8b0a0;
+    --pri:#2a6040; --pri-light:#d8ede2; --pri-border:#a8cdb8;
+    --sec:#b84020; --sec-light:#f5e0d8; --sec-border:#d8a898;
+    --gold:#9a7020; --gold-light:#f5ead8; --gold-border:#d8c098;
+    --slate:#3a5070; --slate-light:#dce8f5; --slate-border:#9ab4cc;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; font-size:15px; line-height:1.72; min-height:100vh; }
+  body::before { content:''; position:fixed; inset:0; background-image:repeating-linear-gradient(to bottom, transparent 0px, transparent 31px, rgba(160,140,100,0.12) 32px); background-size:100% 32px; pointer-events:none; z-index:0; }
+  .page { position:relative; z-index:1; max-width:960px; margin:0 auto; padding:56px 40px 100px; }
+  .book-header { margin-bottom:46px; }
+  .chap-label { font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:300; letter-spacing:.26em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+  .book-title { font-family:'Playfair Display',serif; font-size:clamp(32px,5.5vw,56px); font-weight:900; line-height:1.0; letter-spacing:-.025em; margin-bottom:20px; }
+  .world-bar { display:grid; grid-template-columns:1fr 1px 1fr; border:2px solid var(--ink); overflow:hidden; margin-bottom:6px; }
+  .world-half { padding:14px 20px; display:flex; flex-direction:column; gap:4px; }
+  .world-half.pri { background:var(--pri-light); } .world-half.sec { background:var(--sec-light); }
+  .world-divider { background:var(--ink); }
+  .world-tag { font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:500; letter-spacing:.2em; text-transform:uppercase; }
+  .world-half.pri .world-tag { color:var(--pri); } .world-half.sec .world-tag { color:var(--sec); }
+  .world-def { font-size:12px; font-weight:300; color:var(--muted); font-style:italic; }
+  .world-count { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--faint); margin-top:2px; }
+  .header-note { font-size:12px; font-weight:300; font-style:italic; color:var(--muted); margin-top:10px; }
+  .controls { display:flex; gap:8px; margin-bottom:34px; flex-wrap:wrap; align-items:center; }
+  .ctrl-btn { font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:300; letter-spacing:.14em; text-transform:uppercase; padding:6px 14px; border:1px solid var(--border2); background:var(--surface); color:var(--muted); cursor:pointer; transition:all .16s; }
+  .ctrl-btn:hover { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .filter-group { margin-left:auto; display:flex; gap:5px; align-items:center; }
+  .filter-label { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--faint); margin-right:2px; }
+  .flt { font-family:'IBM Plex Mono',monospace; font-size:10px; padding:4px 12px; border:1px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; transition:all .15s; letter-spacing:.05em; }
+  .flt:hover { opacity:1; } .flt.inactive { opacity:.38; }
+  .flt.pri { border-color:var(--pri-border); color:var(--pri); } .flt.sec { border-color:var(--sec-border); color:var(--sec); } .flt.all { border-color:var(--border2); color:var(--muted); }
+  .section-header { display:flex; align-items:center; margin-bottom:8px; margin-top:32px; border-left:4px solid; padding-left:14px; }
+  .section-header.pri { border-color:var(--pri); } .section-header.sec { border-color:var(--sec); }
+  .section-header-inner { flex:1; }
+  .section-super { font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; margin-bottom:2px; }
+  .section-header.pri .section-super { color:var(--pri); } .section-header.sec .section-super { color:var(--sec); }
+  .section-heading { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; line-height:1.15; }
+  .section-sub { font-size:12px; font-weight:300; font-style:italic; color:var(--muted); margin-top:2px; }
+  .entry { margin-bottom:4px; background:var(--surface); border:1px solid var(--border); position:relative; transition:box-shadow .18s, border-color .18s; }
+  .entry::after { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; }
+  .entry.pri-entry::after { background:var(--pri-border); } .entry.sec-entry::after { background:var(--sec-border); }
+  .entry.open.pri-entry::after { background:var(--pri); } .entry.open.sec-entry::after { background:var(--sec); }
+  .entry:hover { border-color:var(--border2); box-shadow:2px 2px 0 var(--bg3); }
+  .entry-header { display:flex; align-items:center; cursor:pointer; user-select:none; min-height:52px; padding-left:4px; transition:background .14s; }
+  .entry-header:hover { background:var(--bg2); }
+  .entry-icon { width:46px; text-align:center; font-size:16px; flex-shrink:0; padding:0 4px; }
+  .entry-text { flex:1; padding:11px 14px; }
+  .entry-title { font-family:'Playfair Display',serif; font-size:16px; font-weight:700; line-height:1.25; }
+  .entry-desc { font-size:11.5px; font-weight:300; font-style:italic; color:var(--muted); margin-top:2px; }
+  .entry-pills { display:flex; gap:5px; flex-shrink:0; padding-right:12px; flex-wrap:wrap; justify-content:flex-end; max-width:200px; }
+  .pill { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:.1em; text-transform:uppercase; padding:3px 9px; border:1px solid; white-space:nowrap; }
+  .pill-pri { color:var(--pri); border-color:var(--pri-border); background:var(--pri-light); }
+  .pill-sec { color:var(--sec); border-color:var(--sec-border); background:var(--sec-light); }
+  .pill-gold { color:var(--gold); border-color:var(--gold-border); background:var(--gold-light); }
+  .pill-slate { color:var(--slate); border-color:var(--slate-border); background:var(--slate-light); }
+  .pill-ink { color:var(--muted); border-color:var(--border2); background:var(--bg2); }
+  .pill-warn { color:#9a2010; border-color:#d8a898; background:#fdf0ee; }
+  .entry-toggle { width:44px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--faint); align-self:stretch; display:flex; align-items:center; justify-content:center; border-left:1px solid var(--border); flex-shrink:0; transition:transform .25s, color .15s; }
+  .entry.open.pri-entry .entry-toggle { transform:rotate(90deg); color:var(--pri); }
+  .entry.open.sec-entry .entry-toggle { transform:rotate(90deg); color:var(--sec); }
+  .entry-body { display:none; border-top:1px solid var(--border); background:var(--bg); padding:20px 22px 22px 54px; animation:bIn .2s ease; }
+  .entry.open .entry-body { display:block; }
+  @keyframes bIn { from{opacity:0; transform:translateY(-5px);} to{opacity:1; transform:translateY(0);} }
+  .entry-body p { font-size:13.5px; font-weight:300; line-height:1.83; color:var(--ink2); margin-bottom:13px; }
+  .entry-body p:last-of-type { margin-bottom:0; }
+  .entry-body p em { font-style:italic; color:var(--ink); font-weight:400; }
+  .process-flow { display:flex; flex-wrap:wrap; margin-top:18px; border:1px solid var(--border); overflow:hidden; }
+  .pf-step { flex:1; min-width:110px; padding:10px 14px; border-right:1px solid var(--border); background:var(--surface); position:relative; }
+  .pf-step:last-child { border-right:none; }
+  .pf-step:not(:last-child)::after { content:'→'; position:absolute; right:-10px; top:50%; transform:translateY(-50%); font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--faint); z-index:2; }
+  .pf-num { font-family:'IBM Plex Mono',monospace; font-size:9px; color:var(--faint); letter-spacing:.1em; margin-bottom:3px; }
+  .pf-name { font-size:12px; font-weight:500; line-height:1.3; }
+  .pf-note { font-size:11px; font-weight:300; color:var(--muted); margin-top:2px; line-height:1.4; }
+  .pf-step.pri { background:var(--pri-light); border-right-color:var(--pri-border); }
+  .pf-step.sec { background:var(--sec-light); border-right-color:var(--sec-border); }
+  .pf-step.gold { background:var(--gold-light); border-right-color:var(--gold-border); }
+  .pf-step.slate { background:var(--slate-light); border-right-color:var(--slate-border); }
+  .cmp-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; margin-top:18px; }
+  .cmp-cell { padding:12px 14px; border:1px solid var(--border); background:var(--surface); }
+  .cmp-cell-label { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .cmp-cell-val { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500; line-height:1.3; }
+  .cmp-cell-val.pri { color:var(--pri); } .cmp-cell-val.sec { color:var(--sec); } .cmp-cell-val.gold { color:var(--gold); } .cmp-cell-val.warn { color:#9a2010; } .cmp-cell-val.slate { color:var(--slate); }
+  .key-point { margin-top:20px; display:flex; gap:14px; }
+  .kp-bar { width:3px; flex-shrink:0; border-radius:2px; }
+  .pri-entry .kp-bar { background:var(--pri); } .sec-entry .kp-bar { background:var(--sec); }
+  .kp-inner { flex:1; }
+  .kp-label { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .kp-text { font-family:'Playfair Display',serif; font-style:italic; font-size:14.5px; line-height:1.62; }
+  .tags { margin-top:16px; display:flex; flex-wrap:wrap; gap:5px; }
+  .tag { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:.08em; text-transform:uppercase; padding:2px 8px; border:1px solid var(--border); color:var(--muted); }
+  .tag.pri { border-color:var(--pri-border); color:var(--pri); } .tag.sec { border-color:var(--sec-border); color:var(--sec); }
+  .tag.gold { border-color:var(--gold-border); color:var(--gold); } .tag.slate { border-color:var(--slate-border); color:var(--slate); } .tag.warn { border-color:#d8a898; color:#9a2010; }
+  .section-spacer { height:24px; }
+  .foot-rule { margin-top:64px; height:2px; background:var(--ink); position:relative; }
+  .foot-rule::before { content:'2.15'; position:absolute; right:0; top:-22px; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--faint); letter-spacing:.1em; }
+  .footer-text { margin-top:12px; font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:300; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; }
+  @media (max-width:640px) { .page{padding:28px 16px 60px;} .entry-body{padding-left:16px;} .world-bar{grid-template-columns:1fr;} .world-divider{display:none;} .entry-pills{display:none;} .filter-group{margin-left:0; margin-top:8px;} .pf-step::after{display:none;} }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="book-header">
+    <div class="chap-label">Chapter 2 · Section 2.15</div>
+    <h1 class="book-title">Prediction<br>Markets</h1>
+    <div class="world-bar">
+      <div class="world-half pri">
+        <div class="world-tag">● Mechanism & Pricing</div>
+        <div class="world-def">How prediction markets are built, priced, and kept honest — the design layer</div>
+        <div class="world-count">5 topics covered</div>
+      </div>
+      <div class="world-divider"></div>
+      <div class="world-half sec">
+        <div class="world-tag">● Platforms & Applications</div>
+        <div class="world-def">Where the mechanism gets deployed — named platforms, event categories, and adjacent instruments</div>
+        <div class="world-count">5 topics covered</div>
+      </div>
+    </div>
+    <div class="header-note">Click any entry to expand · Use filters to focus on one side</div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="filter-group">
+      <span class="filter-label">Show:</span>
+      <button class="flt all" onclick="filterBy('all',this)">All</button>
+      <button class="flt pri" onclick="filterBy('pri',this)">Mechanism</button>
+      <button class="flt sec" onclick="filterBy('sec',this)">Platforms</button>
+    </div>
+  </div>
+
+  <div id="entries-root"></div>
+
+  <div class="foot-rule"></div>
+  <div class="footer-text">
+    <span>Financial Markets · Revision Notes</span>
+    <span>2.15 Prediction Markets</span>
+  </div>
+</div>
+
+<script>
+const sections = [
+  {
+    side:"pri",
+    heading:"Mechanism & Pricing",
+    sub:"The design choices that turn a wager into a tradeable, price-discovering market",
+    entries:[
+      {
+        icon:"⚙️", title:"Mechanism Design: AMM vs. Order Book", desc:"Two different ways to let people trade a contract on a future event",
+        pills:[{label:"AMM",style:"pri"},{label:"Order Book",style:"gold"}],
+        tags:[["AMM","pri"],["order book","gold"],["LMSR","slate"]],
+        body:[
+          `An <em>automated market maker (AMM)</em>, often built on a logarithmic market scoring rule (LMSR) or a constant-product formula, prices contracts algorithmically against a bonding curve, always quoting a price for any trade size without needing a matching counterparty — useful for thin, illiquid, or newly-created markets where an order book would have no depth. An <em>order book</em> matches buyers and sellers directly at whatever price they agree on, the same model used by traditional exchanges, and tends to produce tighter, more efficient pricing once a market has enough independent participants.`,
+          `Polymarket runs a central limit order book on-chain; Kalshi also uses an order book model under CFTC oversight; many smaller or newer prediction platforms lean on AMMs to bootstrap liquidity before enough traders arrive to sustain a book.`
+        ],
+        keyPoint:"The AMM-vs-order-book choice is a liquidity bootstrapping problem — AMMs guarantee a quote when no one else is trading, order books deliver tighter pricing once enough people are, and many platforms migrate from one to the other as a market matures."
+      },
+      {
+        icon:"🏁", title:"Resolution Mechanisms", desc:"How a market decides, definitively, what actually happened",
+        pills:[{label:"Oracle Problem",style:"warn"},{label:"Dispute Risk",style:"warn"}],
+        tags:[["resolution","pri"],["oracle","warn"],["dispute period","gold"]],
+        body:[
+          `Every prediction market needs a trusted process for settling a contract once the underlying event resolves — the harder problem than it sounds, since it requires converting a real-world outcome into an on-chain or on-platform binary fact. Regulated platforms like Kalshi resolve against a pre-defined, auditable data source specified in the contract terms; decentralised platforms like Polymarket rely on a crowd-sourced oracle (UMA's optimistic oracle) where a proposed resolution can be challenged and disputed within a window before it becomes final.`,
+          `Ambiguous real-world events — a contested election call, a rule dispute in sports, unclear wording in the original contract — are the recurring failure mode, and resolution disputes are consistently the largest source of user complaints and reputational risk across prediction market platforms.`
+        ],
+        keyPoint:"Resolution is the prediction market version of the 'oracle problem' in blockchain systems — the market can be priced perfectly efficiently right up until the moment it needs a human or a data feed to declare a real-world fact, which is exactly where disputes concentrate."
+      },
+      {
+        icon:"📉", title:"Pricing as Probability", desc:"A binary contract's price is, by construction, the market's implied probability",
+        pills:[{label:"Implied Probability",style:"pri"},{label:"Calibration",style:"gold"}],
+        tags:[["implied probability","pri"],["calibration","gold"],["favorite-longshot bias","warn"]],
+        body:[
+          `A binary "Yes/No" contract that pays $1 if the event occurs and $0 otherwise will, under basic no-arbitrage logic, trade at a price equal to the market's aggregate probability estimate for that event — a contract at $0.70 implies roughly a 70% chance of "Yes." This direct price-to-probability mapping is what makes prediction markets useful as forecasting tools well beyond their function as a place to bet.`,
+          `Real-world prices deviate from pure probability for structural reasons too: a persistent <em>favorite-longshot bias</em> (long-shot outcomes tend to be overpriced relative to their true probability) shows up across betting and prediction markets generally, and fees, capital costs, and platform-specific frictions all drive a wedge between quoted price and true probability, especially for extreme (near-0% or near-100%) contracts.`
+        ],
+        keyPoint:"Treat a prediction market price as a probability estimate with known biases, not a perfectly calibrated forecast — it is directionally very informative, but systematically overstates the odds of unlikely, high-payout outcomes."
+      },
+      {
+        icon:"🕵️", title:"Market Manipulation Risks", desc:"Thin, event-driven markets are structurally easier to move than deep financial markets",
+        pills:[{label:"Wash Trading",style:"warn"},{label:"Thin Liquidity",style:"warn"}],
+        tags:[["manipulation","warn"],["wash trading","warn"],["whale risk","gold"]],
+        body:[
+          `Prediction markets, particularly for lower-volume or niche events, can be moved by a single large ("whale") trade in a way that would be far harder in deep, liquid financial markets — a real concern when the market's price is itself being cited as a signal (e.g., in media coverage of election odds). Wash trading and coordinated multi-account trading to manufacture a misleading price are recurring concerns for regulators evaluating whether to permit event-contract trading at all.`,
+          `The 2024 US election cycle drew heightened scrutiny to this exact issue, with researchers and journalists examining whether large Polymarket positions were shifting the platform's odds in ways that outpaced genuine information flow, though no definitive manipulation finding emerged from that specific episode.`
+        ],
+        keyPoint:"A prediction market's usefulness as an information-aggregation tool depends on it being hard to manipulate cheaply — the thinner and more newsworthy the market, the larger the gap between 'the price moved' and 'genuine new information arrived.'"
+      },
+      {
+        icon:"🧠", title:"Information Aggregation Efficiency", desc:"The core academic case for prediction markets: they pool dispersed private information into a single price",
+        pills:[{label:"Wisdom of Crowds",style:"pri"},{label:"Forecasting Tool",style:"gold"}],
+        tags:[["information aggregation","pri"],["efficient markets","gold"],["forecasting","slate"]],
+        body:[
+          `The theoretical appeal of prediction markets rests on the idea that financial incentive causes participants to reveal genuine private information and belief through trading, and that the resulting price aggregates information more efficiently than a poll, an expert panel, or any single forecaster — a market-based application of the same logic behind the efficient markets hypothesis in traditional finance. Academic studies comparing prediction market prices to polls and expert forecasts (across elections, corporate earnings, and other events) have generally found prediction markets to be competitive with, and sometimes better calibrated than, alternative forecasting methods.`,
+          `The efficiency claim is conditional, not automatic — it depends on sufficient liquidity, a diverse and genuinely informed participant base, and resistance to the manipulation risks above; a thin, homogeneous, or manipulable market aggregates far less real information than the theory assumes.`
+        ],
+        keyPoint:"Prediction markets are only as informationally efficient as their participant base and liquidity allow — the 'wisdom of crowds' argument for using market prices as forecasts is strongest in large, liquid, well-followed markets and weakest in exactly the thin, niche markets where a single trader can move the price."
+      }
+    ]
+  },
+  {
+    side:"sec",
+    heading:"Platforms & Applications",
+    sub:"Named platforms, event categories, and the instruments prediction markets most resemble",
+    entries:[
+      {
+        icon:"🟣", title:"Polymarket Structure", desc:"A crypto-native, on-chain prediction market operating largely outside US retail access",
+        pills:[{label:"On-Chain",style:"sec"},{label:"USDC-Settled",style:"gold"}],
+        tags:[["Polymarket","sec"],["on-chain","gold"],["USDC","slate"],["UMA oracle","slate"]],
+        body:[
+          `Polymarket is a blockchain-based (Polygon network) prediction market where contracts are settled in USDC stablecoin and resolution runs through UMA's optimistic oracle system, allowing disputed outcomes to be challenged before finalising. Its order-book model and crypto-wallet-based access gave it global reach and, during the 2024 US election, some of the highest trading volumes of any prediction market in history.`,
+          `Polymarket has historically restricted or geo-blocked US retail users following a 2022 CFTC settlement over operating an unregistered derivatives platform, illustrating the core regulatory tension between crypto-native prediction markets and US derivatives law.`
+        ],
+        keyPoint:"Polymarket demonstrates both the reach and the regulatory fragility of crypto-native prediction markets — global, liquid, and fast to aggregate information, but operating in a persistent grey zone relative to US commodities regulation."
+      },
+      {
+        icon:"🇺🇸", title:"Kalshi (Regulated US)", desc:"A CFTC-regulated exchange bringing event contracts fully inside US derivatives law",
+        pills:[{label:"CFTC-Regulated",style:"pri"},{label:"USD-Settled",style:"gold"}],
+        tags:[["Kalshi","sec"],["CFTC","pri"],["event contracts","gold"],["designated contract market","slate"]],
+        body:[
+          `Kalshi is a US-based exchange, regulated by the CFTC as a designated contract market, offering "event contracts" on economic, weather, and other outcomes settled in US dollars through the regular banking system rather than crypto. Its regulated status lets it legally serve US retail traders directly, in contrast to offshore or crypto-native platforms operating outside explicit CFTC authorisation.`,
+          `Kalshi has pushed into politically contentious territory — including election-outcome contracts — leading to public disputes with the CFTC over whether such contracts constitute impermissible gaming/wagering rather than legitimate hedging instruments, a live regulatory question that has moved through federal court.`
+        ],
+        keyPoint:"Kalshi represents the regulated-exchange path for prediction markets in the US — full CFTC oversight and dollar settlement in exchange for having to fight, contract by contract, over which event types regulators will actually permit."
+      },
+      {
+        icon:"🗳️", title:"Political Event Markets", desc:"Elections and political outcomes are the highest-profile, highest-volume category of prediction market",
+        pills:[{label:"Elections",style:"sec"},{label:"High Volume",style:"gold"}],
+        tags:[["election markets","sec"],["political forecasting","gold"],["media attention","slate"]],
+        body:[
+          `Election and political-outcome contracts consistently generate the largest volumes and the most public attention of any prediction market category, since they combine genuine uncertainty, broad public interest, and a hard, unambiguous resolution date. Media outlets increasingly cite prediction market odds alongside or instead of traditional polling as a real-time gauge of race dynamics, which in turn increases the incentive for participants (and potential manipulators) to try to influence the visible price.`
+        ],
+        keyPoint:"Political markets are prediction markets at their most visible and most scrutinised — the same qualities that make them useful forecasting tools (large stakes, wide attention, clear resolution) also make them the highest-value target for manipulation and the most consequential if manipulation succeeds."
+      },
+      {
+        icon:"🏈", title:"Sports Prediction Markets", desc:"The oldest and most liquid category, blurring directly into traditional sports betting",
+        pills:[{label:"High Liquidity",style:"pri"},{label:"Betting Overlap",style:"gold"}],
+        tags:[["sports markets","sec"],["in-play trading","gold"],["betting exchange","slate"]],
+        body:[
+          `Sports outcomes are the most naturally liquid prediction market category — frequent events, unambiguous resolution, and an existing culture of odds-based thinking from traditional sportsbooks. Betting exchanges like Betfair pioneered the peer-to-peer, order-book model for sports decades before crypto-native prediction markets existed, and the line between "sports betting exchange" and "sports prediction market" is largely regulatory classification rather than any real mechanical difference.`
+        ],
+        keyPoint:"Sports prediction markets show what a mature, high-liquidity prediction market looks like once genuine mechanical and regulatory questions are solved — which is also why regulators scrutinise newer political and event-contract markets against the sports-betting comparison so closely."
+      },
+      {
+        icon:"🔀", title:"Binary Options Parallels", desc:"Structurally near-identical to a prediction market contract, but historically plagued by retail-fraud problems",
+        pills:[{label:"Structural Twin",style:"gold"},{label:"Fraud History",style:"warn"}],
+        tags:[["binary options","sec"],["fixed payout","gold"],["retail fraud","warn"]],
+        body:[
+          `A binary option — pay a premium for a fixed payout if an underlying (a stock price, an index level) is above or below a strike at expiry, otherwise lose the premium — is structurally almost identical to a Yes/No prediction market contract on a financial outcome. The key historical difference has been the counterparty and platform model: binary options were, for years, dominated by offshore platforms with a documented pattern of price manipulation and outright fraud against retail customers, prompting the SEC and CFTC to issue repeated investor warnings and leading many regulators to restrict retail binary options trading.`,
+          `Regulated exchange-traded binary options (Nadex in the US, for example) exist as a legitimate, CFTC-overseen alternative, but the category's reputation continues to be shaped by its offshore-fraud history far more than by its underlying mechanism, which is genuinely just a prediction market on a financial price.`
+        ],
+        keyPoint:"Binary options and prediction markets are close to the same instrument wearing different regulatory clothing — the persistent stigma around binary options is a lesson in how much a fair mechanism's reputation can be damaged by bad actors operating it in an unregulated venue."
+      }
+    ]
+  }
+];
+
+let counter = 0;
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  sections.forEach(sec => {
+    const sHead = document.createElement('div');
+    sHead.setAttribute('data-section', sec.side);
+    sHead.innerHTML = `
+      <div class="section-header ${sec.side}">
+        <div class="section-header-inner">
+          <div class="section-super">${sec.side==='pri'?'● Mechanism & Pricing':'● Platforms & Applications'}</div>
+          <div class="section-heading">${sec.heading}</div>
+          <div class="section-sub">${sec.sub}</div>
+        </div>
+      </div>`;
+    root.appendChild(sHead);
+    sec.entries.forEach(e => {
+      const idx = counter++;
+      const entryClass = sec.side === 'pri' ? 'pri-entry' : 'sec-entry';
+      const pillsHtml = (e.pills||[]).map(p=>`<span class="pill pill-${p.style}">${p.label}</span>`).join('');
+      const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const statsHtml = e.stats ? `<div class="cmp-grid">${e.stats.map(s=>`<div class="cmp-cell"><div class="cmp-cell-label">${s.label}</div><div class="cmp-cell-val ${s.col}">${s.val}</div></div>`).join('')}</div>` : '';
+      const flowHtml = e.flow ? `<div class="process-flow">${e.flow.map(f=>`<div class="pf-step ${f.s}"><div class="pf-num">${f.n}</div><div class="pf-name">${f.name}</div><div class="pf-note">${f.note}</div></div>`).join('')}</div>` : '';
+      const bodyHtml = e.body.map(p=>`<p>${p}</p>`).join('') + flowHtml + statsHtml +
+        `<div class="key-point"><div class="kp-bar"></div><div class="kp-inner"><div class="kp-label">Key Insight</div><div class="kp-text">${e.keyPoint}</div></div></div>` +
+        `<div class="tags">${tagsHtml}</div>`;
+      const div = document.createElement('div');
+      div.className = `entry ${entryClass}`;
+      div.id = `e-${idx}`;
+      div.setAttribute('data-section', sec.side);
+      div.innerHTML = `
+        <div class="entry-header" onclick="toggle(${idx})">
+          <span class="entry-icon">${e.icon}</span>
+          <div class="entry-text"><div class="entry-title">${e.title}</div><div class="entry-desc">${e.desc}</div></div>
+          <div class="entry-pills">${pillsHtml}</div>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>`;
+      root.appendChild(div);
+    });
+    const spacer = document.createElement('div');
+    spacer.className = 'section-spacer';
+    root.appendChild(spacer);
+  });
+}
+function toggle(i){ document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open){ for(let i=0;i<counter;i++){ const el=document.getElementById(`e-${i}`); if(el) open?el.classList.add('open'):el.classList.remove('open'); } }
+function filterBy(side, btn){
+  document.querySelectorAll('.flt').forEach(b=>b.classList.remove('inactive'));
+  if(side!=='all'){ document.querySelectorAll('.flt').forEach(b=>{ if(!b.classList.contains(side) && !b.classList.contains('all')) b.classList.add('inactive'); }); }
+  document.querySelectorAll('[data-section]').forEach(el=>{ const es=el.getAttribute('data-section'); el.style.display=(side==='all'||es===side)?'':'none'; });
+}
+renderAll();
+</script>
+</body>
+</html>

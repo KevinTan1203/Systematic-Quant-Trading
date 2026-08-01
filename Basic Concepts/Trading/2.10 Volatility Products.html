@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 2.10 Volatility Products</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0c0e0d;
+  --bg1:      #111413;
+  --bg2:      #161a18;
+  --bg3:      #1c211e;
+  --surface:  #14201b;
+  --border:   #1e2622;
+  --border2:  #28342e;
+
+  --ink:      #e0e8e2;
+  --ink2:     #8a988e;
+  --muted:    #485a50;
+  --faint:    #18201c;
+
+  --pos:      #4dd982;
+  --pos-d:    #0e3a20;
+  --pos-b:    rgba(77,217,130,0.07);
+
+  --risk:     #e8a83d;
+  --risk-d:   #4a3308;
+  --risk-b:   rgba(232,168,61,0.07);
+
+  --vol:      #e83d9e;   /* magenta for volatility */
+  --vol-d:    #4a0830;
+  --vol-b:    rgba(232,61,158,0.07);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Archivo', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(232,61,158,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,61,158,0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none; z-index: 0;
+}
+
+.masthead {
+  position: relative; z-index: 2;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border2);
+}
+
+.mhd-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 52px 44px 0;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 44px; align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--vol); }
+
+.mhd-title {
+  font-family: 'Archivo', sans-serif;
+  font-size: clamp(44px, 6.5vw, 84px);
+  font-weight: 800; letter-spacing: -0.04em;
+  line-height: 0.88; color: var(--ink);
+  margin-bottom: 14px;
+}
+.mhd-title .eq { color: var(--vol); }
+
+.mhd-sub {
+  font-family: 'Source Serif 4', serif;
+  font-style: italic; font-size: 14px;
+  color: var(--ink2); line-height: 1.65;
+  max-width: 520px; font-weight: 400;
+  margin-bottom: 28px;
+}
+
+.basis-gauge {
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  overflow: hidden; min-width: 260px;
+}
+.bg-hdr {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 8px 14px; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.bg-formula {
+  padding: 18px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px; text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.bg-rows { padding: 0; }
+.bg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+}
+.bg-row:last-child { border-bottom: none; }
+.bg-label { color: var(--muted); }
+.bg-val { font-weight: 700; color: var(--vol); }
+
+.meter-strip {
+  max-width: 1080px; margin: 0 auto;
+  padding: 0 44px;
+  display: flex; gap: 0; overflow-x: auto;
+  border-top: 1px solid var(--border);
+}
+.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 155px; }
+.meter-name { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 3px; }
+.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; color: var(--vol); }
+
+.page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 34px 44px 100px; }
+
+.sec-hdr { display: flex; align-items: center; gap: 14px; margin: 30px 0 8px; }
+.sec-label { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
+.sec-line { flex: 1; height: 1px; background: var(--border); }
+
+.controls { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
+.ctrl { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.ctrl:hover { border-color: var(--vol); color: var(--vol); }
+.ctrl-right { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; }
+
+.entry { border: 1px solid var(--border); background: var(--bg1); margin-bottom: 4px; position: relative; overflow: hidden; transition: border-color 0.18s; }
+.entry::before { content: ''; position: absolute; left:0; top:0; bottom:0; width:3px; transition: width 0.2s; }
+.entry.open::before { width: 4px; }
+.entry:hover { border-color: var(--border2); }
+
+.c-core   .entry::before { background: var(--pos-d); } .c-core   .entry.open::before { background: var(--pos); }
+.c-trade  .entry::before { background: var(--risk-d); } .c-trade  .entry.open::before { background: var(--risk); }
+.c-vol    .entry::before { background: var(--vol-d); } .c-vol    .entry.open::before { background: var(--vol); }
+
+.e-hdr { display: flex; align-items: center; cursor: pointer; user-select: none; min-height: 58px; padding-left: 4px; transition: background 0.14s; }
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--faint); width: 44px; text-align: center; flex-shrink: 0; letter-spacing: 0.06em; }
+
+.e-icon { font-size: 17px; width: 46px; text-align: center; flex-shrink: 0; border-right: 1px solid var(--border); align-self: stretch; display: flex; align-items: center; justify-content: center; }
+
+.e-text { flex: 1; padding: 12px 16px; }
+.e-title { font-family: 'Archivo', sans-serif; font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.2; letter-spacing: -0.01em; }
+.e-sub { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); margin-top: 3px; letter-spacing: 0.03em; font-weight: 300; }
+
+.e-fmla { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink2); padding: 4px 12px; border: 1px solid var(--border2); background: var(--bg2); margin-right: 14px; flex-shrink: 0; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+
+.e-toggle { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; align-self: stretch; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--border); flex-shrink: 0; transition: transform 0.24s, color 0.15s; }
+.entry.open .e-toggle { transform: rotate(90deg); }
+.c-core .entry.open .e-toggle { color: var(--pos); }
+.c-trade .entry.open .e-toggle { color: var(--risk); }
+.c-vol .entry.open .e-toggle { color: var(--vol); }
+
+.e-body { display: none; border-top: 1px solid var(--border); background: var(--bg); padding: 22px 22px 26px 90px; animation: bIn 0.2s ease; }
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p { font-family: 'Source Serif 4', serif; font-size: 14px; font-weight: 400; line-height: 1.86; color: var(--ink2); margin-bottom: 14px; }
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); }
+.e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Archivo', sans-serif; font-size: 13.5px; }
+
+.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--vol); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.fmla-main { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--ink); flex-shrink: 0; line-height: 1.6; }
+.fmla-note { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.stat { flex: 1; min-width: 130px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2); }
+.stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.stat-v { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.stat-v.vol { color: var(--vol); }
+
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cc { padding: 13px 15px; border: 1px solid var(--border); background: var(--bg2); }
+.cc-l { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
+.cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Archivo', sans-serif !important; font-weight: 400 !important; color: var(--ink2) !important; }
+.cc.vol { background: var(--vol-b); border-color: var(--vol-d); } .cc.vol .cc-l { color: var(--vol); }
+
+.ki { margin-top: 20px; padding: 14px 18px; background: var(--bg2); border: 1px solid var(--border2); display: flex; gap: 14px; align-items: flex-start; }
+.ki-glyph { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; flex-shrink: 0; padding-top: 2px; }
+.ki-text { font-family: 'Source Serif 4', serif; font-style: italic; font-size: 14.5px; color: var(--ink); line-height: 1.62; }
+
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
+.tag.vol { border-color: var(--vol-d); color: var(--vol); }
+
+.foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+.foot span { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .basis-gauge { display: none; }
+  .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding: 36px 18px 0; }
+  .meter-strip { padding: 0 18px; }
+  .e-body { padding-left: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 2.10 · Derivatives</div>
+      <div class="mhd-title">Volatility Products<span class="eq"> =</span></div>
+      <div class="mhd-sub">Instruments designed to trade, hedge, or express views on volatility itself rather than directional price moves. 11 topics.</div>
+    </div>
+    <div class="basis-gauge">
+      <div class="bg-hdr">// Key Concepts</div>
+      <div class="bg-formula">
+        Implied vs Realized • VIX • Variance Swaps
+      </div>
+      <div class="bg-rows">
+        <div class="bg-row"><span class="bg-label">VIX</span><span class="bg-val vol">"Fear Index"</span></div>
+        <div class="bg-row"><span class="bg-label">Vol Surface</span><span class="bg-val vol">Smile & Term Structure</span></div>
+        <div class="bg-row"><span class="bg-label">Dispersion</span><span class="bg-val vol">Correlation trading</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="meter-strip">
+    <div class="meter-item"><div class="meter-name">VIX Level</div><div class="meter-val vol">~12–20 calm, >40 panic</div></div>
+    <div class="meter-item"><div class="meter-name">VIX Futures</div><div class="meter-val vol">Contango normal</div></div>
+    <div class="meter-item"><div class="meter-name">Straddle</div><div class="meter-val vol">Pure vol play</div></div>
+    <div class="meter-item"><div class="meter-name">Variance Swap</div><div class="meter-val vol">Clean vol exposure</div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">11 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>2.10 Volatility Products</span>
+</footer>
+
+<script>
+const sections = [
+  {
+    label:"Volatility Benchmarks",
+    color:"var(--vol)",
+    line:"var(--vol-d)",
+    fam:"c-core",
+    entries:[
+      {
+        icon:"📊",
+        fmla:"VIX Index",
+        title:"VIX Index Mechanics",
+        sub:"The 'Fear Index' — market's expectation of future volatility",
+        tags:[["vix","vol"]],
+        body:[
+          `The VIX Index measures the market’s expectation of 30-day forward implied volatility in the S&P 500, derived from a wide range of SPX option prices. It is calculated using a model-free methodology based on the prices of out-of-the-money options. High VIX levels indicate fear and uncertainty; low levels indicate complacency.`
+        ],
+        ki:"The VIX is not directly tradable but serves as the foundation for the entire volatility product ecosystem."
+      },
+      {
+        icon:"📈",
+        fmla:"VIX Futures & ETPs",
+        title:"VIX Futures and ETPs (UVXY, SVXY)",
+        sub:"Direct ways to trade volatility",
+        tags:[["vix futures","vol"]],
+        body:[
+          `VIX futures allow traders to take positions on expected future volatility. Exchange-traded products like UVXY (2x long VIX futures) and SVXY (short VIX futures) provide retail access. These products suffer from significant roll decay due to the typical contango in the VIX futures curve.`
+        ],
+        ki:"VIX ETPs are powerful but dangerous tools — long products decay in calm markets, short products can explode during volatility spikes."
+      }
+    ]
+  },
+  {
+    label:"Volatility Instruments",
+    color:"var(--vol)",
+    line:"var(--vol-d)",
+    fam:"c-core",
+    entries:[
+      {
+        icon:"🔄",
+        fmla:"Vol vs Variance",
+        title:"Volatility Swaps vs Variance Swaps",
+        sub:"Pure volatility exposure instruments",
+        tags:[["variance swap","vol"]],
+        body:[
+          `Volatility swaps pay the difference between realized volatility and a fixed strike. Variance swaps pay the difference in realized variance (vol squared). Variance swaps are more popular because they are easier to replicate with options and have cleaner theoretical properties.`
+        ],
+        ki:"Variance swaps are the cleanest way to trade realized volatility without directional bias."
+      },
+      {
+        icon:"📉",
+        fmla:"Realized vs Implied",
+        title:"Realized vs Implied Volatility",
+        sub:"The fundamental volatility spread",
+        tags:[["realized vol","vol"],["implied vol","vol"]],
+        body:[
+          `Implied volatility is forward-looking (derived from option prices). Realized volatility is backward-looking (actual price movement). The difference between them drives much of options trading profitability. Persistent gaps can signal mispricing or changing market regimes.`
+        ],
+        ki:"Trading the spread between implied and realized volatility is a core professional volatility strategy."
+      },
+      {
+        icon:"📐",
+        fmla:"Vol Surface",
+        title:"Volatility Surface Dynamics",
+        sub:"Smile, skew, and term structure",
+        tags:[["vol surface","vol"]],
+        body:[
+          `The volatility surface shows implied vol across strikes (smile/skew) and maturities (term structure). Equity markets typically show downward-sloping skew (higher vol for downside puts). The surface changes shape during crises, with skew steepening and short-term vols spiking.`
+        ],
+        ki:"Understanding surface dynamics is essential for relative value volatility trading."
+      }
+    ]
+  },
+  {
+    label:"Advanced Volatility Strategies",
+    color:"var(--risk)",
+    line:"var(--risk-d)",
+    fam:"c-trade",
+    entries:[
+      {
+        icon:"📊",
+        fmla:"VIX Term Structure",
+        title:"VIX Term Structure",
+        sub:"Contango and backwardation regimes",
+        tags:[["vix term structure","vol"]],
+        body:[
+          `The VIX futures curve is usually in contango (upward sloping), which causes long VIX ETPs to decay over time. During market stress, the curve can invert into backwardation. The shape of the term structure is a powerful regime indicator.`
+        ],
+        ki:"Rolling VIX futures in contango is like swimming against a strong current — hence the decay in long VIX products."
+      },
+      {
+        icon:"🌐",
+        fmla:"Dispersion",
+        title:"Dispersion Trades",
+        sub:"Trading correlation via index vs components",
+        tags:[["dispersion","vol"]],
+        body:[
+          `Dispersion trading involves being long volatility on individual stocks and short volatility on an index (or vice versa). It is effectively a bet on correlation. Long dispersion profits when correlation decreases (idiosyncratic moves dominate).`
+        ],
+        ki:"Dispersion is one of the purest ways to trade correlation rather than outright volatility."
+      },
+      {
+        icon:"📉",
+        fmla:"Risk Reversals",
+        title:"Risk Reversals",
+        sub:"Skew trading instruments",
+        tags:[["risk reversal","vol"]],
+        body:[
+          `A risk reversal is a combination of a long call and short put (or vice versa) with the same delta. It is a popular way to express directional views with zero or low premium while trading skew.`
+        ],
+        ki:"Risk reversals are the market’s primary way to quote and trade skew."
+      },
+      {
+        icon:"⚖️",
+        fmla:"Straddle",
+        title:"Options Straddles as Vol Instruments",
+        sub:"Pure volatility exposure",
+        tags:[["straddle","vol"]],
+        body:[
+          `A long straddle (long call + long put at same strike) profits from large moves in either direction. It is one of the cleanest ways to buy volatility with defined risk. Short straddles collect premium but have unlimited risk.`
+        ],
+        ki:"Straddles are the purest expression of a volatility view without directional bias."
+      }
+    ]
+  },
+  {
+    label:"Practical Trading Techniques",
+    color:"var(--risk)",
+    line:"var(--risk-d)",
+    fam:"c-trade",
+    entries:[
+      {
+        icon:"📉",
+        fmla:"Gamma Scalping",
+        title:"Gamma Scalping",
+        sub:"Profiting from volatility through dynamic hedging",
+        tags:[["gamma scalping","vol"]],
+        body:[
+          `Gamma scalping involves maintaining a long gamma position (typically long options) and actively trading the underlying to stay delta-neutral. In volatile markets, the profits from buying low and selling high can offset theta decay.`
+        ],
+        ki:"Gamma scalping turns volatility into a trading opportunity for long gamma positions."
+      }
+    ]
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sdiv = document.createElement('div');
+    sdiv.innerHTML = `<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line"></div>
+    </div>`;
+    root.appendChild(sdiv);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.fam;
+
+    sec.entries.forEach(e => {
+      const idx = cnt++;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>` : '';
+      const cmpH = e.cmp ? `<div class="cmp c${e.cmp.length}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>` : '';
+      const fmlaH = e.fmla2 ? `<div class="fmla-block"><div class="fmla-main">${e.fmla2.main}</div><pre class="fmla-note">${e.fmla2.note}</pre></div>` : '';
+
+      const body = e.body.map(p=>`<p>${p}</p>`).join('') + fmlaH + stH + cmpH +
+        `<div class="ki">
+          <div class="ki-glyph">//</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+        <div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-fmla">${e.fmla}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

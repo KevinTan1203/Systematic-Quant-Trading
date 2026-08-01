@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 2.16 Tokenized RWAs (Real-World Assets)</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0c0e0d;
+  --bg1:      #111413;
+  --bg2:      #161a18;
+  --bg3:      #1c211e;
+  --surface:  #14201b;
+  --border:   #1e2622;
+  --border2:  #28342e;
+
+  --ink:      #e0e8e2;
+  --ink2:     #8a988e;
+  --muted:    #485a50;
+  --faint:    #18201c;
+
+  --pos:      #4dd982;
+  --pos-d:    #0e3a20;
+  --pos-b:    rgba(77,217,130,0.07);
+
+  --risk:     #e8a83d;
+  --risk-d:   #4a3308;
+  --risk-b:   rgba(232,168,61,0.07);
+
+  --rwa:      #3da8e8;   /* blue for RWAs / tokenization */
+  --rwa-d:    #082e4a;
+  --rwa-b:    rgba(61,168,232,0.07);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Archivo', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(61,168,232,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61,168,232,0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none; z-index: 0;
+}
+
+.masthead {
+  position: relative; z-index: 2;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border2);
+}
+
+.mhd-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 52px 44px 0;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 44px; align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--rwa); }
+
+.mhd-title {
+  font-family: 'Archivo', sans-serif;
+  font-size: clamp(44px, 6.5vw, 84px);
+  font-weight: 800; letter-spacing: -0.04em;
+  line-height: 0.88; color: var(--ink);
+  margin-bottom: 14px;
+}
+.mhd-title .eq { color: var(--rwa); }
+
+.mhd-sub {
+  font-family: 'Source Serif 4', serif;
+  font-style: italic; font-size: 14px;
+  color: var(--ink2); line-height: 1.65;
+  max-width: 520px; font-weight: 400;
+  margin-bottom: 28px;
+}
+
+.basis-gauge {
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  overflow: hidden; min-width: 260px;
+}
+.bg-hdr {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 8px 14px; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.bg-formula {
+  padding: 18px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px; text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.bg-rows { padding: 0; }
+.bg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+}
+.bg-row:last-child { border-bottom: none; }
+.bg-label { color: var(--muted); }
+.bg-val { font-weight: 700; color: var(--rwa); }
+
+.meter-strip {
+  max-width: 1080px; margin: 0 auto;
+  padding: 0 44px;
+  display: flex; gap: 0; overflow-x: auto;
+  border-top: 1px solid var(--border);
+}
+.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 155px; }
+.meter-name { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 3px; }
+.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; color: var(--rwa); }
+
+.page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 34px 44px 100px; }
+
+.sec-hdr { display: flex; align-items: center; gap: 14px; margin: 30px 0 8px; }
+.sec-label { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
+.sec-line { flex: 1; height: 1px; background: var(--border); }
+
+.controls { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
+.ctrl { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.ctrl:hover { border-color: var(--rwa); color: var(--rwa); }
+.ctrl-right { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; }
+
+.entry { border: 1px solid var(--border); background: var(--bg1); margin-bottom: 4px; position: relative; overflow: hidden; transition: border-color 0.18s; }
+.entry::before { content: ''; position: absolute; left:0; top:0; bottom:0; width:3px; transition: width 0.2s; }
+.entry.open::before { width: 4px; }
+.entry:hover { border-color: var(--border2); }
+
+.c-core   .entry::before { background: var(--pos-d); } .c-core   .entry.open::before { background: var(--pos); }
+.c-asset  .entry::before { background: var(--rwa-d); } .c-asset  .entry.open::before { background: var(--rwa); }
+.c-risk   .entry::before { background: var(--risk-d); } .c-risk   .entry.open::before { background: var(--risk); }
+
+.e-hdr { display: flex; align-items: center; cursor: pointer; user-select: none; min-height: 58px; padding-left: 4px; transition: background 0.14s; }
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--faint); width: 44px; text-align: center; flex-shrink: 0; letter-spacing: 0.06em; }
+
+.e-icon { font-size: 17px; width: 46px; text-align: center; flex-shrink: 0; border-right: 1px solid var(--border); align-self: stretch; display: flex; align-items: center; justify-content: center; }
+
+.e-text { flex: 1; padding: 12px 16px; }
+.e-title { font-family: 'Archivo', sans-serif; font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.2; letter-spacing: -0.01em; }
+.e-sub { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); margin-top: 3px; letter-spacing: 0.03em; font-weight: 300; }
+
+.e-fmla { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink2); padding: 4px 12px; border: 1px solid var(--border2); background: var(--bg2); margin-right: 14px; flex-shrink: 0; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+
+.e-toggle { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; align-self: stretch; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--border); flex-shrink: 0; transition: transform 0.24s, color 0.15s; }
+.entry.open .e-toggle { transform: rotate(90deg); }
+.c-core .entry.open .e-toggle { color: var(--pos); }
+.c-asset .entry.open .e-toggle { color: var(--rwa); }
+.c-risk .entry.open .e-toggle { color: var(--risk); }
+
+.e-body { display: none; border-top: 1px solid var(--border); background: var(--bg); padding: 22px 22px 26px 90px; animation: bIn 0.2s ease; }
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p { font-family: 'Source Serif 4', serif; font-size: 14px; font-weight: 400; line-height: 1.86; color: var(--ink2); margin-bottom: 14px; }
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); }
+.e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Archivo', sans-serif; font-size: 13.5px; }
+
+.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--rwa); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.fmla-main { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--ink); flex-shrink: 0; line-height: 1.6; }
+.fmla-note { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.stat { flex: 1; min-width: 130px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2); }
+.stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.stat-v { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.stat-v.rwa { color: var(--rwa); }
+
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cc { padding: 13px 15px; border: 1px solid var(--border); background: var(--bg2); }
+.cc-l { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
+.cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Archivo', sans-serif !important; font-weight: 400 !important; color: var(--ink2) !important; }
+.cc.rwa { background: var(--rwa-b); border-color: var(--rwa-d); } .cc.rwa .cc-l { color: var(--rwa); }
+
+.ki { margin-top: 20px; padding: 14px 18px; background: var(--bg2); border: 1px solid var(--border2); display: flex; gap: 14px; align-items: flex-start; }
+.ki-glyph { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; flex-shrink: 0; padding-top: 2px; }
+.ki-text { font-family: 'Source Serif 4', serif; font-style: italic; font-size: 14.5px; color: var(--ink); line-height: 1.62; }
+
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
+.tag.rwa { border-color: var(--rwa-d); color: var(--rwa); }
+
+.foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+.foot span { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .basis-gauge { display: none; }
+  .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding: 36px 18px 0; }
+  .meter-strip { padding: 0 18px; }
+  .e-body { padding-left: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 2.16 · Crypto & Traditional Finance Convergence</div>
+      <div class="mhd-title">Tokenized RWAs<span class="eq"> =</span></div>
+      <div class="mhd-sub">Bringing real-world assets on-chain — Treasuries, credit, real estate, and equities as programmable tokens. 10 topics.</div>
+    </div>
+    <div class="basis-gauge">
+      <div class="bg-hdr">// Leading Products</div>
+      <div class="bg-formula">
+        BUIDL • Ondo • Tokenized Treasuries
+      </div>
+      <div class="bg-rows">
+        <div class="bg-row"><span class="bg-label">Primary Use Case</span><span class="bg-val rwa">On-chain yield</span></div>
+        <div class="bg-row"><span class="bg-label">Legal Structure</span><span class="bg-val rwa">SPV / Fund wrappers</span></div>
+        <div class="bg-row"><span class="bg-label">Key Risk</span><span class="bg-val risk">Oracle + Custody</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="meter-strip">
+    <div class="meter-item"><div class="meter-name">Tokenized Treasuries</div><div class="meter-val rwa">Largest category</div></div>
+    <div class="meter-item"><div class="meter-name">BlackRock BUIDL</div><div class="meter-val rwa">Institutional scale</div></div>
+    <div class="meter-item"><div class="meter-name">Settlement</div><div class="meter-val rwa">Near-instant on-chain</div></div>
+    <div class="meter-item"><div class="meter-name">Oracle Risk</div><div class="meter-val risk">Price feed dependency</div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">10 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>2.16 Tokenized RWAs</span>
+</footer>
+
+<script>
+const sections = [
+  {
+    label:"Core Asset Classes",
+    color:"var(--pos)",
+    line:"var(--pos-d)",
+    fam:"c-core",
+    entries:[
+      {
+        icon:"🏛️",
+        fmla:"Treasuries on-chain",
+        title:"Tokenized Treasuries",
+        sub:"Ondo, BlackRock BUIDL and the rise of on-chain T-bills",
+        tags:[["tokenized treasuries","rwa"]],
+        stats:[
+          {l:"Leading Products",v:"BlackRock BUIDL, Ondo OUSG / USDY",c:"rwa"},
+          {l:"Underlying",v:"Short-term U.S. Treasuries / T-bills",c:"rwa"},
+          {l:"Primary Appeal",v:"Stable on-chain yield + composability",c:"rwa"},
+        ],
+        body:[
+          `Tokenized Treasuries represent ownership interests in short-term U.S. government securities held off-chain by a custodian or special purpose vehicle (SPV). Products such as BlackRock’s BUIDL and Ondo’s OUSG/USDY allow holders to earn Treasury yields while keeping the asset in token form for use in DeFi, collateral, or settlement.`,
+          `These products have become the largest and most successful category of Real-World Assets (RWAs) because Treasuries are highly liquid, low-risk, and offer a clear yield benchmark.`
+        ],
+        ki:"Tokenized Treasuries are the bridge that brought institutional capital on-chain at scale."
+      },
+      {
+        icon:"💵",
+        fmla:"Money Markets",
+        title:"Tokenized Money Markets",
+        sub:"Cash management and short-term yield on-chain",
+        tags:[["tokenized money markets","rwa"]],
+        body:[
+          `Tokenized money market funds and cash-equivalent products package traditional money market instruments (T-bills, commercial paper, reverse repo) into tokens. They serve as on-chain alternatives to bank deposits or stablecoins for institutions seeking yield with relatively low risk.`
+        ],
+        ki:"Tokenized money markets aim to solve the ‘cash drag’ problem in crypto portfolios."
+      },
+      {
+        icon:"📄",
+        fmla:"Private Credit",
+        title:"Tokenized Private Credit",
+        sub:"Bringing private loans and credit funds on-chain",
+        tags:[["tokenized private credit","rwa"]],
+        body:[
+          `Tokenized private credit involves packaging loans to businesses, real estate developers, or other borrowers into tokens. Investors gain access to higher-yielding credit exposure that was previously limited to private markets. These products require robust underwriting, servicing, and legal enforceability.`
+        ],
+        ki:"Private credit is one of the highest-yielding RWA categories but carries significantly more credit and liquidity risk."
+      }
+    ]
+  },
+  {
+    label:"Other Real-World Assets",
+    color:"var(--rwa)",
+    line:"var(--rwa-d)",
+    fam:"c-asset",
+    entries:[
+      {
+        icon:"🏢",
+        fmla:"Real Estate",
+        title:"Tokenized Real Estate",
+        sub:"Fractional ownership of physical property",
+        tags:[["tokenized real estate","rwa"]],
+        body:[
+          `Tokenized real estate allows fractional ownership of properties through tokens representing equity or debt interests. While promising for liquidity and accessibility, challenges include legal ownership transfer, valuation, maintenance costs, and regulatory classification as securities.`
+        ],
+        ki:"Real estate tokenization improves accessibility but has not yet solved the core liquidity and legal friction problems at scale."
+      },
+      {
+        icon:"📈",
+        fmla:"Equities",
+        title:"Tokenized Equities",
+        sub:"Shares as blockchain tokens",
+        tags:[["tokenized equities","rwa"]],
+        body:[
+          `Tokenized equities aim to represent ownership of traditional stocks on-chain. Progress has been slower due to securities regulation, corporate law, and custody requirements. Most current offerings are either restricted or synthetic.`
+        ],
+        ki:"Fully compliant, freely transferable tokenized equities remain one of the harder frontiers of RWA."
+      }
+    ]
+  },
+  {
+    label:"Infrastructure & Risks",
+    color:"var(--risk)",
+    line:"var(--risk-d)",
+    fam:"c-risk",
+    entries:[
+      {
+        icon:"📜",
+        fmla:"Legal Wrappers",
+        title:"Legal Wrapper Structures",
+        sub:"How off-chain assets become on-chain tokens",
+        tags:[["legal wrappers","rwa"]],
+        body:[
+          `Most tokenized RWAs use a legal wrapper such as a special purpose vehicle (SPV), trust, or regulated fund. The token represents a claim on the assets held by the wrapper. The quality of the legal structure determines enforceability and investor protection.`
+        ],
+        ki:"The token is only as strong as the legal claim it represents."
+      },
+      {
+        icon:"⚖️",
+        fmla:"SEC Status",
+        title:"Regulatory Status (SEC Considerations)",
+        sub:"Securities law and compliance challenges",
+        tags:[["regulation","risk"]],
+        body:[
+          `Many tokenized RWAs are treated as securities under U.S. law. Issuers must navigate registration, exemption, KYC/AML, and transfer restrictions. Products aimed at institutional or accredited investors face fewer barriers than those targeting retail.`
+        ],
+        ki:"Regulatory clarity remains one of the biggest constraints on the growth of tokenized RWAs."
+      },
+      {
+        icon:"🏦",
+        fmla:"Settlement & Custody",
+        title:"Settlement and Custody",
+        sub:"Bridging on-chain and off-chain worlds",
+        tags:[["custody","rwa"]],
+        body:[
+          `While the token can transfer near-instantly on-chain, the underlying assets are held by traditional custodians. Settlement involves both the blockchain transfer and the corresponding legal and cash movements off-chain. This dual structure creates operational complexity.`
+        ],
+        ki:"True atomic settlement of RWAs requires both legal and technical innovation."
+      },
+      {
+        icon:"📡",
+        fmla:"Oracles",
+        title:"Oracle Dependency for Price Feeds",
+        sub:"How on-chain value is determined",
+        tags:[["oracles","risk"]],
+        body:[
+          `Most RWA tokens rely on oracles to report the net asset value (NAV) or price of the underlying assets. Oracle accuracy, latency, and manipulation resistance are critical. Failures or delays in price feeds can create arbitrage or liquidation risks.`
+        ],
+        ki:"Oracle risk is one of the key systemic risks unique to tokenized assets."
+      }
+    ]
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sdiv = document.createElement('div');
+    sdiv.innerHTML = `<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line"></div>
+    </div>`;
+    root.appendChild(sdiv);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.fam;
+
+    sec.entries.forEach(e => {
+      const idx = cnt++;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>` : '';
+      const cmpH = e.cmp ? `<div class="cmp c${e.cmp.length}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>` : '';
+      const fmlaH = e.fmla2 ? `<div class="fmla-block"><div class="fmla-main">${e.fmla2.main}</div><pre class="fmla-note">${e.fmla2.note}</pre></div>` : '';
+
+      const body = e.body.map(p=>`<p>${p}</p>`).join('') + fmlaH + stH + cmpH +
+        `<div class="ki">
+          <div class="ki-glyph">//</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+        <div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-fmla">${e.fmla}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

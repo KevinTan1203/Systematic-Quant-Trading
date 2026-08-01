@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 2.9 Structured Products</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0c0e0d;
+  --bg1:      #111413;
+  --bg2:      #161a18;
+  --bg3:      #1c211e;
+  --surface:  #14201b;
+  --border:   #1e2622;
+  --border2:  #28342e;
+
+  --ink:      #e0e8e2;
+  --ink2:     #8a988e;
+  --muted:    #485a50;
+  --faint:    #18201c;
+
+  --pos:      #4dd982;
+  --pos-d:    #0e3a20;
+  --pos-b:    rgba(77,217,130,0.07);
+
+  --risk:     #e8a83d;
+  --risk-d:   #4a3308;
+  --risk-b:   rgba(232,168,61,0.07);
+
+  --struct:   #a83de8;   /* purple for structured products */
+  --struct-d: #2e084a;
+  --struct-b: rgba(168,61,232,0.07);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Archivo', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(168,61,232,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168,61,232,0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none; z-index: 0;
+}
+
+.masthead {
+  position: relative; z-index: 2;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border2);
+}
+
+.mhd-inner {
+  max-width: 1080px; margin: 0 auto;
+  padding: 52px 44px 0;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 44px; align-items: start;
+}
+
+.mhd-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.mhd-kicker::before { content:''; width:22px; height:1px; background:var(--struct); }
+
+.mhd-title {
+  font-family: 'Archivo', sans-serif;
+  font-size: clamp(44px, 6.5vw, 84px);
+  font-weight: 800; letter-spacing: -0.04em;
+  line-height: 0.88; color: var(--ink);
+  margin-bottom: 14px;
+}
+.mhd-title .eq { color: var(--struct); }
+
+.mhd-sub {
+  font-family: 'Source Serif 4', serif;
+  font-style: italic; font-size: 14px;
+  color: var(--ink2); line-height: 1.65;
+  max-width: 520px; font-weight: 400;
+  margin-bottom: 28px;
+}
+
+.basis-gauge {
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  overflow: hidden; min-width: 260px;
+}
+.bg-hdr {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8.5px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 8px 14px; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.bg-formula {
+  padding: 18px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px; text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.bg-rows { padding: 0; }
+.bg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+}
+.bg-row:last-child { border-bottom: none; }
+.bg-label { color: var(--muted); }
+.bg-val { font-weight: 700; color: var(--struct); }
+
+.meter-strip {
+  max-width: 1080px; margin: 0 auto;
+  padding: 0 44px;
+  display: flex; gap: 0; overflow-x: auto;
+  border-top: 1px solid var(--border);
+}
+.meter-item { padding: 10px 18px; border-right: 1px solid var(--border); flex-shrink: 0; min-width: 155px; }
+.meter-name { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 3px; }
+.meter-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; color: var(--struct); }
+
+.page { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 34px 44px 100px; }
+
+.sec-hdr { display: flex; align-items: center; gap: 14px; margin: 30px 0 8px; }
+.sec-label { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
+.sec-line { flex: 1; height: 1px; background: var(--border); }
+
+.controls { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
+.ctrl { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.ctrl:hover { border-color: var(--struct); color: var(--struct); }
+.ctrl-right { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; }
+
+.entry { border: 1px solid var(--border); background: var(--bg1); margin-bottom: 4px; position: relative; overflow: hidden; transition: border-color 0.18s; }
+.entry::before { content: ''; position: absolute; left:0; top:0; bottom:0; width:3px; transition: width 0.2s; }
+.entry.open::before { width: 4px; }
+.entry:hover { border-color: var(--border2); }
+
+.c-core   .entry::before { background: var(--pos-d); } .c-core   .entry.open::before { background: var(--pos); }
+.c-credit .entry::before { background: var(--risk-d); } .c-credit .entry.open::before { background: var(--risk); }
+.c-retail .entry::before { background: var(--struct-d); } .c-retail .entry.open::before { background: var(--struct); }
+
+.e-hdr { display: flex; align-items: center; cursor: pointer; user-select: none; min-height: 58px; padding-left: 4px; transition: background 0.14s; }
+.e-hdr:hover { background: var(--bg2); }
+
+.e-num { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--faint); width: 44px; text-align: center; flex-shrink: 0; letter-spacing: 0.06em; }
+
+.e-icon { font-size: 17px; width: 46px; text-align: center; flex-shrink: 0; border-right: 1px solid var(--border); align-self: stretch; display: flex; align-items: center; justify-content: center; }
+
+.e-text { flex: 1; padding: 12px 16px; }
+.e-title { font-family: 'Archivo', sans-serif; font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.2; letter-spacing: -0.01em; }
+.e-sub { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); margin-top: 3px; letter-spacing: 0.03em; font-weight: 300; }
+
+.e-fmla { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink2); padding: 4px 12px; border: 1px solid var(--border2); background: var(--bg2); margin-right: 14px; flex-shrink: 0; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+
+.e-toggle { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; align-self: stretch; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--border); flex-shrink: 0; transition: transform 0.24s, color 0.15s; }
+.entry.open .e-toggle { transform: rotate(90deg); }
+.c-core .entry.open .e-toggle { color: var(--pos); }
+.c-credit .entry.open .e-toggle { color: var(--risk); }
+.c-retail .entry.open .e-toggle { color: var(--struct); }
+
+.e-body { display: none; border-top: 1px solid var(--border); background: var(--bg); padding: 22px 22px 26px 90px; animation: bIn 0.2s ease; }
+.entry.open .e-body { display: block; }
+@keyframes bIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.e-body p { font-family: 'Source Serif 4', serif; font-size: 14px; font-weight: 400; line-height: 1.86; color: var(--ink2); margin-bottom: 14px; }
+.e-body p:last-of-type { margin-bottom: 0; }
+.e-body p em     { font-style: italic; color: var(--ink); }
+.e-body p strong { font-weight: 700; color: var(--ink); font-family: 'Archivo', sans-serif; font-size: 13.5px; }
+
+.fmla-block { margin-top: 16px; padding: 16px 20px; background: var(--bg2); border: 1px solid var(--border2); border-left: 3px solid var(--struct); display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.fmla-main { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--ink); flex-shrink: 0; line-height: 1.6; }
+.fmla-note { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.stat { flex: 1; min-width: 130px; padding: 9px 12px; border: 1px solid var(--border); background: var(--bg2); }
+.stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.stat-v { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.stat-v.struct { color: var(--struct); }
+
+.cmp { display: grid; gap: 8px; margin-top: 18px; }
+.cmp.c2 { grid-template-columns: 1fr 1fr; }
+.cc { padding: 13px 15px; border: 1px solid var(--border); background: var(--bg2); }
+.cc-l { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
+.cc p { font-size: 12.5px !important; line-height: 1.62 !important; margin-bottom: 0 !important; font-family: 'Archivo', sans-serif !important; font-weight: 400 !important; color: var(--ink2) !important; }
+.cc.struct { background: var(--struct-b); border-color: var(--struct-d); } .cc.struct .cc-l { color: var(--struct); }
+
+.ki { margin-top: 20px; padding: 14px 18px; background: var(--bg2); border: 1px solid var(--border2); display: flex; gap: 14px; align-items: flex-start; }
+.ki-glyph { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; flex-shrink: 0; padding-top: 2px; }
+.ki-text { font-family: 'Source Serif 4', serif; font-style: italic; font-size: 14.5px; color: var(--ink); line-height: 1.62; }
+
+.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border2); color: var(--muted); }
+.tag.struct { border-color: var(--struct-d); color: var(--struct); }
+
+.foot { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 18px 44px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+.foot span { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .mhd-inner { grid-template-columns: 1fr; }
+  .basis-gauge { display: none; }
+  .page, .foot { padding-left: 18px; padding-right: 18px; }
+  .mhd-inner { padding: 36px 18px 0; }
+  .meter-strip { padding: 0 18px; }
+  .e-body { padding-left: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="mhd-inner">
+    <div>
+      <div class="mhd-kicker">Section 2.9 · Derivatives & Structured Products</div>
+      <div class="mhd-title">Structured Products<span class="eq"> =</span></div>
+      <div class="mhd-sub">Custom-engineered securities that combine bonds, options, and other derivatives to meet specific risk/return objectives. 11 topics.</div>
+    </div>
+    <div class="basis-gauge">
+      <div class="bg-hdr">// Common Structures</div>
+      <div class="bg-formula">
+        Autocallables • CLNs • Reverse Convertibles
+      </div>
+      <div class="bg-rows">
+        <div class="bg-row"><span class="bg-label">Principal Protection</span><span class="bg-val struct">Capital guarantee</span></div>
+        <div class="bg-row"><span class="bg-label">Embedded Options</span><span class="bg-val struct">Barrier / Autocall</span></div>
+        <div class="bg-row"><span class="bg-label">Retail vs Institutional</span><span class="bg-val struct">Complexity gap</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="meter-strip">
+    <div class="meter-item"><div class="meter-name">Autocallables</div><div class="meter-val struct">Popular retail product</div></div>
+    <div class="meter-item"><div class="meter-name">CLNs</div><div class="meter-val risk">Credit exposure</div></div>
+    <div class="meter-item"><div class="meter-name">CDOs</div><div class="meter-val risk">Tranching risk</div></div>
+    <div class="meter-item"><div class="meter-name">T+1 Settlement</div><div class="meter-val struct">Varies by wrapper</div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page">
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <span class="ctrl-right">11 topics · click to expand</span>
+  </div>
+  <div id="root"></div>
+</div>
+
+<footer class="foot">
+  <span>Financial Markets · Revision Notes</span>
+  <span>2.9 Structured Products</span>
+</footer>
+
+<script>
+const sections = [
+  {
+    label:"Principal Protection & Yield Enhancement",
+    color:"var(--pos)",
+    line:"var(--pos-d)",
+    fam:"c-core",
+    entries:[
+      {
+        icon:"🛡️",
+        fmla:"Capital Guarantee",
+        title:"Principal-Protected Notes",
+        sub:"Downside protection with upside participation",
+        tags:[["principal protected","struct"]],
+        body:[
+          `Principal-Protected Notes (PPNs) guarantee return of capital at maturity while offering participation in the upside of an underlying asset (equity index, commodity, etc.). The protection is typically achieved by investing most of the principal in zero-coupon bonds and using the remainder to buy call options. They appeal to conservative investors seeking equity-like returns with limited downside.`
+        ],
+        ki:"Principal protection comes at the cost of opportunity — returns are capped or participation rates are reduced."
+      },
+      {
+        icon:"🔄",
+        fmla:"Autocall",
+        title:"Autocallables",
+        sub:"Early redemption if conditions are met",
+        tags:[["autocallables","struct"]],
+        body:[
+          `Autocallables are structured notes that pay a high coupon and automatically redeem early (usually quarterly or annually) if the underlying asset is above a certain level. They are popular with retail investors due to high headline yields but carry significant downside risk if the autocall condition is never met.`
+        ],
+        ki:"Autocallables are often called 'yield traps' — attractive coupons hide path-dependent risks."
+      },
+      {
+        icon:"📉",
+        fmla:"Reverse Convertible",
+        title:"Reverse Convertibles",
+        sub:"High yield with equity downside risk",
+        tags:[["reverse convertibles","struct"]],
+        body:[
+          `Reverse convertibles pay a high coupon but convert into shares of the underlying asset (at a discount) if it falls below a barrier. They are essentially a short put option bundled with a bond. Investors collect the coupon but bear equity downside risk.`
+        ],
+        ki:"Reverse convertibles are bond-like until they’re not — sudden equity exposure can surprise retail investors."
+      }
+    ]
+  },
+  {
+    label:"Credit & Synthetic Structures",
+    color:"var(--risk)",
+    line:"var(--risk-d)",
+    fam:"c-credit",
+    entries:[
+      {
+        icon:"🔗",
+        fmla:"CLN",
+        title:"Credit-Linked Notes (CLNs)",
+        sub:"Bond with embedded credit default swap",
+        tags:[["credit linked notes","struct"]],
+        body:[
+          `A Credit-Linked Note (CLN) is a debt security with an embedded credit default swap. Investors receive a higher coupon in exchange for taking on the credit risk of a reference entity. If the reference entity defaults, the investor suffers a loss of principal. CLNs allow investors to gain exposure to credit risk without directly buying the underlying bond.`
+        ],
+        ki:"CLNs were heavily used pre-2008 to gain synthetic credit exposure with leverage."
+      },
+      {
+        icon:"🏗️",
+        fmla:"CDO",
+        title:"CDOs & Synthetic CDOs",
+        sub:"Tranching and repackaging of credit risk",
+        tags:[["cdo","risk"],["synthetic cdo","risk"]],
+        body:[
+          `Collateralized Debt Obligations (CDOs) pool loans or bonds and tranche the cash flows into different risk levels (senior, mezzanine, equity). Synthetic CDOs use credit default swaps instead of physical assets. They were central to the 2008 financial crisis due to mispriced correlation risk.`
+        ],
+        ki:"CDOs demonstrated how structured products can concentrate and hide risk until stress reveals it."
+      }
+    ]
+  },
+  {
+    label:"Other Common Structures",
+    color:"var(--struct)",
+    line:"var(--struct-d)",
+    fam:"c-retail",
+    entries:[
+      {
+        icon:"🌐",
+        fmla:"Dual Currency",
+        title:"Dual Currency Deposits",
+        sub:"FX-linked deposits",
+        tags:[["dual currency","struct"]],
+        body:[
+          `Dual Currency Deposits pay interest in one currency but may repay principal in another if a currency pair moves beyond a strike. They allow investors to earn enhanced yields in exchange for FX risk.`
+        ],
+        ki:"Dual currency products are popular in Asia for yield enhancement with currency views."
+      },
+      {
+        icon:"📏",
+        fmla:"Range Accrual",
+        title:"Range Accruals",
+        sub:"Coupon based on time spent in a range",
+        tags:[["range accrual","struct"]],
+        body:[
+          `Range accrual notes pay a coupon proportional to the number of days the underlying (usually an interest rate or FX rate) stays within a predefined range. They offer high yields when volatility is low but can pay nothing if the range is breached frequently.`
+        ],
+        ki:"Range accruals are a bet on low realized volatility within defined boundaries."
+      }
+    ]
+  },
+  {
+    label:"Retail vs Institutional",
+    color:"var(--risk)",
+    line:"var(--risk-d)",
+    fam:"c-retail",
+    entries:[
+      {
+        icon:"👥",
+        fmla:"Retail vs Institutional",
+        title:"Retail Structured Products vs Institutional",
+        sub:"Complexity, transparency, and target audience",
+        tags:[["retail structured","struct"]],
+        body:[
+          `Retail structured products are typically simpler, with capital protection or high headline yields, and are sold to mass affluent clients. Institutional structured products are highly customized, often involving complex derivatives, large notionals, and tailored risk profiles for hedge funds and asset managers. Retail versions often have higher embedded fees and less transparency.`
+        ],
+        ki:"Retail structured products are often criticized for opacity and mis-selling, while institutional versions are powerful portfolio tools."
+      }
+    ]
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  sections.forEach(sec => {
+    const sdiv = document.createElement('div');
+    sdiv.innerHTML = `<div class="sec-hdr">
+      <div class="sec-label" style="color:${sec.color}">${sec.label}</div>
+      <div class="sec-line"></div>
+    </div>`;
+    root.appendChild(sdiv);
+
+    const wrap = document.createElement('div');
+    wrap.className = sec.fam;
+
+    sec.entries.forEach(e => {
+      const idx = cnt++;
+      const tH = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+      const stH = e.stats ? `<div class="stats">${e.stats.map(s=>`<div class="stat"><div class="stat-l">${s.l}</div><div class="stat-v ${s.c}">${s.v}</div></div>`).join('')}</div>` : '';
+      const cmpH = e.cmp ? `<div class="cmp c${e.cmp.length}">${e.cmp.map(c=>`<div class="cc ${c.cls}"><div class="cc-l">${c.label}</div><p>${c.text}</p></div>`).join('')}</div>` : '';
+      const fmlaH = e.fmla2 ? `<div class="fmla-block"><div class="fmla-main">${e.fmla2.main}</div><pre class="fmla-note">${e.fmla2.note}</pre></div>` : '';
+
+      const body = e.body.map(p=>`<p>${p}</p>`).join('') + fmlaH + stH + cmpH +
+        `<div class="ki">
+          <div class="ki-glyph">//</div>
+          <div class="ki-text">${e.ki}</div>
+        </div>
+        <div class="tags">${tH}</div>`;
+
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.id = `e-${idx}`;
+      div.innerHTML = `
+        <div class="e-hdr" onclick="toggle(${idx})">
+          <span class="e-num">${String(idx+1).padStart(2,'0')}</span>
+          <div class="e-icon">${e.icon}</div>
+          <div class="e-text">
+            <div class="e-title">${e.title}</div>
+            <div class="e-sub">${e.sub}</div>
+          </div>
+          <span class="e-fmla">${e.fmla}</span>
+          <span class="e-toggle">▶</span>
+        </div>
+        <div class="e-body">${body}</div>`;
+      wrap.appendChild(div);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function toggle(i) { document.getElementById(`e-${i}`).classList.toggle('open'); }
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>
