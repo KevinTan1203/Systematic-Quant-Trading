@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Margin Trading Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+  :root {
+    --bg: #060a12;
+    --card: rgba(18, 26, 42, 0.88);
+    --border: rgba(100, 140, 200, 0.18);
+    --accent: #38bdf8;
+    --accent2: #a78bfa;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --green: #34d399;
+    --red: #f87171;
+    --yellow: #fbbf24;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 1.5rem 1.25rem 3rem;
+    background-image:
+      radial-gradient(ellipse 70% 50% at 15% -10%, rgba(56, 189, 248, 0.12), transparent),
+      radial-gradient(ellipse 50% 40% at 90% 5%, rgba(167, 139, 250, 0.10), transparent);
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.3rem;
+    background: linear-gradient(120deg, #38bdf8, #a78bfa 55%, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.92rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .layout {
+    max-width: 1300px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 1.5rem;
+  }
+
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.25rem;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+  }
+
+  .panel-title {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 0.25rem;
+    margin-top: 0.85rem;
+  }
+
+  input[type="number"], input[type="range"] {
+    width: 100%;
+    padding: 0.5rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid rgba(100,140,200,0.25);
+    background: rgba(7,11,20,0.7);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: 'Inter', sans-serif;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+
+  .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent);
+    float: right;
+  }
+
+  button {
+    width: 100%;
+    margin-top: 1.3rem;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+    color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 4px 16px rgba(56,189,248,0.25);
+  }
+  button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 22px rgba(56,189,248,0.35);
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+    margin-top: 1.2rem;
+  }
+
+  .stat-card {
+    background: rgba(7,11,20,0.6);
+    border-radius: 10px;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid rgba(100,140,200,0.12);
+  }
+  .stat-card .label { font-size: 0.7rem; color: var(--muted); }
+  .stat-card .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-top: 0.15rem;
+  }
+
+  .chart-wrap { height: 380px; position: relative; }
+
+  .table-wrap {
+    overflow: auto;
+    max-height: 520px;
+    border-radius: 10px;
+    border: 1px solid rgba(100,140,200,0.12);
+    margin-top: 0.5rem;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: #0f172a;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.65rem 0.6rem;
+    text-align: right;
+    border-bottom: 1px solid rgba(100,140,200,0.2);
+  }
+  th:first-child { text-align: left; }
+
+  td {
+    padding: 0.5rem 0.6rem;
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    border-bottom: 1px solid rgba(100,140,200,0.07);
+  }
+  td:first-child { text-align: left; }
+
+  tr:hover td { background: rgba(56,189,248,0.05); }
+  tr.call-row td { background: rgba(248,113,113,0.12); }
+  tr.call-row:hover td { background: rgba(248,113,113,0.18); }
+
+  .positive { color: var(--green); }
+  .negative { color: var(--red); }
+  .call-yes { color: var(--red); font-weight: 600; }
+  .call-no  { color: var(--muted); }
+
+  .note {
+    font-size: 0.73rem;
+    color: var(--muted);
+    margin-top: 1rem;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+  <h1>Margin Trading Simulator</h1>
+  <p class="subtitle">Day-by-day mark-to-market · Margin calls · Equity & maintenance levels</p>
+
+  <div class="layout">
+    <!-- Controls -->
+    <div class="panel">
+      <div class="panel-title">Simulation Parameters</div>
+
+      <label>Initial Stock Price ($)</label>
+      <input type="number" id="startPrice" value="100" step="1" min="10">
+
+      <label>Shares Purchased</label>
+      <input type="number" id="shares" value="200" step="10" min="10">
+
+      <label>Initial Margin Requirement <span class="value" id="imrVal">50%</span></label>
+      <input type="range" id="imr" min="30" max="70" step="5" value="50">
+
+      <label>Maintenance Margin <span class="value" id="mmrVal">30%</span></label>
+      <input type="range" id="mmr" min="20" max="45" step="5" value="30">
+
+      <label>Daily Volatility <span class="value" id="volVal">2.5%</span></label>
+      <input type="range" id="vol" min="0.5" max="5" step="0.1" value="2.5">
+
+      <label>Trading Days</label>
+      <input type="number" id="days" value="25" min="10" max="60" step="1">
+
+      <button onclick="runSimulation()">↻ Run New Simulation</button>
+
+      <div class="summary-grid" id="summary"></div>
+
+      <p class="note">
+        You buy shares using margin. The broker lends (1 − Initial Margin).  
+        Each day the position is marked-to-market.  
+        If Equity / Market Value falls below Maintenance Margin → Margin Call.  
+        The “Cash Required” column shows how much you must deposit to bring equity back to the <strong>Initial Margin</strong> level.
+      </p>
+    </div>
+
+    <!-- Chart + Table -->
+    <div style="display:flex; flex-direction:column; gap:1.5rem;">
+      <div class="panel">
+        <div class="panel-title">Portfolio Equity & Stock Price</div>
+        <div class="chart-wrap">
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Daily Margin Account Statement</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Stock Price</th>
+                <th>Position Value</th>
+                <th>Loan</th>
+                <th>Equity</th>
+                <th>Unrealised P/L</th>
+                <th>Margin %</th>
+                <th>Margin Call?</th>
+                <th>Cash Required</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+let chart = null;
+
+function updateLabels() {
+  document.getElementById('imrVal').textContent = document.getElementById('imr').value + '%';
+  document.getElementById('mmrVal').textContent = document.getElementById('mmr').value + '%';
+  document.getElementById('volVal').textContent = document.getElementById('vol').value + '%';
+}
+
+['imr','mmr','vol'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateLabels);
+});
+
+function runSimulation() {
+  const S0      = +document.getElementById('startPrice').value;
+  const shares  = +document.getElementById('shares').value;
+  const IMR     = +document.getElementById('imr').value / 100;   // e.g. 0.50
+  const MMR     = +document.getElementById('mmr').value / 100;   // e.g. 0.30
+  const vol     = +document.getElementById('vol').value / 100;   // daily vol
+  const nDays   = +document.getElementById('days').value;
+
+  // Initial position
+  const initialValue = S0 * shares;
+  const initialEquity = initialValue * IMR;
+  const loan = initialValue - initialEquity;   // stays constant (ignore interest)
+
+  // Generate random price path (geometric random walk)
+  const prices = [S0];
+  for (let i = 1; i <= nDays; i++) {
+    const shock = (Math.random() + Math.random() + Math.random() + Math.random() - 2) / 2; // approx normal
+    const ret = shock * vol;
+    prices.push(+(prices[i-1] * (1 + ret)).toFixed(2));
+  }
+
+  // Build daily records
+  const records = [];
+  let maxEquity = initialEquity;
+  let minEquity = initialEquity;
+
+  for (let d = 0; d <= nDays; d++) {
+    const price = prices[d];
+    const posValue = +(price * shares).toFixed(2);
+    const equity = +(posValue - loan).toFixed(2);
+    const unrealPL = +(equity - initialEquity).toFixed(2);
+    const marginPct = posValue > 0 ? equity / posValue : 0;
+    const isCall = marginPct < MMR && d > 0;
+    // Cash needed to restore equity to Initial Margin requirement on current position value
+    const targetEquity = posValue * IMR;
+    const cashRequired = isCall ? Math.max(0, +(targetEquity - equity).toFixed(2)) : 0;
+
+    if (equity > maxEquity) maxEquity = equity;
+    if (equity < minEquity) minEquity = equity;
+
+    records.push({
+      day: d,
+      price,
+      posValue,
+      loan: +loan.toFixed(2),
+      equity,
+      unrealPL,
+      marginPct: +(marginPct * 100).toFixed(1),
+      isCall,
+      cashRequired
+    });
+  }
+
+  // Summary cards
+  document.getElementById('summary').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Initial Equity</div>
+      <div class="val">$${initialEquity.toLocaleString()}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Loan Amount</div>
+      <div class="val">$${loan.toLocaleString()}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Initial Position</div>
+      <div class="val">$${initialValue.toLocaleString()}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Maintenance Level</div>
+      <div class="val">${(MMR*100)}%</div>
+    </div>
+  `;
+
+  // Table
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = records.map(r => `
+    <tr class="${r.isCall ? 'call-row' : ''}">
+      <td>${r.day}</td>
+      <td>$${r.price.toFixed(2)}</td>
+      <td>$${r.posValue.toLocaleString()}</td>
+      <td>$${r.loan.toLocaleString()}</td>
+      <td class="${r.equity >= initialEquity ? 'positive' : 'negative'}">$${r.equity.toLocaleString()}</td>
+      <td class="${r.unrealPL >= 0 ? 'positive' : 'negative'}">${r.unrealPL >= 0 ? '+' : ''}${r.unrealPL.toLocaleString()}</td>
+      <td>${r.marginPct}%</td>
+      <td class="${r.isCall ? 'call-yes' : 'call-no'}">${r.isCall ? 'YES' : 'No'}</td>
+      <td class="${r.cashRequired > 0 ? 'negative' : ''}">${r.cashRequired > 0 ? '$' + r.cashRequired.toLocaleString() : '—'}</td>
+    </tr>
+  `).join('');
+
+  // Chart data
+  const labels = records.map(r => 'Day ' + r.day);
+  const equityData = records.map(r => r.equity);
+  const priceData = records.map(r => r.price);
+
+  // Horizontal lines: Maintenance Margin equity level is dynamic,
+  // so we plot the equity series and two reference lines based on average or initial.
+  // Better: show the equity series + a line representing the maintenance threshold
+  // approximated using the loan (Maintenance Equity ≈ MMR/(1-MMR)*Loan  when solved)
+  // Actually the true maintenance equity level changes with price.
+  // We will plot equity and also the "maintenance equity" series (MMR * posValue)
+
+  const maintEquity = records.map(r => +(r.posValue * MMR).toFixed(2));
+  const initMarginEquity = records.map(r => +(r.posValue * IMR).toFixed(2));
+
+  const ctx = document.getElementById('chart').getContext('2d');
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Equity',
+          data: equityData,
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56,189,248,0.12)',
+          borderWidth: 2.8,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          fill: true,
+          tension: 0.15,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Maintenance Margin Level',
+          data: maintEquity,
+          borderColor: '#f87171',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0.15,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Initial Margin Level',
+          data: initMarginEquity,
+          borderColor: '#fbbf24',
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0.15,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Stock Price',
+          data: priceData,
+          borderColor: '#a78bfa',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.15,
+          yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: {
+            color: '#94a3b8',
+            font: { size: 11 },
+            boxWidth: 14,
+            padding: 14
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(15,23,42,0.95)',
+          titleColor: '#e2e8f0',
+          bodyColor: '#cbd5e1',
+          borderColor: 'rgba(56,189,248,0.3)',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 8
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#64748b', maxTicksLimit: 12, font: { size: 10 } },
+          grid: { color: 'rgba(51,65,85,0.35)' }
+        },
+        y: {
+          position: 'left',
+          title: { display: true, text: 'Equity / Margin Levels ($)', color: '#94a3b8', font: { size: 11 } },
+          ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } },
+          grid: { color: 'rgba(51,65,85,0.35)' }
+        },
+        y1: {
+          position: 'right',
+          title: { display: true, text: 'Stock Price ($)', color: '#a78bfa', font: { size: 11 } },
+          ticks: { color: '#a78bfa', font: { family: 'JetBrains Mono', size: 10 } },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+}
+
+// Init
+updateLabels();
+runSimulation();
+</script>
+</body>
+</html>
