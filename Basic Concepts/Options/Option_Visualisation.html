@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Options Strategy Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg-deep: #070b14;
+    --bg: #0c1220;
+    --card: rgba(22, 30, 46, 0.75);
+    --card-border: rgba(99, 130, 180, 0.18);
+    --accent: #38bdf8;
+    --accent-2: #a78bfa;
+    --accent-glow: rgba(56, 189, 248, 0.35);
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --green: #34d399;
+    --red: #f87171;
+    --yellow: #fbbf24;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem 1.5rem;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% -20%, rgba(56, 189, 248, 0.12), transparent),
+      radial-gradient(ellipse 60% 40% at 90% 10%, rgba(167, 139, 250, 0.1), transparent),
+      radial-gradient(ellipse 50% 30% at 50% 100%, rgba(52, 211, 153, 0.05), transparent);
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.35rem;
+    background: linear-gradient(120deg, #38bdf8 0%, #a78bfa 50%, #f472b6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    margin-bottom: 2rem;
+    font-size: 0.95rem;
+    font-weight: 400;
+  }
+
+  .container {
+    max-width: 1240px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 1.75rem;
+  }
+
+  @media (max-width: 960px) {
+    .container { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--card);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .panel-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+    margin-top: 0.9rem;
+  }
+
+  select, input {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border-radius: 10px;
+    border: 1px solid rgba(99, 130, 180, 0.25);
+    background: rgba(7, 11, 20, 0.7);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: 'Inter', sans-serif;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  select:focus, input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  button {
+    width: 100%;
+    margin-top: 1.25rem;
+    padding: 0.8rem;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+    color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.25);
+  }
+
+  button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 24px rgba(56, 189, 248, 0.35);
+  }
+
+  button:active { transform: translateY(0); }
+
+  .stats {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(99, 130, 180, 0.15);
+  }
+
+  .stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.55rem;
+    font-size: 0.9rem;
+  }
+
+  .stat span:first-child { color: var(--muted); }
+
+  .stat span:last-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    font-size: 0.92rem;
+  }
+
+  .positive { color: var(--green); }
+  .negative { color: var(--red); }
+  .neutral { color: var(--yellow); }
+
+  .chart-wrap {
+    position: relative;
+    height: 520px;
+  }
+
+  .note {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 1.25rem;
+    line-height: 1.5;
+    opacity: 0.85;
+  }
+
+  /* subtle hover lift on cards */
+  .panel {
+    transition: border-color 0.3s;
+  }
+  .panel:hover {
+    border-color: rgba(99, 130, 180, 0.3);
+  }
+</style>
+</head>
+<body>
+  <h1>Options Strategy Visualizer</h1>
+  <p class="subtitle">Interactive payoff diagrams at expiration · Adjust strikes & premiums live</p>
+
+  <div class="container">
+    <!-- Controls -->
+    <div class="panel">
+      <div class="panel-header">Strategy & Parameters</div>
+
+      <label>Strategy</label>
+      <select id="strategy" onchange="updateInputs(); calculate()">
+        <option value="longCall">Long Call</option>
+        <option value="longPut">Long Put</option>
+        <option value="shortCall">Short Call</option>
+        <option value="shortPut">Short Put</option>
+        <option value="bullCall">Bull Call Spread</option>
+        <option value="bearPut">Bear Put Spread</option>
+        <option value="straddle">Long Straddle</option>
+        <option value="strangle">Long Strangle</option>
+        <option value="butterfly">Long Butterfly (Calls)</option>
+        <option value="ironCondor">Iron Condor</option>
+      </select>
+
+      <div id="inputs"></div>
+
+      <label>Underlying Price Range</label>
+      <div class="row">
+        <input type="number" id="minPrice" value="50" step="1" oninput="calculate()">
+        <input type="number" id="maxPrice" value="150" step="1" oninput="calculate()">
+      </div>
+
+      <button onclick="calculate()">Update Chart</button>
+
+      <div class="stats" id="stats"></div>
+      <p class="note">
+        Values shown are theoretical P/L at expiration. Premiums are exchanged upfront.
+        Does not include commissions, dividends, or early assignment risk.
+      </p>
+    </div>
+
+    <!-- Chart -->
+    <div class="panel">
+      <div class="panel-header">Payoff Diagram</div>
+      <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+<script>
+const strategies = {
+  longCall: {
+    fields: [
+      {id:"K", label:"Strike", value:100},
+      {id:"premium", label:"Premium paid", value:5}
+    ]
+  },
+  longPut: {
+    fields: [
+      {id:"K", label:"Strike", value:100},
+      {id:"premium", label:"Premium paid", value:5}
+    ]
+  },
+  shortCall: {
+    fields: [
+      {id:"K", label:"Strike", value:100},
+      {id:"premium", label:"Premium received", value:5}
+    ]
+  },
+  shortPut: {
+    fields: [
+      {id:"K", label:"Strike", value:100},
+      {id:"premium", label:"Premium received", value:5}
+    ]
+  },
+  bullCall: {
+    fields: [
+      {id:"K1", label:"Long Call Strike", value:95},
+      {id:"P1", label:"Long Premium", value:7},
+      {id:"K2", label:"Short Call Strike", value:110},
+      {id:"P2", label:"Short Premium", value:2}
+    ]
+  },
+  bearPut: {
+    fields: [
+      {id:"K1", label:"Long Put Strike", value:110},
+      {id:"P1", label:"Long Premium", value:7},
+      {id:"K2", label:"Short Put Strike", value:95},
+      {id:"P2", label:"Short Premium", value:2}
+    ]
+  },
+  straddle: {
+    fields: [
+      {id:"K", label:"Strike (ATM)", value:100},
+      {id:"callP", label:"Call Premium", value:5},
+      {id:"putP", label:"Put Premium", value:5}
+    ]
+  },
+  strangle: {
+    fields: [
+      {id:"Kput", label:"Put Strike", value:90},
+      {id:"Pput", label:"Put Premium", value:3},
+      {id:"Kcall", label:"Call Strike", value:110},
+      {id:"Pcall", label:"Call Premium", value:3}
+    ]
+  },
+  butterfly: {
+    fields: [
+      {id:"K1", label:"Lower Strike (buy 1)", value:90},
+      {id:"P1", label:"Lower Premium", value:12},
+      {id:"K2", label:"Middle Strike (sell 2)", value:100},
+      {id:"P2", label:"Middle Premium", value:6},
+      {id:"K3", label:"Upper Strike (buy 1)", value:110},
+      {id:"P3", label:"Upper Premium", value:2}
+    ]
+  },
+  ironCondor: {
+    fields: [
+      {id:"KputL", label:"Long Put Strike", value:85},
+      {id:"PputL", label:"Long Put Premium", value:1},
+      {id:"KputS", label:"Short Put Strike", value:95},
+      {id:"PputS", label:"Short Put Premium", value:3},
+      {id:"KcallS", label:"Short Call Strike", value:105},
+      {id:"PcallS", label:"Short Call Premium", value:3},
+      {id:"KcallL", label:"Long Call Strike", value:115},
+      {id:"PcallL", label:"Long Call Premium", value:1}
+    ]
+  }
+};
+
+let chart = null;
+
+function updateInputs() {
+  const strat = document.getElementById('strategy').value;
+  const cfg = strategies[strat];
+  let html = '';
+  cfg.fields.forEach(f => {
+    html += `<label>${f.label}</label>
+             <input type="number" id="${f.id}" value="${f.value}" step="0.5" oninput="calculate()">`;
+  });
+  document.getElementById('inputs').innerHTML = html;
+}
+
+function getVal(id) {
+  return parseFloat(document.getElementById(id)?.value) || 0;
+}
+
+function payoff(S, strat) {
+  switch(strat) {
+    case 'longCall': {
+      const K = getVal('K'), p = getVal('premium');
+      return Math.max(S - K, 0) - p;
+    }
+    case 'longPut': {
+      const K = getVal('K'), p = getVal('premium');
+      return Math.max(K - S, 0) - p;
+    }
+    case 'shortCall': {
+      const K = getVal('K'), p = getVal('premium');
+      return p - Math.max(S - K, 0);
+    }
+    case 'shortPut': {
+      const K = getVal('K'), p = getVal('premium');
+      return p - Math.max(K - S, 0);
+    }
+    case 'bullCall': {
+      const K1 = getVal('K1'), P1 = getVal('P1');
+      const K2 = getVal('K2'), P2 = getVal('P2');
+      return (Math.max(S - K1, 0) - P1) + (P2 - Math.max(S - K2, 0));
+    }
+    case 'bearPut': {
+      const K1 = getVal('K1'), P1 = getVal('P1');
+      const K2 = getVal('K2'), P2 = getVal('P2');
+      return (Math.max(K1 - S, 0) - P1) + (P2 - Math.max(K2 - S, 0));
+    }
+    case 'straddle': {
+      const K = getVal('K'), cp = getVal('callP'), pp = getVal('putP');
+      return Math.max(S - K, 0) - cp + Math.max(K - S, 0) - pp;
+    }
+    case 'strangle': {
+      const Kp = getVal('Kput'), Pp = getVal('Pput');
+      const Kc = getVal('Kcall'), Pc = getVal('Pcall');
+      return Math.max(Kp - S, 0) - Pp + Math.max(S - Kc, 0) - Pc;
+    }
+    case 'butterfly': {
+      const K1 = getVal('K1'), P1 = getVal('P1');
+      const K2 = getVal('K2'), P2 = getVal('P2');
+      const K3 = getVal('K3'), P3 = getVal('P3');
+      return (Math.max(S-K1,0)-P1) + 2*(P2 - Math.max(S-K2,0)) + (Math.max(S-K3,0)-P3);
+    }
+    case 'ironCondor': {
+      const Kpl = getVal('KputL'), Ppl = getVal('PputL');
+      const Kps = getVal('KputS'), Pps = getVal('PputS');
+      const Kcs = getVal('KcallS'), Pcs = getVal('PcallS');
+      const Kcl = getVal('KcallL'), Pcl = getVal('PcallL');
+      return (Math.max(Kpl-S,0)-Ppl) + (Pps - Math.max(Kps-S,0))
+           + (Pcs - Math.max(S-Kcs,0)) + (Math.max(S-Kcl,0)-Pcl);
+    }
+  }
+  return 0;
+}
+
+function calculate() {
+  const strat = document.getElementById('strategy').value;
+  const minP = getVal('minPrice');
+  const maxP = getVal('maxPrice');
+  const steps = 250;
+  const labels = [];
+  const data = [];
+  let maxProfit = -Infinity, maxLoss = Infinity;
+  const zeros = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const S = minP + (maxP - minP) * i / steps;
+    const pl = payoff(S, strat);
+    labels.push(+S.toFixed(2));
+    data.push(+pl.toFixed(4));
+    if (pl > maxProfit) maxProfit = pl;
+    if (pl < maxLoss) maxLoss = pl;
+  }
+
+  // Breakevens
+  for (let i = 1; i < data.length; i++) {
+    if ((data[i-1] <= 0 && data[i] >= 0) || (data[i-1] >= 0 && data[i] <= 0)) {
+      const S1 = labels[i-1];
+      const S2 = labels[i];
+      const ratio = Math.abs(data[i-1]) / (Math.abs(data[i-1]) + Math.abs(data[i]) || 1);
+      zeros.push((S1 + ratio * (S2 - S1)).toFixed(2));
+    }
+  }
+
+  // Stats
+  const fmt = v => {
+    if (v === Infinity) return '∞';
+    if (v === -Infinity) return '-∞';
+    return v.toFixed(2);
+  };
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat">
+      <span>Max Profit</span>
+      <span class="${maxProfit >= 0 ? 'positive' : 'negative'}">${fmt(maxProfit)}</span>
+    </div>
+    <div class="stat">
+      <span>Max Loss</span>
+      <span class="${maxLoss >= 0 ? 'positive' : 'negative'}">${fmt(maxLoss)}</span>
+    </div>
+    <div class="stat">
+      <span>Breakeven(s)</span>
+      <span class="neutral">${zeros.length ? zeros.join('  ·  ') : '—'}</span>
+    </div>
+  `;
+
+  // Gradient for the area fill
+  const ctx = document.getElementById('chart').getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 480);
+  gradient.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+  gradient.addColorStop(0.5, 'rgba(56, 189, 248, 0.08)');
+  gradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Profit / Loss',
+          data: data,
+          borderColor: '#38bdf8',
+          backgroundColor: gradient,
+          borderWidth: 2.8,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#38bdf8',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
+          fill: true,
+          tension: 0.15
+        },
+        {
+          label: 'Zero line',
+          data: labels.map(() => 0),
+          borderColor: 'rgba(148, 163, 184, 0.45)',
+          borderWidth: 1.5,
+          borderDash: [6, 5],
+          pointRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          titleColor: '#e2e8f0',
+          bodyColor: '#38bdf8',
+          borderColor: 'rgba(56, 189, 248, 0.3)',
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 10,
+          displayColors: false,
+          callbacks: {
+            title: items => `Underlying  ${items[0].label}`,
+            label: item => `P/L  ${item.raw.toFixed(2)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Underlying Price at Expiration',
+            color: '#94a3b8',
+            font: { size: 12, weight: '500' },
+            padding: { top: 10 }
+          },
+          ticks: {
+            color: '#64748b',
+            maxTicksLimit: 11,
+            font: { family: 'JetBrains Mono', size: 11 }
+          },
+          grid: { color: 'rgba(51, 65, 85, 0.4)', drawBorder: false }
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'Profit / Loss',
+            color: '#94a3b8',
+            font: { size: 12, weight: '500' }
+          },
+          ticks: {
+            color: '#64748b',
+            font: { family: 'JetBrains Mono', size: 11 },
+            callback: v => v.toFixed(0)
+          },
+          grid: { color: 'rgba(51, 65, 85, 0.45)', drawBorder: false }
+        }
+      }
+    }
+  });
+}
+
+// Initialize
+updateInputs();
+calculate();
+</script>
+</body>
+</html>

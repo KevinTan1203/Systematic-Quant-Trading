@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Random IV Surface & Option Chain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root {
+    --bg: #060a12;
+    --card: rgba(18, 26, 42, 0.85);
+    --border: rgba(100, 140, 200, 0.18);
+    --accent: #38bdf8;
+    --accent2: #a78bfa;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --green: #34d399;
+    --red: #f87171;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 1.5rem 1.25rem 2.5rem;
+    background-image:
+      radial-gradient(ellipse 70% 50% at 10% -15%, rgba(56, 189, 248, 0.13), transparent),
+      radial-gradient(ellipse 50% 40% at 90% 0%, rgba(167, 139, 250, 0.11), transparent);
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.25rem;
+    background: linear-gradient(120deg, #38bdf8, #a78bfa 55%, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.92rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stock-header {
+    max-width: 1280px;
+    margin: 0 auto 1.5rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.1rem 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(16px);
+  }
+
+  .stock-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.75rem;
+    align-items: baseline;
+  }
+
+  .ticker {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+
+  .stock-name { color: var(--muted); font-size: 0.95rem; }
+
+  .metric {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+  }
+  .metric span { color: var(--muted); margin-right: 0.35rem; }
+
+  button#regen {
+    background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+    color: white;
+    border: none;
+    padding: 0.65rem 1.3rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 4px 14px rgba(56, 189, 248, 0.25);
+  }
+  button#regen:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
+  }
+
+  .layout {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.25rem;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+  }
+
+  .panel-title {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.9rem;
+  }
+
+  #surface { width: 100%; height: 520px; }
+
+  .table-wrap {
+    overflow: auto;
+    max-height: 480px;
+    border-radius: 10px;
+    border: 1px solid rgba(100,140,200,0.12);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: #0f172a;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.7rem 0.75rem;
+    text-align: right;
+    border-bottom: 1px solid rgba(100,140,200,0.2);
+  }
+  th:first-child, td:first-child { text-align: left; }
+
+  td {
+    padding: 0.55rem 0.75rem;
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    border-bottom: 1px solid rgba(100,140,200,0.07);
+  }
+
+  tr:hover td { background: rgba(56, 189, 248, 0.06); }
+
+  .call { color: var(--green); }
+  .put  { color: var(--red); }
+
+  .note {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.8rem;
+    line-height: 1.45;
+  }
+</style>
+</head>
+<body>
+  <h1>Implied Volatility Surface & Option Chain</h1>
+  <p class="subtitle">Randomly generated realistic option data · Surface + full chain</p>
+
+  <div class="stock-header">
+    <div class="stock-info">
+      <div>
+        <div class="ticker" id="ticker">—</div>
+        <div class="stock-name" id="stockName">—</div>
+      </div>
+      <div class="metric"><span>Spot</span><span id="spot">—</span></div>
+      <div class="metric"><span>ATM Vol</span><span id="atmVol">—</span></div>
+      <div class="metric"><span>Rate</span><span id="rate">—</span></div>
+      <div class="metric"><span>Div Yield</span><span id="div">—</span></div>
+    </div>
+    <button id="regen" onclick="generateAll()">↻ Regenerate Random Stock</button>
+  </div>
+
+  <div class="layout">
+    <!-- Surface -->
+    <div class="panel">
+      <div class="panel-title">Implied Volatility Surface · σ(K, T)</div>
+      <div id="surface"></div>
+    </div>
+
+    <!-- Option Chain Table -->
+    <div class="panel">
+      <div class="panel-title">Option Chain (Calls & Puts)</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Expiry</th>
+              <th>TTM (y)</th>
+              <th>Strike</th>
+              <th>Type</th>
+              <th>IV %</th>
+              <th>Mid Price</th>
+              <th>Delta</th>
+              <th>Moneyness</th>
+            </tr>
+          </thead>
+          <tbody id="chainBody"></tbody>
+        </table>
+      </div>
+      <p class="note">
+        Prices & Greeks are theoretical (Black-Scholes). IV surface is generated from the same underlying model that produces this chain.
+        Data is synthetic but exhibits realistic skew, smile and term structure.
+      </p>
+    </div>
+  </div>
+
+<script>
+/* ========== Black-Scholes helpers ========== */
+function normCDF(x) {
+  const a1 =  0.254829592, a2 = -0.284496736, a3 =  1.421413741;
+  const a4 = -1.453152027, a5 =  1.061405429, p  =  0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.SQRT2;
+  const t = 1 / (1 + p * x);
+  const y = 1 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t * Math.exp(-x*x);
+  return 0.5 * (1 + sign * y);
+}
+
+function normPDF(x) {
+  return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+}
+
+function blackScholes(S, K, T, r, q, sigma, type) {
+  if (T <= 0) {
+    const intrinsic = type === 'call' ? Math.max(S-K,0) : Math.max(K-S,0);
+    return { price: intrinsic, delta: type === 'call' ? (S>K?1:0) : (S<K?-1:0) };
+  }
+  const sqrtT = Math.sqrt(T);
+  const d1 = (Math.log(S/K) + (r - q + 0.5*sigma*sigma)*T) / (sigma*sqrtT);
+  const d2 = d1 - sigma*sqrtT;
+  let price, delta;
+  if (type === 'call') {
+    price = S*Math.exp(-q*T)*normCDF(d1) - K*Math.exp(-r*T)*normCDF(d2);
+    delta = Math.exp(-q*T)*normCDF(d1);
+  } else {
+    price = K*Math.exp(-r*T)*normCDF(-d2) - S*Math.exp(-q*T)*normCDF(-d1);
+    delta = -Math.exp(-q*T)*normCDF(-d1);
+  }
+  return { price: Math.max(0, price), delta };
+}
+
+/* ========== Random data generators ========== */
+const TICKERS = [
+  {t:'NVDA', n:'NVIDIA Corp'}, {t:'AAPL', n:'Apple Inc'}, {t:'TSLA', n:'Tesla Inc'},
+  {t:'META', n:'Meta Platforms'}, {t:'AMZN', n:'Amazon.com'}, {t:'MSFT', n:'Microsoft'},
+  {t:'GOOGL', n:'Alphabet Inc'}, {t:'AMD', n:'Advanced Micro Devices'},
+  {t:'COIN', n:'Coinbase Global'}, {t:'PLTR', n:'Palantir Technologies'},
+  {t:'SPY', n:'SPDR S&P 500 ETF'}, {t:'QQQ', n:'Invesco QQQ Trust'}
+];
+
+function rand(min, max) { return min + Math.random() * (max - min); }
+function randInt(min, max) { return Math.floor(rand(min, max+1)); }
+
+function generateIV(S, K, T, atmVol, skew, smile, termSlope, vov) {
+  const m = Math.log(K / S) / Math.max(Math.sqrt(T), 0.12);
+  let vol = atmVol * (1 + termSlope * Math.log(1 + T));
+  vol += -skew * 0.045 * m;               // equity-style put skew
+  vol += smile * 0.028 * m * m;           // smile convexity
+  vol += vov * 0.09 * Math.exp(-T * 3.5); // short-term elevation
+  return Math.max(0.06, Math.min(0.95, vol));
+}
+
+function generateAll() {
+  // --- Random stock ---
+  const stock = TICKERS[randInt(0, TICKERS.length-1)];
+  const S = +(rand(45, 480).toFixed(2));
+  const r = +(rand(0.03, 0.055).toFixed(4));
+  const q = +(rand(0.0, 0.025).toFixed(4));
+  const atmVol = rand(0.16, 0.48);
+  const skew = rand(0.7, 2.2);
+  const smile = rand(0.4, 1.6);
+  const termSlope = rand(-0.12, 0.35);
+  const vov = rand(0.15, 0.55);
+
+  document.getElementById('ticker').textContent = stock.t;
+  document.getElementById('stockName').textContent = stock.n;
+  document.getElementById('spot').textContent = S.toFixed(2);
+  document.getElementById('atmVol').textContent = (atmVol*100).toFixed(1) + '%';
+  document.getElementById('rate').textContent = (r*100).toFixed(2) + '%';
+  document.getElementById('div').textContent = (q*100).toFixed(2) + '%';
+
+  // --- Expiries (realistic) ---
+  const expiries = [
+    {label: '1W',  T: 7/365},
+    {label: '2W',  T: 14/365},
+    {label: '1M',  T: 30/365},
+    {label: '2M',  T: 60/365},
+    {label: '3M',  T: 91/365},
+    {label: '6M',  T: 182/365},
+    {label: '9M',  T: 273/365},
+    {label: '1Y',  T: 1.0},
+    {label: '18M', T: 1.5}
+  ];
+
+  // --- Strikes around spot ---
+  const strikePct = [-0.28, -0.20, -0.14, -0.09, -0.05, -0.02, 0, 0.02, 0.05, 0.09, 0.14, 0.20, 0.28];
+  const strikes = strikePct.map(p => +(S * (1 + p)).toFixed(S > 100 ? 0 : 1));
+
+  // --- Build option chain ---
+  const chain = [];
+  const surfaceStrikes = [...new Set(strikes)].sort((a,b)=>a-b);
+  const surfaceTTM = expiries.map(e => e.T);
+  const surfaceIV = [];   // rows = TTM, cols = strikes
+
+  expiries.forEach((exp, j) => {
+    const rowIV = [];
+    surfaceStrikes.forEach(K => {
+      const iv = generateIV(S, K, exp.T, atmVol, skew, smile, termSlope, vov);
+      rowIV.push(+(iv*100).toFixed(2));
+
+      // Call
+      const call = blackScholes(S, K, exp.T, r, q, iv, 'call');
+      chain.push({
+        expiry: exp.label,
+        T: exp.T,
+        K,
+        type: 'Call',
+        iv: iv*100,
+        price: call.price,
+        delta: call.delta,
+        moneyness: K/S
+      });
+
+      // Put
+      const put = blackScholes(S, K, exp.T, r, q, iv, 'put');
+      chain.push({
+        expiry: exp.label,
+        T: exp.T,
+        K,
+        type: 'Put',
+        iv: iv*100,
+        price: put.price,
+        delta: put.delta,
+        moneyness: K/S
+      });
+    });
+    surfaceIV.push(rowIV);
+  });
+
+  // Sort chain nicely: by TTM then Strike then Call before Put
+  chain.sort((a,b) => a.T - b.T || a.K - b.K || (a.type === 'Call' ? -1 : 1));
+
+  // --- Render table ---
+  const tbody = document.getElementById('chainBody');
+  tbody.innerHTML = chain.map(o => `
+    <tr>
+      <td>${o.expiry}</td>
+      <td>${o.T.toFixed(3)}</td>
+      <td>${o.K}</td>
+      <td class="${o.type === 'Call' ? 'call' : 'put'}">${o.type}</td>
+      <td>${o.iv.toFixed(2)}</td>
+      <td>${o.price.toFixed(2)}</td>
+      <td>${o.delta.toFixed(3)}</td>
+      <td>${o.moneyness.toFixed(3)}</td>
+    </tr>
+  `).join('');
+
+  // --- Render surface ---
+  const data = [{
+    type: 'surface',
+    x: surfaceStrikes,
+    y: surfaceTTM,
+    z: surfaceIV,
+    colorscale: [
+      [0.00, '#0c4a6e'], [0.2, '#0e7490'], [0.35, '#06b6d4'],
+      [0.5, '#22d3ee'], [0.65, '#a5f3fc'], [0.8, '#fde68a'],
+      [0.9, '#fb923c'], [1.00, '#ef4444']
+    ],
+    showscale: true,
+    colorbar: {
+      title: { text: 'IV %', font: { color: '#94a3b8', size: 12 } },
+      tickfont: { color: '#94a3b8', family: 'JetBrains Mono', size: 11 },
+      thickness: 15, len: 0.7, outlinewidth: 0
+    },
+    hovertemplate: '<b>Strike</b>: %{x}<br><b>TTM</b>: %{y:.3f}y<br><b>IV</b>: %{z:.2f}%<extra></extra>',
+    lighting: { ambient: 0.6, diffuse: 0.85, specular: 0.35, roughness: 0.4 },
+    lightposition: { x: 1000, y: 700, z: 1400 }
+  }];
+
+  const layout = {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'Inter', color: '#94a3b8' },
+    margin: { l: 0, r: 0, t: 10, b: 0 },
+    scene: {
+      xaxis: {
+        title: { text: 'Strike', font: { size: 12 } },
+        gridcolor: 'rgba(100,130,180,0.15)',
+        showbackground: true,
+        backgroundcolor: 'rgba(10,16,28,0.7)',
+        tickfont: { family: 'JetBrains Mono', size: 10 }
+      },
+      yaxis: {
+        title: { text: 'Time to Maturity (years)', font: { size: 12 } },
+        gridcolor: 'rgba(100,130,180,0.15)',
+        showbackground: true,
+        backgroundcolor: 'rgba(10,16,28,0.7)',
+        tickfont: { family: 'JetBrains Mono', size: 10 }
+      },
+      zaxis: {
+        title: { text: 'Implied Vol (%)', font: { size: 12 } },
+        gridcolor: 'rgba(100,130,180,0.15)',
+        showbackground: true,
+        backgroundcolor: 'rgba(10,16,28,0.7)',
+        tickfont: { family: 'JetBrains Mono', size: 10 }
+      },
+      camera: { eye: { x: 1.5, y: -1.55, z: 1.2 } },
+      aspectmode: 'manual',
+      aspectratio: { x: 1.2, y: 1.0, z: 0.65 }
+    }
+  };
+
+  Plotly.react('surface', data, layout, {
+    responsive: true,
+    displayModeBar: true,
+    displaylogo: false,
+    modeBarButtonsToRemove: ['toImage', 'sendDataToCloud']
+  });
+}
+
+// Initial generation
+generateAll();
+</script>
+</body>
+</html>
