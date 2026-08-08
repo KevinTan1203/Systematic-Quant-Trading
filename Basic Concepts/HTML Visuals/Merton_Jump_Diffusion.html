@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merton Jump Diffusion — Quant Research Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#0A0D14;
+  --bg-2:#0D1119;
+  --panel:#121722;
+  --panel-2:#161d2b;
+  --border:#212a3a;
+  --border-soft:#1a2230;
+  --text:#E7EAF0;
+  --text-dim:#8A93A6;
+  --text-faint:#5B6478;
+  --accent-jump:#17E3B5;
+  --accent-jump-dim:#0e9c7e;
+  --accent-gbm:#5B8DEF;
+  --accent-warn:#F5A623;
+  --accent-loss:#EF5B5B;
+  --accent-gain:#3DD68C;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px;
+  --shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(23,227,181,0.06), transparent),
+    radial-gradient(1000px 500px at 100% 0%, rgba(91,141,239,0.06), transparent),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  font-size:14px;
+  line-height:1.5;
+}
+a{color:var(--accent-jump);}
+::selection{background:var(--accent-jump);color:#00120d;}
+
+/* ---------- Layout shell ---------- */
+.app{
+  display:grid;
+  grid-template-columns: 328px 1fr;
+  min-height:100vh;
+}
+@media (max-width: 980px){
+  .app{grid-template-columns: 1fr;}
+  .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}
+}
+
+/* ---------- Sidebar / controls ---------- */
+.sidebar{
+  position:sticky; top:0; height:100vh; overflow-y:auto;
+  background:linear-gradient(180deg, var(--panel), var(--bg-2));
+  border-right:1px solid var(--border);
+  padding:20px 18px 40px;
+}
+.brand{
+  display:flex; align-items:center; gap:10px; margin-bottom:4px;
+}
+.brand-mark{
+  width:30px;height:30px;border-radius:8px;
+  background:conic-gradient(from 210deg, var(--accent-jump), var(--accent-gbm), var(--accent-jump));
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono); font-weight:700; color:#00120d; font-size:13px;
+}
+.brand-name{font-family:var(--display); font-weight:700; font-size:16px; letter-spacing:0.2px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px 0; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{
+  border:1px solid var(--border-soft); border-radius:var(--radius);
+  background:rgba(255,255,255,0.015);
+  padding:12px 14px 14px; margin-bottom:12px;
+}
+.ctrl-group h4{
+  margin:0 0 10px 0; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px;
+  text-transform:uppercase; color:var(--text-dim); font-weight:600;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{
+  display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px;
+  font-size:12px; color:var(--text-dim);
+}
+.field-label .tip{
+  cursor:help; border-bottom:1px dotted var(--text-faint);
+}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{
+  -webkit-appearance:none; width:100%; height:4px; border-radius:2px;
+  background:var(--border); outline:none; margin:6px 0 2px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+  background:var(--accent-jump); cursor:pointer; border:2px solid #00120d;
+  box-shadow:0 0 0 2px rgba(23,227,181,0.25);
+}
+input[type=range]::-moz-range-thumb{
+  width:14px; height:14px; border-radius:50%; background:var(--accent-jump);
+  cursor:pointer; border:2px solid #00120d;
+}
+select, input[type=number], input[type=text]{
+  width:100%; background:var(--panel-2); border:1px solid var(--border);
+  color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono);
+  font-size:12.5px;
+}
+select:focus, input:focus{outline:1.5px solid var(--accent-jump);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+
+.btn{
+  width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border);
+  background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600;
+  font-size:12.5px; cursor:pointer; transition:all .15s ease;
+}
+.btn:hover{border-color:var(--accent-jump); color:var(--accent-jump);}
+.btn-primary{
+  background:linear-gradient(135deg, var(--accent-jump), var(--accent-jump-dim));
+  color:#00160f; border:none; font-weight:700;
+}
+.btn-primary:hover{filter:brightness(1.08); color:#00160f;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;}
+.preset-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;}
+.preset-btn{padding:8px 4px; font-size:11px;}
+.toggle-row{display:flex; align-items:center; justify-content:space-between; padding:2px 0;}
+.switch{position:relative; width:36px; height:20px; flex-shrink:0;}
+.switch input{opacity:0; width:0; height:0;}
+.slider-tog{position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:20px; transition:.15s;}
+.slider-tog:before{content:""; position:absolute; width:14px; height:14px; left:3px; top:3px; background:var(--text-dim); border-radius:50%; transition:.15s;}
+.switch input:checked + .slider-tog{background:rgba(23,227,181,0.35);}
+.switch input:checked + .slider-tog:before{transform:translateX(16px); background:var(--accent-jump);}
+.status-line{
+  font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px;
+  border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;
+}
+.status-line b{color:var(--accent-jump); font-weight:600;}
+
+/* ---------- Main content ---------- */
+.main{padding:26px 32px 60px; max-width:1400px;}
+.page-header{margin-bottom:22px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent-jump);}
+.page-title{font-family:var(--display); font-size:30px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:760px; font-size:13.5px;}
+
+.section{margin-top:34px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:14px;}
+.section-num{font-family:var(--mono); color:var(--accent-jump); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:17px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-6px 0 14px 0; max-width:760px;}
+
+.card{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+  padding:18px 18px 16px; box-shadow:var(--shadow);
+}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+/* KPI cards */
+.kpi{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+  padding:14px 16px; position:relative; overflow:hidden;
+}
+.kpi:before{
+  content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px;
+  background:var(--accent-jump);
+}
+.kpi.warn:before{background:var(--accent-warn);}
+.kpi.loss:before{background:var(--accent-loss);}
+.kpi.gbm:before{background:var(--accent-gbm);}
+.kpi-label{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:22px; font-weight:600; margin-top:6px; letter-spacing:-0.3px;}
+.kpi-sub{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+.kpi-sub b{color:var(--text-dim); font-weight:600;}
+
+/* tables */
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12.5px;}
+table.data-table th, table.data-table td{
+  padding:8px 10px; text-align:right; border-bottom:1px solid var(--border-soft);
+}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left; color:var(--text-dim); font-family:var(--body);}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+.tag-jump{color:var(--accent-jump);}
+.tag-gbm{color:var(--accent-gbm);}
+
+/* formula blocks */
+.formula-block{
+  background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px;
+  padding:14px 16px; margin-bottom:12px;
+}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent-jump); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:14.5px; color:var(--text); margin-bottom:6px; overflow-x:auto;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+/* collapsible */
+details.disclosure{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+  padding:14px 18px; margin-bottom:12px;
+}
+details.disclosure > summary{
+  cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none;
+  display:flex; align-items:center; gap:8px;
+}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent-jump); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body h5{color:var(--text); font-family:var(--display); font-size:13px; margin:14px 0 4px;}
+.disclosure-body p{margin:4px 0 10px;}
+.disclosure-body ul{margin:4px 0 10px; padding-left:18px;}
+
+.badge{
+  display:inline-block; font-family:var(--mono); font-size:10.5px; padding:2px 7px; border-radius:20px;
+  border:1px solid var(--border); color:var(--text-dim); margin-left:8px; text-transform:none;
+}
+.badge.illustrative{color:var(--accent-warn); border-color:rgba(245,166,35,0.4);}
+
+.legend-row{display:flex; gap:18px; align-items:center; font-size:12px; color:var(--text-dim); margin-bottom:10px; flex-wrap:wrap;}
+.legend-dot{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px;}
+
+.footer-note{
+  margin-top:44px; padding-top:18px; border-top:1px solid var(--border-soft);
+  color:var(--text-faint); font-size:11.5px; line-height:1.7;
+}
+
+.two-col{display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
+@media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+.jump-select-row{display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;}
+.jump-detail-box{
+  font-family:var(--mono); font-size:12px; background:var(--panel-2); border:1px solid var(--border-soft);
+  border-radius:8px; padding:12px 14px; min-height:96px; color:var(--text-dim);
+}
+.jump-detail-box .jd-row{display:flex; justify-content:space-between; padding:2px 0;}
+.jump-detail-box .jd-row span:last-child{color:var(--text); font-weight:600;}
+
+.overlay-loading{
+  position:fixed; inset:0; background:rgba(8,10,15,0.72); backdrop-filter:blur(2px);
+  display:none; align-items:center; justify-content:center; z-index:999; flex-direction:column; gap:10px;
+}
+.overlay-loading.active{display:flex;}
+.spinner{
+  width:34px; height:34px; border-radius:50%; border:3px solid var(--border);
+  border-top-color:var(--accent-jump); animation:spin 0.8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.overlay-loading span{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+</style>
+</head>
+<body>
+
+<div class="overlay-loading" id="loadingOverlay"><div class="spinner"></div><span id="loadingText">Running simulation…</span></div>
+
+<div class="app">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">MJ</div>
+      <div class="brand-name">Jump Diffusion Console</div>
+    </div>
+    <div class="brand-sub">Merton (1976) · Monte Carlo Engine</div>
+
+    <div class="ctrl-group">
+      <h4>Scenario Presets <span class="badge illustrative">illustrative</span></h4>
+      <div class="preset-row">
+        <button class="btn preset-btn" data-preset="low">Low Vol</button>
+        <button class="btn preset-btn" data-preset="normal">Normal</button>
+        <button class="btn preset-btn" data-preset="crisis">Crisis</button>
+      </div>
+      <div class="hint">Presets set illustrative parameter combinations — not empirical market estimates.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Asset &amp; Drift</h4>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Starting asset price at t=0">Initial Price S₀</span><span class="val" id="v_S0">100</span></div>
+        <input type="range" id="S0" min="1" max="1000" step="1" value="100">
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Physical-measure annual expected return μ">Annual Drift μ</span><span class="val" id="v_mu">8.0%</span></div>
+        <input type="range" id="mu" min="-20" max="50" step="0.5" value="8">
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Annualized volatility of the continuous diffusion component">Diffusion Vol σ</span><span class="val" id="v_sigma">20.0%</span></div>
+        <input type="range" id="sigma" min="1" max="100" step="0.5" value="20">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Jump Process</h4>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Expected number of jump events per year (Poisson intensity)">Jump Intensity λ</span><span class="val" id="v_lambda">0.75</span></div>
+        <input type="range" id="lambda" min="0" max="5" step="0.05" value="0.75">
+        <div class="hint">Higher λ → jumps occur more frequently per year.</div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Mean of ln(J), the log jump multiplier — not the direct % price change">Mean Log Jump μ_J</span><span class="val" id="v_muJ">-10.0%</span></div>
+        <input type="range" id="muJ" min="-50" max="50" step="0.5" value="-10">
+        <div class="hint">This is the mean of the <i>log</i> jump size, not the direct percentage price change.</div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Std. dev. of ln(J) — dispersion of jump sizes">Jump Vol σ_J</span><span class="val" id="v_sigmaJ">20.0%</span></div>
+        <input type="range" id="sigmaJ" min="0" max="100" step="0.5" value="20">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Simulation Grid</h4>
+      <div class="field">
+        <div class="field-label"><span>Time Horizon T</span></div>
+        <select id="T">
+          <option value="0.25">3 months (0.25y)</option>
+          <option value="0.5">6 months (0.5y)</option>
+          <option value="1" selected>1 year</option>
+          <option value="2">2 years</option>
+          <option value="5">5 years</option>
+          <option value="10">10 years</option>
+        </select>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Time Steps</span></div>
+          <select id="steps">
+            <option value="52">52</option>
+            <option value="252" selected>252</option>
+            <option value="504">504</option>
+            <option value="1260">1260</option>
+            <option value="2520">2520</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>MC Paths</span></div>
+          <select id="paths">
+            <option value="100">100</option>
+            <option value="500">500</option>
+            <option value="1000" selected>1,000</option>
+            <option value="5000">5,000</option>
+            <option value="10000">10,000</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint">Larger simulations (10,000 paths × 2,520 steps) require more browser computation and may take a few seconds.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Display &amp; Reproducibility</h4>
+      <div class="toggle-row">
+        <span>Compare with GBM</span>
+        <label class="switch"><input type="checkbox" id="compareGBM"><span class="slider-tog"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Show jump events</span>
+        <label class="switch"><input type="checkbox" id="showJumps" checked><span class="slider-tog"></span></label>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <div class="field-label"><span>Displayed paths</span><span class="val" id="v_displayPaths">120</span></div>
+        <input type="range" id="displayPaths" min="20" max="300" step="10" value="120">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Random seed</span></div>
+        <input type="text" id="seed" value="42">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="runBtn">▶ Run Simulation</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+
+    <div class="status-line" id="statusLine">
+      Ready. Adjust parameters and click <b>Run Simulation</b>.
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Quantitative Finance / Monte Carlo</div>
+      <h1 class="page-title">Merton Jump Diffusion Model</h1>
+      <p class="page-desc">An interactive research console for simulating asset prices under Merton's (1976) jump diffusion process — continuous Brownian diffusion overlaid with discrete, log-normally sized Poisson jumps. Adjust parameters on the left and run the Monte Carlo engine to update every chart and metric below.</p>
+    </div>
+
+    <!-- 8. KPI DASHBOARD -->
+    <section class="section" id="sec-kpi">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Key Metrics Dashboard</span></div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <!-- 6. PRICE PATH CHART -->
+    <section class="section" id="sec-paths">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Simulated Price Paths</span></div>
+      <p class="section-desc">A representative subset of Monte Carlo paths, with percentile bands computed from <i>all</i> simulated paths showing how the distribution widens through time.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-dot" style="background:var(--accent-jump);"></span>Jump Diffusion paths</span>
+          <span><span class="legend-dot" style="background:var(--accent-gbm); opacity:0.85;" id="gbmLegendDot"></span>GBM paths (when compare enabled)</span>
+          <span><span class="legend-dot" style="background:var(--text-faint);"></span>5–95% / 25–75% percentile bands</span>
+        </div>
+        <div id="pathChart" style="width:100%; height:460px;"></div>
+      </div>
+    </section>
+
+    <!-- 10. TERMINAL DISTRIBUTION + 7. GBM comparison distribution -->
+    <section class="section" id="sec-dist">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Terminal Price Distribution</span></div>
+      <p class="section-desc">Distribution of S<sub>T</sub> across all simulated paths. Jump diffusion can exhibit fatter tails and greater asymmetry than GBM — the direction of skew depends on the sign and size of μ_J, not a fixed rule.</p>
+      <div class="card">
+        <div id="distChart" style="width:100%; height:420px;"></div>
+      </div>
+    </section>
+
+    <!-- 9. Distribution statistics table -->
+    <section class="section" id="sec-diststats">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Distribution Statistics</span></div>
+      <div class="card">
+        <table class="data-table" id="distStatsTable">
+          <thead><tr><th>Statistic</th><th>Jump Diffusion</th><th id="gbmStatHeader" style="display:none;">GBM</th></tr></thead>
+          <tbody id="distStatsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 13. GBM comparison table -->
+    <section class="section" id="sec-gbmcompare" style="display:none;">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">GBM vs Jump Diffusion — Comparison</span></div>
+      <p class="section-desc">Side-by-side metrics illustrating why jump diffusion can better capture assets prone to sudden, discontinuous price movements.</p>
+      <div class="card">
+        <table class="data-table" id="compareTable">
+          <thead><tr><th>Metric</th><th class="tag-gbm">GBM</th><th class="tag-jump">Jump Diffusion</th></tr></thead>
+          <tbody id="compareTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 11 & 12. Jump analysis + event visualization -->
+    <section class="section" id="sec-jumps">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Jump Analysis</span></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="jump-select-row">
+            <label for="pathSelect" style="color:var(--text-dim); font-size:12.5px;">Selected path:</label>
+            <select id="pathSelect" style="width:auto; min-width:140px;"></select>
+          </div>
+          <div id="jumpPathChart" style="width:100%; height:340px;"></div>
+          <div class="hint" style="margin-top:8px;">Click or hover a marker on the chart to inspect that jump event.</div>
+          <div class="jump-detail-box" id="jumpDetailBox">Hover or click a jump marker to see details here.</div>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <tbody>
+              <tr><td>Expected jump multiplier E[J]</td><td id="m_EJ">–</td></tr>
+              <tr><td>Expected relative jump E[J]−1 (k)</td><td id="m_k">–</td></tr>
+              <tr><td>Annual jump contribution λ(E[J]−1)</td><td id="m_lambdaK">–</td></tr>
+              <tr><td>Theoretical expected jumps λT</td><td id="m_theoJumps">–</td></tr>
+              <tr><td>Avg. simulated jumps / path</td><td id="m_simJumps">–</td></tr>
+            </tbody>
+          </table>
+          <div class="hint" style="margin-top:10px; line-height:1.6;">
+            <b style="color:var(--text-dim);">Interpretation:</b> λ(E[J]−1) is the annualized expected percentage drag (or lift) on the price contributed purely by the jump component, before drift compensation. When μ_J &lt; 0, jumps typically pull the drift-compensation term k negative, meaning more of the continuous drift μ must offset expected jump losses to keep the risk-neutral-style compensation consistent.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 14. Risk metrics -->
+    <section class="section" id="sec-risk">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Risk Analysis</span></div>
+      <p class="section-desc">Value at Risk and Expected Shortfall computed from simulated terminal returns R = S<sub>T</sub>/S₀ − 1 over the full horizon T. Values are expressed as a percentage loss.</p>
+      <div class="grid grid-4" id="riskGrid"></div>
+    </section>
+
+    <!-- 15. Statistical diagnostics -->
+    <section class="section" id="sec-diag">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Statistical Diagnostics</span></div>
+      <div class="card">
+        <table class="data-table" id="diagTable"><tbody id="diagTableBody"></tbody></table>
+        <div class="hint" style="margin-top:10px;">
+          Monte Carlo standard error scales approximately as O(1/√N) — quadrupling the number of paths roughly halves the sampling error of the mean.
+        </div>
+      </div>
+    </section>
+
+    <!-- 18. Sensitivity analysis -->
+    <section class="section" id="sec-sensitivity">
+      <div class="section-head"><span class="section-num">09</span><span class="section-title">Parameter Sensitivity — Jump Intensity λ</span></div>
+      <p class="section-desc">A reduced-size Monte Carlo sweep (paths and steps capped for speed) re-running the model at λ = 0, 0.25, 0.5, 1, 2, 3 while holding all other parameters fixed at their current sidebar values.</p>
+      <div class="card">
+        <button class="btn" id="runSensitivity" style="width:auto; padding:8px 16px; margin-bottom:14px;">Run Sensitivity Sweep</button>
+        <div id="sensitivityChart" style="width:100%; height:380px;"></div>
+        <div class="hint" id="sensitivityHint">Not yet run. Click "Run Sensitivity Sweep" to compute.</div>
+      </div>
+    </section>
+
+    <!-- 17. Formula reference -->
+    <section class="section" id="sec-formulas">
+      <div class="section-head"><span class="section-num">10</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Merton Jump Diffusion SDE</div>
+        <div class="f-math">dSₜ / Sₜ = (μ − λk) dt + σ dWₜ + (J − 1) dNₜ</div>
+        <div class="f-note">The instantaneous return decomposes into compensated drift, continuous diffusion, and a compound Poisson jump term.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Discrete-Time Simulation Step</div>
+        <div class="f-math">S(t+Δt) = S(t) · exp[(μ − λk − ½σ²)Δt + σ√Δt · Z] · ∏ Jᵢ, i = 1..N(Δt)</div>
+        <div class="f-note">Z ~ N(0,1) drives diffusion; N(Δt) ~ Poisson(λΔt) draws the jump count; each Jᵢ is an independent jump multiplier.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Jump Multiplier</div>
+        <div class="f-math">ln(J) ~ N(μ_J, σ_J²)</div>
+        <div class="f-note">Jump sizes are log-normal: the log of the multiplier is normally distributed with mean μ_J and standard deviation σ_J.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Expected Jump Multiplier</div>
+        <div class="f-math">E[J] = exp(μ_J + ½σ_J²)</div>
+        <div class="f-note">Follows from the log-normal moment-generating function.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Jump Compensation</div>
+        <div class="f-math">k = E[J] − 1</div>
+        <div class="f-note">k is subtracted from the drift (as λk) so that the jump component has zero expected instantaneous contribution — this is the compensated-drift form used in the simulation, distinct from the raw physical-measure drift μ alone.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Poisson Jump-Count Process</div>
+        <div class="f-math">N(t) ~ Poisson(λt)</div>
+        <div class="f-note">The number of jump events in an interval of length t is Poisson-distributed with mean λt.</div>
+      </div>
+    </section>
+
+    <!-- 16. Educational explanation -->
+    <section class="section" id="sec-edu">
+      <div class="section-head"><span class="section-num">11</span><span class="section-title">Educational Explanation</span></div>
+      <details class="disclosure">
+        <summary>How the Jump Diffusion Model Works</summary>
+        <div class="disclosure-body">
+          <h5>Component 1 — Drift</h5>
+          <p>Drift μ represents the expected directional movement of the asset per year, absent any randomness. In the jump-adjusted simulation, the effective drift used inside the exponential is compensated by −λk so that jumps don't silently add extra expected return on top of μ.</p>
+          <h5>Component 2 — Diffusion</h5>
+          <p>The continuous part, σ dWₜ, models everyday random fluctuations via a Wiener process (Brownian motion). It produces the familiar smooth, "jittery" GBM-style path with no discontinuities.</p>
+          <h5>Component 3 — Jump Process</h5>
+          <p>Real markets occasionally move by a discrete, sudden amount rather than drifting there gradually. Component 3 layers a compound Poisson process on top of the diffusion to capture events such as:</p>
+          <ul>
+            <li>Earnings surprises</li>
+            <li>Economic announcements</li>
+            <li>Geopolitical shocks</li>
+            <li>Market crashes</li>
+            <li>Unexpected news</li>
+          </ul>
+          <p>Standard GBM assumes a continuous sample path, so no matter how volatile σ is, it cannot reproduce an instantaneous discrete price gap. Jump diffusion adds exactly that missing ingredient by letting the Poisson counter N(t) "fire" and multiply the price by an independent, log-normally distributed jump size J.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Physical-Measure Drift vs. Compensated Drift</summary>
+        <div class="disclosure-body">
+          <p>This tool simulates in the <b style="color:var(--text);">physical (real-world) measure</b>, using your specified annual drift μ directly. The <b style="color:var(--text);">compensated drift</b> term (μ − λk) is a modeling device, not a change of probability measure: it subtracts the expected contribution of jumps, λk, from μ so that the diffusion coefficient inside the exponential doesn't need to separately account for jump-driven expected return.</p>
+          <p>In a genuine <b style="color:var(--text);">risk-neutral</b> formulation (used for derivatives pricing), the drift would instead be set so that the discounted asset price is a martingale, i.e. μ would be replaced by (r − λk) where r is the risk-free rate, and jump risk may additionally carry a risk premium depending on market completeness assumptions. This console does not perform derivatives pricing and does not assume market completeness — it uses the physical-measure formulation with drift compensation applied only to the jump term, as shown in the SDE above.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational Monte Carlo tool. All figures are generated dynamically from the parameters you select and are recomputed each time you click "Run Simulation." Scenario presets are illustrative parameter combinations, not empirical calibrations to real market data. Nothing here constitutes investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   MERTON JUMP DIFFUSION — SIMULATION ENGINE
+   Sections:
+     A. Seeded RNG + Normal + Poisson generators
+     B. Core Monte Carlo simulation (jump diffusion / GBM)
+     C. Statistics helpers (percentiles, skew, kurtosis, VaR, ES ...)
+     D. Rendering (KPIs, charts, tables)
+     E. UI wiring (sliders, presets, run button, sensitivity sweep)
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   A. RANDOM NUMBER GENERATION
+   --------------------------------------------------------------------- */
+
+// Mulberry32 seeded PRNG -> deterministic, fast, good enough statistical
+// quality for Monte Carlo teaching purposes. Returns function() -> [0,1).
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Standard normal generator via Box-Muller, with spare-value caching
+// per RNG stream so each call to rng() is used efficiently.
+function makeNormalGen(rng) {
+  let spare = null;
+  return function () {
+    if (spare !== null) { const v = spare; spare = null; return v; }
+    let u, v, s;
+    do {
+      u = rng() * 2 - 1;
+      v = rng() * 2 - 1;
+      s = u * u + v * v;
+    } while (s >= 1 || s === 0);
+    const mul = Math.sqrt((-2 * Math.log(s)) / s);
+    spare = v * mul;
+    return u * mul;
+  };
+}
+
+// Poisson random variate via Knuth's algorithm. Appropriate here because
+// lambda*dt is small for all valid parameter combinations (lambda <= 5,
+// dt = T/steps typically << 1). Guarded fallback for pathological inputs.
+function poissonKnuth(rng, lambdaDt) {
+  if (lambdaDt <= 0) return 0;
+  if (lambdaDt > 30) {
+    // Extremely unlikely with this UI's ranges, but guard against a
+    // pathological combination (very few steps + long horizon) using a
+    // normal approximation to avoid an unbounded loop.
+    const approx = Math.round(lambdaDt + Math.sqrt(lambdaDt) * (rng() - 0.5) * 2);
+    return Math.max(0, approx);
+  }
+  const L = Math.exp(-lambdaDt);
+  let k = 0, p = 1;
+  do { k++; p *= rng(); } while (p > L);
+  return k - 1;
+}
+
+/* ---------------------------------------------------------------------
+   B. CORE MONTE CARLO SIMULATION
+   --------------------------------------------------------------------- */
+
+// Runs a full Monte Carlo simulation for either the jump-diffusion model
+// (includeJumps = true) or plain GBM (includeJumps = false).
+//
+// To keep memory and rendering bounded even at 10,000 paths x 2,520 steps,
+// we do NOT store every path's full time series. Instead:
+//   - A capped number of "display paths" store their full trajectory
+//     (and jump events) for the path chart / jump inspector.
+//   - A small number of evenly spaced "checkpoints" in time store the
+//     price for ALL paths, which is enough to compute percentile bands
+//     through time without O(steps x paths) memory.
+//   - Terminal price, max drawdown, and jump count are tracked
+//     incrementally for every path.
+function runSimulation(params) {
+  const { S0, mu, sigma, lambda, muJ, sigmaJ, T, steps, paths, seed, includeJumps, numDisplayPaths, checkpointCount } = params;
+
+  const dt = T / steps;
+  const sqrtDt = Math.sqrt(dt);
+  const EJ = Math.exp(muJ + 0.5 * sigmaJ * sigmaJ);   // E[J]
+  const k = EJ - 1;                                    // E[J] - 1
+  const driftAdj = includeJumps ? (mu - lambda * k - 0.5 * sigma * sigma)
+                                 : (mu - 0.5 * sigma * sigma);
+
+  const rng = mulberry32(seed >>> 0);
+  const normalGen = makeNormalGen(rng);
+
+  const numDisplay = Math.max(1, Math.min(numDisplayPaths, paths));
+  const cpCount = Math.max(2, Math.min(checkpointCount, steps));
+  const checkpointIdx = [];
+  for (let c = 0; c <= cpCount; c++) checkpointIdx.push(Math.round((c * steps) / cpCount));
+
+  const checkpointMatrix = checkpointIdx.map(() => new Float64Array(paths));
+  const terminalPrices = new Float64Array(paths);
+  const maxDrawdowns = new Float64Array(paths);
+  const jumpCounts = new Int32Array(paths);
+  const displayPaths = [];
+
+  for (let path = 0; path < paths; path++) {
+    let S = S0;
+    let runningMax = S;
+    let maxDD = 0;
+    let jumpCount = 0;
+    const storeFull = path < numDisplay;
+    const series = storeFull ? new Float32Array(steps + 1) : null;
+    const jumpEvents = storeFull ? [] : null;
+    if (storeFull) series[0] = S;
+
+    let cpPointer = 0;
+    if (checkpointIdx[0] === 0) { checkpointMatrix[0][path] = S; cpPointer = 1; }
+
+    for (let step = 1; step <= steps; step++) {
+      const Z = normalGen();
+
+      let nJ = 0, jumpFactor = 1;
+      if (includeJumps && lambda > 0) {
+        nJ = poissonKnuth(rng, lambda * dt);
+        for (let i = 0; i < nJ; i++) {
+          const lnJ = muJ + sigmaJ * normalGen();
+          jumpFactor *= Math.exp(lnJ);
+        }
+        jumpCount += nJ;
+      }
+
+      const diffusionFactor = Math.exp(driftAdj * dt + sigma * sqrtDt * Z);
+      const preJumpPrice = S * diffusionFactor;
+      let newS = preJumpPrice * jumpFactor;
+
+      // Numerical safety: clamp against underflow/overflow producing NaN/Inf
+      if (!isFinite(newS) || newS <= 0) newS = preJumpPrice > 0 && isFinite(preJumpPrice) ? preJumpPrice : Math.max(S, 1e-8);
+
+      if (storeFull && nJ > 0) {
+        jumpEvents.push({
+          stepIdx: step, t: step * dt,
+          pre: preJumpPrice, post: newS,
+          mult: jumpFactor, pct: (jumpFactor - 1) * 100
+        });
+      }
+
+      S = newS;
+      if (S > runningMax) runningMax = S;
+      const dd = runningMax > 0 ? (runningMax - S) / runningMax : 0;
+      if (dd > maxDD) maxDD = dd;
+
+      if (storeFull) series[step] = S;
+      if (checkpointIdx[cpPointer] === step) { checkpointMatrix[cpPointer][path] = S; cpPointer++; }
+    }
+
+    terminalPrices[path] = S;
+    maxDrawdowns[path] = maxDD;
+    jumpCounts[path] = jumpCount;
+    if (storeFull) displayPaths.push({ series, jumpEvents });
+  }
+
+  return {
+    terminalPrices, maxDrawdowns, jumpCounts,
+    checkpointMatrix, checkpointIdx, displayPaths,
+    dt, k, EJ, driftAdj, params
+  };
+}
+
+/* ---------------------------------------------------------------------
+   C. STATISTICS HELPERS
+   --------------------------------------------------------------------- */
+
+function mean(arr) {
+  let s = 0; for (let i = 0; i < arr.length; i++) s += arr[i];
+  return s / arr.length;
+}
+function stdev(arr, m) {
+  if (m === undefined) m = mean(arr);
+  let s = 0; for (let i = 0; i < arr.length; i++) { const d = arr[i] - m; s += d * d; }
+  return Math.sqrt(s / (arr.length - 1));
+}
+function sortedCopy(arr) {
+  const c = Array.from(arr); c.sort((a, b) => a - b); return c;
+}
+function percentileSorted(sorted, p) {
+  // p in [0,100]; linear interpolation between closest ranks
+  const n = sorted.length;
+  if (n === 0) return NaN;
+  const idx = (p / 100) * (n - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  const frac = idx - lo;
+  return sorted[lo] * (1 - frac) + sorted[hi] * frac;
+}
+function skewness(arr, m, s) {
+  if (m === undefined) m = mean(arr);
+  if (s === undefined) s = stdev(arr, m);
+  const n = arr.length;
+  let sum = 0; for (let i = 0; i < n; i++) { sum += Math.pow((arr[i] - m) / s, 3); }
+  return (n / ((n - 1) * (n - 2))) * sum;
+}
+function excessKurtosis(arr, m, s) {
+  if (m === undefined) m = mean(arr);
+  if (s === undefined) s = stdev(arr, m);
+  const n = arr.length;
+  let sum = 0; for (let i = 0; i < n; i++) { sum += Math.pow((arr[i] - m) / s, 4); }
+  const g2 = (n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3)) * sum
+           - (3 * Math.pow(n - 1, 2)) / ((n - 2) * (n - 3));
+  return g2;
+}
+function safeNum(x, fallback) {
+  return isFinite(x) ? x : (fallback === undefined ? 0 : fallback);
+}
+function fmtNum(x, digits) {
+  if (!isFinite(x)) return '—';
+  return x.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+function fmtPct(x, digits) {
+  if (!isFinite(x)) return '—';
+  return (x * 100).toLocaleString(undefined, { minimumFractionDigits: digits === undefined ? 2 : digits, maximumFractionDigits: digits === undefined ? 2 : digits }) + '%';
+}
+
+// Computes the full metrics bundle used across KPIs / tables / risk section
+// from a runSimulation() result.
+function computeMetrics(result, S0, T) {
+  const ST = result.terminalPrices;
+  const n = ST.length;
+  const sortedST = sortedCopy(ST);
+
+  const meanST = mean(ST);
+  const medianST = percentileSorted(sortedST, 50);
+  const stdST = stdev(ST, meanST);
+  const minST = sortedST[0], maxST = sortedST[n - 1];
+
+  // Annualized simple return per path: (ST/S0)^(1/T) - 1
+  const annReturns = new Float64Array(n);
+  const logReturns = new Float64Array(n);
+  const simpleReturns = new Float64Array(n); // total (non-annualized) return over horizon
+  for (let i = 0; i < n; i++) {
+    const ratio = ST[i] / S0;
+    annReturns[i] = Math.pow(ratio, 1 / T) - 1;
+    logReturns[i] = Math.log(ratio);
+    simpleReturns[i] = ratio - 1;
+  }
+  const meanAnnReturn = mean(annReturns);
+  const medianAnnReturn = percentileSorted(sortedCopy(annReturns), 50);
+
+  const logMean = mean(logReturns);
+  const logStd = stdev(logReturns, logMean);
+  const annVol = logStd / Math.sqrt(T);
+
+  const avgMaxDD = mean(result.maxDrawdowns);
+  const worstMaxDD = Math.max(...result.maxDrawdowns);
+
+  let lossCount = 0, largeLossCount = 0, largeGainCount = 0;
+  for (let i = 0; i < n; i++) {
+    if (ST[i] < S0) lossCount++;
+    if (ST[i] < 0.8 * S0) largeLossCount++;
+    if (ST[i] > 1.2 * S0) largeGainCount++;
+  }
+  const probLoss = lossCount / n;
+  const probLargeLoss = largeLossCount / n;
+  const probLargeGain = largeGainCount / n;
+
+  const theoJumps = result.params.lambda * T;
+  const simJumps = mean(Array.from(result.jumpCounts));
+
+  // Distribution percentiles on ST
+  const pctiles = {};
+  [5, 10, 25, 75, 90, 95].forEach(p => pctiles[p] = percentileSorted(sortedST, p));
+
+  // Risk metrics from simple total returns
+  const sortedR = sortedCopy(simpleReturns);
+  const q05 = percentileSorted(sortedR, 5);
+  const q01 = percentileSorted(sortedR, 1);
+  const VaR95 = -q05;
+  const VaR99 = -q01;
+  const tail95 = sortedR.filter(r => r <= q05);
+  const tail99 = sortedR.filter(r => r <= q01);
+  const ES95 = -(tail95.length ? mean(tail95) : q05);
+  const ES99 = -(tail99.length ? mean(tail99) : q01);
+
+  const skew = skewness(simpleReturns);
+  const kurt = excessKurtosis(simpleReturns);
+
+  const SE = stdST / Math.sqrt(n);
+  const ciLow = meanST - 1.96 * SE;
+  const ciHigh = meanST + 1.96 * SE;
+
+  return {
+    n, meanST, medianST, stdST, minST, maxST, pctiles,
+    meanAnnReturn, medianAnnReturn, annVol,
+    avgMaxDD, worstMaxDD,
+    probLoss, probLargeLoss, probLargeGain,
+    theoJumps, simJumps,
+    VaR95, VaR99, ES95, ES99,
+    skew, kurt, SE, ciLow, ciHigh,
+    simpleReturns
+  };
+}
+
+/* ---------------------------------------------------------------------
+   STATE
+   --------------------------------------------------------------------- */
+let lastResult = null;      // jump diffusion runSimulation() result
+let lastMetrics = null;
+let lastGbmResult = null;   // GBM runSimulation() result (if compare enabled)
+let lastGbmMetrics = null;
+let lastParams = null;
+
+/* ---------------------------------------------------------------------
+   E. UI WIRING — parameter reading / label sync
+   --------------------------------------------------------------------- */
+
+const els = {
+  S0: document.getElementById('S0'), v_S0: document.getElementById('v_S0'),
+  mu: document.getElementById('mu'), v_mu: document.getElementById('v_mu'),
+  sigma: document.getElementById('sigma'), v_sigma: document.getElementById('v_sigma'),
+  lambda: document.getElementById('lambda'), v_lambda: document.getElementById('v_lambda'),
+  muJ: document.getElementById('muJ'), v_muJ: document.getElementById('v_muJ'),
+  sigmaJ: document.getElementById('sigmaJ'), v_sigmaJ: document.getElementById('v_sigmaJ'),
+  T: document.getElementById('T'),
+  steps: document.getElementById('steps'),
+  paths: document.getElementById('paths'),
+  compareGBM: document.getElementById('compareGBM'),
+  showJumps: document.getElementById('showJumps'),
+  displayPaths: document.getElementById('displayPaths'), v_displayPaths: document.getElementById('v_displayPaths'),
+  seed: document.getElementById('seed'),
+};
+
+function syncLabels() {
+  els.v_S0.textContent = els.S0.value;
+  els.v_mu.textContent = parseFloat(els.mu.value).toFixed(1) + '%';
+  els.v_sigma.textContent = parseFloat(els.sigma.value).toFixed(1) + '%';
+  els.v_lambda.textContent = parseFloat(els.lambda.value).toFixed(2);
+  els.v_muJ.textContent = parseFloat(els.muJ.value).toFixed(1) + '%';
+  els.v_sigmaJ.textContent = parseFloat(els.sigmaJ.value).toFixed(1) + '%';
+  els.v_displayPaths.textContent = els.displayPaths.value;
+}
+['S0','mu','sigma','lambda','muJ','sigmaJ','displayPaths'].forEach(id => {
+  els[id].addEventListener('input', syncLabels);
+});
+syncLabels();
+
+function readParams() {
+  let seedVal = parseInt(els.seed.value, 10);
+  if (!Number.isFinite(seedVal)) {
+    // hash arbitrary string seed into an integer
+    seedVal = 0;
+    const str = String(els.seed.value || 'seed');
+    for (let i = 0; i < str.length; i++) seedVal = (seedVal * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return {
+    S0: parseFloat(els.S0.value),
+    mu: parseFloat(els.mu.value) / 100,
+    sigma: parseFloat(els.sigma.value) / 100,
+    lambda: parseFloat(els.lambda.value),
+    muJ: parseFloat(els.muJ.value) / 100,
+    sigmaJ: parseFloat(els.sigmaJ.value) / 100,
+    T: parseFloat(els.T.value),
+    steps: parseInt(els.steps.value, 10),
+    paths: parseInt(els.paths.value, 10),
+    seed: seedVal >>> 0,
+    numDisplayPaths: parseInt(els.displayPaths.value, 10),
+    checkpointCount: 50,
+    compareGBM: els.compareGBM.checked,
+    showJumps: els.showJumps.checked,
+  };
+}
+
+/* ---------------------------------------------------------------------
+   PRESETS
+   --------------------------------------------------------------------- */
+const PRESETS = {
+  low:    { sigma: 10, lambda: 0.25, muJ: -5,  sigmaJ: 10 },
+  normal: { sigma: 20, lambda: 0.75, muJ: -10, sigmaJ: 20 },
+  crisis: { sigma: 35, lambda: 2,    muJ: -20, sigmaJ: 35 },
+};
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = PRESETS[btn.dataset.preset];
+    els.sigma.value = p.sigma; els.lambda.value = p.lambda; els.muJ.value = p.muJ; els.sigmaJ.value = p.sigmaJ;
+    syncLabels();
+    runAll();
+  });
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  els.S0.value = 100; els.mu.value = 8; els.sigma.value = 20; els.lambda.value = 0.75;
+  els.muJ.value = -10; els.sigmaJ.value = 20; els.T.value = '1'; els.steps.value = '252';
+  els.paths.value = '1000'; els.compareGBM.checked = false; els.showJumps.checked = true;
+  els.displayPaths.value = 120; els.seed.value = '42';
+  syncLabels();
+  runAll();
+});
+
+document.getElementById('runBtn').addEventListener('click', runAll);
+
+/* ---------------------------------------------------------------------
+   MAIN RUN ORCHESTRATION
+   --------------------------------------------------------------------- */
+function showLoading(text) {
+  document.getElementById('loadingText').textContent = text || 'Running simulation…';
+  document.getElementById('loadingOverlay').classList.add('active');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+function plotlyReady() {
+  if (typeof Plotly === 'undefined') {
+    document.getElementById('statusLine').innerHTML =
+      '<span style="color:var(--accent-loss);">Chart library failed to load from CDN (no network access?). ' +
+      'Metrics and tables below still work, but charts are unavailable. Reload the page or check your connection.</span>';
+    hideLoading();
+    return false;
+  }
+  return true;
+}
+
+function runAll() {
+  showLoading('Running simulation…');
+  // setTimeout lets the loading overlay paint before the heavy synchronous
+  // computation blocks the main thread.
+  setTimeout(() => {
+    const t0 = performance.now();
+    const params = readParams();
+    lastParams = params;
+
+    const result = runSimulation({ ...params, includeJumps: true });
+    const metrics = computeMetrics(result, params.S0, params.T);
+    lastResult = result; lastMetrics = metrics;
+
+    let gbmResult = null, gbmMetrics = null;
+    if (params.compareGBM) {
+      gbmResult = runSimulation({ ...params, includeJumps: false, seed: (params.seed + 977) >>> 0 });
+      gbmMetrics = computeMetrics(gbmResult, params.S0, params.T);
+    }
+    lastGbmResult = gbmResult; lastGbmMetrics = gbmMetrics;
+
+    const t1 = performance.now();
+    document.getElementById('statusLine').innerHTML =
+      `Simulation completed: <b>${params.paths.toLocaleString()}</b> paths × <b>${params.steps.toLocaleString()}</b> steps` +
+      (gbmResult ? ` <br>+ GBM comparison run` : '') +
+      `<br>Computation time: <b>${(t1 - t0).toFixed(0)} ms</b>`;
+
+    renderAll();
+    hideLoading();
+  }, 15);
+}
+
+/* ---------------------------------------------------------------------
+   D. RENDERING
+   --------------------------------------------------------------------- */
+
+function renderAll() {
+  renderKPIs();
+  renderDistStatsTable();
+  renderCompareSection();
+  renderRiskGrid();
+  renderDiagnostics();
+  if (plotlyReady()) {
+    renderPathChart();
+    renderDistChart();
+    renderJumpAnalysis(); // includes jump path chart + relies on Plotly for the chart portion
+  } else {
+    // Still populate the non-chart jump metrics even without Plotly
+    renderJumpAnalysis();
+  }
+}
+
+function kpiCard(label, value, sub, cls) {
+  return `<div class="kpi ${cls || ''}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    <div class="kpi-sub">${sub || ''}</div>
+  </div>`;
+}
+
+function renderKPIs() {
+  const m = lastMetrics, p = lastParams;
+  const html = [
+    kpiCard('Terminal Price S<sub>T</sub>', fmtNum(m.meanST, 2),
+      `median <b>${fmtNum(m.medianST, 2)}</b> · S₀ = ${p.S0}`),
+    kpiCard('Expected Return (ann.)', fmtPct(m.meanAnnReturn, 2),
+      `median <b>${fmtPct(m.medianAnnReturn, 2)}</b>`),
+    kpiCard('Simulated Volatility (ann.)', fmtPct(m.annVol, 2),
+      `from log returns of S<sub>T</sub>/S₀`),
+    kpiCard('Max Drawdown', fmtPct(m.avgMaxDD, 2),
+      `worst path <b>${fmtPct(m.worstMaxDD, 2)}</b>`, 'warn'),
+    kpiCard('P(S<sub>T</sub> &lt; S₀)', fmtPct(m.probLoss, 2), 'probability of any loss', 'loss'),
+    kpiCard('P(S<sub>T</sub> &lt; 0.8·S₀)', fmtPct(m.probLargeLoss, 2), 'probability of &gt;20% loss', 'loss'),
+    kpiCard('P(S<sub>T</sub> &gt; 1.2·S₀)', fmtPct(m.probLargeGain, 2), 'probability of &gt;20% gain'),
+    kpiCard('Expected Jumps', `${fmtNum(m.simJumps, 2)}`,
+      `theoretical λT = <b>${fmtNum(m.theoJumps, 2)}</b>`),
+  ];
+  document.getElementById('kpiGrid').innerHTML = html.join('');
+}
+
+function plotlyLayoutBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8A93A6', size: 11 },
+    margin: { l: 55, r: 20, t: 20, b: 40 },
+    xaxis: { gridcolor: '#1a2230', zerolinecolor: '#212a3a', linecolor:'#212a3a' },
+    yaxis: { gridcolor: '#1a2230', zerolinecolor: '#212a3a', linecolor:'#212a3a' },
+    legend: { orientation: 'h', y: 1.08, font: { color: '#8A93A6' } },
+    hoverlabel: { bgcolor: '#161d2b', bordercolor: '#212a3a', font: { color: '#E7EAF0', family: 'JetBrains Mono, monospace' } },
+  }, extra || {});
+}
+const PLOTLY_CONFIG = { displayModeBar: false, responsive: true };
+
+function renderPathChart() {
+  const result = lastResult, p = lastParams;
+  const traces = [];
+
+  // Percentile bands from checkpoint matrix (all paths)
+  const cpTimes = result.checkpointIdx.map(idx => idx * result.dt);
+  const bandLevels = [
+    { lo: 5, hi: 95, opacity: 0.10 },
+    { lo: 25, hi: 75, opacity: 0.18 },
+  ];
+  bandLevels.forEach(bl => {
+    const loVals = result.checkpointMatrix.map(col => percentileSorted(sortedCopy(col), bl.lo));
+    const hiVals = result.checkpointMatrix.map(col => percentileSorted(sortedCopy(col), bl.hi));
+    traces.push({
+      x: cpTimes.concat([...cpTimes].reverse()),
+      y: hiVals.concat([...loVals].reverse()),
+      fill: 'toself', fillcolor: `rgba(23,227,181,${bl.opacity})`,
+      line: { color: 'rgba(0,0,0,0)' }, hoverinfo: 'skip',
+      showlegend: false, name: `${bl.lo}-${bl.hi}%`
+    });
+  });
+  const medianVals = result.checkpointMatrix.map(col => percentileSorted(sortedCopy(col), 50));
+  traces.push({ x: cpTimes, y: medianVals, mode: 'lines', line: { color: '#17E3B5', width: 2 }, name: 'JD median' });
+
+  // Representative individual paths (thin, translucent)
+  const displayCount = Math.min(result.displayPaths.length, 150);
+  for (let i = 0; i < displayCount; i++) {
+    const series = result.displayPaths[i].series;
+    const xs = new Array(series.length);
+    for (let s = 0; s < series.length; s++) xs[s] = s * result.dt;
+    traces.push({
+      x: xs, y: Array.from(series), mode: 'lines',
+      line: { color: 'rgba(23,227,181,0.10)', width: 1 },
+      showlegend: false, hoverinfo: 'skip'
+    });
+  }
+
+  if (lastGbmResult) {
+    const g = lastGbmResult;
+    const gCpTimes = g.checkpointIdx.map(idx => idx * g.dt);
+    const gMedian = g.checkpointMatrix.map(col => percentileSorted(sortedCopy(col), 50));
+    traces.push({ x: gCpTimes, y: gMedian, mode: 'lines', line: { color: '#5B8DEF', width: 2, dash: 'dot' }, name: 'GBM median' });
+    const gDisplay = Math.min(g.displayPaths.length, 60);
+    for (let i = 0; i < gDisplay; i++) {
+      const series = g.displayPaths[i].series;
+      const xs = new Array(series.length);
+      for (let s = 0; s < series.length; s++) xs[s] = s * g.dt;
+      traces.push({ x: xs, y: Array.from(series), mode: 'lines', line: { color: 'rgba(91,141,239,0.10)', width: 1 }, showlegend: false, hoverinfo: 'skip' });
+    }
+  }
+
+  Plotly.newPlot('pathChart', traces, plotlyLayoutBase({
+    xaxis: { title: 'Time (years)', gridcolor: '#1a2230', linecolor:'#212a3a' },
+    yaxis: { title: 'Asset Price', gridcolor: '#1a2230', linecolor:'#212a3a' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderDistChart() {
+  const m = lastMetrics;
+  const traces = [{
+    x: Array.from(lastResult.terminalPrices), type: 'histogram',
+    marker: { color: 'rgba(23,227,181,0.55)', line: { color: '#17E3B5', width: 0.5 } },
+    name: 'Jump Diffusion S_T', nbinsx: 60, opacity: 0.85
+  }];
+  if (lastGbmResult) {
+    traces.push({
+      x: Array.from(lastGbmResult.terminalPrices), type: 'histogram',
+      marker: { color: 'rgba(91,141,239,0.40)', line: { color: '#5B8DEF', width: 0.5 } },
+      name: 'GBM S_T', nbinsx: 60, opacity: 0.65
+    });
+  }
+  const shapes = [
+    { type: 'line', x0: m.meanST, x1: m.meanST, y0: 0, y1: 1, yref: 'paper', line: { color: '#F5A623', width: 1.5, dash: 'dash' } },
+    { type: 'line', x0: m.medianST, x1: m.medianST, y0: 0, y1: 1, yref: 'paper', line: { color: '#3DD68C', width: 1.5, dash: 'dot' } },
+  ];
+  Plotly.newPlot('distChart', traces, plotlyLayoutBase({
+    barmode: 'overlay',
+    xaxis: { title: 'Terminal Price S_T', gridcolor: '#1a2230', linecolor:'#212a3a' },
+    yaxis: { title: 'Count', gridcolor: '#1a2230', linecolor:'#212a3a' },
+    shapes,
+    annotations: [
+      { x: m.meanST, y: 1.0, yref: 'paper', text: 'mean', showarrow: false, font: { color: '#F5A623', size: 10 }, yshift: 10 },
+      { x: m.medianST, y: 1.0, yref: 'paper', text: 'median', showarrow: false, font: { color: '#3DD68C', size: 10 }, yshift: 24 },
+    ]
+  }), PLOTLY_CONFIG);
+}
+
+function renderDistStatsTable() {
+  const m = lastMetrics;
+  const rows = [
+    ['Mean', fmtNum(m.meanST, 3)],
+    ['Median', fmtNum(m.medianST, 3)],
+    ['Std. Deviation', fmtNum(m.stdST, 3)],
+    ['Minimum', fmtNum(m.minST, 3)],
+    ['Maximum', fmtNum(m.maxST, 3)],
+    ['5th Percentile', fmtNum(m.pctiles[5], 3)],
+    ['10th Percentile', fmtNum(m.pctiles[10], 3)],
+    ['25th Percentile', fmtNum(m.pctiles[25], 3)],
+    ['75th Percentile', fmtNum(m.pctiles[75], 3)],
+    ['90th Percentile', fmtNum(m.pctiles[90], 3)],
+    ['95th Percentile', fmtNum(m.pctiles[95], 3)],
+  ];
+  const gbmOn = !!lastGbmMetrics;
+  document.getElementById('gbmStatHeader').style.display = gbmOn ? '' : 'none';
+  const gRows = gbmOn ? {
+    'Mean': lastGbmMetrics.meanST, 'Median': lastGbmMetrics.medianST, 'Std. Deviation': lastGbmMetrics.stdST,
+    'Minimum': lastGbmMetrics.minST, 'Maximum': lastGbmMetrics.maxST,
+    '5th Percentile': lastGbmMetrics.pctiles[5], '10th Percentile': lastGbmMetrics.pctiles[10],
+    '25th Percentile': lastGbmMetrics.pctiles[25], '75th Percentile': lastGbmMetrics.pctiles[75],
+    '90th Percentile': lastGbmMetrics.pctiles[90], '95th Percentile': lastGbmMetrics.pctiles[95],
+  } : null;
+  document.getElementById('distStatsBody').innerHTML = rows.map(([label, val]) =>
+    `<tr><td>${label}</td><td>${val}</td>${gbmOn ? `<td>${fmtNum(gRows[label], 3)}</td>` : ''}</tr>`
+  ).join('');
+}
+
+function renderCompareSection() {
+  const sec = document.getElementById('sec-gbmcompare');
+  if (!lastGbmMetrics) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  const j = lastMetrics, g = lastGbmMetrics;
+  const rows = [
+    ['Mean Terminal Price', fmtNum(g.meanST, 2), fmtNum(j.meanST, 2)],
+    ['Median Terminal Price', fmtNum(g.medianST, 2), fmtNum(j.medianST, 2)],
+    ['Volatility (ann.)', fmtPct(g.annVol, 2), fmtPct(j.annVol, 2)],
+    ['Probability of Loss', fmtPct(g.probLoss, 2), fmtPct(j.probLoss, 2)],
+    ['5th Percentile S_T', fmtNum(g.pctiles[5], 2), fmtNum(j.pctiles[5], 2)],
+    ['95th Percentile S_T', fmtNum(g.pctiles[95], 2), fmtNum(j.pctiles[95], 2)],
+    ['Maximum Drawdown (avg)', fmtPct(g.avgMaxDD, 2), fmtPct(j.avgMaxDD, 2)],
+    ['Skewness', fmtNum(g.skew, 3), fmtNum(j.skew, 3)],
+    ['Excess Kurtosis', fmtNum(g.kurt, 3), fmtNum(j.kurt, 3)],
+  ];
+  document.getElementById('compareTableBody').innerHTML = rows.map(([label, gv, jv]) =>
+    `<tr><td>${label}</td><td class="tag-gbm">${gv}</td><td class="tag-jump">${jv}</td></tr>`
+  ).join('');
+}
+
+/* ------------------ Jump analysis + per-path event chart ------------------ */
+function renderJumpAnalysis() {
+  const result = lastResult, p = lastParams;
+  document.getElementById('m_EJ').textContent = fmtNum(result.EJ, 4);
+  document.getElementById('m_k').textContent = fmtPct(result.k, 3);
+  document.getElementById('m_lambdaK').textContent = fmtPct(p.lambda * result.k, 3) + ' / yr';
+  document.getElementById('m_theoJumps').textContent = fmtNum(p.lambda * p.T, 3);
+  document.getElementById('m_simJumps').textContent = fmtNum(mean(Array.from(result.jumpCounts)), 3);
+
+  const sel = document.getElementById('pathSelect');
+  const prevVal = sel.value;
+  sel.innerHTML = result.displayPaths.map((dp, i) =>
+    `<option value="${i}">Path ${i + 1} (${dp.jumpEvents.length} jump${dp.jumpEvents.length === 1 ? '' : 's'})</option>`
+  ).join('');
+  // try to keep a path with jumps selected by default
+  let defaultIdx = result.displayPaths.findIndex(dp => dp.jumpEvents.length > 0);
+  if (defaultIdx < 0) defaultIdx = 0;
+  sel.value = (prevVal && parseInt(prevVal, 10) < result.displayPaths.length) ? prevVal : String(defaultIdx);
+  sel.onchange = () => renderJumpPathChart(parseInt(sel.value, 10));
+  renderJumpPathChart(parseInt(sel.value, 10));
+}
+
+function renderJumpPathChart(pathIdx) {
+  if (typeof Plotly === 'undefined') return;
+  const result = lastResult, showJumps = lastParams.showJumps;
+  const dp = result.displayPaths[pathIdx];
+  if (!dp) return;
+  const xs = new Array(dp.series.length);
+  for (let s = 0; s < dp.series.length; s++) xs[s] = s * result.dt;
+
+  const traces = [{
+    x: xs, y: Array.from(dp.series), mode: 'lines',
+    line: { color: '#17E3B5', width: 1.6 }, name: 'Price path', hoverinfo: 'skip'
+  }];
+
+  if (showJumps && dp.jumpEvents.length) {
+    const upX = [], upY = [], downX = [], downY = [], upText = [], downText = [];
+    dp.jumpEvents.forEach(je => {
+      const label = `t=${je.t.toFixed(3)}y<br>pre: ${je.pre.toFixed(2)}<br>post: ${je.post.toFixed(2)}<br>Δ=${je.pct >= 0 ? '+' : ''}${je.pct.toFixed(2)}%<br>J=${je.mult.toFixed(4)}`;
+      if (je.post >= je.pre) { upX.push(je.t); upY.push(je.post); upText.push(label); }
+      else { downX.push(je.t); downY.push(je.post); downText.push(label); }
+    });
+    if (upX.length) traces.push({
+      x: upX, y: upY, mode: 'markers', name: 'Upward jump',
+      marker: { color: '#3DD68C', size: 10, symbol: 'triangle-up', line: { color: '#08120c', width: 1 } },
+      text: upText, hovertemplate: '%{text}<extra></extra>'
+    });
+    if (downX.length) traces.push({
+      x: downX, y: downY, mode: 'markers', name: 'Downward jump',
+      marker: { color: '#EF5B5B', size: 10, symbol: 'triangle-down', line: { color: '#160808', width: 1 } },
+      text: downText, hovertemplate: '%{text}<extra></extra>'
+    });
+  }
+
+  Plotly.newPlot('jumpPathChart', traces, plotlyLayoutBase({
+    xaxis: { title: 'Time (years)', gridcolor: '#1a2230', linecolor:'#212a3a' },
+    yaxis: { title: 'Price', gridcolor: '#1a2230', linecolor:'#212a3a' },
+  }), PLOTLY_CONFIG);
+
+  const gd = document.getElementById('jumpPathChart');
+  const showDetail = (je) => {
+    document.getElementById('jumpDetailBox').innerHTML = `
+      <div class="jd-row"><span>Time</span><span>${je.t.toFixed(4)} yr</span></div>
+      <div class="jd-row"><span>Pre-jump price</span><span>${je.pre.toFixed(3)}</span></div>
+      <div class="jd-row"><span>Post-jump price</span><span>${je.post.toFixed(3)}</span></div>
+      <div class="jd-row"><span>Jump %</span><span style="color:${je.pct >= 0 ? '#3DD68C' : '#EF5B5B'}">${je.pct >= 0 ? '+' : ''}${je.pct.toFixed(3)}%</span></div>
+      <div class="jd-row"><span>Jump multiplier J</span><span>${je.mult.toFixed(5)}</span></div>
+    `;
+  };
+  gd.on('plotly_click', (e) => {
+    const pt = e.points[0];
+    const je = dp.jumpEvents.find(j => Math.abs(j.t - pt.x) < 1e-9 && Math.abs(j.post - pt.y) < 1e-9);
+    if (je) showDetail(je);
+  });
+  gd.on('plotly_hover', (e) => {
+    const pt = e.points[0];
+    const je = dp.jumpEvents.find(j => Math.abs(j.t - pt.x) < 1e-9 && Math.abs(j.post - pt.y) < 1e-9);
+    if (je) showDetail(je);
+  });
+  if (!dp.jumpEvents.length) {
+    document.getElementById('jumpDetailBox').textContent = 'This path had no jump events — try another path from the selector above.';
+  } else {
+    document.getElementById('jumpDetailBox').textContent = 'Hover or click a jump marker to see details here.';
+  }
+}
+
+/* ------------------ Risk grid ------------------ */
+function renderRiskGrid() {
+  const m = lastMetrics;
+  const html = [
+    kpiCard('VaR 95%', fmtPct(m.VaR95, 2), 'loss threshold at 95% confidence', 'warn'),
+    kpiCard('VaR 99%', fmtPct(m.VaR99, 2), 'loss threshold at 99% confidence', 'loss'),
+    kpiCard('Expected Shortfall 95%', fmtPct(m.ES95, 2), 'avg. loss beyond VaR95', 'warn'),
+    kpiCard('Expected Shortfall 99%', fmtPct(m.ES99, 2), 'avg. loss beyond VaR99', 'loss'),
+  ];
+  document.getElementById('riskGrid').innerHTML = html.join('');
+}
+
+/* ------------------ Diagnostics table ------------------ */
+function renderDiagnostics() {
+  const m = lastMetrics;
+  const rows = [
+    ['Skewness (terminal return)', fmtNum(m.skew, 4)],
+    ['Excess Kurtosis (terminal return)', fmtNum(m.kurt, 4)],
+    ['Std. Deviation of S_T', fmtNum(m.stdST, 4)],
+    ['Standard Error of Mean (SE = s/√N)', fmtNum(m.SE, 4)],
+    ['95% CI for Mean S_T', `[${fmtNum(m.ciLow, 3)}, ${fmtNum(m.ciHigh, 3)}]`],
+    ['Number of Paths (N)', m.n.toLocaleString()],
+  ];
+  document.getElementById('diagTableBody').innerHTML = rows.map(([l, v]) =>
+    `<tr><td>${l}</td><td>${v}</td></tr>`
+  ).join('');
+}
+
+/* ---------------------------------------------------------------------
+   SENSITIVITY ANALYSIS (λ sweep)
+   --------------------------------------------------------------------- */
+document.getElementById('runSensitivity').addEventListener('click', () => {
+  if (!plotlyReady()) return;
+  showLoading('Running λ sensitivity sweep…');
+  setTimeout(() => {
+    const base = readParams();
+    const lambdas = [0, 0.25, 0.5, 1, 2, 3];
+    const sweepPaths = Math.min(base.paths, 500);
+    const sweepSteps = Math.min(base.steps, 252);
+
+    const vol = [], probLoss = [], p5 = [], p95 = [], var95 = [], es95 = [];
+    lambdas.forEach((lam, i) => {
+      const res = runSimulation({
+        ...base, lambda: lam, paths: sweepPaths, steps: sweepSteps,
+        numDisplayPaths: 1, checkpointCount: 10, includeJumps: true,
+        seed: (base.seed + 1000 + i) >>> 0
+      });
+      const met = computeMetrics(res, base.S0, base.T);
+      vol.push(met.annVol * 100);
+      probLoss.push(met.probLoss * 100);
+      p5.push((met.pctiles[5] / base.S0 - 1) * 100);
+      p95.push((met.pctiles[95] / base.S0 - 1) * 100);
+      var95.push(met.VaR95 * 100);
+      es95.push(met.ES95 * 100);
+    });
+
+    const traces = [
+      { x: lambdas, y: vol, mode: 'lines+markers', name: 'Ann. Volatility (%)', line: { color: '#17E3B5' } },
+      { x: lambdas, y: probLoss, mode: 'lines+markers', name: 'P(Loss) (%)', line: { color: '#EF5B5B' } },
+      { x: lambdas, y: p5, mode: 'lines+markers', name: '5th %ile return (%)', line: { color: '#5B8DEF' } },
+      { x: lambdas, y: p95, mode: 'lines+markers', name: '95th %ile return (%)', line: { color: '#3DD68C' } },
+      { x: lambdas, y: var95, mode: 'lines+markers', name: 'VaR 95% (%)', line: { color: '#F5A623' } },
+      { x: lambdas, y: es95, mode: 'lines+markers', name: 'ES 95% (%)', line: { color: '#F5A623', dash: 'dot' } },
+    ];
+    Plotly.newPlot('sensitivityChart', traces, plotlyLayoutBase({
+      xaxis: { title: 'Jump Intensity λ (jumps/yr)', gridcolor: '#1a2230', linecolor:'#212a3a' },
+      yaxis: { title: '%', gridcolor: '#1a2230', linecolor:'#212a3a' },
+    }), PLOTLY_CONFIG);
+
+    document.getElementById('sensitivityHint').innerHTML =
+      `Sweep computed with a reduced grid (<b>${sweepPaths.toLocaleString()}</b> paths × <b>${sweepSteps.toLocaleString()}</b> steps per λ value) for responsiveness — other parameters held at current sidebar values.`;
+    hideLoading();
+  }, 15);
+});
+
+/* ---------------------------------------------------------------------
+   INITIAL RUN
+   --------------------------------------------------------------------- */
+runAll();
+</script>
+</body>
+</html>
