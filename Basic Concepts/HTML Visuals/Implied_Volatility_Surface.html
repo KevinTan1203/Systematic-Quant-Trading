@@ -3,453 +3,1294 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Random IV Surface & Option Chain</title>
+<title>IV Surface — Options Volatility Terminal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js"></script>
 <style>
-  :root {
-    --bg: #060a12;
-    --card: rgba(18, 26, 42, 0.85);
-    --border: rgba(100, 140, 200, 0.18);
-    --accent: #38bdf8;
-    --accent2: #a78bfa;
-    --text: #f1f5f9;
-    --muted: #94a3b8;
-    --green: #34d399;
-    --red: #f87171;
-  }
+:root{
+  --bg:#07090C;
+  --bg-2:#0B0E14;
+  --panel:#0F131B;
+  --panel-2:#141A24;
+  --border:#1E2733;
+  --border-soft:#171F2A;
+  --text:#E4E8EE;
+  --text-dim:#8B94A6;
+  --text-faint:#57607A;
+  --call:#28C76F;
+  --put:#FF5C5C;
+  --accent:#28D9C8;
+  --accent-2:#7C9CFF;
+  --warn:#F5A623;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px;
+  --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(40,217,200,0.05), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(124,156,255,0.05), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#00201c;}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+.app{display:grid; grid-template-columns:330px 1fr; min-height:100vh;}
+@media (max-width:1000px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
 
-  body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    padding: 1.5rem 1.25rem 2.5rem;
-    background-image:
-      radial-gradient(ellipse 70% 50% at 10% -15%, rgba(56, 189, 248, 0.13), transparent),
-      radial-gradient(ellipse 50% 40% at 90% 0%, rgba(167, 139, 250, 0.11), transparent);
-  }
+.sidebar{
+  position:sticky; top:0; height:100vh; overflow-y:auto;
+  background:linear-gradient(180deg, var(--panel), var(--bg-2));
+  border-right:1px solid var(--border); padding:20px 18px 40px;
+}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{
+  width:30px;height:30px;border-radius:8px;
+  background:conic-gradient(from 200deg, var(--accent), var(--accent-2), var(--accent));
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-weight:700; color:#00201c; font-size:12px;
+}
+.brand-name{font-family:var(--display); font-weight:700; font-size:16px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
 
-  h1 {
-    text-align: center;
-    font-size: 1.9rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    margin-bottom: 0.25rem;
-    background: linear-gradient(120deg, #38bdf8, #a78bfa 55%, #f472b6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600; display:flex; justify-content:space-between; align-items:center;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .tip{cursor:help; border-bottom:1px dotted var(--text-faint);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #00201c; box-shadow:0 0 0 2px rgba(40,217,200,0.25);}
+input[type=range]::-moz-range-thumb{width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #00201c;}
+select, input[type=number], input[type=text]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), #14a190); color:#00201c; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.08); color:#00201c;}
+.btn.active{border-color:var(--accent); color:var(--accent); background:rgba(40,217,200,0.08);}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;}
+.preset-row{display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
+.preset-btn{padding:8px 2px; font-size:10.5px;}
+.toggle-row{display:flex; align-items:center; justify-content:space-between; padding:2px 0;}
+.switch{position:relative; width:36px; height:20px; flex-shrink:0;}
+.switch input{opacity:0; width:0; height:0;}
+.slider-tog{position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:20px; transition:.15s;}
+.slider-tog:before{content:""; position:absolute; width:14px; height:14px; left:3px; top:3px; background:var(--text-dim); border-radius:50%; transition:.15s;}
+.switch input:checked + .slider-tog{background:rgba(40,217,200,0.35);}
+.switch input:checked + .slider-tog:before{transform:translateX(16px); background:var(--accent);}
+.seg{display:flex; border:1px solid var(--border); border-radius:7px; overflow:hidden;}
+.seg button{flex:1; padding:7px 4px; background:var(--panel-2); border:none; color:var(--text-dim); font-family:var(--mono); font-size:11px; cursor:pointer;}
+.seg button.active{background:rgba(40,217,200,0.15); color:var(--accent);}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
 
-  .subtitle {
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.92rem;
-    margin-bottom: 1.5rem;
-  }
+.main{padding:26px 32px 60px; max-width:1440px;}
+.page-header{margin-bottom:22px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:30px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:780px; font-size:13.5px;}
 
-  .stock-header {
-    max-width: 1280px;
-    margin: 0 auto 1.5rem;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 1.1rem 1.5rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-    align-items: center;
-    justify-content: space-between;
-    backdrop-filter: blur(16px);
-  }
+.section{margin-top:34px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:17px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-6px 0 14px; max-width:780px;}
 
-  .stock-info {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.75rem;
-    align-items: baseline;
-  }
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:18px 18px 16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
 
-  .ticker {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: -0.02em;
-  }
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 16px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.call:before{background:var(--call);}
+.kpi.put:before{background:var(--put);}
+.kpi.warn:before{background:var(--warn);}
+.kpi.alt:before{background:var(--accent-2);}
+.kpi-label{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:21px; font-weight:600; margin-top:6px; letter-spacing:-0.3px;}
+.kpi-sub{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+.kpi-sub b{color:var(--text-dim); font-weight:600;}
 
-  .stock-name { color: var(--muted); font-size: 0.95rem; }
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12.5px;}
+table.data-table th, table.data-table td{padding:8px 10px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left; color:var(--text-dim); font-family:var(--body);}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+table.data-table tr.row-atm{background:rgba(124,156,255,0.06);}
+table.data-table tr.row-selected{background:rgba(40,217,200,0.10);}
+table.data-table tr{cursor:pointer;}
+table.data-table tr:hover{background:rgba(255,255,255,0.03);}
+.cell-hi{color:var(--warn); font-weight:600;}
+.cell-lo{color:var(--accent-2); font-weight:600;}
+.tag-call{color:var(--call);}
+.tag-put{color:var(--put);}
 
-  .metric {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.9rem;
-  }
-  .metric span { color: var(--muted); margin-right: 0.35rem; }
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:14px; color:var(--text); margin-bottom:6px; overflow-x:auto;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
 
-  button#regen {
-    background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
-    color: white;
-    border: none;
-    padding: 0.65rem 1.3rem;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.2s;
-    box-shadow: 0 4px 14px rgba(56, 189, 248, 0.25);
-  }
-  button#regen:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
-  }
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body h5{color:var(--text); font-family:var(--display); font-size:13px; margin:14px 0 4px;}
+.disclosure-body p{margin:4px 0 10px;}
 
-  .layout {
-    max-width: 1280px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
+.badge{display:inline-block; font-family:var(--mono); font-size:10.5px; padding:2px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-dim); margin-left:8px;}
+.badge.illustrative{color:var(--warn); border-color:rgba(245,166,35,0.4);}
+.badge.ok{color:var(--call); border-color:rgba(40,199,111,0.4);}
+.badge.warnbadge{color:var(--warn); border-color:rgba(245,166,35,0.5);}
 
-  .panel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 1.25rem;
-    backdrop-filter: blur(16px);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
-  }
+.legend-row{display:flex; gap:18px; align-items:center; font-size:12px; color:var(--text-dim); margin-bottom:10px; flex-wrap:wrap;}
+.legend-dot{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px;}
 
-  .panel-title {
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 0.9rem;
-  }
+.footer-note{margin-top:44px; padding-top:18px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.two-col{display:grid; grid-template-columns:1.2fr 1fr; gap:16px;}
+.three-col{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+@media (max-width:980px){.two-col,.three-col{grid-template-columns:1fr;}}
 
-  #surface { width: 100%; height: 520px; }
+.interp-box{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:12px 14px; font-size:12.5px; color:var(--text-dim); line-height:1.6; margin-top:12px;}
+.interp-box b{color:var(--text);}
 
-  .table-wrap {
-    overflow: auto;
-    max-height: 480px;
-    border-radius: 10px;
-    border: 1px solid rgba(100,140,200,0.12);
-  }
+.diag-line{display:flex; align-items:baseline; gap:8px; font-family:var(--mono); font-size:12.5px; padding:5px 0; border-bottom:1px solid var(--border-soft);}
+.diag-line:last-child{border-bottom:none;}
+.diag-ok{color:var(--call);}
+.diag-warn{color:var(--warn);}
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.84rem;
-  }
-
-  th {
-    position: sticky;
-    top: 0;
-    background: #0f172a;
-    color: var(--muted);
-    font-weight: 600;
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 0.7rem 0.75rem;
-    text-align: right;
-    border-bottom: 1px solid rgba(100,140,200,0.2);
-  }
-  th:first-child, td:first-child { text-align: left; }
-
-  td {
-    padding: 0.55rem 0.75rem;
-    text-align: right;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.82rem;
-    border-bottom: 1px solid rgba(100,140,200,0.07);
-  }
-
-  tr:hover td { background: rgba(56, 189, 248, 0.06); }
-
-  .call { color: var(--green); }
-  .put  { color: var(--red); }
-
-  .note {
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-top: 0.8rem;
-    line-height: 1.45;
-  }
+.overlay-loading{position:fixed; inset:0; background:rgba(6,8,12,0.72); backdrop-filter:blur(2px); display:none; align-items:center; justify-content:center; z-index:999; flex-direction:column; gap:10px;}
+.overlay-loading.active{display:flex;}
+.spinner{width:34px; height:34px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--accent); animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.overlay-loading span{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
 </style>
 </head>
 <body>
-  <h1>Implied Volatility Surface & Option Chain</h1>
-  <p class="subtitle">Randomly generated realistic option data · Surface + full chain</p>
 
-  <div class="stock-header">
-    <div class="stock-info">
-      <div>
-        <div class="ticker" id="ticker">—</div>
-        <div class="stock-name" id="stockName">—</div>
+<div class="overlay-loading" id="loadingOverlay"><div class="spinner"></div><span id="loadingText">Building surface…</span></div>
+
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">σ</div><div class="brand-name">IV Surface Terminal</div></div>
+    <div class="brand-sub">Synthetic Vol Surface · Black-Scholes</div>
+
+    <div class="ctrl-group">
+      <h4>Volatility Regime <span class="badge illustrative">illustrative</span></h4>
+      <div class="preset-row">
+        <button class="btn preset-btn" data-preset="low">Low</button>
+        <button class="btn preset-btn" data-preset="normal">Normal</button>
+        <button class="btn preset-btn" data-preset="high">High</button>
+        <button class="btn preset-btn" data-preset="crisis">Crisis</button>
       </div>
-      <div class="metric"><span>Spot</span><span id="spot">—</span></div>
-      <div class="metric"><span>ATM Vol</span><span id="atmVol">—</span></div>
-      <div class="metric"><span>Rate</span><span id="rate">—</span></div>
-      <div class="metric"><span>Div Yield</span><span id="div">—</span></div>
-    </div>
-    <button id="regen" onclick="generateAll()">↻ Regenerate Random Stock</button>
-  </div>
-
-  <div class="layout">
-    <!-- Surface -->
-    <div class="panel">
-      <div class="panel-title">Implied Volatility Surface · σ(K, T)</div>
-      <div id="surface"></div>
     </div>
 
-    <!-- Option Chain Table -->
-    <div class="panel">
-      <div class="panel-title">Option Chain (Calls & Puts)</div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Expiry</th>
-              <th>TTM (y)</th>
-              <th>Strike</th>
-              <th>Type</th>
-              <th>IV %</th>
-              <th>Mid Price</th>
-              <th>Delta</th>
-              <th>Moneyness</th>
-            </tr>
-          </thead>
-          <tbody id="chainBody"></tbody>
+    <div class="ctrl-group">
+      <h4>Market Inputs</h4>
+      <div class="field">
+        <div class="field-label"><span>Spot Price S</span><span class="val" id="v_S">100</span></div>
+        <input type="range" id="S" min="50" max="500" step="1" value="100">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Rate r</span><span class="val" id="v_r">5.0%</span></div>
+          <input type="range" id="r" min="0" max="15" step="0.25" value="5">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Div. Yield q</span><span class="val" id="v_q">0.0%</span></div>
+          <input type="range" id="q" min="0" max="10" step="0.25" value="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Surface Shape</h4>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Base at-the-money volatility level">Base Vol σ₀</span><span class="val" id="v_sigma0">20.0%</span></div>
+        <input type="range" id="sigma0" min="1" max="100" step="0.5" value="20">
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Negative: OTM puts richer. Positive: OTM calls richer.">Skew</span><span class="val" id="v_skew">-0.15</span></div>
+        <input type="range" id="skew" min="-1" max="1" step="0.01" value="-0.15">
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="How strongly IV rises moving away from ATM">Smile Curvature</span><span class="val" id="v_curv">0.20</span></div>
+        <input type="range" id="curv" min="0" max="1" step="0.01" value="0.20">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Term Structure</span></div>
+        <select id="termShape">
+          <option value="upward">Upward sloping</option>
+          <option value="flat">Flat</option>
+          <option value="downward">Downward sloping</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Deterministic wiggle amplitude added to the surface">Vol-of-Vol</span><span class="val" id="v_volvol">0.10</span></div>
+        <input type="range" id="volvol" min="0" max="1" step="0.02" value="0.10">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Display</h4>
+      <div class="field">
+        <div class="field-label"><span>X-axis Convention</span></div>
+        <div class="seg" id="xModeSeg">
+          <button data-mode="strike" class="active">Strike</button>
+          <button data-mode="moneyness">K/S</button>
+          <button data-mode="logmoneyness">ln(K/S)</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>3D / Heatmap Metric</span></div>
+        <div class="seg" id="metricSeg">
+          <button data-metric="iv" class="active">IV</button>
+          <button data-metric="vega">Vega</button>
+          <button data-metric="gamma">Gamma</button>
+          <button data-metric="delta">Delta</button>
+        </div>
+      </div>
+      <div class="toggle-row" style="margin-top:10px;">
+        <span>Sticky Delta (vs. Sticky Strike)</span>
+        <label class="switch"><input type="checkbox" id="stickyDelta"><span class="slider-tog"></span></label>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Scenario Analysis <span class="badge illustrative">illustrative</span></h4>
+      <div class="preset-row">
+        <button class="btn preset-btn" data-scenario="selloff">Selloff</button>
+        <button class="btn preset-btn" data-scenario="crush">Vol Crush</button>
+        <button class="btn preset-btn" data-scenario="spike">Vol Spike</button>
+        <button class="btn preset-btn" data-scenario="calm">Calm</button>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="runBtn">▶ Rebuild Surface</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+    <div class="status-line" id="statusLine">Ready.</div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Derivatives / Volatility Analytics</div>
+      <h1 class="page-title">Implied Volatility Surface</h1>
+      <p class="page-desc">A synthetic, illustrative options volatility terminal: IV = f(K,T) built from a deterministic smile + skew + term-structure specification, priced through Black-Scholes. Not derived from real market quotes.</p>
+    </div>
+
+    <!-- 28. KPI dashboard -->
+    <section class="section" id="sec-kpi">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Surface KPIs</span></div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <!-- 6/7/14/18. 3D surface + heatmap -->
+    <section class="section" id="sec-surface">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">3D Volatility Surface</span><span class="badge illustrative">synthetic surface</span></div>
+      <p class="section-desc">Rotate, zoom and hover. Toggle the metric (IV / Vega / Gamma / Delta) in the sidebar to see how the surface's risk profile — not just its volatility level — varies across strike and maturity.</p>
+      <div class="card">
+        <div id="surface3d" style="width:100%; height:480px;"></div>
+      </div>
+    </section>
+
+    <section class="section" id="sec-heatmap">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Surface Heatmap</span></div>
+      <div class="card">
+        <div id="heatmap" style="width:100%; height:400px;"></div>
+      </div>
+    </section>
+
+    <!-- 8/9. Smile -->
+    <section class="section" id="sec-smile">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Volatility Smile</span></div>
+      <p class="section-desc">IV against moneyness for a chosen expiry, with the ATM point and currently selected strike marked. Toggle "Compare maturities" to overlay the term structure's effect on smile shape.</p>
+      <div class="card">
+        <div class="jump-select-row" style="display:flex; gap:14px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+          <label style="color:var(--text-dim); font-size:12.5px;">Expiry:
+            <select id="smileExpiry" style="width:auto; display:inline-block; margin-left:6px;">
+              <option value="7">7D</option><option value="30" selected>30D</option><option value="60">60D</option>
+              <option value="90">90D</option><option value="180">180D</option><option value="365">365D</option>
+            </select>
+          </label>
+          <label class="toggle-row" style="gap:8px;"><span style="color:var(--text-dim); font-size:12.5px;">Compare maturities</span>
+            <label class="switch"><input type="checkbox" id="compareMaturities"><span class="slider-tog"></span></label>
+          </label>
+        </div>
+        <div id="smileChart" style="width:100%; height:380px;"></div>
+      </div>
+    </section>
+
+    <!-- 10. Term structure -->
+    <section class="section" id="sec-term">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">ATM Volatility Term Structure</span></div>
+      <div class="card">
+        <div class="jump-select-row" style="display:flex; gap:14px; align-items:center; margin-bottom:12px;">
+          <span style="color:var(--text-dim); font-size:12.5px;">Series:</span>
+          <div class="seg" id="termSeriesSeg" style="width:auto;">
+            <button data-series="atm" class="active">ATM IV</button>
+            <button data-series="strike">Selected Strike IV</button>
+            <button data-series="moneyness">Selected Moneyness IV</button>
+          </div>
+        </div>
+        <div id="termChart" style="width:100%; height:340px;"></div>
+      </div>
+    </section>
+
+    <!-- 19. Surface slice tool -->
+    <section class="section" id="sec-slice">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Surface Slice Tool</span></div>
+      <div class="card">
+        <div class="jump-select-row" style="display:flex; gap:14px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+          <span style="color:var(--text-dim); font-size:12.5px;">Slice surface by:</span>
+          <div class="seg" id="sliceSeg" style="width:auto;">
+            <button data-slice="expiry" class="active">Expiry</button>
+            <button data-slice="strike">Strike</button>
+          </div>
+          <span id="sliceHint" class="hint" style="margin:0;"></span>
+        </div>
+        <div id="sliceChart" style="width:100%; height:340px;"></div>
+      </div>
+    </section>
+
+    <!-- 11/12/13. Selected option + BS pricing + Greeks -->
+    <section class="section" id="sec-selected">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Selected Option Analytics</span></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="row3" style="margin-bottom:14px;">
+            <div class="field">
+              <div class="field-label"><span>Type</span></div>
+              <div class="seg" id="optTypeSeg"><button data-type="call" class="active">Call</button><button data-type="put">Put</button></div>
+            </div>
+            <div class="field">
+              <div class="field-label"><span>Strike K</span></div>
+              <input type="number" id="selStrike" value="100" step="1">
+            </div>
+            <div class="field">
+              <div class="field-label"><span>Expiry</span></div>
+              <select id="selExpiry">
+                <option value="7">7D</option><option value="14">14D</option><option value="30">30D</option>
+                <option value="60">60D</option><option value="90" selected>90D</option><option value="180">180D</option>
+                <option value="365">365D</option><option value="730">2Y</option>
+              </select>
+            </div>
+          </div>
+          <table class="data-table">
+            <tbody id="selectedOptionBody"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="grid grid-2" id="greeksGrid"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 15/16/17. Skew analysis -->
+    <section class="section" id="sec-skew">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Volatility Skew Analysis</span></div>
+      <div class="two-col">
+        <div class="card">
+          <table class="data-table">
+            <tbody id="skewTableBody"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="grid grid-2" id="skewKpiGrid"></div>
+          <div class="interp-box" id="interpBox"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 27. Realized vs implied -->
+    <section class="section" id="sec-rv">
+      <div class="section-head"><span class="section-num">09</span><span class="section-title">Realized vs. Implied Volatility</span></div>
+      <div class="card">
+        <div class="row3" style="align-items:end;">
+          <div class="field">
+            <div class="field-label"><span>Realized Volatility (input)</span><span class="val" id="v_rv">18.0%</span></div>
+            <input type="range" id="rv" min="1" max="100" step="0.5" value="18">
+          </div>
+          <div class="kpi" style="margin:0;"><div class="kpi-label">ATM IV (selected expiry)</div><div class="kpi-value" id="rv_atmiv">–</div></div>
+          <div class="kpi" style="margin:0;"><div class="kpi-label">IV − RV</div><div class="kpi-value" id="rv_diff">–</div></div>
+        </div>
+        <div class="interp-box" id="rvInterp"></div>
+      </div>
+    </section>
+
+    <!-- 21/22. Spot shock -->
+    <section class="section" id="sec-shock">
+      <div class="section-head"><span class="section-num">10</span><span class="section-title">Spot Shock Simulation</span></div>
+      <p class="section-desc">Applies a spot move to the selected option under the chosen sticky convention (toggle in the sidebar). Sticky strike freezes IV(K); sticky delta / moneyness lets IV move with the strike's moneyness relative to the new spot. Both are simplified assumptions, not full dynamic vol models.</p>
+      <div class="card">
+        <div class="seg" id="shockSeg" style="max-width:640px; margin-bottom:14px;">
+          <button data-shock="-20">-20%</button><button data-shock="-10">-10%</button><button data-shock="-5">-5%</button>
+          <button data-shock="0" class="active">0%</button><button data-shock="5">+5%</button><button data-shock="10">+10%</button><button data-shock="20">+20%</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Metric</th><th>Original</th><th>Shocked</th><th>Δ</th></tr></thead>
+          <tbody id="shockTableBody"></tbody>
         </table>
       </div>
-      <p class="note">
-        Prices & Greeks are theoretical (Black-Scholes). IV surface is generated from the same underlying model that produces this chain.
-        Data is synthetic but exhibits realistic skew, smile and term structure.
-      </p>
+    </section>
+
+    <!-- 23. Option chain -->
+    <section class="section" id="sec-chain">
+      <div class="section-head"><span class="section-num">11</span><span class="section-title">Option Chain</span></div>
+      <p class="section-desc">Priced at the Selected Option panel's expiry. Click a row to set that strike as the selected option.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-dot" style="background:rgba(124,156,255,0.5);"></span>ATM</span>
+          <span><span class="legend-dot" style="background:rgba(40,217,200,0.5);"></span>Selected</span>
+          <span><span class="legend-dot" style="background:var(--warn);"></span>Highest IV</span>
+          <span><span class="legend-dot" style="background:var(--accent-2);"></span>Lowest IV</span>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Strike</th><th class="tag-call">Call IV</th><th class="tag-call">Call Δ</th><th class="tag-call">Call Price</th><th class="tag-put">Put Price</th><th class="tag-put">Put Δ</th><th class="tag-put">Put IV</th></tr></thead>
+          <tbody id="chainTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 24. Arbitrage diagnostics -->
+    <section class="section" id="sec-diag">
+      <div class="section-head"><span class="section-num">12</span><span class="section-title">Surface Diagnostics</span></div>
+      <p class="section-desc">Basic, simplified sanity checks — not a complete static-arbitrage or calendar-arbitrage test.</p>
+      <div class="card">
+        <div id="diagStatus" style="font-family:var(--mono); font-size:14px; margin-bottom:10px;"></div>
+        <div id="diagDetails"></div>
+      </div>
+    </section>
+
+    <!-- 25. Educational -->
+    <section class="section" id="sec-edu">
+      <div class="section-head"><span class="section-num">13</span><span class="section-title">Understanding the IV Surface</span></div>
+      <details class="disclosure">
+        <summary>Volatility Smile, Skew &amp; Term Structure</summary>
+        <div class="disclosure-body">
+          <h5>Volatility Smile</h5>
+          <p>Implied volatility often rises for both out-of-the-money puts and calls relative to at-the-money options — a "smile" — because tail outcomes (large moves in either direction) are priced with extra volatility relative to what a single lognormal model would imply.</p>
+          <h5>Volatility Skew</h5>
+          <p>When downside (put) strikes carry persistently higher IV than equivalent upside (call) strikes, the smile becomes asymmetric — a "skew." This is frequently linked to demand for downside protection and to the empirical tendency of equity-like assets to fall faster than they rise, though the model here simply imposes a linear+quadratic shape, not a derived equilibrium.</p>
+          <h5>Term Structure</h5>
+          <p>IV can differ substantially by expiry: near-term options may reflect a specific upcoming event, while longer-dated options average over more uncertainty. An upward-sloping term structure means longer maturities carry higher ATM IV; downward-sloping (inverted) term structure is often associated with near-term stress.</p>
+          <h5>The Surface Itself</h5>
+          <div class="formula-block"><div class="f-math">IV = f(K, T)</div><div class="f-note">A single constant volatility cannot simultaneously price every strike and maturity consistently with observed option prices — the market instead implies a different volatility for each (K,T) pair, which together form the surface.</div></div>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>How Traders Read the Surface</summary>
+        <div class="disclosure-body">
+          <p><b>High IV</b> — options may be more expensive in premium terms, but high IV does not by itself mean options are "overpriced"; it may simply reflect genuinely elevated expected variability.</p>
+          <p><b>Low IV</b> — options may be cheaper in premium terms, but low IV does not by itself mean options are "underpriced."</p>
+          <p><b>Steep put skew</b> — often read as elevated demand for downside protection, or asymmetric pricing of crash risk.</p>
+          <p><b>High short-dated IV</b> — often associated with a known near-term event or elevated near-term uncertainty.</p>
+          <p><b>Flat surface</b> — suggests more uniform volatility expectations across strikes and maturities.</p>
+          <p>Implied volatility is <b>market-implied pricing</b>, back-solved from option premiums — it is not a direct forecast of what realized volatility will turn out to be.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational, synthetic options-analytics tool. The volatility surface is generated from a deterministic parametric formula (base level + skew + curvature + term structure + optional deterministic wiggle) — it is illustrative and is not fitted to, or sourced from, real market option quotes. All prices, Greeks, and surface statistics are recomputed live from your inputs. Nothing here constitutes investment advice.
     </div>
-  </div>
+  </main>
+</div>
 
 <script>
-/* ========== Black-Scholes helpers ========== */
-function normCDF(x) {
-  const a1 =  0.254829592, a2 = -0.284496736, a3 =  1.421413741;
-  const a4 = -1.453152027, a5 =  1.061405429, p  =  0.3275911;
-  const sign = x < 0 ? -1 : 1;
-  x = Math.abs(x) / Math.SQRT2;
+/* =====================================================================
+   IMPLIED VOLATILITY SURFACE TERMINAL
+   Sections:
+     A. Math primitives (normal CDF/PDF, Black-Scholes, Greeks)
+     B. Synthetic IV surface construction
+     C. Delta-strike solver (25Δ / 10Δ) via bisection
+     D. Grid / surface builders
+     E. Arbitrage-style diagnostics
+     F. Rendering (charts, tables, KPIs)
+     G. UI wiring
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   A. MATH PRIMITIVES
+   --------------------------------------------------------------------- */
+
+// Abramowitz-Stegun erf approximation (max error ~1.5e-7)
+function erf(x) {
+  const sign = x < 0 ? -1 : 1; x = Math.abs(x);
+  const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429, p=0.3275911;
   const t = 1 / (1 + p * x);
-  const y = 1 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t * Math.exp(-x*x);
-  return 0.5 * (1 + sign * y);
+  const y = 1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return sign * y;
+}
+function normCDF(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
+function normPDF(x) { return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI); }
+
+// Black-Scholes d1/d2
+function bsD1D2(S, K, T, r, q, sigma) {
+  const s = Math.max(sigma, 1e-6), t = Math.max(T, 1e-6);
+  const d1 = (Math.log(S / K) + (r - q + 0.5 * s * s) * t) / (s * Math.sqrt(t));
+  const d2 = d1 - s * Math.sqrt(t);
+  return { d1, d2 };
+}
+function bsPrice(S, K, T, r, q, sigma, type) {
+  const { d1, d2 } = bsD1D2(S, K, T, r, q, sigma);
+  const df_q = Math.exp(-q * T), df_r = Math.exp(-r * T);
+  if (type === 'call') return S * df_q * normCDF(d1) - K * df_r * normCDF(d2);
+  return K * df_r * normCDF(-d2) - S * df_q * normCDF(-d1);
+}
+// Greeks (annualized theta returned as per-year; UI displays per-day too)
+function bsGreeks(S, K, T, r, q, sigma, type) {
+  const { d1, d2 } = bsD1D2(S, K, T, r, q, sigma);
+  const s = Math.max(sigma, 1e-6), t = Math.max(T, 1e-6);
+  const df_q = Math.exp(-q * t), df_r = Math.exp(-r * t);
+  const pdf = normPDF(d1);
+  const sign = type === 'call' ? 1 : -1;
+
+  const delta = sign * df_q * normCDF(sign * d1);
+  const gamma = (df_q * pdf) / (S * s * Math.sqrt(t));
+  const vega = S * df_q * pdf * Math.sqrt(t) / 100; // per 1 vol point (1%)
+  const rho = sign * K * t * df_r * normCDF(sign * d2) / 100; // per 1% rate move
+
+  const term1 = -(S * df_q * pdf * s) / (2 * Math.sqrt(t));
+  const term2 = sign * q * S * df_q * normCDF(sign * d1);
+  const term3 = -sign * r * K * df_r * normCDF(sign * d2);
+  const theta = (term1 + term2 + term3) / 365; // per calendar day
+
+  return { delta, gamma, vega, theta, rho };
 }
 
-function normPDF(x) {
-  return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+/* ---------------------------------------------------------------------
+   B. SYNTHETIC IV SURFACE
+   --------------------------------------------------------------------- */
+
+const TERM_PRESETS = {
+  upward:   { a: 0.05, b: 0.02 },
+  flat:     { a: 0.0,  b: 0.0 },
+  downward: { a: -0.05, b: -0.015 },
+};
+
+// Deterministic "vol of vol" wiggle — reproducible, not random, purely a
+// bounded smooth function of (K,T) scaled by the volvol slider.
+function volWiggle(K, T, amp) {
+  if (amp <= 0) return 0;
+  return amp * 0.03 * Math.sin(K * 0.11 + T * 6.0) * Math.cos(K * 0.05 - T * 3.0);
 }
 
-function blackScholes(S, K, T, r, q, sigma, type) {
-  if (T <= 0) {
-    const intrinsic = type === 'call' ? Math.max(S-K,0) : Math.max(K-S,0);
-    return { price: intrinsic, delta: type === 'call' ? (S>K?1:0) : (S<K?-1:0) };
+// Core surface function: IV(K,T) given current shape parameters.
+// p = { S, sigma0, skew, curvature, termShape, volvol }
+function ivSurface(K, T, S, p) {
+  const m = Math.log(Math.max(K, 1e-6) / Math.max(S, 1e-6));
+  const term = TERM_PRESETS[p.termShape] || TERM_PRESETS.flat;
+  const atm = p.sigma0 + term.a * Math.sqrt(Math.max(T, 0)) + term.b * Math.max(T, 0);
+  let iv = atm + p.skew * m + p.curvature * m * m + volWiggle(K, T, p.volvol);
+  const rawIv = iv;
+  iv = Math.max(iv, 0.01); // enforce IV > 0
+  return { iv, clamped: rawIv < 0.01 };
+}
+function ivAt(K, T, S, p) { return ivSurface(K, T, S, p).iv; }
+
+/* ---------------------------------------------------------------------
+   C. DELTA-STRIKE SOLVER (25Δ / 10Δ) via bisection
+   --------------------------------------------------------------------- */
+
+// Finds K such that BS delta(K,T) ≈ target, for the given option type,
+// using the live IV surface. Both call delta (1 -> 0) and put delta
+// (0 -> -1) are monotonically DECREASING functions of K, since both are
+// increasing functions of d1 and d1 itself decreases as K increases.
+// That means a single bisection rule works for both option types.
+function deltaAtK(K, type, T, S, r, q, p) {
+  const iv = ivAt(K, T, S, p);
+  return bsGreeks(S, K, T, r, q, iv, type).delta;
+}
+function solveDeltaStrike(target, type, T, S, r, q, p, iterations) {
+  const wantedSign = type === 'call' ? 1 : -1;
+  const wanted = wantedSign * Math.abs(target);
+  let lo = 0.2 * S, hi = 5 * S;
+  // delta(K) is decreasing in K for both calls and puts under a *flat*
+  // volatility. With strike-dependent IV, however, very large curvature
+  // combined with a very high base level can make sigma(K) itself grow
+  // fast enough that delta stops decreasing at extreme strikes. We expand
+  // the bracket to try to find the target, but cap it at a realistic
+  // strike range (5%–800% of spot) so pathological parameter combinations
+  // degrade to a bounded, sane answer instead of an unbounded search.
+  const HARD_HI = 8 * S, HARD_LO = 0.05 * S;
+  let guard = 0;
+  while (deltaAtK(hi, type, T, S, r, q, p) > wanted && hi < HARD_HI && guard < 10) { hi = Math.min(hi * 1.6, HARD_HI); guard++; }
+  guard = 0;
+  while (deltaAtK(lo, type, T, S, r, q, p) < wanted && lo > HARD_LO && guard < 10) { lo = Math.max(lo * 0.65, HARD_LO); guard++; }
+  for (let i = 0; i < (iterations || 60); i++) {
+    const mid = 0.5 * (lo + hi);
+    const d = deltaAtK(mid, type, T, S, r, q, p);
+    // delta(K) is decreasing in K in the well-behaved region this bracket targets
+    if (d > wanted) lo = mid; else hi = mid;
   }
-  const sqrtT = Math.sqrt(T);
-  const d1 = (Math.log(S/K) + (r - q + 0.5*sigma*sigma)*T) / (sigma*sqrtT);
-  const d2 = d1 - sigma*sqrtT;
-  let price, delta;
-  if (type === 'call') {
-    price = S*Math.exp(-q*T)*normCDF(d1) - K*Math.exp(-r*T)*normCDF(d2);
-    delta = Math.exp(-q*T)*normCDF(d1);
+  const K = Math.min(Math.max(0.5 * (lo + hi), HARD_LO), HARD_HI);
+  const iv = ivAt(K, T, S, p);
+  const achievedDelta = deltaAtK(K, type, T, S, r, q, p);
+  const found = Math.abs(achievedDelta - wanted) < 0.02;
+  return { K, iv, found };
+}
+
+/* ---------------------------------------------------------------------
+   D. GRID / SURFACE BUILDERS
+   --------------------------------------------------------------------- */
+
+function buildStrikeGrid(S, n) {
+  const lo = 0.5 * S, hi = 1.6 * S;
+  const arr = [];
+  for (let i = 0; i < n; i++) arr.push(lo + (hi - lo) * (i / (n - 1)));
+  return arr;
+}
+// Maturities in years, sqrt-spaced (finer near the short end) from 7d to 2y.
+function buildMaturityGrid(n) {
+  const loD = 7, hiD = 730;
+  const arr = [];
+  for (let i = 0; i < n; i++) {
+    const f = i / (n - 1);
+    const days = loD + (hiD - loD) * f * f; // quadratic spacing -> denser short end
+    arr.push(days / 365);
+  }
+  return arr;
+}
+const TENOR_DAYS = [7, 14, 30, 60, 90, 180, 365, 730];
+
+function xAxisValue(K, S, mode) {
+  if (mode === 'strike') return K;
+  if (mode === 'moneyness') return K / S;
+  return Math.log(K / S);
+}
+function xAxisLabel(mode) {
+  if (mode === 'strike') return 'Strike (K)';
+  if (mode === 'moneyness') return 'Moneyness (K/S)';
+  return 'Log-Moneyness ln(K/S)';
+}
+
+function metricValue(metric, S, K, T, r, q, iv) {
+  if (metric === 'iv') return iv;
+  const g = bsGreeks(S, K, T, r, q, iv, 'call');
+  if (metric === 'vega') return g.vega;
+  if (metric === 'gamma') return g.gamma;
+  return g.delta; // 'delta'
+}
+function metricLabel(metric) {
+  return { iv: 'Implied Volatility', vega: 'Vega (per 1 vol pt)', gamma: 'Gamma', delta: 'Call Delta' }[metric];
+}
+
+/* ---------------------------------------------------------------------
+   E. ARBITRAGE-STYLE DIAGNOSTICS (simplified, not exhaustive)
+   --------------------------------------------------------------------- */
+
+function runDiagnostics(S, p) {
+  const findings = [];
+  let anyClamped = false;
+
+  // 1. Negative raw IV (pre-clamp) at extreme strikes
+  const testKs = [0.5 * S, 0.6 * S, 1.5 * S, 1.6 * S];
+  const testTs = [7 / 365, 1, 2];
+  testKs.forEach(K => testTs.forEach(T => {
+    const r0 = ivSurface(K, T, S, p);
+    if (r0.clamped) anyClamped = true;
+  }));
+  if (anyClamped) {
+    findings.push({ level: 'warn', text: 'Raw parametric formula implies non-positive variance at some extreme strikes; values were floored at 1% IV.' });
   } else {
-    price = K*Math.exp(-r*T)*normCDF(-d2) - S*Math.exp(-q*T)*normCDF(-d1);
-    delta = -Math.exp(-q*T)*normCDF(-d1);
+    findings.push({ level: 'ok', text: 'No negative-variance points detected before flooring.' });
   }
-  return { price: Math.max(0, price), delta };
-}
 
-/* ========== Random data generators ========== */
-const TICKERS = [
-  {t:'NVDA', n:'NVIDIA Corp'}, {t:'AAPL', n:'Apple Inc'}, {t:'TSLA', n:'Tesla Inc'},
-  {t:'META', n:'Meta Platforms'}, {t:'AMZN', n:'Amazon.com'}, {t:'MSFT', n:'Microsoft'},
-  {t:'GOOGL', n:'Alphabet Inc'}, {t:'AMD', n:'Advanced Micro Devices'},
-  {t:'COIN', n:'Coinbase Global'}, {t:'PLTR', n:'Palantir Technologies'},
-  {t:'SPY', n:'SPDR S&P 500 ETF'}, {t:'QQQ', n:'Invesco QQQ Trust'}
-];
-
-function rand(min, max) { return min + Math.random() * (max - min); }
-function randInt(min, max) { return Math.floor(rand(min, max+1)); }
-
-function generateIV(S, K, T, atmVol, skew, smile, termSlope, vov) {
-  const m = Math.log(K / S) / Math.max(Math.sqrt(T), 0.12);
-  let vol = atmVol * (1 + termSlope * Math.log(1 + T));
-  vol += -skew * 0.045 * m;               // equity-style put skew
-  vol += smile * 0.028 * m * m;           // smile convexity
-  vol += vov * 0.09 * Math.exp(-T * 3.5); // short-term elevation
-  return Math.max(0.06, Math.min(0.95, vol));
-}
-
-function generateAll() {
-  // --- Random stock ---
-  const stock = TICKERS[randInt(0, TICKERS.length-1)];
-  const S = +(rand(45, 480).toFixed(2));
-  const r = +(rand(0.03, 0.055).toFixed(4));
-  const q = +(rand(0.0, 0.025).toFixed(4));
-  const atmVol = rand(0.16, 0.48);
-  const skew = rand(0.7, 2.2);
-  const smile = rand(0.4, 1.6);
-  const termSlope = rand(-0.12, 0.35);
-  const vov = rand(0.15, 0.55);
-
-  document.getElementById('ticker').textContent = stock.t;
-  document.getElementById('stockName').textContent = stock.n;
-  document.getElementById('spot').textContent = S.toFixed(2);
-  document.getElementById('atmVol').textContent = (atmVol*100).toFixed(1) + '%';
-  document.getElementById('rate').textContent = (r*100).toFixed(2) + '%';
-  document.getElementById('div').textContent = (q*100).toFixed(2) + '%';
-
-  // --- Expiries (realistic) ---
-  const expiries = [
-    {label: '1W',  T: 7/365},
-    {label: '2W',  T: 14/365},
-    {label: '1M',  T: 30/365},
-    {label: '2M',  T: 60/365},
-    {label: '3M',  T: 91/365},
-    {label: '6M',  T: 182/365},
-    {label: '9M',  T: 273/365},
-    {label: '1Y',  T: 1.0},
-    {label: '18M', T: 1.5}
-  ];
-
-  // --- Strikes around spot ---
-  const strikePct = [-0.28, -0.20, -0.14, -0.09, -0.05, -0.02, 0, 0.02, 0.05, 0.09, 0.14, 0.20, 0.28];
-  const strikes = strikePct.map(p => +(S * (1 + p)).toFixed(S > 100 ? 0 : 1));
-
-  // --- Build option chain ---
-  const chain = [];
-  const surfaceStrikes = [...new Set(strikes)].sort((a,b)=>a-b);
-  const surfaceTTM = expiries.map(e => e.T);
-  const surfaceIV = [];   // rows = TTM, cols = strikes
-
-  expiries.forEach((exp, j) => {
-    const rowIV = [];
-    surfaceStrikes.forEach(K => {
-      const iv = generateIV(S, K, exp.T, atmVol, skew, smile, termSlope, vov);
-      rowIV.push(+(iv*100).toFixed(2));
-
-      // Call
-      const call = blackScholes(S, K, exp.T, r, q, iv, 'call');
-      chain.push({
-        expiry: exp.label,
-        T: exp.T,
-        K,
-        type: 'Call',
-        iv: iv*100,
-        price: call.price,
-        delta: call.delta,
-        moneyness: K/S
-      });
-
-      // Put
-      const put = blackScholes(S, K, exp.T, r, q, iv, 'put');
-      chain.push({
-        expiry: exp.label,
-        T: exp.T,
-        K,
-        type: 'Put',
-        iv: iv*100,
-        price: put.price,
-        delta: put.delta,
-        moneyness: K/S
-      });
-    });
-    surfaceIV.push(rowIV);
+  // 2. Calendar arbitrage necessary condition: total variance w(T)=IV_ATM(T)^2 * T
+  //    should be non-decreasing in T.
+  const atmSeries = TENOR_DAYS.map(d => {
+    const T = d / 365;
+    return { T, iv: ivAt(S, T, S, p) };
   });
-
-  // Sort chain nicely: by TTM then Strike then Call before Put
-  chain.sort((a,b) => a.T - b.T || a.K - b.K || (a.type === 'Call' ? -1 : 1));
-
-  // --- Render table ---
-  const tbody = document.getElementById('chainBody');
-  tbody.innerHTML = chain.map(o => `
-    <tr>
-      <td>${o.expiry}</td>
-      <td>${o.T.toFixed(3)}</td>
-      <td>${o.K}</td>
-      <td class="${o.type === 'Call' ? 'call' : 'put'}">${o.type}</td>
-      <td>${o.iv.toFixed(2)}</td>
-      <td>${o.price.toFixed(2)}</td>
-      <td>${o.delta.toFixed(3)}</td>
-      <td>${o.moneyness.toFixed(3)}</td>
-    </tr>
-  `).join('');
-
-  // --- Render surface ---
-  const data = [{
-    type: 'surface',
-    x: surfaceStrikes,
-    y: surfaceTTM,
-    z: surfaceIV,
-    colorscale: [
-      [0.00, '#0c4a6e'], [0.2, '#0e7490'], [0.35, '#06b6d4'],
-      [0.5, '#22d3ee'], [0.65, '#a5f3fc'], [0.8, '#fde68a'],
-      [0.9, '#fb923c'], [1.00, '#ef4444']
-    ],
-    showscale: true,
-    colorbar: {
-      title: { text: 'IV %', font: { color: '#94a3b8', size: 12 } },
-      tickfont: { color: '#94a3b8', family: 'JetBrains Mono', size: 11 },
-      thickness: 15, len: 0.7, outlinewidth: 0
-    },
-    hovertemplate: '<b>Strike</b>: %{x}<br><b>TTM</b>: %{y:.3f}y<br><b>IV</b>: %{z:.2f}%<extra></extra>',
-    lighting: { ambient: 0.6, diffuse: 0.85, specular: 0.35, roughness: 0.4 },
-    lightposition: { x: 1000, y: 700, z: 1400 }
-  }];
-
-  const layout = {
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
-    font: { family: 'Inter', color: '#94a3b8' },
-    margin: { l: 0, r: 0, t: 10, b: 0 },
-    scene: {
-      xaxis: {
-        title: { text: 'Strike', font: { size: 12 } },
-        gridcolor: 'rgba(100,130,180,0.15)',
-        showbackground: true,
-        backgroundcolor: 'rgba(10,16,28,0.7)',
-        tickfont: { family: 'JetBrains Mono', size: 10 }
-      },
-      yaxis: {
-        title: { text: 'Time to Maturity (years)', font: { size: 12 } },
-        gridcolor: 'rgba(100,130,180,0.15)',
-        showbackground: true,
-        backgroundcolor: 'rgba(10,16,28,0.7)',
-        tickfont: { family: 'JetBrains Mono', size: 10 }
-      },
-      zaxis: {
-        title: { text: 'Implied Vol (%)', font: { size: 12 } },
-        gridcolor: 'rgba(100,130,180,0.15)',
-        showbackground: true,
-        backgroundcolor: 'rgba(10,16,28,0.7)',
-        tickfont: { family: 'JetBrains Mono', size: 10 }
-      },
-      camera: { eye: { x: 1.5, y: -1.55, z: 1.2 } },
-      aspectmode: 'manual',
-      aspectratio: { x: 1.2, y: 1.0, z: 0.65 }
+  let calendarViolation = null;
+  for (let i = 1; i < atmSeries.length; i++) {
+    const wPrev = Math.pow(atmSeries[i - 1].iv, 2) * atmSeries[i - 1].T;
+    const wNow = Math.pow(atmSeries[i].iv, 2) * atmSeries[i].T;
+    if (wNow < wPrev - 1e-6) {
+      calendarViolation = { from: TENOR_DAYS[i - 1], to: TENOR_DAYS[i] };
+      break;
     }
-  };
+  }
+  if (calendarViolation) {
+    findings.push({ level: 'warn', text: `Total variance decreases between ${calendarViolation.from}D and ${calendarViolation.to}D — a necessary calendar-arbitrage condition is violated at the ATM strike.` });
+  } else {
+    findings.push({ level: 'ok', text: 'ATM total variance is non-decreasing across the tenor ladder (necessary calendar condition holds).' });
+  }
 
-  Plotly.react('surface', data, layout, {
-    responsive: true,
-    displayModeBar: true,
-    displaylogo: false,
-    modeBarButtonsToRemove: ['toImage', 'sendDataToCloud']
+  // 3. Strike-to-strike discontinuity check at a representative mid tenor (90D)
+  const Tmid = 90 / 365;
+  const strikes = buildStrikeGrid(S, 25);
+  let maxJump = 0, jumpPair = null;
+  for (let i = 1; i < strikes.length; i++) {
+    const iv1 = ivAt(strikes[i - 1], Tmid, S, p);
+    const iv2 = ivAt(strikes[i], Tmid, S, p);
+    const jump = Math.abs(iv2 - iv1);
+    if (jump > maxJump) { maxJump = jump; jumpPair = [strikes[i - 1], strikes[i]]; }
+  }
+  const JUMP_THRESHOLD = 0.08; // 8 vol points between adjacent grid strikes
+  if (maxJump > JUMP_THRESHOLD) {
+    findings.push({ level: 'warn', text: `Large IV jump (${(maxJump * 100).toFixed(1)} vol pts) detected between neighboring strikes near K≈${jumpPair[0].toFixed(0)}–${jumpPair[1].toFixed(0)} at the 90D tenor.` });
+  } else {
+    findings.push({ level: 'ok', text: `Largest neighboring-strike IV jump at the 90D tenor is ${(maxJump * 100).toFixed(2)} vol pts (within tolerance).` });
+  }
+
+  const hasWarning = findings.some(f => f.level === 'warn');
+  return { ok: !hasWarning, findings };
+}
+
+/* ---------------------------------------------------------------------
+   STATE
+   --------------------------------------------------------------------- */
+let STATE = {
+  S: 100, r: 0.05, q: 0.0,
+  sigma0: 0.20, skew: -0.15, curvature: 0.20, termShape: 'upward', volvol: 0.10,
+  xMode: 'strike', metric: 'iv', stickyDelta: false,
+  optType: 'call', selStrike: 100, selExpiryDays: 90,
+  smileExpiryDays: 30, compareMaturities: false,
+  termSeries: 'atm', sliceBy: 'expiry', shockPct: 0,
+  rv: 0.18,
+};
+
+function currentParams() {
+  return { sigma0: STATE.sigma0, skew: STATE.skew, curvature: STATE.curvature, termShape: STATE.termShape, volvol: STATE.volvol };
+}
+
+/* ---------------------------------------------------------------------
+   G. UI ELEMENT WIRING
+   --------------------------------------------------------------------- */
+const els = {
+  S: document.getElementById('S'), v_S: document.getElementById('v_S'),
+  r: document.getElementById('r'), v_r: document.getElementById('v_r'),
+  q: document.getElementById('q'), v_q: document.getElementById('v_q'),
+  sigma0: document.getElementById('sigma0'), v_sigma0: document.getElementById('v_sigma0'),
+  skew: document.getElementById('skew'), v_skew: document.getElementById('v_skew'),
+  curv: document.getElementById('curv'), v_curv: document.getElementById('v_curv'),
+  termShape: document.getElementById('termShape'),
+  volvol: document.getElementById('volvol'), v_volvol: document.getElementById('v_volvol'),
+  stickyDelta: document.getElementById('stickyDelta'),
+  rv: document.getElementById('rv'), v_rv: document.getElementById('v_rv'),
+  selStrike: document.getElementById('selStrike'),
+  selExpiry: document.getElementById('selExpiry'),
+  smileExpiry: document.getElementById('smileExpiry'),
+  compareMaturities: document.getElementById('compareMaturities'),
+};
+
+function syncLabels() {
+  els.v_S.textContent = els.S.value;
+  els.v_r.textContent = parseFloat(els.r.value).toFixed(2) + '%';
+  els.v_q.textContent = parseFloat(els.q.value).toFixed(2) + '%';
+  els.v_sigma0.textContent = parseFloat(els.sigma0.value).toFixed(1) + '%';
+  els.v_skew.textContent = parseFloat(els.skew.value).toFixed(2);
+  els.v_curv.textContent = parseFloat(els.curv.value).toFixed(2);
+  els.v_volvol.textContent = parseFloat(els.volvol.value).toFixed(2);
+  els.v_rv.textContent = parseFloat(els.rv.value).toFixed(1) + '%';
+}
+['S','r','q','sigma0','skew','curv','volvol','rv'].forEach(id => els[id].addEventListener('input', syncLabels));
+syncLabels();
+
+function readStateFromControls() {
+  STATE.S = parseFloat(els.S.value);
+  STATE.r = parseFloat(els.r.value) / 100;
+  STATE.q = parseFloat(els.q.value) / 100;
+  STATE.sigma0 = parseFloat(els.sigma0.value) / 100;
+  STATE.skew = parseFloat(els.skew.value);
+  STATE.curvature = parseFloat(els.curv.value);
+  STATE.termShape = els.termShape.value;
+  STATE.volvol = parseFloat(els.volvol.value);
+  STATE.stickyDelta = els.stickyDelta.checked;
+  STATE.rv = parseFloat(els.rv.value) / 100;
+  STATE.selStrike = parseFloat(els.selStrike.value) || STATE.S;
+  STATE.selExpiryDays = parseFloat(els.selExpiry.value);
+  STATE.smileExpiryDays = parseFloat(els.smileExpiry.value);
+  STATE.compareMaturities = els.compareMaturities.checked;
+}
+
+// Segmented controls
+function wireSeg(segId, dataAttr, stateKey, onChange) {
+  const seg = document.getElementById(segId);
+  seg.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      seg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      STATE[stateKey] = btn.dataset[dataAttr];
+      if (onChange) onChange();
+    });
+  });
+}
+wireSeg('xModeSeg', 'mode', 'xMode', () => renderAll());
+wireSeg('metricSeg', 'metric', 'metric', () => renderAll());
+wireSeg('optTypeSeg', 'type', 'optType', () => renderAll());
+wireSeg('termSeriesSeg', 'series', 'termSeries', () => renderTermChart());
+wireSeg('sliceSeg', 'slice', 'sliceBy', () => renderSliceChart());
+
+document.getElementById('shockSeg').querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#shockSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.shockPct = parseFloat(btn.dataset.shock) / 100;
+    renderShockTable();
+  });
+});
+
+// Presets
+const REGIME_PRESETS = {
+  low:    { sigma0: 10, skew: -0.08, curvature: 0.10, termShape: 'flat' },
+  normal: { sigma0: 20, skew: -0.15, curvature: 0.20, termShape: 'upward' },
+  high:   { sigma0: 32, skew: -0.25, curvature: 0.35, termShape: 'upward' },
+  crisis: { sigma0: 50, skew: -0.45, curvature: 0.55, termShape: 'downward' },
+};
+document.querySelectorAll('[data-preset]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = REGIME_PRESETS[btn.dataset.preset];
+    els.sigma0.value = p.sigma0; els.skew.value = p.skew; els.curv.value = p.curvature; els.termShape.value = p.termShape;
+    syncLabels(); runAll();
+  });
+});
+
+const SCENARIOS = {
+  selloff: { S_mult: 0.90, sigma0: 30, skew: -0.35, curvature: 0.30, termShape: 'downward' },
+  crush:   { S_mult: 1.00, sigma0: 12, skew: -0.10, curvature: 0.12, termShape: 'flat' },
+  spike:   { S_mult: 1.00, sigma0: 38, skew: -0.30, curvature: 0.40, termShape: 'downward' },
+  calm:    { S_mult: 1.00, sigma0: 11, skew: -0.06, curvature: 0.08, termShape: 'flat' },
+};
+document.querySelectorAll('[data-scenario]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sc = SCENARIOS[btn.dataset.scenario];
+    els.S.value = Math.round(parseFloat(els.S.value) * sc.S_mult);
+    els.sigma0.value = sc.sigma0; els.skew.value = sc.skew; els.curv.value = sc.curvature; els.termShape.value = sc.termShape;
+    syncLabels(); runAll();
+  });
+});
+
+document.getElementById('runBtn').addEventListener('click', runAll);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  els.S.value = 100; els.r.value = 5; els.q.value = 0;
+  els.sigma0.value = 20; els.skew.value = -0.15; els.curv.value = 0.20; els.termShape.value = 'upward'; els.volvol.value = 0.10;
+  els.stickyDelta.checked = false; els.rv.value = 18;
+  els.selStrike.value = 100; els.selExpiry.value = '90'; els.smileExpiry.value = '30'; els.compareMaturities.checked = false;
+  document.querySelectorAll('#shockSeg button').forEach(b => b.classList.remove('active'));
+  document.querySelector('#shockSeg button[data-shock="0"]').classList.add('active');
+  STATE.shockPct = 0;
+  syncLabels(); runAll();
+});
+[els.selStrike, els.selExpiry, els.smileExpiry, els.compareMaturities].forEach(el => el.addEventListener('change', () => { readStateFromControls(); renderAll(); }));
+
+/* ---------------------------------------------------------------------
+   MAIN ORCHESTRATION
+   --------------------------------------------------------------------- */
+function showLoading(text) { document.getElementById('loadingText').textContent = text || 'Working…'; document.getElementById('loadingOverlay').classList.add('active'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+function runAll() {
+  showLoading('Building surface…');
+  setTimeout(() => {
+    const t0 = performance.now();
+    readStateFromControls();
+    renderAll();
+    const t1 = performance.now();
+    document.getElementById('statusLine').innerHTML = `Surface rebuilt · grid 35×22<br>Computation time: <b>${(t1 - t0).toFixed(1)} ms</b>`;
+    hideLoading();
+  }, 10);
+}
+
+function plotlyReady() {
+  if (typeof Plotly === 'undefined') {
+    document.getElementById('statusLine').innerHTML = '<span style="color:var(--put);">Chart library failed to load from CDN. Tables and metrics still work.</span>';
+    hideLoading();
+    return false;
+  }
+  return true;
+}
+
+function renderAll() {
+  renderKPIs();
+  renderSelectedOption();
+  renderSkewSection();
+  renderRealizedVsImplied();
+  renderShockTable();
+  renderOptionChain();
+  renderDiagnostics();
+  if (plotlyReady()) {
+    renderSurface3D();
+    renderHeatmap();
+    renderSmileChart();
+    renderTermChart();
+    renderSliceChart();
+  }
+}
+
+/* ---------------------------------------------------------------------
+   F. RENDERING
+   --------------------------------------------------------------------- */
+function kpiCard(label, value, sub, cls) {
+  return `<div class="kpi ${cls || ''}"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub || ''}</div></div>`;
+}
+function fmtPct(x, d) { if (!isFinite(x)) return '—'; return (x * 100).toFixed(d === undefined ? 2 : d) + '%'; }
+function fmtNum(x, d) { if (!isFinite(x)) return '—'; return x.toFixed(d === undefined ? 2 : d); }
+
+function renderKPIs() {
+  const p = currentParams(), S = STATE.S;
+  const atmIV = ivAt(S, 30 / 365, S, p);
+  const iv30 = ivAt(S, 30 / 365, S, p);
+  const iv90 = ivAt(S, 90 / 365, S, p);
+  const iv1y = ivAt(S, 365 / 365, S, p);
+  const put25 = solveDeltaStrike(0.25, 'put', 30 / 365, S, STATE.r, STATE.q, p);
+  const call25 = solveDeltaStrike(0.25, 'call', 30 / 365, S, STATE.r, STATE.q, p);
+  const rr25 = call25.iv - put25.iv;
+  const bf25 = (call25.iv + put25.iv) / 2 - atmIV;
+
+  const html = [
+    kpiCard('Spot', '$' + fmtNum(S, 2), `r = ${fmtPct(STATE.r)} · q = ${fmtPct(STATE.q)}`),
+    kpiCard('ATM IV (30D)', fmtPct(atmIV), 'σ₀ base level'),
+    kpiCard('30D IV', fmtPct(iv30), ''),
+    kpiCard('90D IV', fmtPct(iv90), '', 'alt'),
+    kpiCard('1Y IV', fmtPct(iv1y), '', 'alt'),
+    kpiCard('25Δ Put IV', fmtPct(put25.iv), put25.found ? `K ≈ ${fmtNum(put25.K, 1)}` : 'target Δ not reached in range', 'put'),
+    kpiCard('25Δ Call IV', fmtPct(call25.iv), call25.found ? `K ≈ ${fmtNum(call25.K, 1)}` : 'target Δ not reached in range', 'call'),
+    kpiCard('25Δ Risk Reversal', (rr25 >= 0 ? '+' : '') + fmtPct(rr25), 'call IV − put IV', rr25 < 0 ? 'put' : 'call'),
+  ];
+  document.getElementById('kpiGrid').innerHTML = html.join('');
+}
+
+function plotlyLayoutBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8B94A6', size: 11 },
+    margin: { l: 55, r: 20, t: 20, b: 40 },
+    xaxis: { gridcolor: '#171F2A', zerolinecolor: '#1E2733', linecolor: '#1E2733' },
+    yaxis: { gridcolor: '#171F2A', zerolinecolor: '#1E2733', linecolor: '#1E2733' },
+    legend: { orientation: 'h', y: 1.08, font: { color: '#8B94A6' } },
+    hoverlabel: { bgcolor: '#141A24', bordercolor: '#1E2733', font: { color: '#E4E8EE', family: 'JetBrains Mono, monospace' } },
+  }, extra || {});
+}
+const PLOTLY_CONFIG = { displayModeBar: true, modeBarButtonsToRemove: ['sendDataToCloud','lasso2d','select2d'], responsive: true, displaylogo: false };
+
+function renderSurface3D() {
+  const p = currentParams(), S = STATE.S, r = STATE.r, q = STATE.q, metric = STATE.metric, xMode = STATE.xMode;
+  const strikes = buildStrikeGrid(S, 35);
+  const maturities = buildMaturityGrid(22);
+  const xVals = strikes.map(K => xAxisValue(K, S, xMode));
+  const yVals = maturities.map(T => T * 365); // display in days
+  const z = maturities.map(T => strikes.map(K => {
+    const iv = ivAt(K, T, S, p);
+    return metricValue(metric, S, K, T, r, q, iv);
+  }));
+
+  const trace = {
+    type: 'surface', x: xVals, y: yVals, z: z,
+    colorscale: [[0,'#0B2E2A'],[0.35,'#0F5C52'],[0.6,'#1FA593'],[0.8,'#28D9C8'],[1,'#B7FFF4']],
+    showscale: true, colorbar: { thickness: 12, outlinewidth: 0, tickfont: { color: '#8B94A6', size: 10 } },
+    hovertemplate: `${xAxisLabel(xMode)}: %{x:.3f}<br>Expiry: %{y:.0f}d<br>${metricLabel(metric)}: %{z:.4f}<extra></extra>`,
+  };
+  Plotly.newPlot('surface3d', [trace], plotlyLayoutBase({
+    scene: {
+      xaxis: { title: xAxisLabel(xMode), gridcolor: '#171F2A', color: '#8B94A6', backgroundcolor: 'rgba(0,0,0,0)' },
+      yaxis: { title: 'Days to Expiry', gridcolor: '#171F2A', color: '#8B94A6', backgroundcolor: 'rgba(0,0,0,0)' },
+      zaxis: { title: metricLabel(metric), gridcolor: '#171F2A', color: '#8B94A6', backgroundcolor: 'rgba(0,0,0,0)' },
+      camera: { eye: { x: 1.5, y: -1.5, z: 0.8 } },
+    },
+    margin: { l: 0, r: 0, t: 10, b: 0 },
+  }), PLOTLY_CONFIG);
+}
+
+function renderHeatmap() {
+  const p = currentParams(), S = STATE.S, r = STATE.r, q = STATE.q, metric = STATE.metric, xMode = STATE.xMode;
+  const strikes = buildStrikeGrid(S, 35);
+  const maturities = buildMaturityGrid(22);
+  const xVals = strikes.map(K => xAxisValue(K, S, xMode));
+  const yVals = maturities.map(T => T * 365);
+  const z = maturities.map(T => strikes.map(K => {
+    const iv = ivAt(K, T, S, p);
+    return metricValue(metric, S, K, T, r, q, iv);
+  }));
+  const trace = {
+    type: 'heatmap', x: xVals, y: yVals, z: z,
+    colorscale: [[0,'#0B2E2A'],[0.35,'#0F5C52'],[0.6,'#1FA593'],[0.8,'#28D9C8'],[1,'#B7FFF4']],
+    hovertemplate: `${xAxisLabel(xMode)}: %{x:.3f}<br>Expiry: %{y:.0f}d<br>${metricLabel(metric)}: %{z:.4f}<extra></extra>`,
+    colorbar: { thickness: 12, outlinewidth: 0, tickfont: { color: '#8B94A6', size: 10 } },
+  };
+  Plotly.newPlot('heatmap', [trace], plotlyLayoutBase({
+    xaxis: { title: xAxisLabel(xMode), gridcolor: '#171F2A', linecolor: '#1E2733' },
+    yaxis: { title: 'Days to Expiry', gridcolor: '#171F2A', linecolor: '#1E2733' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderSmileChart() {
+  const p = currentParams(), S = STATE.S, xMode = STATE.xMode;
+  const strikes = buildStrikeGrid(S, 60);
+  const traces = [];
+  const mainT = STATE.smileExpiryDays / 365;
+
+  function smileTrace(Tdays, color, width) {
+    const T = Tdays / 365;
+    const xs = strikes.map(K => xAxisValue(K, S, xMode));
+    const ys = strikes.map(K => ivAt(K, T, S, p));
+    return { x: xs, y: ys, mode: 'lines', line: { color, width: width || 2 }, name: `${Tdays}D` };
+  }
+
+  if (STATE.compareMaturities) {
+    const tenors = [7, 30, 90, 180, 365];
+    const colors = ['#7C9CFF', '#28D9C8', '#F5A623', '#FF5C5C', '#B7FFF4'];
+    tenors.forEach((d, i) => traces.push(smileTrace(d, colors[i % colors.length])));
+  } else {
+    traces.push(smileTrace(STATE.smileExpiryDays, '#28D9C8', 2.5));
+  }
+
+  // ATM marker
+  const atmIV = ivAt(S, mainT, S, p);
+  traces.push({ x: [xAxisValue(S, S, xMode)], y: [atmIV], mode: 'markers', marker: { color: '#7C9CFF', size: 9, symbol: 'diamond' }, name: 'ATM' });
+  // Selected strike marker
+  const selIV = ivAt(STATE.selStrike, mainT, S, p);
+  traces.push({ x: [xAxisValue(STATE.selStrike, S, xMode)], y: [selIV], mode: 'markers', marker: { color: '#FF5C5C', size: 9, symbol: 'x' }, name: 'Selected K' });
+
+  Plotly.newPlot('smileChart', traces, plotlyLayoutBase({
+    xaxis: { title: xAxisLabel(xMode), gridcolor: '#171F2A', linecolor: '#1E2733' },
+    yaxis: { title: 'Implied Volatility', tickformat: '.0%', gridcolor: '#171F2A', linecolor: '#1E2733' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderTermChart() {
+  const p = currentParams(), S = STATE.S;
+  const xs = TENOR_DAYS;
+  let ys, label;
+  if (STATE.termSeries === 'atm') {
+    ys = TENOR_DAYS.map(d => ivAt(S, d / 365, S, p)); label = 'ATM IV';
+  } else if (STATE.termSeries === 'strike') {
+    ys = TENOR_DAYS.map(d => ivAt(STATE.selStrike, d / 365, S, p)); label = `IV @ K=${STATE.selStrike}`;
+  } else {
+    const m = STATE.selStrike / S;
+    ys = TENOR_DAYS.map(d => ivAt(m * S, d / 365, S, p)); label = `IV @ K/S=${m.toFixed(2)}`;
+  }
+  Plotly.newPlot('termChart', [{
+    x: xs, y: ys, mode: 'lines+markers', line: { color: '#28D9C8', width: 2.5 }, marker: { size: 6 }, name: label
+  }], plotlyLayoutBase({
+    xaxis: { title: 'Days to Expiry', type: 'log', gridcolor: '#171F2A', linecolor: '#1E2733' },
+    yaxis: { title: label, tickformat: '.0%', gridcolor: '#171F2A', linecolor: '#1E2733' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderSliceChart() {
+  const p = currentParams(), S = STATE.S;
+  const hint = document.getElementById('sliceHint');
+  if (STATE.sliceBy === 'expiry') {
+    const T = STATE.selExpiryDays / 365;
+    const strikes = buildStrikeGrid(S, 50);
+    const xs = strikes.map(K => xAxisValue(K, S, STATE.xMode));
+    const ys = strikes.map(K => ivAt(K, T, S, p));
+    hint.textContent = `IV(K, T=${STATE.selExpiryDays}D) — from the Selected Option expiry`;
+    Plotly.newPlot('sliceChart', [{ x: xs, y: ys, mode: 'lines', line: { color: '#7C9CFF', width: 2.5 } }], plotlyLayoutBase({
+      xaxis: { title: xAxisLabel(STATE.xMode), gridcolor: '#171F2A', linecolor: '#1E2733' },
+      yaxis: { title: 'IV', tickformat: '.0%', gridcolor: '#171F2A', linecolor: '#1E2733' },
+    }), PLOTLY_CONFIG);
+  } else {
+    const K = STATE.selStrike;
+    const maturities = buildMaturityGrid(30);
+    const xs = maturities.map(T => T * 365);
+    const ys = maturities.map(T => ivAt(K, T, S, p));
+    hint.textContent = `IV(K=${K}, T) — from the Selected Option strike`;
+    Plotly.newPlot('sliceChart', [{ x: xs, y: ys, mode: 'lines', line: { color: '#F5A623', width: 2.5 } }], plotlyLayoutBase({
+      xaxis: { title: 'Days to Expiry', gridcolor: '#171F2A', linecolor: '#1E2733' },
+      yaxis: { title: 'IV', tickformat: '.0%', gridcolor: '#171F2A', linecolor: '#1E2733' },
+    }), PLOTLY_CONFIG);
+  }
+}
+
+function renderSelectedOption() {
+  const p = currentParams(), S = STATE.S, r = STATE.r, q = STATE.q;
+  const K = STATE.selStrike, T = STATE.selExpiryDays / 365, type = STATE.optType;
+  const iv = ivAt(K, T, S, p);
+  const price = bsPrice(S, K, T, r, q, iv, type);
+  const g = bsGreeks(S, K, T, r, q, iv, type);
+
+  document.getElementById('selectedOptionBody').innerHTML = `
+    <tr><td>Spot</td><td>${fmtNum(S, 2)}</td></tr>
+    <tr><td>Strike</td><td>${fmtNum(K, 2)}</td></tr>
+    <tr><td>Maturity</td><td>${STATE.selExpiryDays} days (${fmtNum(T, 3)}y)</td></tr>
+    <tr><td>Moneyness (K/S)</td><td>${fmtNum(K / S, 4)}</td></tr>
+    <tr><td>Implied Volatility</td><td>${fmtPct(iv)}</td></tr>
+    <tr><td>Theoretical Price (Black-Scholes)</td><td style="color:${type==='call' ? 'var(--call)' : 'var(--put)'}; font-weight:600;">${fmtNum(price, 3)}</td></tr>
+  `;
+
+  const greeksHtml = [
+    kpiCard('Delta', fmtNum(g.delta, 4), 'Δ price per $1 move in spot', type === 'call' ? 'call' : 'put'),
+    kpiCard('Gamma', fmtNum(g.gamma, 5), 'Δ(delta) per $1 move in spot'),
+    kpiCard('Vega', fmtNum(g.vega, 4), 'Δ price per 1 vol point', 'alt'),
+    kpiCard('Theta', fmtNum(g.theta, 4), 'Δ price per calendar day', 'warn'),
+    kpiCard('Rho', fmtNum(g.rho, 4), 'Δ price per 1% rate move'),
+    kpiCard('Moneyness', fmtNum(K / S, 3), K < S ? (type==='call'?'ITM call / OTM put':'OTM put / ITM... ') : ''),
+  ];
+  document.getElementById('greeksGrid').innerHTML = greeksHtml.join('');
+}
+
+function renderSkewSection() {
+  const p = currentParams(), S = STATE.S, r = STATE.r, q = STATE.q;
+  const T = STATE.selExpiryDays / 365;
+  const atmIV = ivAt(S, T, S, p);
+  const put25 = solveDeltaStrike(0.25, 'put', T, S, r, q, p);
+  const call25 = solveDeltaStrike(0.25, 'call', T, S, r, q, p);
+  const put10 = solveDeltaStrike(0.10, 'put', T, S, r, q, p);
+  const call10 = solveDeltaStrike(0.10, 'call', T, S, r, q, p);
+  const rr25 = call25.iv - put25.iv;
+  const bf25 = (call25.iv + put25.iv) / 2 - atmIV;
+
+  document.getElementById('skewTableBody').innerHTML = `
+    <tr><td class="tag-put">25Δ Put IV</td><td>${fmtPct(put25.iv)}</td></tr>
+    <tr><td>ATM IV</td><td>${fmtPct(atmIV)}</td></tr>
+    <tr><td class="tag-call">25Δ Call IV</td><td>${fmtPct(call25.iv)}</td></tr>
+    <tr><td>25Δ Risk Reversal (call − put)</td><td>${(rr25 >= 0 ? '+' : '')}${fmtPct(rr25)}</td></tr>
+    <tr><td>25Δ Butterfly (avg wing − ATM)</td><td>${(bf25 >= 0 ? '+' : '')}${fmtPct(bf25)}</td></tr>
+    <tr><td class="tag-put">10Δ Put IV</td><td>${fmtPct(put10.iv)}</td></tr>
+    <tr><td class="tag-call">10Δ Call IV</td><td>${fmtPct(call10.iv)}</td></tr>
+    <tr><td>Front-end IV (7D)</td><td>${fmtPct(ivAt(S, 7/365, S, p))}</td></tr>
+    <tr><td>1Y IV</td><td>${fmtPct(ivAt(S, 1, S, p))}</td></tr>
+  `;
+
+  document.getElementById('skewKpiGrid').innerHTML = [
+    kpiCard('25Δ Risk Reversal', (rr25 >= 0 ? '+' : '') + fmtPct(rr25), 'call skew − put skew', rr25 < 0 ? 'put' : 'call'),
+    kpiCard('25Δ Butterfly', (bf25 >= 0 ? '+' : '') + fmtPct(bf25), 'wing richness vs ATM', 'alt'),
+  ].join('');
+
+  // Interpretation text (explicitly framed as non-universal)
+  let interp = '';
+  if (STATE.skew < -0.05) {
+    interp += `<p><b>Downside skew detected</b> (skew = ${STATE.skew.toFixed(2)}): OTM puts trade at higher implied volatility than comparable OTM calls in this surface. This pattern is commonly associated with stronger demand for downside protection — but it is not a universal market truth, and this reading is a description of the current parametric surface, not a market observation.</p>`;
+  } else if (STATE.skew > 0.05) {
+    interp += `<p><b>Upside skew detected</b> (skew = ${STATE.skew.toFixed(2)}): OTM calls have higher implied volatility than comparable OTM puts in this surface.</p>`;
+  } else {
+    interp += `<p><b>Roughly symmetric surface</b> (skew ≈ ${STATE.skew.toFixed(2)}): puts and calls at similar distance from ATM carry similar implied volatility.</p>`;
+  }
+  if (STATE.curvature > 0.35) {
+    interp += `<p><b>Pronounced smile curvature</b> (curvature = ${STATE.curvature.toFixed(2)}): implied volatility rises significantly moving away from ATM in either direction.</p>`;
+  }
+  document.getElementById('interpBox').innerHTML = interp;
+}
+
+function renderRealizedVsImplied() {
+  const p = currentParams(), S = STATE.S;
+  const T = STATE.selExpiryDays / 365;
+  const atmIV = ivAt(S, T, S, p);
+  const diff = atmIV - STATE.rv;
+  const ratio = atmIV / Math.max(STATE.rv, 1e-6);
+  document.getElementById('rv_atmiv').textContent = fmtPct(atmIV);
+  document.getElementById('rv_diff').textContent = (diff >= 0 ? '+' : '') + fmtPct(diff);
+  document.getElementById('rvInterp').innerHTML = `
+    IV / RV ratio: <b style="color:var(--text);">${ratio.toFixed(2)}×</b>.
+    ${diff > 0
+      ? 'Implied volatility is running above the realized volatility input — the market is pricing in more movement than has recently been observed.'
+      : diff < 0
+      ? 'Implied volatility is running below the realized volatility input — the market is pricing in less movement than has recently been observed.'
+      : 'Implied and realized volatility are approximately equal.'}
+    This gap is not, by itself, a guaranteed trading opportunity — it reflects only a comparison between a forward-looking, market-implied number and a backward-looking realized-volatility input you supplied.
+  `;
+}
+
+function renderShockTable() {
+  const p = currentParams(), S0 = STATE.S, r = STATE.r, q = STATE.q;
+  const K = STATE.selStrike, T = STATE.selExpiryDays / 365, type = STATE.optType;
+  const Snew = S0 * (1 + STATE.shockPct);
+
+  const ivOld = ivAt(K, T, S0, p);
+  // Sticky strike: keep the mapping from strike -> IV anchored to the ORIGINAL spot
+  // (freezes IV(K) as a function of K). Sticky delta/moneyness: recompute moneyness
+  // against the NEW spot so IV(K) shifts with the strike's relative moneyness.
+  const ivNew = STATE.stickyDelta ? ivAt(K, T, Snew, p) : ivAt(K, T, S0, p);
+
+  const priceOld = bsPrice(S0, K, T, r, q, ivOld, type);
+  const priceNew = bsPrice(Snew, K, T, r, q, ivNew, type);
+  const gOld = bsGreeks(S0, K, T, r, q, ivOld, type);
+  const gNew = bsGreeks(Snew, K, T, r, q, ivNew, type);
+
+  const rows = [
+    ['Spot', fmtNum(S0, 2), fmtNum(Snew, 2), fmtNum(Snew - S0, 2)],
+    ['Moneyness (K/S)', fmtNum(K / S0, 4), fmtNum(K / Snew, 4), fmtNum(K / Snew - K / S0, 4)],
+    ['Implied Volatility', fmtPct(ivOld), fmtPct(ivNew), (ivNew - ivOld >= 0 ? '+' : '') + fmtPct(ivNew - ivOld)],
+    ['Option Price', fmtNum(priceOld, 3), fmtNum(priceNew, 3), (priceNew - priceOld >= 0 ? '+' : '') + fmtNum(priceNew - priceOld, 3)],
+    ['Delta', fmtNum(gOld.delta, 4), fmtNum(gNew.delta, 4), (gNew.delta - gOld.delta >= 0 ? '+' : '') + fmtNum(gNew.delta - gOld.delta, 4)],
+    ['Gamma', fmtNum(gOld.gamma, 5), fmtNum(gNew.gamma, 5), (gNew.gamma - gOld.gamma >= 0 ? '+' : '') + fmtNum(gNew.gamma - gOld.gamma, 5)],
+    ['Vega', fmtNum(gOld.vega, 4), fmtNum(gNew.vega, 4), (gNew.vega - gOld.vega >= 0 ? '+' : '') + fmtNum(gNew.vega - gOld.vega, 4)],
+    ['Theta', fmtNum(gOld.theta, 4), fmtNum(gNew.theta, 4), (gNew.theta - gOld.theta >= 0 ? '+' : '') + fmtNum(gNew.theta - gOld.theta, 4)],
+  ];
+  document.getElementById('shockTableBody').innerHTML = rows.map(([l, o, n, d]) =>
+    `<tr><td>${l}</td><td>${o}</td><td>${n}</td><td style="color:${d.toString().startsWith('-') ? 'var(--put)' : 'var(--call)'}">${d}</td></tr>`
+  ).join('');
+}
+
+function renderOptionChain() {
+  const p = currentParams(), S = STATE.S, r = STATE.r, q = STATE.q;
+  const T = STATE.selExpiryDays / 365;
+  const strikes = [70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 130];
+  const rows = strikes.map(K => {
+    const iv = ivAt(K, T, S, p);
+    const callPrice = bsPrice(S, K, T, r, q, iv, 'call');
+    const putPrice = bsPrice(S, K, T, r, q, iv, 'put');
+    const callG = bsGreeks(S, K, T, r, q, iv, 'call');
+    const putG = bsGreeks(S, K, T, r, q, iv, 'put');
+    return { K, iv, callPrice, putPrice, callDelta: callG.delta, putDelta: putG.delta };
+  });
+  const ivs = rows.map(r0 => r0.iv);
+  const maxIV = Math.max(...ivs), minIV = Math.min(...ivs);
+  const atmK = strikes.reduce((a, b) => Math.abs(b - S) < Math.abs(a - S) ? b : a);
+
+  document.getElementById('chainTableBody').innerHTML = rows.map(row => {
+    const isATM = row.K === atmK;
+    const isSelected = row.K === STATE.selStrike;
+    const cls = isSelected ? 'row-selected' : (isATM ? 'row-atm' : '');
+    const ivCellClass = row.iv === maxIV ? 'cell-hi' : (row.iv === minIV ? 'cell-lo' : '');
+    return `<tr class="${cls}" data-strike="${row.K}">
+      <td>${row.K}${isATM ? ' <span class="badge">ATM</span>' : ''}</td>
+      <td class="${ivCellClass}">${fmtPct(row.iv)}</td>
+      <td>${fmtNum(row.callDelta, 3)}</td>
+      <td>${fmtNum(row.callPrice, 2)}</td>
+      <td>${fmtNum(row.putPrice, 2)}</td>
+      <td>${fmtNum(row.putDelta, 3)}</td>
+      <td class="${ivCellClass}">${fmtPct(row.iv)}</td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('#chainTableBody tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      STATE.selStrike = parseFloat(tr.dataset.strike);
+      els.selStrike.value = STATE.selStrike;
+      renderAll();
+    });
   });
 }
 
-// Initial generation
-generateAll();
+function renderDiagnostics() {
+  const p = currentParams(), S = STATE.S;
+  const diag = runDiagnostics(S, p);
+  document.getElementById('diagStatus').innerHTML = diag.ok
+    ? `<span style="color:var(--call);">✓ Surface Status: Consistent</span> <span class="badge ok">basic checks passed</span>`
+    : `<span style="color:var(--warn);">⚠ Surface Warning: issue(s) detected</span> <span class="badge warnbadge">review below</span>`;
+  document.getElementById('diagDetails').innerHTML = diag.findings.map(f =>
+    `<div class="diag-line ${f.level === 'ok' ? 'diag-ok' : 'diag-warn'}">${f.level === 'ok' ? '✓' : '⚠'} ${f.text}</div>`
+  ).join('') + `<div class="hint" style="margin-top:10px;">These are simplified, illustrative diagnostics — not a complete static-arbitrage or calendar-arbitrage test suite.</div>`;
+}
+
+/* ---------------------------------------------------------------------
+   INITIAL RUN
+   --------------------------------------------------------------------- */
+readStateFromControls();
+runAll();
 </script>
 </body>
 </html>

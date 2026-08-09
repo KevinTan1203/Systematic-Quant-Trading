@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Impact Simulator — Order Book Sweep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090B;
+  --bg-2:#0C0E11;
+  --panel:#111318;
+  --panel-2:#15181E;
+  --border:#242832;
+  --border-soft:#1A1D24;
+  --text:#E9EBEF;
+  --text-dim:#8D93A0;
+  --text-faint:#5B6170;
+  --bid:#23C97C;
+  --bid-dim:#158F58;
+  --ask:#FF6161;
+  --ask-dim:#C93B3B;
+  --accent:#F0A93C;
+  --accent-2:#4FD1C5;
+  --warn:#F5A623;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px;
+  --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(240,169,60,0.05), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(79,209,197,0.05), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#1a1200;}
+
+.app{display:grid; grid-template-columns:320px 1fr; min-height:100vh;}
+@media (max-width:1000px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--accent), var(--accent-2), var(--accent)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#1a1200; font-size:14px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:16px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600; display:flex; justify-content:space-between; align-items:center;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .tip{cursor:help; border-bottom:1px dotted var(--text-faint);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #1a1200; box-shadow:0 0 0 2px rgba(240,169,60,0.25);}
+input[type=range]::-moz-range-thumb{width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #1a1200;}
+select, input[type=number], input[type=text]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), #B97D1E); color:#1a1200; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.08); color:#1a1200;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;}
+.preset-row{display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
+.preset-btn{padding:8px 2px; font-size:10.5px;}
+.seg{display:flex; border:1px solid var(--border); border-radius:7px; overflow:hidden;}
+.seg button{flex:1; padding:8px 4px; background:var(--panel-2); border:none; color:var(--text-dim); font-family:var(--mono); font-size:11.5px; cursor:pointer;}
+.seg button.active{background:rgba(240,169,60,0.15); color:var(--accent);}
+.seg button.buy-active{background:rgba(35,201,124,0.18); color:var(--bid);}
+.seg button.sell-active{background:rgba(255,97,97,0.18); color:var(--ask);}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:26px 32px 60px; max-width:1440px;}
+.page-header{margin-bottom:22px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:30px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:780px; font-size:13.5px;}
+
+.section{margin-top:34px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:17px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-6px 0 14px; max-width:780px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:18px 18px 16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 16px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.bid:before{background:var(--bid);}
+.kpi.ask:before{background:var(--ask);}
+.kpi.alt:before{background:var(--accent-2);}
+.kpi.warn:before{background:var(--warn);}
+.kpi-label{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:20px; font-weight:600; margin-top:6px; letter-spacing:-0.3px;}
+.kpi-sub{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+.kpi-sub b{color:var(--text-dim); font-weight:600;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12.5px;}
+table.data-table th, table.data-table td{padding:8px 10px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left; color:var(--text-dim); font-family:var(--body);}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:14.5px; color:var(--text); margin-bottom:6px; overflow-x:auto;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body h5{color:var(--text); font-family:var(--display); font-size:13px; margin:14px 0 4px;}
+.disclosure-body p{margin:4px 0 10px;}
+.disclosure-body ul{margin:4px 0 10px; padding-left:18px;}
+
+.badge{display:inline-block; font-family:var(--mono); font-size:10.5px; padding:2px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-dim); margin-left:8px;}
+.badge.illustrative{color:var(--warn); border-color:rgba(245,166,35,0.4);}
+.badge.buy{color:var(--bid); border-color:rgba(35,201,124,0.4);}
+.badge.sell{color:var(--ask); border-color:rgba(255,97,97,0.4);}
+
+.legend-row{display:flex; gap:18px; align-items:center; font-size:12px; color:var(--text-dim); margin-bottom:10px; flex-wrap:wrap;}
+.legend-dot{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px;}
+
+.footer-note{margin-top:44px; padding-top:18px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.two-col{display:grid; grid-template-columns:1.1fr 1fr; gap:16px;}
+@media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+.overlay-loading{position:fixed; inset:0; background:rgba(6,7,9,0.72); backdrop-filter:blur(2px); display:none; align-items:center; justify-content:center; z-index:999; flex-direction:column; gap:10px;}
+.overlay-loading.active{display:flex;}
+.spinner{width:34px; height:34px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--accent); animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.overlay-loading span{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+
+.warn-banner{background:rgba(245,166,35,0.10); border:1px solid rgba(245,166,35,0.35); color:var(--warn); border-radius:8px; padding:10px 14px; font-size:12.5px; margin-bottom:14px; display:none;}
+.warn-banner.active{display:block;}
+</style>
+</head>
+<body>
+
+<div class="overlay-loading" id="loadingOverlay"><div class="spinner"></div><span id="loadingText">Building order book…</span></div>
+
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">◧◨</div><div class="brand-name">Market Impact Simulator</div></div>
+    <div class="brand-sub">Synthetic Order Book · Sweep Mechanics</div>
+
+    <div class="ctrl-group">
+      <h4>Liquidity Regime <span class="badge illustrative">illustrative</span></h4>
+      <div class="preset-row">
+        <button class="btn preset-btn" data-regime="deep">Deep</button>
+        <button class="btn preset-btn" data-regime="normal">Normal</button>
+        <button class="btn preset-btn" data-regime="thin">Thin</button>
+        <button class="btn preset-btn" data-regime="crisis">Crisis</button>
+      </div>
+      <div class="hint" id="regimeHint">Normal liquidity regime selected.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Market</h4>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Mid Price</span><span class="val" id="v_mid">100.00</span></div>
+          <input type="range" id="mid" min="1" max="1000" step="0.5" value="100">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Tick Size</span><span class="val" id="v_tick">0.01</span></div>
+          <input type="range" id="tick" min="0.01" max="1" step="0.01" value="0.01">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Average daily volume, used for participation rate and the impact model">ADV (shares)</span></div>
+        <input type="number" id="adv" value="2000000" step="10000">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Order</h4>
+      <div class="field">
+        <div class="field-label"><span>Side</span></div>
+        <div class="seg" id="sideSeg"><button data-side="buy" class="active buy-active">Buy</button><button data-side="sell">Sell</button></div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Order Size (shares)</span><span class="val" id="v_orderSize">50,000</span></div>
+        <input type="range" id="orderSize" min="100" max="2000000" step="100" value="50000">
+      </div>
+      <div class="hint">Try sizing this against ADV and the liquidity regime to see execution cost scale.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Impact Model <span class="badge illustrative">educational</span></h4>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Scale coefficient in bps">α (alpha, bps)</span><span class="val" id="v_alpha">20</span></div>
+        <input type="range" id="alpha" min="1" max="200" step="1" value="20">
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Exponent — 0.5 is the classic square-root law">β (beta)</span><span class="val" id="v_beta">0.50</span></div>
+        <input type="range" id="beta" min="0.1" max="1.2" step="0.05" value="0.5">
+      </div>
+      <div class="formula-block" style="margin:8px 0 0; padding:10px 12px;">
+        <div class="f-math" style="font-size:12.5px;">Impact = α · (Q / ADV)^β</div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Slicing Comparison</h4>
+      <div class="field">
+        <div class="field-label"><span>Number of slices</span></div>
+        <select id="numSlices">
+          <option value="1">1 (single order)</option>
+          <option value="2">2</option>
+          <option value="4" selected>4</option>
+          <option value="8">8</option>
+          <option value="16">16</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Minutes between slices</span><span class="val" id="v_sliceGap">5</span></div>
+        <input type="range" id="sliceGap" min="1" max="30" step="1" value="5">
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Annualized volatility used to estimate timing risk while the order is worked">Volatility (ann.)</span><span class="val" id="v_dailyVol">25.0%</span></div>
+        <input type="range" id="dailyVol" min="5" max="150" step="1" value="25">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="runBtn">▶ Sweep Order</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+    <div class="status-line" id="statusLine">Ready.</div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Market Microstructure</div>
+      <h1 class="page-title">Market Impact Simulator</h1>
+      <p class="page-desc">A synthetic multi-level limit order book that you sweep with a market order. Watch execution cost build up level by level, and compare a single block trade against slicing the same order into smaller pieces over time.</p>
+    </div>
+
+    <div class="warn-banner" id="insufficientBanner">⚠ Order size exceeds total displayed liquidity on this side of the book — the order could not be fully filled. Metrics below reflect the partial fill only.</div>
+
+    <!-- KPI dashboard -->
+    <section class="section" id="sec-kpi">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Execution Metrics</span></div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <!-- Book depth before/after -->
+    <section class="section" id="sec-book">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Order Book Depth — Before &amp; After</span>
+        <button class="btn" id="playBtn" style="width:auto; padding:6px 14px;">▶ Animate Sweep</button>
+      </div>
+      <p class="section-desc">Bids in green, asks in red. The order consumes levels starting from the best price outward until fully filled or the book is exhausted.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-dot" style="background:var(--bid);"></span>Bid depth</span>
+          <span><span class="legend-dot" style="background:var(--ask);"></span>Ask depth</span>
+          <span><span class="legend-dot" style="background:var(--accent);"></span>Consumed by order</span>
+        </div>
+        <div class="two-col">
+          <div>
+            <div style="font-family:var(--display); font-size:12.5px; color:var(--text-dim); margin-bottom:6px;">BEFORE</div>
+            <div id="bookBefore" style="width:100%; height:420px;"></div>
+          </div>
+          <div>
+            <div style="font-family:var(--display); font-size:12.5px; color:var(--text-dim); margin-bottom:6px;">AFTER</div>
+            <div id="bookAfter" style="width:100%; height:420px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Fill breakdown -->
+    <section class="section" id="sec-fills">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Level-by-Level Fill Breakdown</span></div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr><th>Level</th><th>Price</th><th>Filled Qty</th><th>Cumulative Qty</th><th>Cumulative Avg Price</th></tr></thead>
+          <tbody id="fillsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Impact model -->
+    <section class="section" id="sec-impactmodel">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Impact Model — Theoretical vs. Simulated</span></div>
+      <p class="section-desc">The square-root-style impact model Impact = α·(Q/ADV)^β is a widely used <i>approximation</i>, not a physical law — it's shown here alongside the impact actually measured by sweeping the synthetic book, so you can see where a simple model and a simulated limit order book agree or diverge.</p>
+      <div class="card">
+        <div id="impactModelChart" style="width:100%; height:380px;"></div>
+      </div>
+    </section>
+
+    <!-- Slicing comparison -->
+    <section class="section" id="sec-slicing">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Single Order vs. Sliced Execution</span></div>
+      <p class="section-desc">The same total order, executed either all at once or split into equal slices over time with partial book replenishment between slices.</p>
+      <div class="two-col">
+        <div class="card">
+          <table class="data-table"><tbody id="sliceTableBody"></tbody></table>
+        </div>
+        <div class="card">
+          <div id="sliceChart" style="width:100%; height:320px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Impact vs risk tradeoff -->
+    <section class="section" id="sec-tradeoff">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Impact vs. Timing Risk Trade-off</span></div>
+      <p class="section-desc">Splitting an order into more, smaller slices reduces the instantaneous price impact of each slice — but it also stretches out the execution horizon, during which the price can move for reasons unrelated to your own trading. That exposure is timing (market) risk.</p>
+      <div class="card">
+        <div id="tradeoffChart" style="width:100%; height:380px;"></div>
+      </div>
+    </section>
+
+    <!-- Formula reference -->
+    <section class="section" id="sec-formulas">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Average Execution Price</div>
+        <div class="f-math">AEP = Σ(price_i · qty_i) / Σ(qty_i)</div>
+        <div class="f-note">Volume-weighted average of the prices at which the order actually filled, walking the book level by level.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Slippage</div>
+        <div class="f-math">Slippage = (AEP − best quote before the order) × side</div>
+        <div class="f-note">The extra cost incurred purely from walking past the best price into deeper, worse-priced levels.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Arrival-Price Shortfall (Implementation Shortfall)</div>
+        <div class="f-math">Shortfall = (AEP − arrival mid-price) × side</div>
+        <div class="f-note">The total cost versus the price that prevailed at the moment the decision to trade was made — includes both the cost of crossing the spread and the cost of walking the book.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Book-Referenced VWAP</div>
+        <div class="f-math">VWAP_book = Σ(price_i · size_i) / Σ(size_i), over all displayed bid + ask levels</div>
+        <div class="f-note">A liquidity-weighted "center of gravity" of the pre-trade book — distinct from the mid-price when the book is imbalanced between bids and asks.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Price Impact</div>
+        <div class="f-math">Impact = (new mid-price after the sweep − arrival mid-price), in ticks and bps</div>
+        <div class="f-note">How far the quoted market moved simply because your order consumed displayed liquidity — distinct from slippage, which measures your own execution cost rather than the market's new quote.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Participation Rate</div>
+        <div class="f-math">Participation = Order Size / ADV</div>
+        <div class="f-note">How large the order is relative to a typical day's trading volume — a common proxy for how much attention an order should draw and how much it should be worked over time.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Square-Root Impact Model</div>
+        <div class="f-math">Impact (bps) = α · (Q / ADV)^β</div>
+        <div class="f-note">A widely used educational approximation (β ≈ 0.5 is the classical "square-root law"). α and β are configurable here purely for exploration — real trading desks calibrate these from historical execution data.</div>
+      </div>
+    </section>
+
+    <!-- Educational -->
+    <section class="section" id="sec-edu">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Market Impact vs. Market Risk</span></div>
+      <details class="disclosure" open>
+        <summary>Why Splitting an Order Trades One Risk for Another</summary>
+        <div class="disclosure-body">
+          <p><b>Market impact</b> is the cost your own order creates by consuming displayed liquidity — the more size you demand right now, the further you walk into the book, and the worse your average fill price gets. A single large block order concentrates all of this cost into one instant.</p>
+          <p>Splitting that same order into smaller slices, executed over time, reduces each individual slice's impact — smaller orders don't need to walk as far into the book, and if the book has any resilience (liquidity replenishing between trades), later slices may trade against a partially refreshed book.</p>
+          <p>But spreading execution out over time introduces <b>timing risk</b> (sometimes called market risk in this context): the price can move for reasons that have nothing to do with your own trading — news, other participants, broad market moves — while your order is still being worked. The longer the execution horizon, the more that uncertainty accumulates, roughly growing with the square root of elapsed time for a random-walk-like price process.</p>
+          <p>This is the central trade-off in optimal execution: trade fast and pay more in impact but face less timing risk, or trade slow and reduce impact but accept more exposure to unpredictable price moves in the meantime. Neither extreme is universally "better" — the right balance depends on urgency, risk tolerance, and how confident you are that immediate execution cost outweighs the risk of the market moving against you while you wait.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Limitations of This Simulator</summary>
+        <div class="disclosure-body">
+          <p>This is a simplified, illustrative model. Real order books move continuously as other participants add, cancel, and trade — this simulator uses a static snapshot that only changes because of your own order (with a simple, deterministic replenishment assumption between slices). It ignores adverse selection, information leakage, other traders reacting to your activity, and the fact that real liquidity is often not fully visible in the displayed book. Treat every number here as a teaching aid, not a forecast of real trading costs.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational market-microstructure tool. The order book, its liquidity regimes, and the square-root impact model are synthetic and illustrative — they are not fitted to, or sourced from, real exchange data. All metrics are recomputed live from your inputs. Nothing here constitutes trading or investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   MARKET IMPACT SIMULATOR
+   Sections:
+     A. Order book construction (regime-driven synthetic depth)
+     B. Sweep mechanics (walking the book with a market order)
+     C. Execution metrics (AEP, slippage, shortfall, impact, VWAP, ...)
+     D. Square-root impact model
+     E. Slicing simulation (single order vs. N slices + book replenishment)
+     F. Rendering (charts, tables, KPIs, sweep animation)
+     G. UI wiring
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   A. ORDER BOOK CONSTRUCTION
+   --------------------------------------------------------------------- */
+const REGIMES = {
+  deep:    { label: 'Deep',    baseSize: 6000, decay: 0.95, spreadTicks: 1, adv: 6000000, alpha: 10, replenish: 0.85 },
+  normal:  { label: 'Normal',  baseSize: 2000, decay: 0.90, spreadTicks: 2, adv: 2000000, alpha: 20, replenish: 0.65 },
+  thin:    { label: 'Thin',    baseSize: 500,  decay: 0.80, spreadTicks: 4, adv: 400000,  alpha: 45, replenish: 0.40 },
+  crisis:  { label: 'Crisis',  baseSize: 150,  decay: 0.65, spreadTicks: 8, adv: 150000,  alpha: 90, replenish: 0.15 },
+};
+const LEVELS_COUNT = 20;
+
+// Deterministic small wiggle so level sizes look organic without being
+// random (keeps the simulator fully reproducible for a given regime).
+function levelWiggle(i) { return 1 + 0.06 * Math.sin(i * 1.7) * Math.cos(i * 0.6); }
+
+// Builds a fresh two-sided order book from current market + regime inputs.
+function buildBook(mid, tick, regimeKey) {
+  const reg = REGIMES[regimeKey];
+  const halfSpread = (reg.spreadTicks / 2) * tick;
+  const bestAsk = mid + halfSpread;
+  const bestBid = mid - halfSpread;
+  const askLevels = [], bidLevels = [];
+  for (let i = 0; i < LEVELS_COUNT; i++) {
+    const size = Math.max(1, Math.round(reg.baseSize * Math.pow(reg.decay, i) * levelWiggle(i)));
+    askLevels.push({ price: +(bestAsk + i * tick).toFixed(6), size });
+    bidLevels.push({ price: +(bestBid - i * tick).toFixed(6), size });
+  }
+  return { mid, tick, bestBid, bestAsk, askLevels, bidLevels, regime: reg, regimeKey };
+}
+
+/* ---------------------------------------------------------------------
+   B. SWEEP MECHANICS
+   --------------------------------------------------------------------- */
+// Walks a list of levels (best price first) consuming `orderSize` shares.
+// Returns the fills, the remaining post-sweep levels, and whether the
+// order was fully filled.
+function sweepLevels(levels, orderSize) {
+  const fills = [];
+  const remaining = levels.map(l => ({ price: l.price, size: l.size }));
+  let need = orderSize;
+  for (let i = 0; i < remaining.length && need > 1e-9; i++) {
+    const lvl = remaining[i];
+    const take = Math.min(lvl.size, need);
+    if (take > 0) {
+      fills.push({ level: i + 1, price: lvl.price, qty: take });
+      lvl.size -= take;
+      need -= take;
+    }
+  }
+  const filledQty = orderSize - Math.max(need, 0);
+  return { fills, remaining, filledQty, fullyFilled: need <= 1e-9 };
+}
+
+/* ---------------------------------------------------------------------
+   C. EXECUTION METRICS
+   --------------------------------------------------------------------- */
+function bookVWAP(book) {
+  let num = 0, den = 0;
+  book.askLevels.forEach(l => { num += l.price * l.size; den += l.size; });
+  book.bidLevels.forEach(l => { num += l.price * l.size; den += l.size; });
+  return den > 0 ? num / den : book.mid;
+}
+
+function computeExecutionMetrics(book, side, orderSize) {
+  const sign = side === 'buy' ? 1 : -1;
+  const levels = side === 'buy' ? book.askLevels : book.bidLevels;
+  const bestQuote = side === 'buy' ? book.bestAsk : book.bestBid;
+  const arrivalMid = book.mid;
+
+  const sweep = sweepLevels(levels, orderSize);
+  const filledQty = sweep.filledQty;
+  const totalCost = sweep.fills.reduce((s, f) => s + f.price * f.qty, 0);
+  const AEP = filledQty > 0 ? totalCost / filledQty : bestQuote;
+
+  const slippage = (AEP - bestQuote) * sign;
+  const shortfall = (AEP - arrivalMid) * sign;
+
+  // New top-of-book on the consumed side after the sweep (first level with
+  // remaining size), used to infer the post-trade mid and price impact.
+  const remainingWithSize = sweep.remaining.filter(l => l.size > 1e-9);
+  const newBestOnSide = remainingWithSize.length > 0 ? remainingWithSize[0].price : (side === 'buy' ? book.bestAsk + book.tick * LEVELS_COUNT : book.bestBid - book.tick * LEVELS_COUNT);
+  const otherSideBest = side === 'buy' ? book.bestBid : book.bestAsk;
+  const newMid = side === 'buy' ? (otherSideBest + newBestOnSide) / 2 : (newBestOnSide + otherSideBest) / 2;
+  const impactPrice = (newMid - arrivalMid) * sign;
+  const impactTicks = impactPrice / book.tick;
+  const impactBps = (impactPrice / arrivalMid) * 10000;
+
+  const participation = orderSize / book.regime.adv;
+  const remainingLiquidity = remainingWithSize.reduce((s, l) => s + l.size, 0);
+  const totalPretradeLiquidity = levels.reduce((s, l) => s + l.size, 0);
+
+  const vwapBook = bookVWAP(book);
+  const vwapShortfall = (AEP - vwapBook) * sign;
+
+  return {
+    sweep, AEP, slippage, shortfall, impactPrice, impactTicks, impactBps,
+    participation, remainingLiquidity, totalPretradeLiquidity, vwapBook, vwapShortfall,
+    filledQty, fullyFilled: sweep.fullyFilled, bestQuote, arrivalMid, newMid,
+  };
+}
+
+/* ---------------------------------------------------------------------
+   D. SQUARE-ROOT IMPACT MODEL
+   --------------------------------------------------------------------- */
+function modelImpactBps(alpha, beta, Q, ADV) {
+  if (ADV <= 0 || Q <= 0) return 0;
+  return alpha * Math.pow(Q / ADV, beta);
+}
+
+/* ---------------------------------------------------------------------
+   E. SLICING SIMULATION
+   --------------------------------------------------------------------- */
+// Executes `totalSize` as N equal slices against a book that partially
+// replenishes (toward its original shape) between slices, using the
+// regime's replenishment fraction. Returns per-slice fills and totals.
+function simulateSlicedExecution(baseBook, side, totalSize, numSlices) {
+  const sliceSize = totalSize / numSlices;
+  const levelsKey = side === 'buy' ? 'askLevels' : 'bidLevels';
+  const originalLevels = baseBook[levelsKey].map(l => ({ price: l.price, size: l.size }));
+  let currentLevels = originalLevels.map(l => ({ ...l }));
+  const arrivalMid = baseBook.mid;
+  const sign = side === 'buy' ? 1 : -1;
+
+  const sliceResults = [];
+  let totalFilled = 0, totalCost = 0;
+
+  for (let s = 0; s < numSlices; s++) {
+    const sweep = sweepLevels(currentLevels, sliceSize);
+    const filled = sweep.filledQty;
+    const cost = sweep.fills.reduce((sum, f) => sum + f.price * f.qty, 0);
+    const aep = filled > 0 ? cost / filled : (side === 'buy' ? baseBook.bestAsk : baseBook.bestBid);
+    totalFilled += filled; totalCost += cost;
+    sliceResults.push({ slice: s + 1, filled, aep, fullyFilled: sweep.fullyFilled });
+
+    // Replenish: blend remaining levels back toward the original book shape
+    // by the regime's replenishment fraction (simplified, deterministic).
+    const r = baseBook.regime.replenish;
+    currentLevels = sweep.remaining.map((l, i) => ({
+      price: l.price,
+      size: l.size + r * Math.max(originalLevels[i].size - l.size, 0),
+    }));
+  }
+
+  const overallAEP = totalFilled > 0 ? totalCost / totalFilled : arrivalMid;
+  const overallShortfallBps = ((overallAEP - arrivalMid) * sign / arrivalMid) * 10000;
+
+  // Final displayed liquidity remaining after all slices
+  const remainingLiquidity = currentLevels.reduce((s, l) => s + l.size, 0);
+
+  return { sliceResults, overallAEP, overallShortfallBps, totalFilled, remainingLiquidity, sliceSize };
+}
+
+/* ---------------------------------------------------------------------
+   STATE
+   --------------------------------------------------------------------- */
+let STATE = { side: 'buy', regimeKey: 'normal' };
+let lastRun = null;
+let animTimer = null;
+
+const els = {
+  mid: document.getElementById('mid'), v_mid: document.getElementById('v_mid'),
+  tick: document.getElementById('tick'), v_tick: document.getElementById('v_tick'),
+  adv: document.getElementById('adv'),
+  orderSize: document.getElementById('orderSize'), v_orderSize: document.getElementById('v_orderSize'),
+  alpha: document.getElementById('alpha'), v_alpha: document.getElementById('v_alpha'),
+  beta: document.getElementById('beta'), v_beta: document.getElementById('v_beta'),
+  numSlices: document.getElementById('numSlices'),
+  sliceGap: document.getElementById('sliceGap'), v_sliceGap: document.getElementById('v_sliceGap'),
+  dailyVol: document.getElementById('dailyVol'), v_dailyVol: document.getElementById('v_dailyVol'),
+};
+
+function syncLabels() {
+  els.v_mid.textContent = parseFloat(els.mid.value).toFixed(2);
+  els.v_tick.textContent = parseFloat(els.tick.value).toFixed(2);
+  els.v_orderSize.textContent = parseInt(els.orderSize.value, 10).toLocaleString();
+  els.v_alpha.textContent = els.alpha.value;
+  els.v_beta.textContent = parseFloat(els.beta.value).toFixed(2);
+  els.v_sliceGap.textContent = els.sliceGap.value;
+  els.v_dailyVol.textContent = parseFloat(els.dailyVol.value).toFixed(1) + '%';
+}
+['mid','tick','orderSize','alpha','beta','sliceGap','dailyVol'].forEach(id => els[id].addEventListener('input', syncLabels));
+syncLabels();
+
+document.getElementById('sideSeg').querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#sideSeg button').forEach(b => b.classList.remove('active','buy-active','sell-active'));
+    btn.classList.add('active', btn.dataset.side === 'buy' ? 'buy-active' : 'sell-active');
+    STATE.side = btn.dataset.side;
+    runAll();
+  });
+});
+
+document.querySelectorAll('[data-regime]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-regime]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.regimeKey = btn.dataset.regime;
+    const reg = REGIMES[STATE.regimeKey];
+    els.adv.value = reg.adv;
+    els.alpha.value = reg.alpha;
+    syncLabels();
+    document.getElementById('regimeHint').textContent = `${reg.label} liquidity: base level size ≈ ${reg.baseSize.toLocaleString()} shares, spread ≈ ${reg.spreadTicks} ticks, ADV ≈ ${reg.adv.toLocaleString()}.`;
+    runAll();
+  });
+});
+document.querySelector('[data-regime="normal"]').classList.add('active');
+
+document.getElementById('runBtn').addEventListener('click', runAll);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  els.mid.value = 100; els.tick.value = 0.01; els.adv.value = REGIMES.normal.adv;
+  els.orderSize.value = 50000; els.alpha.value = REGIMES.normal.alpha; els.beta.value = 0.5;
+  els.numSlices.value = '4'; els.sliceGap.value = 5; els.dailyVol.value = 25;
+  document.querySelectorAll('#sideSeg button').forEach(b => b.classList.remove('active','buy-active','sell-active'));
+  document.querySelector('#sideSeg button[data-side="buy"]').classList.add('active','buy-active');
+  STATE.side = 'buy';
+  document.querySelectorAll('[data-regime]').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-regime="normal"]').classList.add('active');
+  STATE.regimeKey = 'normal';
+  document.getElementById('regimeHint').textContent = 'Normal liquidity regime selected.';
+  syncLabels(); runAll();
+});
+els.numSlices.addEventListener('change', () => renderSlicingSection());
+
+/* ---------------------------------------------------------------------
+   MAIN ORCHESTRATION
+   --------------------------------------------------------------------- */
+function showLoading(text) { document.getElementById('loadingText').textContent = text || 'Working…'; document.getElementById('loadingOverlay').classList.add('active'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+function runAll() {
+  if (animTimer) { clearInterval(animTimer); animTimer = null; document.getElementById('playBtn').textContent = '▶ Animate Sweep'; }
+  showLoading('Building order book…');
+  setTimeout(() => {
+    const t0 = performance.now();
+    const mid = parseFloat(els.mid.value);
+    const tick = Math.max(parseFloat(els.tick.value) || 0.01, 0.0001);
+    const adv = Math.max(parseFloat(els.adv.value) || 1, 1);
+    const orderSize = Math.max(parseInt(els.orderSize.value, 10) || 0, 0);
+    const alpha = parseFloat(els.alpha.value);
+    const beta = parseFloat(els.beta.value);
+
+    const book = buildBook(mid, tick, STATE.regimeKey);
+    book.regime = { ...book.regime, adv, alpha }; // allow user overrides of ADV/alpha
+    const metrics = computeExecutionMetrics(book, STATE.side, orderSize);
+    const t1 = performance.now();
+
+    lastRun = { book, metrics, orderSize, side: STATE.side, alpha, beta, adv, runtimeMs: t1 - t0 };
+
+    document.getElementById('statusLine').innerHTML =
+      `Book swept: <b>${metrics.filledQty.toLocaleString(undefined,{maximumFractionDigits:0})}</b> / ${orderSize.toLocaleString()} shares filled<br>Runtime: <b>${(t1 - t0).toFixed(1)} ms</b>`;
+    document.getElementById('insufficientBanner').classList.toggle('active', !metrics.fullyFilled);
+
+    renderAll();
+    hideLoading();
+  }, 10);
+}
+
+function plotlyReady() {
+  if (typeof Plotly === 'undefined') {
+    document.getElementById('statusLine').innerHTML = '<span style="color:var(--ask);">Chart library failed to load from CDN. Tables and metrics still work.</span>';
+    hideLoading();
+    return false;
+  }
+  return true;
+}
+
+function renderAll() {
+  renderKPIs();
+  renderFillsTable();
+  renderSlicingSection();
+  if (plotlyReady()) {
+    renderBookCharts();
+    renderImpactModelChart();
+    renderSliceChart();
+    renderTradeoffChart();
+  }
+}
+
+/* ---------------------------------------------------------------------
+   F. RENDERING
+   --------------------------------------------------------------------- */
+function kpiCard(label, value, sub, cls) {
+  return `<div class="kpi ${cls || ''}"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub || ''}</div></div>`;
+}
+function fmtNum(x, d) { if (!isFinite(x)) return '—'; return x.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function fmtInt(x) { if (!isFinite(x)) return '—'; return Math.round(x).toLocaleString(); }
+function fmtBps(x, d) { if (!isFinite(x)) return '—'; return (x >= 0 ? '+' : '') + x.toFixed(d === undefined ? 1 : d) + ' bps'; }
+
+function renderKPIs() {
+  const { book, metrics, orderSize, side } = lastRun;
+  const html = [
+    kpiCard('Average Execution Price', fmtNum(metrics.AEP, 4), `${side === 'buy' ? 'bought' : 'sold'} ${fmtInt(metrics.filledQty)} sh`, side === 'buy' ? 'ask' : 'bid'),
+    kpiCard('Slippage', fmtNum(metrics.slippage, 4), 'vs. best quote pre-trade', metrics.slippage > 0 ? 'warn' : undefined),
+    kpiCard('Book-Referenced VWAP', fmtNum(metrics.vwapBook, 4), `shortfall vs VWAP: ${fmtNum(metrics.vwapShortfall,4)}`, 'alt'),
+    kpiCard('Arrival-Price Shortfall', fmtNum(metrics.shortfall, 4), 'vs. pre-trade mid', metrics.shortfall > 0 ? 'warn' : undefined),
+    kpiCard('Price Impact (ticks)', fmtNum(metrics.impactTicks, 2) + ' ticks', `${fmtBps(metrics.impactBps,2)}`),
+    kpiCard('Participation Rate', fmtNum(metrics.participation * 100, 3) + '%', `of ${fmtInt(book.regime.adv)} ADV`),
+    kpiCard('Remaining Liquidity', fmtInt(metrics.remainingLiquidity), `of ${fmtInt(metrics.totalPretradeLiquidity)} pre-trade (this side)`, !metrics.fullyFilled ? 'warn' : undefined),
+    kpiCard('Fill Status', metrics.fullyFilled ? 'Fully Filled' : 'Partial Fill', `${fmtInt(metrics.filledQty)} / ${fmtInt(orderSize)} shares`, metrics.fullyFilled ? undefined : 'warn'),
+  ];
+  document.getElementById('kpiGrid').innerHTML = html.join('');
+}
+
+function renderFillsTable() {
+  const { metrics } = lastRun;
+  let cum = 0, cumCost = 0;
+  const rows = metrics.sweep.fills.map(f => {
+    cum += f.qty; cumCost += f.price * f.qty;
+    return `<tr><td>${f.level}</td><td>${fmtNum(f.price, 4)}</td><td>${fmtInt(f.qty)}</td><td>${fmtInt(cum)}</td><td>${fmtNum(cumCost/cum, 4)}</td></tr>`;
+  });
+  document.getElementById('fillsTableBody').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5">No fills — order size is zero.</td></tr>';
+}
+
+function plotlyLayoutBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8D93A0', size: 11 },
+    margin: { l: 60, r: 20, t: 20, b: 40 },
+    xaxis: { gridcolor: '#1A1D24', zerolinecolor: '#242832', linecolor: '#242832' },
+    yaxis: { gridcolor: '#1A1D24', zerolinecolor: '#242832', linecolor: '#242832' },
+    legend: { orientation: 'h', y: 1.08, font: { color: '#8D93A0' } },
+    hoverlabel: { bgcolor: '#15181E', bordercolor: '#242832', font: { color: '#E9EBEF', family: 'JetBrains Mono, monospace' } },
+  }, extra || {});
+}
+const PLOTLY_CONFIG = { displayModeBar: false, responsive: true };
+
+function bookTraces(book, consumedLevels, side) {
+  // consumedLevels: optional array of remaining sizes per level on the traded side (post-sweep), for the "after" view.
+  const bidPrices = book.bidLevels.map(l => l.price.toFixed(4));
+  const bidSizes = book.bidLevels.map(l => -l.size);
+  const askPrices = book.askLevels.map(l => l.price.toFixed(4));
+  let askSizes = book.askLevels.map(l => l.size);
+  let bidSizesFinal = bidSizes;
+
+  if (consumedLevels) {
+    if (side === 'buy') askSizes = consumedLevels.map(l => l.size);
+    else bidSizesFinal = consumedLevels.map(l => -l.size);
+  }
+
+  const bidColor = side === 'sell' && consumedLevels ? '#B97D1E' : '#23C97C';
+  const askColor = side === 'buy' && consumedLevels ? '#F0A93C' : '#FF6161';
+
+  return [
+    { x: bidSizesFinal, y: bidPrices, type: 'bar', orientation: 'h', name: 'Bids', marker: { color: bidColor }, hovertemplate: 'Price: %{y}<br>Size: %{customdata}<extra></extra>', customdata: bidSizesFinal.map(v => Math.abs(v)) },
+    { x: askSizes, y: askPrices, type: 'bar', orientation: 'h', name: 'Asks', marker: { color: askColor }, hovertemplate: 'Price: %{y}<br>Size: %{x}<extra></extra>' },
+  ];
+}
+
+function renderBookCharts() {
+  const { book, metrics, side } = lastRun;
+  const beforeTraces = bookTraces(book, null, side);
+  Plotly.newPlot('bookBefore', beforeTraces, plotlyLayoutBase({
+    barmode: 'overlay',
+    xaxis: { title: 'Size (bids −, asks +)', gridcolor: '#1A1D24', linecolor: '#242832' },
+    yaxis: { title: 'Price', type: 'category', gridcolor: '#1A1D24', linecolor: '#242832', autorange: 'reversed' },
+  }), PLOTLY_CONFIG);
+
+  const afterTraces = bookTraces(book, metrics.sweep.remaining, side);
+  Plotly.newPlot('bookAfter', afterTraces, plotlyLayoutBase({
+    barmode: 'overlay',
+    xaxis: { title: 'Size (bids −, asks +)', gridcolor: '#1A1D24', linecolor: '#242832' },
+    yaxis: { title: 'Price', type: 'category', gridcolor: '#1A1D24', linecolor: '#242832', autorange: 'reversed' },
+  }), PLOTLY_CONFIG);
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (!lastRun || !plotlyReady()) return;
+  if (animTimer) { clearInterval(animTimer); animTimer = null; document.getElementById('playBtn').textContent = '▶ Animate Sweep'; renderBookCharts(); return; }
+  document.getElementById('playBtn').textContent = '⏸ Stop';
+  const { book, metrics, side } = lastRun;
+  const levels = side === 'buy' ? book.askLevels : book.bidLevels;
+  const finalRemaining = metrics.sweep.remaining;
+  const n = levels.length;
+  let step = 0;
+  // Rebuild "after" panel progressively: levels beyond `step` still show
+  // their original size; levels up to `step` show their final (post-sweep)
+  // size, visually sweeping the order across the book.
+  animTimer = setInterval(() => {
+    step++;
+    const partial = levels.map((l, i) => i < step ? { size: finalRemaining[i].size } : { size: l.size });
+    const traces = bookTraces(book, partial, side);
+    Plotly.react('bookAfter', traces, plotlyLayoutBase({
+      barmode: 'overlay',
+      xaxis: { title: 'Size (bids −, asks +)', gridcolor: '#1A1D24', linecolor: '#242832' },
+      yaxis: { title: 'Price', type: 'category', gridcolor: '#1A1D24', linecolor: '#242832', autorange: 'reversed' },
+    }), PLOTLY_CONFIG);
+    if (step >= n) { clearInterval(animTimer); animTimer = null; document.getElementById('playBtn').textContent = '▶ Animate Sweep'; }
+  }, 180);
+});
+
+function renderImpactModelChart() {
+  const { book, metrics, orderSize, alpha, beta } = lastRun;
+  const adv = book.regime.adv;
+  const xs = [], modelYs = [];
+  const maxParticipation = Math.min(1, Math.max(0.5, (orderSize / adv) * 2));
+  for (let i = 0; i <= 60; i++) {
+    const frac = (i / 60) * maxParticipation;
+    xs.push(frac);
+    modelYs.push(modelImpactBps(alpha, beta, frac * adv, adv));
+  }
+  const currentFrac = orderSize / adv;
+  const currentModelBps = modelImpactBps(alpha, beta, orderSize, adv);
+  const currentSimBps = metrics.impactBps;
+
+  Plotly.newPlot('impactModelChart', [
+    { x: xs, y: modelYs, mode: 'lines', line: { color: '#4FD1C5', width: 2.5 }, name: 'Model: α·(Q/ADV)^β' },
+    { x: [currentFrac], y: [currentModelBps], mode: 'markers', marker: { color: '#4FD1C5', size: 11, symbol: 'diamond' }, name: 'Model @ current order' },
+    { x: [currentFrac], y: [currentSimBps], mode: 'markers', marker: { color: '#F0A93C', size: 11, symbol: 'circle' }, name: 'Simulated (order book sweep)' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Participation (Q / ADV)', tickformat: '.1%', gridcolor: '#1A1D24', linecolor: '#242832' },
+    yaxis: { title: 'Impact (bps)', gridcolor: '#1A1D24', linecolor: '#242832' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderSlicingSection() {
+  if (!lastRun) return;
+  const { book, side, orderSize } = lastRun;
+  const numSlices = parseInt(els.numSlices.value, 10);
+
+  const singleMetrics = computeExecutionMetrics(book, side, orderSize);
+  const sliced = simulateSlicedExecution(book, side, orderSize, numSlices);
+  const sign = side === 'buy' ? 1 : -1;
+  const singleShortfallBps = ((singleMetrics.AEP - book.mid) * sign / book.mid) * 10000;
+
+  document.getElementById('sliceTableBody').innerHTML = `
+    <tr><th></th><th>Single Order</th><th>${numSlices}-Slice Execution</th></tr>
+    <tr><td>Filled Qty</td><td>${fmtInt(singleMetrics.filledQty)}</td><td>${fmtInt(sliced.totalFilled)}</td></tr>
+    <tr><td>Avg / VWAP Execution Price</td><td>${fmtNum(singleMetrics.AEP, 4)}</td><td>${fmtNum(sliced.overallAEP, 4)}</td></tr>
+    <tr><td>Shortfall vs Arrival (bps)</td><td>${fmtBps(singleShortfallBps, 2)}</td><td>${fmtBps(sliced.overallShortfallBps, 2)}</td></tr>
+    <tr><td>Remaining Liquidity (this side)</td><td>${fmtInt(singleMetrics.remainingLiquidity)}</td><td>${fmtInt(sliced.remainingLiquidity)}</td></tr>
+    <tr><td>Execution Horizon</td><td>Instant</td><td>${((numSlices - 1) * parseFloat(els.sliceGap.value))} min</td></tr>
+  `;
+  lastRun.sliced = sliced;
+  lastRun.singleShortfallBps = singleShortfallBps;
+  if (typeof Plotly !== 'undefined') { renderSliceChart(); renderTradeoffChart(); }
+}
+
+function renderSliceChart() {
+  if (!lastRun || !lastRun.sliced) return;
+  const { sliced, singleShortfallBps } = lastRun;
+  const xs = sliced.sliceResults.map(s => `Slice ${s.slice}`);
+  const ys = sliced.sliceResults.map(s => s.aep);
+  Plotly.newPlot('sliceChart', [
+    { x: xs, y: ys, type: 'bar', marker: { color: '#F0A93C' }, name: 'Slice AEP' },
+  ], plotlyLayoutBase({
+    yaxis: { title: 'Execution Price per Slice', gridcolor: '#1A1D24', linecolor: '#242832' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderTradeoffChart() {
+  if (!lastRun) return;
+  const { book, side, orderSize, alpha, beta } = lastRun;
+  const sliceCounts = [1, 2, 4, 8, 16, 32];
+  const gapMin = parseFloat(els.sliceGap.value);
+  const annVol = parseFloat(els.dailyVol.value) / 100;
+  const minutesPerYear = 252 * 6.5 * 60; // trading minutes/year approx
+
+  const impactYs = [], timingYs = [], totalYs = [];
+  sliceCounts.forEach(n => {
+    const sliceQty = orderSize / n;
+    // Instantaneous impact of a representative single slice, per the model
+    const sliceImpactBps = modelImpactBps(alpha, beta, sliceQty, book.regime.adv);
+    impactYs.push(sliceImpactBps);
+    // Timing risk: price uncertainty (1 std dev, bps) accumulated over the
+    // full execution horizon, via vol * sqrt(time fraction of trading year).
+    const horizonMin = (n - 1) * gapMin;
+    const timingRiskBps = annVol * Math.sqrt(Math.max(horizonMin, 0) / minutesPerYear) * 10000;
+    timingYs.push(timingRiskBps);
+    totalYs.push(Math.sqrt(sliceImpactBps ** 2 + timingRiskBps ** 2));
+  });
+
+  Plotly.newPlot('tradeoffChart', [
+    { x: sliceCounts, y: impactYs, mode: 'lines+markers', line: { color: '#F0A93C', width: 2.5 }, name: 'Per-slice impact (bps)' },
+    { x: sliceCounts, y: timingYs, mode: 'lines+markers', line: { color: '#FF6161', width: 2.5 }, name: 'Timing risk (bps, 1σ)' },
+    { x: sliceCounts, y: totalYs, mode: 'lines+markers', line: { color: '#4FD1C5', width: 2, dash: 'dot' }, name: 'Combined (illustrative, √(impact²+risk²))' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Number of Slices', type: 'log', gridcolor: '#1A1D24', linecolor: '#242832' },
+    yaxis: { title: 'bps', gridcolor: '#1A1D24', linecolor: '#242832' },
+  }), PLOTLY_CONFIG);
+}
+
+/* ---------------------------------------------------------------------
+   INITIAL RUN
+   --------------------------------------------------------------------- */
+document.getElementById('regimeHint').textContent = `${REGIMES.normal.label} liquidity: base level size ≈ ${REGIMES.normal.baseSize.toLocaleString()} shares, spread ≈ ${REGIMES.normal.spreadTicks} ticks, ADV ≈ ${REGIMES.normal.adv.toLocaleString()}.`;
+runAll();
+</script>
+</body>
+</html>

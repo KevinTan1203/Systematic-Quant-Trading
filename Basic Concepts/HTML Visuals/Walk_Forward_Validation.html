@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walk-Forward Optimization Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C;
+  --bg-2:#0C0E12;
+  --panel:#111318;
+  --panel-2:#15171D;
+  --border:#242730;
+  --border-soft:#1A1C22;
+  --text:#E8E9EE;
+  --text-dim:#8C90A0;
+  --text-faint:#5A5E6B;
+  --accent:#4F8EFF;
+  --accent-dim:#3A6BC4;
+  --oos:#FFC145;
+  --train:#4F8EFF;
+  --profit:#2ED573;
+  --loss:#FF4757;
+  --warn:#F5A623;
+  --bull:#2ED573;
+  --bear:#FF4757;
+  --choppy:#8C7CFF;
+  --crisis:#B00020;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px;
+  --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(255,193,69,0.05), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+
+.app{display:grid; grid-template-columns:330px 1fr; min-height:100vh;}
+@media (max-width:1020px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--accent), var(--oos), var(--accent)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:13px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:16px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600; display:flex; justify-content:space-between; align-items:center;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .tip{cursor:help; border-bottom:1px dotted var(--text-faint);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+input[type=range]::-moz-range-thumb{width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14;}
+select, input[type=number], input[type=text]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:26px 32px 60px; max-width:1460px;}
+.page-header{margin-bottom:22px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:30px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:800px; font-size:13.5px;}
+
+.section{margin-top:34px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:17px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-6px 0 14px; max-width:800px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:18px 18px 16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 16px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.warn:before{background:var(--warn);}
+.kpi.loss:before{background:var(--loss);}
+.kpi-label{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:20px; font-weight:600; margin-top:6px; letter-spacing:-0.3px;}
+.kpi-sub{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+.kpi-sub b{color:var(--text-dim); font-weight:600;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12.5px;}
+table.data-table th, table.data-table td{padding:8px 10px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left; color:var(--text-dim); font-family:var(--body);}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+table.data-table th.oos-col, table.data-table td.oos-col{color:var(--oos);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:14px; color:var(--text); margin-bottom:6px; overflow-x:auto;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body h5{color:var(--text); font-family:var(--display); font-size:13px; margin:14px 0 4px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.badge{display:inline-block; font-family:var(--mono); font-size:10.5px; padding:2px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-dim); margin-left:8px;}
+.badge.illustrative{color:var(--warn); border-color:rgba(245,166,35,0.4);}
+
+.legend-row{display:flex; gap:16px; align-items:center; font-size:12px; color:var(--text-dim); margin-bottom:10px; flex-wrap:wrap;}
+.legend-dot{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px;}
+.legend-line{display:inline-block; width:16px; height:2px; margin-right:6px; vertical-align:middle;}
+
+.footer-note{margin-top:44px; padding-top:18px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.two-col{display:grid; grid-template-columns:1.2fr 1fr; gap:16px;}
+@media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+.overlay-loading{position:fixed; inset:0; background:rgba(6,7,9,0.72); backdrop-filter:blur(2px); display:none; align-items:center; justify-content:center; z-index:999; flex-direction:column; gap:10px;}
+.overlay-loading.active{display:flex;}
+.spinner{width:34px; height:34px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--accent); animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.overlay-loading span{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+</style>
+</head>
+<body>
+
+<div class="overlay-loading" id="loadingOverlay"><div class="spinner"></div><span id="loadingText">Running walk-forward optimization…</span></div>
+
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">↻</div><div class="brand-name">Walk-Forward Lab</div></div>
+    <div class="brand-sub">Optimization · Out-of-Sample Testing</div>
+
+    <div class="ctrl-group">
+      <h4>Synthetic Data</h4>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Total Days</span></div>
+          <input type="number" id="totalDays" value="1500" step="50">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Regime Segments</span></div>
+          <input type="number" id="numSegments" value="7" step="1" min="2" max="12">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Seed</span></div>
+        <input type="text" id="dataSeed" value="42">
+      </div>
+      <div class="hint">Cycles through bull → choppy → bear → crisis → choppy → bull regimes with different drift/volatility (choppy regimes also mean-revert, which tends to whipsaw trend-following strategies).</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Strategy: Moving-Average Crossover</h4>
+      <div class="toggle-hint field">
+        <div class="field-label"><span>Fast MA periods (grid)</span></div>
+        <input type="text" id="fastList" value="5,10,15,20,30">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Slow MA periods (grid)</span></div>
+        <input type="text" id="slowList" value="20,30,50,75,100">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Allow Shorts</span></div>
+          <select id="allowShort"><option value="0">No (long/flat)</option><option value="1">Yes (long/short)</option></select>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Txn Cost / trade</span><span class="val" id="v_txCost">5 bps</span></div>
+          <input type="range" id="txCost" min="0" max="50" step="1" value="5">
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Walk-Forward Windows</h4>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Training Length (days)</span></div>
+          <input type="number" id="trainLen" value="200" step="10">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Test Length (days)</span></div>
+          <input type="number" id="testLen" value="60" step="10">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span class="tip" title="Defaults to Test Length for standard non-overlapping walk-forward">Step Size (days)</span></div>
+        <input type="number" id="stepSize" value="60" step="10">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Training Selection Metric</span></div>
+        <select id="selectionMetric">
+          <option value="sharpe" selected>Sharpe Ratio</option>
+          <option value="cagr">CAGR</option>
+          <option value="totalReturn">Total Return</option>
+        </select>
+      </div>
+      <div class="hint" id="overlapHint"></div>
+    </div>
+
+    <button class="btn btn-primary" id="runBtn">▶ Run Walk-Forward</button>
+    <div class="btn-row">
+      <button class="btn" id="regenBtn">Regenerate Data</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+    <div class="status-line" id="statusLine">Ready.</div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Quantitative Research / Backtesting Methodology</div>
+      <h1 class="page-title">Walk-Forward Optimization Visualizer</h1>
+      <p class="page-desc">Optimize a moving-average crossover strategy on a rolling training window, apply the winning parameters only to the unseen test window that follows, then roll forward — and see how that honest out-of-sample result compares to naively picking "the best" parameters with the benefit of hindsight over the whole dataset.</p>
+    </div>
+
+    <!-- KPI dashboard -->
+    <section class="section" id="sec-kpi">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Walk-Forward Performance</span></div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <!-- Price series with regions -->
+    <section class="section" id="sec-price">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Price Series — Regimes, Training &amp; Test Windows</span></div>
+      <p class="section-desc">Faint background bands show the underlying synthetic regime; blue bands are training windows, gold bands are the out-of-sample test windows that follow each one.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-dot" style="background:var(--bull);"></span>Bull</span>
+          <span><span class="legend-dot" style="background:var(--bear);"></span>Bear</span>
+          <span><span class="legend-dot" style="background:var(--choppy);"></span>Choppy</span>
+          <span><span class="legend-dot" style="background:var(--crisis);"></span>Crisis</span>
+          <span><span class="legend-dot" style="background:var(--train); opacity:0.6;"></span>Train window</span>
+          <span><span class="legend-dot" style="background:var(--oos); opacity:0.6;"></span>Test (OOS) window</span>
+        </div>
+        <div id="priceChart" style="width:100%; height:420px;"></div>
+      </div>
+    </section>
+
+    <!-- Parameter selection through time -->
+    <section class="section" id="sec-paramtime">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Parameter Selection Through Time</span></div>
+      <p class="section-desc">Which (fast, slow) combination was selected in each rolling training window — jumping around a lot is a sign of parameter instability.</p>
+      <div class="card">
+        <div id="paramTimeChart" style="width:100%; height:340px;"></div>
+      </div>
+    </section>
+
+    <!-- Heatmap for selected window -->
+    <section class="section" id="sec-heatmap">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Parameter Performance Heatmap</span>
+        <select id="windowSelect" style="width:auto; display:inline-block;"></select>
+      </div>
+      <p class="section-desc">Training-window performance (selection metric) across the full parameter grid for the chosen window — a "peaky" surface with an isolated best cell is a classic overfitting warning sign.</p>
+      <div class="card">
+        <div id="heatmapChart" style="width:100%; height:400px;"></div>
+      </div>
+    </section>
+
+    <!-- In-sample vs OOS -->
+    <section class="section" id="sec-isoos">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">In-Sample vs. Out-of-Sample Performance</span></div>
+      <p class="section-desc">Each point is one walk-forward window: the blue line compounds each window's <i>training-period</i> return with its own selected parameters (how good the strategy looked on the data used to pick it); the gold line compounds that same parameter choice's return on the following <i>unseen test window</i>.</p>
+      <div class="card">
+        <div id="isoosChart" style="width:100%; height:380px;"></div>
+      </div>
+    </section>
+
+    <!-- Walk-forward equity curve -->
+    <section class="section" id="sec-equity">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Walk-Forward Equity Curve</span></div>
+      <p class="section-desc">Day-by-day compounded equity from concatenating every window's genuinely out-of-sample returns — this is the realistic performance an investor following this process would have actually experienced, shown against two benchmarks over the same period.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-line" style="background:var(--oos);"></span>Walk-forward (honest OOS)</span>
+          <span><span class="legend-line" style="background:var(--loss);"></span>Full-sample optimized (hindsight, in-sample)</span>
+          <span><span class="legend-line" style="background:var(--text-faint);"></span>Buy &amp; hold</span>
+        </div>
+        <div id="wfEquityChart" style="width:100%; height:400px;"></div>
+      </div>
+    </section>
+
+    <!-- Drawdown -->
+    <section class="section" id="sec-drawdown">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Drawdown</span></div>
+      <div class="card">
+        <div id="drawdownChart" style="width:100%; height:340px;"></div>
+      </div>
+    </section>
+
+    <!-- Metrics comparison table -->
+    <section class="section" id="sec-metrics">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Metrics Comparison</span></div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr><th>Metric</th><th class="oos-col">Walk-Forward (OOS)</th><th>Full-Sample Optimized (Hindsight)</th><th>Buy &amp; Hold</th></tr></thead>
+          <tbody id="metricsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Formula reference -->
+    <section class="section" id="sec-formulas">
+      <div class="section-head"><span class="section-num">09</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">CAGR</div>
+        <div class="f-math">CAGR = (V_final / V_start)^(252/N) − 1</div>
+        <div class="f-note">N = number of trading days in the period; 252 trading days/year is assumed.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Sharpe Ratio (annualized)</div>
+        <div class="f-math">Sharpe = mean(daily returns) / std(daily returns) × √252</div>
+        <div class="f-note">Assumes a zero risk-free rate for simplicity.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Maximum Drawdown</div>
+        <div class="f-math">MaxDD = max over t of (running peak equity − equity(t)) / running peak equity</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Turnover</div>
+        <div class="f-math">Turnover = Σ |position(t) − position(t−1)|</div>
+        <div class="f-note">A position of 1 unit fully reversing to −1 contributes 2 to turnover.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Signal &amp; Position Timing</div>
+        <div class="f-math">signal(t) = 1 if MA_fast(t) &gt; MA_slow(t) else 0 (or −1 if shorts allowed)</div>
+        <div class="f-math">position held on day t+1 = signal(t); return(t+1) uses that position</div>
+        <div class="f-note">The one-day lag between signal and execution avoids lookahead bias — today's trade can only use information known as of yesterday's close.</div>
+      </div>
+    </section>
+
+    <!-- Educational -->
+    <section class="section" id="sec-edu">
+      <div class="section-head"><span class="section-num">10</span><span class="section-title">Overfitting, Data Snooping &amp; Why Walk-Forward Testing Exists</span></div>
+      <details class="disclosure" open>
+        <summary>Overfitting &amp; Data Snooping</summary>
+        <div class="disclosure-body">
+          <p><b>Overfitting</b> happens when a strategy's parameters are tuned so closely to the quirks of one specific dataset that they capture noise rather than a genuine, persistent pattern. <b>Data snooping</b> (or "data mining bias") is the related risk of testing many parameter combinations against the same data until one happens to look great by chance — with enough combinations tried, some will look spectacular purely by luck, not skill.</p>
+          <p>The Parameter Performance Heatmap above makes this concrete: a smooth surface where many nearby parameter combinations perform similarly suggests a robust pattern; a sharp, isolated peak surrounded by mediocre neighbors is a warning sign that the "best" combination may just be noise.</p>
+        </div>
+      </details>
+      <details class="disclosure" open>
+        <summary>Parameter Instability</summary>
+        <div class="disclosure-body">
+          <p>If the truly "best" parameters were stable properties of the market, walk-forward optimization should select roughly the same parameters window after window. In practice, the Parameter Selection Through Time chart usually shows the selected (fast, slow) pair jumping around, often correlating with regime shifts — what worked during a trending window can be actively harmful once the market turns choppy or reverses. That instability is itself important information, not a flaw in the tool.</p>
+        </div>
+      </details>
+      <details class="disclosure" open>
+        <summary>Why Walk-Forward Testing Is More Realistic</summary>
+        <div class="disclosure-body">
+          <p>Selecting parameters by optimizing over the <i>entire</i> historical dataset and then reporting performance over that same dataset is a form of look-ahead bias: you are effectively trading with knowledge of the future. Walk-forward testing enforces a stricter, more honest discipline: parameters are chosen using only data available <i>up to</i> a point in time, then judged strictly on data that follows — exactly mirroring how a strategy would actually have to be run in real time, without the benefit of hindsight.</p>
+          <p>The Metrics Comparison table above typically shows the full-sample, hindsight-optimized result looking better than the honest walk-forward result. That gap is not a bug — it <i>is</i> the lesson: it's a direct, visible measure of how much of the full-sample result was really just overfitting to that specific history.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational backtesting-methodology tool. The price series is synthetic and illustrative, not real market data. The moving-average crossover strategy, transaction cost assumptions, and metric definitions are simplified for teaching purposes. Past or simulated performance, walk-forward or otherwise, is not indicative of future results. Nothing here constitutes investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   WALK-FORWARD OPTIMIZATION VISUALIZER
+   Sections:
+     A. Seeded RNG
+     B. Synthetic regime-based price generator
+     C. Moving-average crossover backtest engine (lookahead-bias tested)
+     D. Metrics (CAGR, Sharpe, max drawdown, turnover)
+     E. Walk-forward loop (grid search per window, verified against
+        brute-force in build/test notes)
+     F. Rendering (charts, tables, KPIs)
+     G. UI wiring
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   A. RANDOM NUMBER GENERATION
+   --------------------------------------------------------------------- */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeNormalGen(rng) {
+  let spare = null;
+  return function () {
+    if (spare !== null) { const v = spare; spare = null; return v; }
+    let u, v, s;
+    do { u = rng() * 2 - 1; v = rng() * 2 - 1; s = u * u + v * v; } while (s >= 1 || s === 0);
+    const mul = Math.sqrt((-2 * Math.log(s)) / s);
+    spare = v * mul;
+    return u * mul;
+  };
+}
+
+/* ---------------------------------------------------------------------
+   B. SYNTHETIC REGIME-BASED PRICE GENERATOR
+   --------------------------------------------------------------------- */
+const REGIME_TYPES = {
+  bull:   { drift: 0.15, vol: 0.15, meanRevert: 0 },
+  bear:   { drift: -0.15, vol: 0.20, meanRevert: 0 },
+  choppy: { drift: 0.0, vol: 0.12, meanRevert: 3.0 },
+  crisis: { drift: -0.40, vol: 0.45, meanRevert: 0 },
+};
+const REGIME_CYCLE = ['bull', 'choppy', 'bear', 'crisis', 'choppy', 'bull'];
+
+function generateRegimeSeries(days, numSegments, seed) {
+  const rng = mulberry32(seed >>> 0);
+  const normalGen = makeNormalGen(rng);
+  const dt = 1 / 252;
+  const prices = new Float64Array(days + 1);
+  const regimeLabels = new Array(days + 1);
+  prices[0] = 100;
+  regimeLabels[0] = REGIME_CYCLE[0];
+
+  const segLen = Math.floor(days / numSegments);
+  let segStart = 0, t = 1, logMeanRef = Math.log(100);
+  for (let seg = 0; seg < numSegments; seg++) {
+    const regimeType = REGIME_CYCLE[seg % REGIME_CYCLE.length];
+    const cfg = REGIME_TYPES[regimeType];
+    const segEnd = seg === numSegments - 1 ? days : segStart + segLen;
+    logMeanRef = Math.log(prices[t - 1]);
+    for (; t <= segEnd; t++) {
+      const Z = normalGen();
+      const logPrev = Math.log(prices[t - 1]);
+      const revertTerm = cfg.meanRevert > 0 ? cfg.meanRevert * (logMeanRef - logPrev) * dt : 0;
+      const drift = (cfg.drift - 0.5 * cfg.vol * cfg.vol) * dt + revertTerm;
+      const shock = cfg.vol * Math.sqrt(dt) * Z;
+      prices[t] = prices[t - 1] * Math.exp(drift + shock);
+      if (!isFinite(prices[t]) || prices[t] <= 0) prices[t] = prices[t - 1] * 0.5;
+      regimeLabels[t] = regimeType;
+    }
+    segStart = segEnd;
+  }
+  return { prices: Array.from(prices), regimeLabels };
+}
+
+/* ---------------------------------------------------------------------
+   C. MOVING-AVERAGE CROSSOVER BACKTEST ENGINE
+   --------------------------------------------------------------------- */
+function movingAverages(prices, period) {
+  const n = prices.length;
+  const ma = new Float64Array(n).fill(NaN);
+  let sum = 0;
+  for (let t = 0; t < n; t++) {
+    sum += prices[t];
+    if (t >= period) sum -= prices[t - period];
+    if (t >= period - 1) ma[t] = sum / period;
+  }
+  return ma;
+}
+// Signal decided from data through day t-1; position applied to day t's
+// return -- a one-day lag that prevents lookahead bias (verified in
+// build/test notes with a manufactured price-jump scenario).
+function backtestCombo(prices, fast, slow, allowShort, txCost) {
+  const n = prices.length;
+  const maFast = movingAverages(prices, fast);
+  const maSlow = movingAverages(prices, slow);
+  const positions = new Float64Array(n);
+  const returns = new Float64Array(n);
+  let prevPosition = 0;
+  for (let t = 1; t < n; t++) {
+    let signal = 0;
+    if (!isNaN(maFast[t - 1]) && !isNaN(maSlow[t - 1])) {
+      signal = maFast[t - 1] > maSlow[t - 1] ? 1 : (allowShort ? -1 : 0);
+    }
+    const assetReturn = prices[t] / prices[t - 1] - 1;
+    const posChange = Math.abs(signal - prevPosition);
+    returns[t] = signal * assetReturn - txCost * posChange;
+    positions[t] = signal;
+    prevPosition = signal;
+  }
+  return { positions: Array.from(positions), returns: Array.from(returns) };
+}
+
+/* ---------------------------------------------------------------------
+   D. METRICS
+   --------------------------------------------------------------------- */
+function sliceMetrics(returns, positions, start, end) {
+  const slice = returns.slice(start, end);
+  const posSlice = positions.slice(start, end);
+  const n = slice.length;
+  if (n === 0) return { totalReturn: 0, CAGR: 0, sharpe: 0, maxDrawdown: 0, turnover: 0, equityCurve: [1], n: 0 };
+  let equity = 1;
+  const equityCurve = [1];
+  let peak = 1, maxDD = 0, sum = 0, sumSq = 0, turnover = 0;
+  for (let i = 0; i < n; i++) {
+    const r = slice[i];
+    equity *= (1 + r);
+    equityCurve.push(equity);
+    if (equity > peak) peak = equity;
+    const dd = (peak - equity) / peak;
+    if (dd > maxDD) maxDD = dd;
+    sum += r; sumSq += r * r;
+    if (i > 0) turnover += Math.abs(posSlice[i] - posSlice[i - 1]);
+  }
+  const mean = sum / n;
+  const variance = n > 1 ? Math.max((sumSq / n - mean * mean) * n / (n - 1), 0) : 0;
+  const std = Math.sqrt(variance);
+  const sharpe = std > 1e-12 ? (mean / std) * Math.sqrt(252) : 0;
+  const totalReturn = equity - 1;
+  const years = n / 252;
+  const CAGR = years > 0 ? Math.pow(Math.max(equity, 1e-9), 1 / years) - 1 : 0;
+  return { totalReturn, CAGR, sharpe, maxDrawdown: maxDD, turnover, equityCurve, n };
+}
+
+/* ---------------------------------------------------------------------
+   E. WALK-FORWARD LOOP
+   --------------------------------------------------------------------- */
+function buildParamGrid(fastList, slowList) {
+  const grid = [];
+  fastList.forEach(f => slowList.forEach(s => { if (f < s) grid.push({ fast: f, slow: s }); }));
+  return grid;
+}
+function selectionValue(metrics, metricName) {
+  if (metricName === 'sharpe') return metrics.sharpe;
+  if (metricName === 'cagr') return metrics.CAGR;
+  return metrics.totalReturn;
+}
+function runWalkForward(prices, opts) {
+  const { trainLen, testLen, stepSize, grid, allowShort, txCost, selectionMetric } = opts;
+  const n = prices.length;
+  const comboResults = grid.map(({ fast, slow }) => ({ fast, slow, ...backtestCombo(prices, fast, slow, allowShort, txCost) }));
+
+  const windows = [];
+  let trainStart = 1;
+  while (trainStart + trainLen + testLen <= n) {
+    const trainEnd = trainStart + trainLen;
+    const testStart = trainEnd;
+    const testEnd = testStart + testLen;
+    let bestIdx = -1, bestVal = -Infinity, bestTrainMetrics = null;
+    const trainMetricsAll = [];
+    comboResults.forEach((combo, idx) => {
+      const m = sliceMetrics(combo.returns, combo.positions, trainStart, trainEnd);
+      trainMetricsAll.push(m);
+      const val = selectionValue(m, selectionMetric);
+      if (val > bestVal) { bestVal = val; bestIdx = idx; bestTrainMetrics = m; }
+    });
+    const bestCombo = comboResults[bestIdx];
+    const testMetrics = sliceMetrics(bestCombo.returns, bestCombo.positions, testStart, testEnd);
+    windows.push({
+      trainStart, trainEnd, testStart, testEnd,
+      fast: bestCombo.fast, slow: bestCombo.slow,
+      trainMetrics: bestTrainMetrics, testMetrics, trainMetricsAll,
+      testReturns: bestCombo.returns.slice(testStart, testEnd),
+      testPositions: bestCombo.positions.slice(testStart, testEnd),
+    });
+    trainStart += stepSize;
+  }
+  return { windows, comboResults };
+}
+
+/* ---------------------------------------------------------------------
+   STATE
+   --------------------------------------------------------------------- */
+let DATA = null;   // { prices, regimeLabels }
+let RESULT = null; // walk-forward run output
+let GRID = null;
+
+const els = {
+  totalDays: document.getElementById('totalDays'),
+  numSegments: document.getElementById('numSegments'),
+  dataSeed: document.getElementById('dataSeed'),
+  fastList: document.getElementById('fastList'),
+  slowList: document.getElementById('slowList'),
+  allowShort: document.getElementById('allowShort'),
+  txCost: document.getElementById('txCost'), v_txCost: document.getElementById('v_txCost'),
+  trainLen: document.getElementById('trainLen'),
+  testLen: document.getElementById('testLen'),
+  stepSize: document.getElementById('stepSize'),
+  selectionMetric: document.getElementById('selectionMetric'),
+  windowSelect: document.getElementById('windowSelect'),
+};
+function syncLabels() {
+  els.v_txCost.textContent = els.txCost.value + ' bps';
+  const step = parseFloat(els.stepSize.value), test = parseFloat(els.testLen.value);
+  document.getElementById('overlapHint').innerHTML = step < test
+    ? `<span style="color:var(--warn);">Step size &lt; test length: test windows overlap, so the walk-forward equity curve double-counts some days.</span>`
+    : `Step size ≥ test length: non-overlapping test windows (standard walk-forward).`;
+}
+els.txCost.addEventListener('input', syncLabels);
+[els.stepSize, els.testLen].forEach(el => el.addEventListener('input', syncLabels));
+syncLabels();
+
+function parseList(str) {
+  return str.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n > 0);
+}
+
+function showLoading(text) { document.getElementById('loadingText').textContent = text || 'Working…'; document.getElementById('loadingOverlay').classList.add('active'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+function plotlyReady() {
+  if (typeof Plotly === 'undefined') {
+    document.getElementById('statusLine').innerHTML = '<span style="color:var(--loss);">Chart library failed to load from CDN. Tables and metrics still work.</span>';
+    return false;
+  }
+  return true;
+}
+
+function regenerateData() {
+  const days = Math.max(parseInt(els.totalDays.value, 10) || 500, 100);
+  const segs = Math.max(parseInt(els.numSegments.value, 10) || 4, 2);
+  let seedVal = parseInt(els.dataSeed.value, 10);
+  if (!Number.isFinite(seedVal)) { seedVal = 0; const s = String(els.dataSeed.value||'seed'); for (let i=0;i<s.length;i++) seedVal=(seedVal*31+s.charCodeAt(i))>>>0; }
+  DATA = generateRegimeSeries(days, segs, seedVal);
+}
+
+document.getElementById('regenBtn').addEventListener('click', () => { regenerateData(); runAll(); });
+document.getElementById('runBtn').addEventListener('click', runAll);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  els.totalDays.value = 1500; els.numSegments.value = 7; els.dataSeed.value = '42';
+  els.fastList.value = '5,10,15,20,30'; els.slowList.value = '20,30,50,75,100';
+  els.allowShort.value = '0'; els.txCost.value = 5;
+  els.trainLen.value = 200; els.testLen.value = 60; els.stepSize.value = 60; els.selectionMetric.value = 'sharpe';
+  syncLabels();
+  regenerateData(); runAll();
+});
+
+function runAll() {
+  showLoading('Running walk-forward optimization…');
+  setTimeout(() => {
+    const t0 = performance.now();
+    if (!DATA) regenerateData();
+    const fastList = parseList(els.fastList.value);
+    const slowList = parseList(els.slowList.value);
+    GRID = buildParamGrid(fastList, slowList);
+    if (GRID.length === 0) {
+      document.getElementById('statusLine').innerHTML = '<span style="color:var(--loss);">Parameter grid is empty — ensure at least one fast period is smaller than a slow period.</span>';
+      hideLoading();
+      return;
+    }
+    const trainLen = Math.max(parseInt(els.trainLen.value, 10) || 50, 10);
+    const testLen = Math.max(parseInt(els.testLen.value, 10) || 20, 5);
+    const stepSize = Math.max(parseInt(els.stepSize.value, 10) || testLen, 1);
+    const allowShort = els.allowShort.value === '1';
+    const txCost = parseFloat(els.txCost.value) / 10000;
+    const selectionMetric = els.selectionMetric.value;
+
+    RESULT = runWalkForward(DATA.prices, { trainLen, testLen, stepSize, grid: GRID, allowShort, txCost, selectionMetric });
+    const t1 = performance.now();
+
+    document.getElementById('statusLine').innerHTML =
+      `${RESULT.windows.length} windows · ${GRID.length} grid combos · ` +
+      (RESULT.windows.length === 0 ? '<span style="color:var(--loss);">no windows fit — reduce train/test length</span>' : `<b>${(t1-t0).toFixed(0)} ms</b>`);
+
+    populateWindowSelect();
+    renderAll();
+    hideLoading();
+  }, 15);
+}
+
+function populateWindowSelect() {
+  const sel = els.windowSelect;
+  const prev = sel.value;
+  sel.innerHTML = RESULT.windows.map((w, i) => `<option value="${i}">Window ${i} (train ${w.trainStart}-${w.trainEnd}, test ${w.testStart}-${w.testEnd})</option>`).join('');
+  if (prev && parseInt(prev,10) < RESULT.windows.length) sel.value = prev;
+  sel.onchange = () => { if (plotlyReady()) renderHeatmap(); };
+}
+
+/* ---------------------------------------------------------------------
+   F. RENDERING
+   --------------------------------------------------------------------- */
+function kpiCard(label, value, sub, cls) {
+  return `<div class="kpi ${cls || ''}"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub || ''}</div></div>`;
+}
+function fmtPct(x, d) { if (!isFinite(x)) return '—'; return (x >= 0 ? '+' : '') + (x * 100).toFixed(d === undefined ? 2 : d) + '%'; }
+function fmtNum(x, d) { if (!isFinite(x)) return '—'; return x.toFixed(d === undefined ? 2 : d); }
+
+function buildBenchmarks() {
+  const prices = DATA.prices;
+  const firstTestStart = RESULT.windows[0].testStart;
+  const lastTestEnd = RESULT.windows[RESULT.windows.length - 1].testEnd;
+
+  // Walk-forward day-by-day OOS curve
+  const wfReturns = [0];
+  const wfPositions = [0];
+  RESULT.windows.forEach(w => { w.testReturns.forEach((r,i) => { wfReturns.push(r); wfPositions.push(w.testPositions[i]); }); });
+  const wfMetrics = sliceMetrics(wfReturns, wfPositions, 1, wfReturns.length);
+
+  // Full-sample optimized (hindsight): best combo over the ENTIRE series, sliced to [firstTestStart,lastTestEnd) for fair comparison
+  let fullBestVal = -Infinity, fullBestCombo = null, fullBestFull = null;
+  const allowShort = els.allowShort.value === '1';
+  const txCost = parseFloat(els.txCost.value) / 10000;
+  const selectionMetric = els.selectionMetric.value;
+  GRID.forEach(({ fast, slow }) => {
+    const bt = backtestCombo(prices, fast, slow, allowShort, txCost);
+    const m = sliceMetrics(bt.returns, bt.positions, 1, prices.length);
+    const val = selectionValue(m, selectionMetric);
+    if (val > fullBestVal) { fullBestVal = val; fullBestCombo = { fast, slow }; fullBestFull = bt; }
+  });
+  const fullSliceMetrics = sliceMetrics(fullBestFull.returns, fullBestFull.positions, firstTestStart, lastTestEnd);
+
+  // Buy & hold, sliced to same window
+  const bhReturns = [0], bhPositions = [0];
+  for (let t = 1; t < prices.length; t++) { bhReturns.push(prices[t]/prices[t-1]-1); bhPositions.push(1); }
+  const bhSliceMetrics = sliceMetrics(bhReturns, bhPositions, firstTestStart, lastTestEnd);
+
+  return { wfMetrics, wfReturns, fullBestCombo, fullSliceMetrics, fullBestFull, bhSliceMetrics, bhReturns, firstTestStart, lastTestEnd };
+}
+
+function renderAll() {
+  if (!RESULT || RESULT.windows.length === 0) return;
+  const bench = buildBenchmarks();
+  lastBench = bench;
+  renderKPIs(bench);
+  renderMetricsTable(bench);
+  if (plotlyReady()) {
+    renderPriceChart();
+    renderParamTimeChart();
+    renderHeatmap();
+    renderISOOSChart();
+    renderWFEquityChart(bench);
+    renderDrawdownChart(bench);
+  }
+}
+let lastBench = null;
+
+function renderKPIs(bench) {
+  const m = bench.wfMetrics;
+  // Parameter stability: fraction of windows where selection changed from previous
+  let changes = 0;
+  for (let i = 1; i < RESULT.windows.length; i++) {
+    if (RESULT.windows[i].fast !== RESULT.windows[i-1].fast || RESULT.windows[i].slow !== RESULT.windows[i-1].slow) changes++;
+  }
+  const instabilityPct = RESULT.windows.length > 1 ? changes / (RESULT.windows.length - 1) : 0;
+  const avgTrainSharpe = RESULT.windows.reduce((s,w) => s + w.trainMetrics.sharpe, 0) / RESULT.windows.length;
+  const avgTestSharpe = RESULT.windows.reduce((s,w) => s + w.testMetrics.sharpe, 0) / RESULT.windows.length;
+  const efficiency = avgTrainSharpe !== 0 ? avgTestSharpe / avgTrainSharpe : NaN;
+
+  const html = [
+    kpiCard('Walk-Forward CAGR', fmtPct(m.CAGR), 'out-of-sample, honest', 'oos'),
+    kpiCard('Walk-Forward Sharpe', fmtNum(m.sharpe, 2), 'annualized', 'oos'),
+    kpiCard('Max Drawdown', fmtPct(m.maxDrawdown), 'walk-forward equity curve', 'loss'),
+    kpiCard('Turnover', fmtNum(m.turnover, 1), 'total |Δposition|'),
+    kpiCard('Avg Train Sharpe', fmtNum(avgTrainSharpe, 2), 'in-sample, across windows'),
+    kpiCard('Avg Test Sharpe', fmtNum(avgTestSharpe, 2), 'out-of-sample, across windows', 'oos'),
+    kpiCard('OOS / IS Efficiency', isFinite(efficiency) ? efficiency.toFixed(2)+'×' : '—', 'test Sharpe ÷ train Sharpe', efficiency < 0.5 ? 'warn' : undefined),
+    kpiCard('Parameter Instability', (instabilityPct*100).toFixed(0)+'%', 'of windows changed selection', instabilityPct > 0.5 ? 'warn' : undefined),
+  ];
+  document.getElementById('kpiGrid').innerHTML = html.join('');
+}
+
+function renderMetricsTable(bench) {
+  const wf = bench.wfMetrics, full = bench.fullSliceMetrics, bh = bench.bhSliceMetrics;
+  const rows = [
+    ['CAGR', fmtPct(wf.CAGR), fmtPct(full.CAGR), fmtPct(bh.CAGR)],
+    ['Sharpe Ratio', fmtNum(wf.sharpe,2), fmtNum(full.sharpe,2), fmtNum(bh.sharpe,2)],
+    ['Max Drawdown', fmtPct(wf.maxDrawdown), fmtPct(full.maxDrawdown), fmtPct(bh.maxDrawdown)],
+    ['Total Return', fmtPct(wf.totalReturn), fmtPct(full.totalReturn), fmtPct(bh.totalReturn)],
+    ['Turnover', fmtNum(wf.turnover,1), fmtNum(full.turnover,1), '0.0'],
+    ['Selected Params', '(rolling — see chart)', `fast=${bench.fullBestCombo.fast}, slow=${bench.fullBestCombo.slow}`, 'n/a'],
+  ];
+  document.getElementById('metricsTableBody').innerHTML = rows.map(([l,a,b,c]) =>
+    `<tr><td>${l}</td><td class="oos-col">${a}</td><td>${b}</td><td>${c}</td></tr>`
+  ).join('');
+}
+
+function plotlyLayoutBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 60, r: 20, t: 20, b: 40 },
+    xaxis: { gridcolor: '#1A1C22', zerolinecolor: '#242730', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', zerolinecolor: '#242730', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.08, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE', family: 'JetBrains Mono, monospace' } },
+  }, extra || {});
+}
+const PLOTLY_CONFIG = { displayModeBar: false, responsive: true };
+const REGIME_COLORS = { bull: 'rgba(46,213,115,0.07)', bear: 'rgba(255,71,87,0.07)', choppy: 'rgba(140,124,255,0.06)', crisis: 'rgba(176,0,32,0.12)' };
+
+function renderPriceChart() {
+  const { prices, regimeLabels } = DATA;
+  const xs = prices.map((_, i) => i);
+  const shapes = [];
+
+  // Regime background bands (merge contiguous same-regime runs)
+  let runStart = 0;
+  for (let i = 1; i <= regimeLabels.length; i++) {
+    if (i === regimeLabels.length || regimeLabels[i] !== regimeLabels[runStart]) {
+      shapes.push({ type: 'rect', x0: runStart, x1: i - 1, y0: 0, y1: 1, yref: 'paper', fillcolor: REGIME_COLORS[regimeLabels[runStart]] || 'rgba(0,0,0,0)', line: { width: 0 } });
+      runStart = i;
+    }
+  }
+  // Train/test window bands
+  RESULT.windows.forEach(w => {
+    shapes.push({ type: 'rect', x0: w.trainStart, x1: w.trainEnd, y0: 0, y1: 0.06, yref: 'paper', fillcolor: 'rgba(79,142,255,0.5)', line: { width: 0 } });
+    shapes.push({ type: 'rect', x0: w.testStart, x1: w.testEnd, y0: 0, y1: 0.06, yref: 'paper', fillcolor: 'rgba(255,193,69,0.6)', line: { width: 0 } });
+  });
+
+  Plotly.newPlot('priceChart', [{ x: xs, y: prices, mode: 'lines', line: { color: '#E8E9EE', width: 1.5 }, name: 'Price', hoverinfo: 'skip' }],
+    plotlyLayoutBase({
+      xaxis: { title: 'Day', gridcolor: '#1A1C22', linecolor: '#242730' },
+      yaxis: { title: 'Price', gridcolor: '#1A1C22', linecolor: '#242730' },
+      shapes,
+    }), PLOTLY_CONFIG);
+}
+
+function renderParamTimeChart() {
+  const xs = RESULT.windows.map((w, i) => i);
+  const fastYs = RESULT.windows.map(w => w.fast);
+  const slowYs = RESULT.windows.map(w => w.slow);
+  Plotly.newPlot('paramTimeChart', [
+    { x: xs, y: fastYs, mode: 'lines+markers', line: { color: '#4F8EFF', width: 2, shape: 'hv' }, name: 'Selected fast MA' },
+    { x: xs, y: slowYs, mode: 'lines+markers', line: { color: '#FFC145', width: 2, shape: 'hv' }, name: 'Selected slow MA' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Window #', gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'MA Period (days)', gridcolor: '#1A1C22', linecolor: '#242730' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderHeatmap() {
+  const idx = parseInt(els.windowSelect.value || '0', 10);
+  const w = RESULT.windows[idx];
+  if (!w) return;
+  const fastVals = Array.from(new Set(GRID.map(g => g.fast))).sort((a,b)=>a-b);
+  const slowVals = Array.from(new Set(GRID.map(g => g.slow))).sort((a,b)=>a-b);
+  const z = fastVals.map(f => slowVals.map(s => {
+    const gi = GRID.findIndex(g => g.fast === f && g.slow === s);
+    return gi >= 0 ? selectionValue(w.trainMetricsAll[gi], els.selectionMetric.value) : null;
+  }));
+  Plotly.newPlot('heatmapChart', [{
+    z, x: slowVals.map(String), y: fastVals.map(String), type: 'heatmap',
+    colorscale: [[0,'#2A0A0F'],[0.4,'#7A2030'],[0.6,'#B08A2E'],[0.8,'#3A7A5C'],[1,'#4FD1C5']],
+    hovertemplate: 'fast=%{y}, slow=%{x}<br>value=%{z:.3f}<extra></extra>',
+    colorbar: { thickness: 12, outlinewidth: 0, tickfont: { color: '#8C90A0', size: 10 } },
+  }], plotlyLayoutBase({
+    xaxis: { title: 'Slow MA period', gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Fast MA period', gridcolor: '#1A1C22', linecolor: '#242730' },
+    annotations: [{ x: String(w.slow), y: String(w.fast), text: '★ selected', showarrow: false, font: { color: '#E8E9EE', size: 11 } }],
+  }), PLOTLY_CONFIG);
+}
+
+function renderISOOSChart() {
+  let isEq = 1, oosEq = 1;
+  const isEquity = [1], oosEquity = [1];
+  RESULT.windows.forEach(w => {
+    isEq *= (1 + w.trainMetrics.totalReturn); isEquity.push(isEq);
+    oosEq *= (1 + w.testMetrics.totalReturn); oosEquity.push(oosEq);
+  });
+  const xs = isEquity.map((_, i) => i);
+  Plotly.newPlot('isoosChart', [
+    { x: xs, y: isEquity, mode: 'lines+markers', line: { color: '#4F8EFF', width: 2.5 }, name: 'In-sample (training) chained' },
+    { x: xs, y: oosEquity, mode: 'lines+markers', line: { color: '#FFC145', width: 2.5 }, name: 'Out-of-sample (test) chained' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Window #', gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Chained Equity (per-window compounding)', gridcolor: '#1A1C22', linecolor: '#242730' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderWFEquityChart(bench) {
+  const wfXs = bench.wfMetrics.equityCurve.map((_, i) => i);
+  const fullXs = bench.fullSliceMetrics.equityCurve.map((_, i) => i);
+  const bhXs = bench.bhSliceMetrics.equityCurve.map((_, i) => i);
+  Plotly.newPlot('wfEquityChart', [
+    { x: wfXs, y: bench.wfMetrics.equityCurve, mode: 'lines', line: { color: '#FFC145', width: 2.5 }, name: 'Walk-forward (honest OOS)' },
+    { x: fullXs, y: bench.fullSliceMetrics.equityCurve, mode: 'lines', line: { color: '#FF4757', width: 2, dash: 'dash' }, name: 'Full-sample optimized (hindsight)' },
+    { x: bhXs, y: bench.bhSliceMetrics.equityCurve, mode: 'lines', line: { color: '#5A5E6B', width: 1.5, dash: 'dot' }, name: 'Buy & hold' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Days since first test window began', gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Equity (starts at 1.0)', gridcolor: '#1A1C22', linecolor: '#242730' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderDrawdownChart(bench) {
+  const eq = bench.wfMetrics.equityCurve;
+  let peak = 1;
+  const dd = eq.map(v => { if (v > peak) peak = v; return -((peak - v) / peak) * 100; });
+  const xs = eq.map((_, i) => i);
+  Plotly.newPlot('drawdownChart', [
+    { x: xs, y: dd, mode: 'lines', fill: 'tozeroy', fillcolor: 'rgba(255,71,87,0.18)', line: { color: '#FF4757', width: 2 }, name: 'Walk-forward drawdown' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Days since first test window began', gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Drawdown (%)', gridcolor: '#1A1C22', linecolor: '#242730' },
+  }), PLOTLY_CONFIG);
+}
+
+/* ---------------------------------------------------------------------
+   INITIAL RUN
+   --------------------------------------------------------------------- */
+regenerateData();
+runAll();
+</script>
+</body>
+</html>

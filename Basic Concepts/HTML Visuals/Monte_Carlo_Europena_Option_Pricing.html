@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monte Carlo Option Pricing — Quant Research Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090D;
+  --bg-2:#0C0E15;
+  --panel:#111420;
+  --panel-2:#151827;
+  --border:#242A3B;
+  --border-soft:#1A1E2C;
+  --text:#E7E9F2;
+  --text-dim:#8D93A8;
+  --text-faint:#5A6078;
+  --accent:#8C7CFF;
+  --accent-dim:#5F4FCB;
+  --accent-2:#4FD1C5;
+  --warn:#F5A623;
+  --loss:#FF6B6B;
+  --gain:#3DD68C;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px;
+  --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 12% -10%, rgba(140,124,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(79,209,197,0.05), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#0d0620;}
+
+.app{display:grid; grid-template-columns:320px 1fr; min-height:100vh;}
+@media (max-width:1000px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--accent), var(--accent-2), var(--accent)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#0d0620; font-size:13px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:16px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600; display:flex; justify-content:space-between; align-items:center;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .tip{cursor:help; border-bottom:1px dotted var(--text-faint);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #0d0620; box-shadow:0 0 0 2px rgba(140,124,255,0.25);}
+input[type=range]::-moz-range-thumb{width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #0d0620;}
+select, input[type=number], input[type=text]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#0d0620; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.08); color:#0d0620;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;}
+.seg{display:flex; border:1px solid var(--border); border-radius:7px; overflow:hidden;}
+.seg button{flex:1; padding:8px 4px; background:var(--panel-2); border:none; color:var(--text-dim); font-family:var(--mono); font-size:11.5px; cursor:pointer;}
+.seg button.active{background:rgba(140,124,255,0.15); color:var(--accent);}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:26px 32px 60px; max-width:1400px;}
+.page-header{margin-bottom:22px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:30px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:760px; font-size:13.5px;}
+
+.section{margin-top:34px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:17px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-6px 0 14px; max-width:760px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:18px 18px 16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 16px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.alt:before{background:var(--accent-2);}
+.kpi.warn:before{background:var(--warn);}
+.kpi.loss:before{background:var(--loss);}
+.kpi-label{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:21px; font-weight:600; margin-top:6px; letter-spacing:-0.3px;}
+.kpi-sub{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+.kpi-sub b{color:var(--text-dim); font-weight:600;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12.5px;}
+table.data-table th, table.data-table td{padding:8px 10px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left; color:var(--text-dim); font-family:var(--body);}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:14.5px; color:var(--text); margin-bottom:6px; overflow-x:auto;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body h5{color:var(--text); font-family:var(--display); font-size:13px; margin:14px 0 4px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.badge{display:inline-block; font-family:var(--mono); font-size:10.5px; padding:2px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-dim); margin-left:8px;}
+.badge.illustrative{color:var(--warn); border-color:rgba(245,166,35,0.4);}
+
+.legend-row{display:flex; gap:18px; align-items:center; font-size:12px; color:var(--text-dim); margin-bottom:10px; flex-wrap:wrap;}
+.legend-dot{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px;}
+.legend-line{display:inline-block; width:16px; height:2px; margin-right:6px; vertical-align:middle;}
+
+.footer-note{margin-top:44px; padding-top:18px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.two-col{display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
+@media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+.overlay-loading{position:fixed; inset:0; background:rgba(6,7,11,0.72); backdrop-filter:blur(2px); display:none; align-items:center; justify-content:center; z-index:999; flex-direction:column; gap:10px;}
+.overlay-loading.active{display:flex;}
+.spinner{width:34px; height:34px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--accent); animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.overlay-loading span{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+</style>
+</head>
+<body>
+
+<div class="overlay-loading" id="loadingOverlay"><div class="spinner"></div><span id="loadingText">Running simulation…</span></div>
+
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">MC</div><div class="brand-name">MC Option Pricer</div></div>
+    <div class="brand-sub">Monte Carlo vs. Black-Scholes</div>
+
+    <div class="ctrl-group">
+      <h4>Contract</h4>
+      <div class="field">
+        <div class="field-label"><span>Type</span></div>
+        <div class="seg" id="optTypeSeg"><button data-type="call" class="active">Call</button><button data-type="put">Put</button></div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Spot S₀</span><span class="val" id="v_S0">100</span></div>
+          <input type="range" id="S0" min="1" max="500" step="1" value="100">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Strike K</span><span class="val" id="v_K">100</span></div>
+          <input type="range" id="K" min="1" max="500" step="1" value="100">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Maturity T (years)</span><span class="val" id="v_T">1.00</span></div>
+        <input type="range" id="T" min="0.05" max="5" step="0.05" value="1">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Market</h4>
+      <div class="field">
+        <div class="field-label"><span>Volatility σ</span><span class="val" id="v_sigma">20.0%</span></div>
+        <input type="range" id="sigma" min="1" max="150" step="0.5" value="20">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Rate r</span><span class="val" id="v_r">5.0%</span></div>
+          <input type="range" id="r" min="-5" max="20" step="0.25" value="5">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Div. Yield q</span><span class="val" id="v_q">0.0%</span></div>
+          <input type="range" id="q" min="0" max="10" step="0.25" value="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Simulation Grid</h4>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>MC Paths (N)</span></div>
+          <select id="paths">
+            <option value="100">100</option>
+            <option value="500">500</option>
+            <option value="1000">1,000</option>
+            <option value="5000" selected>5,000</option>
+            <option value="10000">10,000</option>
+            <option value="50000">50,000</option>
+            <option value="100000">100,000</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Time Steps</span></div>
+          <select id="steps">
+            <option value="12">12</option>
+            <option value="52" selected>52</option>
+            <option value="126">126</option>
+            <option value="252">252</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Random seed</span></div>
+        <input type="text" id="seed" value="42">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Displayed paths</span><span class="val" id="v_displayPaths">100</span></div>
+        <input type="range" id="displayPaths" min="10" max="250" step="10" value="100">
+      </div>
+      <div class="hint">Increasing N demonstrates convergence — try 100 vs. 100,000 and watch the error-decay chart below.</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="runBtn">▶ Run Simulation</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+    <div class="status-line" id="statusLine">Ready. Adjust parameters and click <b>Run Simulation</b>.</div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Quantitative Finance / Monte Carlo</div>
+      <h1 class="page-title">Monte Carlo Pricing of European Options</h1>
+      <p class="page-desc">Simulates risk-neutral geometric Brownian motion, prices a European option as the discounted expected payoff, and benchmarks the result against the closed-form Black-Scholes price — with the statistical machinery (standard error, confidence intervals, O(1/√N) convergence) made explicit and interactive.</p>
+    </div>
+
+    <!-- KPI dashboard -->
+    <section class="section" id="sec-kpi">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Pricing &amp; Error Metrics</span></div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <!-- 1. Price paths -->
+    <section class="section" id="sec-paths">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Simulated Price Paths</span>
+        <button class="btn" id="playBtn" style="width:auto; padding:6px 14px;">▶ Play Animation</button>
+      </div>
+      <p class="section-desc">A representative subset of the full simulated set of paths under the risk-neutral measure. Strike K is marked for reference.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-line" style="background:var(--accent);"></span>Simulated paths</span>
+          <span><span class="legend-line" style="background:var(--warn); opacity:0.8;"></span>Strike K</span>
+          <span><span class="legend-line" style="background:var(--accent-2);"></span>Mean path</span>
+        </div>
+        <div id="pathChart" style="width:100%; height:440px;"></div>
+      </div>
+    </section>
+
+    <!-- 2. Terminal histogram -->
+    <section class="section" id="sec-terminal">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Terminal Price Distribution</span></div>
+      <div class="card">
+        <div id="terminalChart" style="width:100%; height:380px;"></div>
+      </div>
+    </section>
+
+    <!-- 3. Payoff distribution -->
+    <section class="section" id="sec-payoff">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Payoff Distribution</span></div>
+      <p class="section-desc">Undiscounted payoff at maturity across all simulated paths. The mean of this distribution, discounted at the risk-free rate, is exactly the Monte Carlo price.</p>
+      <div class="card">
+        <div id="payoffChart" style="width:100%; height:340px;"></div>
+      </div>
+    </section>
+
+    <!-- 4. MC vs BS -->
+    <section class="section" id="sec-compare">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Monte Carlo vs. Black-Scholes</span></div>
+      <div class="two-col">
+        <div class="card">
+          <div id="compareChart" style="width:100%; height:300px;"></div>
+        </div>
+        <div class="card">
+          <table class="data-table"><tbody id="compareTableBody"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Convergence + 6. Confidence interval -->
+    <section class="section" id="sec-convergence">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Convergence &amp; Confidence Interval</span></div>
+      <p class="section-desc">The cumulative Monte Carlo estimate as more paths are included, using the same simulated sample (paths are i.i.d., so any prefix is a valid sub-sample). The shaded band is the running 95% confidence interval; the dashed line is the Black-Scholes benchmark.</p>
+      <div class="card">
+        <div id="convergenceChart" style="width:100%; height:400px;"></div>
+      </div>
+    </section>
+
+    <!-- Educational: error decay ~ 1/sqrt(N) -->
+    <section class="section" id="sec-errordecay">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Error Decay — the O(1/√N) Rule</span></div>
+      <p class="section-desc">Log-log plot of the absolute error between the running Monte Carlo estimate and the Black-Scholes price versus the number of paths used. Monte Carlo sampling error shrinks roughly as 1/√N, which appears as a straight line of slope ≈ −0.5 on log-log axes.</p>
+      <div class="card">
+        <div id="errorDecayChart" style="width:100%; height:380px;"></div>
+        <div class="hint" id="slopeHint" style="margin-top:8px;"></div>
+      </div>
+    </section>
+
+    <!-- Formula reference -->
+    <section class="section" id="sec-formulas">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Risk-Neutral GBM</div>
+        <div class="f-math">dS/S = (r − q) dt + σ dW</div>
+        <div class="f-note">Under the risk-neutral measure Q, the drift is replaced by (r − q) so that the discounted asset price is a martingale — this is what makes discounted expected payoff a valid price.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Exact Lognormal Simulation Step</div>
+        <div class="f-math">S(t+Δt) = S(t) · exp[(r − q − ½σ²)Δt + σ√Δt · Z],  Z ~ N(0,1)</div>
+        <div class="f-note">Because GBM has a closed-form lognormal transition density, this step is exact — using more time steps changes path granularity for visualization but introduces no discretization bias in the terminal distribution.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Monte Carlo Price</div>
+        <div class="f-math">V₀ = e^(−rT) · E_Q[payoff(S_T)]  ≈  e^(−rT) · (1/N) Σ payoff(S_T^(i))</div>
+        <div class="f-note">The option price is the discounted expectation of the payoff; Monte Carlo approximates the expectation with a sample average over N simulated terminal prices.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Standard Error &amp; Confidence Interval</div>
+        <div class="f-math">SE = s / √N,  95% CI = V̂₀ ± 1.96 · SE</div>
+        <div class="f-note">s is the sample standard deviation of the discounted payoffs. The Monte Carlo estimate is a sample mean, so its own sampling error shrinks at rate O(1/√N) by the Central Limit Theorem.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Black-Scholes Closed Form</div>
+        <div class="f-math">C = S₀e^(−qT)N(d₁) − Ke^(−rT)N(d₂),  P = Ke^(−rT)N(−d₂) − S₀e^(−qT)N(−d₁)</div>
+        <div class="f-math">d₁ = [ln(S₀/K) + (r − q + ½σ²)T] / (σ√T),  d₂ = d₁ − σ√T</div>
+        <div class="f-note">The exact solution for a European option under GBM — used here purely as a benchmark to validate the Monte Carlo estimate.</div>
+      </div>
+    </section>
+
+    <!-- Educational explanation -->
+    <section class="section" id="sec-edu">
+      <div class="section-head"><span class="section-num">09</span><span class="section-title">Educational Explanation</span></div>
+      <details class="disclosure">
+        <summary>Why Monte Carlo Works for Option Pricing</summary>
+        <div class="disclosure-body">
+          <p>Under the risk-neutral measure, an option's fair value equals the discounted expected payoff. If we can simulate the asset's terminal distribution under that measure, we can approximate this expectation by simply averaging the payoff across many simulated outcomes — no need to solve a PDE or invert a Fourier transform.</p>
+          <p>The trade-off is statistical noise: each simulated path is one random draw, so the sample average carries sampling error. That error is exactly what the standard error and confidence interval sections above quantify.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Understanding the 1/√N Convergence Rate</summary>
+        <div class="disclosure-body">
+          <p>By the Central Limit Theorem, the standard error of a sample mean built from N i.i.d. draws scales as σ/√N, where σ is the standard deviation of a single draw (here, a single discounted payoff). This means:</p>
+          <ul>
+            <li>Quadrupling N halves the standard error.</li>
+            <li>Increasing N by 100× only reduces error by 10×.</li>
+          </ul>
+          <p>This is why the Error Decay chart looks like a straight, downward-sloping line on log-log axes with a slope near −0.5 — and why practical Monte Carlo pricing engines invest heavily in variance-reduction techniques (antithetic variates, control variates, importance sampling) rather than simply brute-forcing N ever higher.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Interpreting the Confidence Interval</summary>
+        <div class="disclosure-body">
+          <p>The 95% confidence interval does not mean "there is a 95% probability the true price lies in this range" in a strict frequentist sense — it means that if we repeated this entire simulation many times, about 95% of the resulting intervals would contain the true (risk-neutral) expected discounted payoff. As N grows, this interval should tighten around the Black-Scholes price, since both are estimating (and here, exactly solving for) the same theoretical quantity.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational Monte Carlo tool. All prices, errors, and charts are recomputed live from your parameters and simulation seed. Black-Scholes is used here purely as a closed-form benchmark against which to validate the Monte Carlo estimate. Nothing here constitutes investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   MONTE CARLO EUROPEAN OPTION PRICER
+   Sections:
+     A. Seeded RNG + normal generator
+     B. Black-Scholes closed form (benchmark)
+     C. Monte Carlo simulation engine (paths + terminal-only fast path)
+     D. Statistics helpers (mean/std/percentile, cumulative stats)
+     E. Rendering (KPIs, charts, tables)
+     F. UI wiring
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   A. RANDOM NUMBER GENERATION
+   --------------------------------------------------------------------- */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeNormalGen(rng) {
+  let spare = null;
+  return function () {
+    if (spare !== null) { const v = spare; spare = null; return v; }
+    let u, v, s;
+    do { u = rng() * 2 - 1; v = rng() * 2 - 1; s = u * u + v * v; } while (s >= 1 || s === 0);
+    const mul = Math.sqrt((-2 * Math.log(s)) / s);
+    spare = v * mul;
+    return u * mul;
+  };
+}
+
+/* ---------------------------------------------------------------------
+   B. BLACK-SCHOLES CLOSED FORM (benchmark)
+   --------------------------------------------------------------------- */
+function erf(x) {
+  const sign = x < 0 ? -1 : 1; x = Math.abs(x);
+  const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429, p=0.3275911;
+  const t = 1 / (1 + p * x);
+  const y = 1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return sign * y;
+}
+function normCDF(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
+
+function blackScholes(S0, K, T, r, q, sigma, type) {
+  const s = Math.max(sigma, 1e-6), t = Math.max(T, 1e-6);
+  const d1 = (Math.log(S0 / K) + (r - q + 0.5 * s * s) * t) / (s * Math.sqrt(t));
+  const d2 = d1 - s * Math.sqrt(t);
+  const df_q = Math.exp(-q * t), df_r = Math.exp(-r * t);
+  if (type === 'call') return S0 * df_q * normCDF(d1) - K * df_r * normCDF(d2);
+  return K * df_r * normCDF(-d2) - S0 * df_q * normCDF(-d1);
+}
+
+/* ---------------------------------------------------------------------
+   C. MONTE CARLO SIMULATION ENGINE
+   --------------------------------------------------------------------- */
+// Simulates N full GBM paths under the risk-neutral measure. Only a
+// capped subset of paths keep their full time series (for the path
+// chart); every path contributes its terminal price and payoff to the
+// pricing statistics, using typed arrays for memory efficiency.
+function runMonteCarlo(p) {
+  const { S0, K, sigma, r, q, T, steps, paths, seed, type, numDisplayPaths } = p;
+  const dt = T / steps;
+  const drift = (r - q - 0.5 * sigma * sigma) * dt;
+  const vol = sigma * Math.sqrt(dt);
+
+  const rng = mulberry32(seed >>> 0);
+  const normalGen = makeNormalGen(rng);
+
+  const numDisplay = Math.max(1, Math.min(numDisplayPaths, paths));
+  const terminalPrices = new Float64Array(paths);
+  const payoffs = new Float64Array(paths);
+  const discountedPayoffs = new Float64Array(paths);
+  const displayPaths = [];
+  const df = Math.exp(-r * T);
+
+  for (let path = 0; path < paths; path++) {
+    let S = S0;
+    const storeFull = path < numDisplay;
+    const series = storeFull ? new Float32Array(steps + 1) : null;
+    if (storeFull) series[0] = S;
+    for (let step = 1; step <= steps; step++) {
+      const Z = normalGen();
+      S = S * Math.exp(drift + vol * Z);
+      if (!isFinite(S) || S <= 0) S = Math.max(S0 * 1e-8, 1e-8);
+      if (storeFull) series[step] = S;
+    }
+    terminalPrices[path] = S;
+    const payoff = type === 'call' ? Math.max(S - K, 0) : Math.max(K - S, 0);
+    payoffs[path] = payoff;
+    discountedPayoffs[path] = df * payoff;
+    if (storeFull) displayPaths.push(series);
+  }
+
+  return { terminalPrices, payoffs, discountedPayoffs, displayPaths, dt, df };
+}
+
+/* ---------------------------------------------------------------------
+   D. STATISTICS HELPERS
+   --------------------------------------------------------------------- */
+function mean(arr) { let s = 0; for (let i = 0; i < arr.length; i++) s += arr[i]; return s / arr.length; }
+function stdev(arr, m) {
+  if (m === undefined) m = mean(arr);
+  let s = 0; for (let i = 0; i < arr.length; i++) { const d = arr[i] - m; s += d * d; }
+  return Math.sqrt(s / (arr.length - 1));
+}
+function sortedCopy(arr) { const c = Array.from(arr); c.sort((a, b) => a - b); return c; }
+function percentileSorted(sorted, pct) {
+  const n = sorted.length; if (n === 0) return NaN;
+  const idx = (pct / 100) * (n - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  const frac = idx - lo;
+  return sorted[lo] * (1 - frac) + sorted[hi] * frac;
+}
+function fmtNum(x, d) { if (!isFinite(x)) return '—'; return x.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function fmtPct(x, d) { if (!isFinite(x)) return '—'; return (x * 100).toFixed(d === undefined ? 2 : d) + '%'; }
+
+// Computes cumulative mean & standard error at a set of log-spaced
+// checkpoints N=1..paths using running sums (single pass, O(N)).
+function cumulativeStats(discountedPayoffs, checkpointNs) {
+  const n = discountedPayoffs.length;
+  let sum = 0, sumSq = 0;
+  const results = [];
+  let cpIdx = 0;
+  for (let i = 0; i < n; i++) {
+    const x = discountedPayoffs[i];
+    sum += x; sumSq += x * x;
+    const N = i + 1;
+    if (cpIdx < checkpointNs.length && checkpointNs[cpIdx] === N) {
+      const m = sum / N;
+      const variance = N > 1 ? Math.max((sumSq - N * m * m) / (N - 1), 0) : 0;
+      const se = Math.sqrt(variance / N);
+      results.push({ N, mean: m, se });
+      cpIdx++;
+    }
+  }
+  // Ensure the final point (N = n) is always included even if not an exact checkpoint
+  if (results.length === 0 || results[results.length - 1].N !== n) {
+    const m = sum / n;
+    const variance = n > 1 ? Math.max((sumSq - n * m * m) / (n - 1), 0) : 0;
+    results.push({ N: n, mean: m, se: Math.sqrt(variance / n) });
+  }
+  return results;
+}
+// Log-spaced checkpoint counts from 1 to N (deduplicated, ascending).
+function logSpacedCheckpoints(N, count) {
+  const set = new Set();
+  set.add(1);
+  for (let i = 0; i < count; i++) {
+    const f = i / (count - 1);
+    const v = Math.round(Math.exp(Math.log(1) + f * (Math.log(N) - Math.log(1))));
+    set.add(Math.max(1, Math.min(N, v)));
+  }
+  set.add(N);
+  return Array.from(set).sort((a, b) => a - b);
+}
+
+/* ---------------------------------------------------------------------
+   STATE
+   --------------------------------------------------------------------- */
+let STATE = { optType: 'call' };
+let lastRun = null;
+let animTimer = null;
+
+const els = {
+  S0: document.getElementById('S0'), v_S0: document.getElementById('v_S0'),
+  K: document.getElementById('K'), v_K: document.getElementById('v_K'),
+  T: document.getElementById('T'), v_T: document.getElementById('v_T'),
+  sigma: document.getElementById('sigma'), v_sigma: document.getElementById('v_sigma'),
+  r: document.getElementById('r'), v_r: document.getElementById('v_r'),
+  q: document.getElementById('q'), v_q: document.getElementById('v_q'),
+  paths: document.getElementById('paths'),
+  steps: document.getElementById('steps'),
+  seed: document.getElementById('seed'),
+  displayPaths: document.getElementById('displayPaths'), v_displayPaths: document.getElementById('v_displayPaths'),
+};
+
+function syncLabels() {
+  els.v_S0.textContent = els.S0.value;
+  els.v_K.textContent = els.K.value;
+  els.v_T.textContent = parseFloat(els.T.value).toFixed(2);
+  els.v_sigma.textContent = parseFloat(els.sigma.value).toFixed(1) + '%';
+  els.v_r.textContent = parseFloat(els.r.value).toFixed(2) + '%';
+  els.v_q.textContent = parseFloat(els.q.value).toFixed(2) + '%';
+  els.v_displayPaths.textContent = els.displayPaths.value;
+}
+['S0','K','T','sigma','r','q','displayPaths'].forEach(id => els[id].addEventListener('input', syncLabels));
+syncLabels();
+
+document.getElementById('optTypeSeg').querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#optTypeSeg button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.optType = btn.dataset.type;
+    runAll();
+  });
+});
+
+function readParams() {
+  let seedVal = parseInt(els.seed.value, 10);
+  if (!Number.isFinite(seedVal)) {
+    seedVal = 0;
+    const str = String(els.seed.value || 'seed');
+    for (let i = 0; i < str.length; i++) seedVal = (seedVal * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  // Safe parameter handling: clamp to sane positive ranges to avoid NaN/Infinity.
+  const S0 = Math.max(parseFloat(els.S0.value) || 1, 0.01);
+  const K = Math.max(parseFloat(els.K.value) || 1, 0.01);
+  const T = Math.max(parseFloat(els.T.value) || 0.01, 0.01);
+  const sigma = Math.max(parseFloat(els.sigma.value) / 100 || 0.0001, 0.0001);
+  const r = parseFloat(els.r.value) / 100;
+  const q = parseFloat(els.q.value) / 100;
+  const steps = Math.max(parseInt(els.steps.value, 10) || 12, 1);
+  const paths = Math.max(parseInt(els.paths.value, 10) || 100, 10);
+  return {
+    S0, K, T, sigma, r, q, steps, paths, seed: seedVal >>> 0,
+    type: STATE.optType, numDisplayPaths: parseInt(els.displayPaths.value, 10),
+  };
+}
+
+document.getElementById('runBtn').addEventListener('click', runAll);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  els.S0.value = 100; els.K.value = 100; els.T.value = 1; els.sigma.value = 20;
+  els.r.value = 5; els.q.value = 0; els.paths.value = '5000'; els.steps.value = '52';
+  els.seed.value = '42'; els.displayPaths.value = 100;
+  document.querySelectorAll('#optTypeSeg button').forEach(b => b.classList.remove('active'));
+  document.querySelector('#optTypeSeg button[data-type="call"]').classList.add('active');
+  STATE.optType = 'call';
+  syncLabels(); runAll();
+});
+
+/* ---------------------------------------------------------------------
+   MAIN ORCHESTRATION
+   --------------------------------------------------------------------- */
+function showLoading(text) { document.getElementById('loadingText').textContent = text || 'Working…'; document.getElementById('loadingOverlay').classList.add('active'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+function runAll() {
+  if (animTimer) { clearInterval(animTimer); animTimer = null; }
+  showLoading('Running simulation…');
+  setTimeout(() => {
+    const t0 = performance.now();
+    const params = readParams();
+    const result = runMonteCarlo(params);
+    const bsPrice = blackScholes(params.S0, params.K, params.T, params.r, params.q, params.sigma, params.type);
+    const t1 = performance.now();
+
+    lastRun = { params, result, bsPrice, runtimeMs: t1 - t0 };
+
+    document.getElementById('statusLine').innerHTML =
+      `Simulation completed: <b>${params.paths.toLocaleString()}</b> paths × <b>${params.steps.toLocaleString()}</b> steps<br>` +
+      `Computation time: <b>${(t1 - t0).toFixed(0)} ms</b>`;
+
+    renderAll();
+    hideLoading();
+  }, 15);
+}
+
+function plotlyReady() {
+  if (typeof Plotly === 'undefined') {
+    document.getElementById('statusLine').innerHTML = '<span style="color:var(--loss);">Chart library failed to load from CDN. Tables and metrics still work.</span>';
+    hideLoading();
+    return false;
+  }
+  return true;
+}
+
+function renderAll() {
+  renderKPIs();
+  renderCompareTable();
+  if (plotlyReady()) {
+    renderPathChart();
+    renderTerminalChart();
+    renderPayoffChart();
+    renderCompareChart();
+    renderConvergenceChart();
+    renderErrorDecayChart();
+  }
+}
+
+/* ---------------------------------------------------------------------
+   E. RENDERING
+   --------------------------------------------------------------------- */
+function kpiCard(label, value, sub, cls) {
+  return `<div class="kpi ${cls || ''}"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub || ''}</div></div>`;
+}
+
+function computeSummaryStats() {
+  const { params, result, bsPrice, runtimeMs } = lastRun;
+  const dp = result.discountedPayoffs;
+  const mcPrice = mean(dp);
+  const s = stdev(dp, mcPrice);
+  const se = s / Math.sqrt(dp.length);
+  const ciLow = mcPrice - 1.96 * se, ciHigh = mcPrice + 1.96 * se;
+  const absError = Math.abs(mcPrice - bsPrice);
+  const pctError = bsPrice !== 0 ? (absError / Math.abs(bsPrice)) * 100 : NaN;
+  return { mcPrice, s, se, ciLow, ciHigh, absError, pctError, bsPrice, runtimeMs, params };
+}
+
+function renderKPIs() {
+  const st = computeSummaryStats();
+  const html = [
+    kpiCard('Monte Carlo Price', fmtNum(st.mcPrice, 4), `± ${fmtNum(1.96*st.se, 4)} (95% CI)`),
+    kpiCard('Black-Scholes Price', fmtNum(st.bsPrice, 4), 'closed-form benchmark', 'alt'),
+    kpiCard('Absolute Error', fmtNum(st.absError, 4), '|MC − BS|', st.absError > 2*st.se ? 'warn' : undefined),
+    kpiCard('Percentage Error', fmtNum(st.pctError, 3) + '%', 'relative to BS price'),
+    kpiCard('Standard Error', fmtNum(st.se, 5), 's / √N'),
+    kpiCard('95% Confidence Interval', `[${fmtNum(st.ciLow,4)}, ${fmtNum(st.ciHigh,4)}]`, 'contains BS price? ' + (st.bsPrice >= st.ciLow && st.bsPrice <= st.ciHigh ? 'yes' : 'no')),
+    kpiCard('Paths × Steps', `${st.params.paths.toLocaleString()} × ${st.params.steps}`, 'simulation grid', 'alt'),
+    kpiCard('Runtime', fmtNum(st.runtimeMs, 0) + ' ms', 'full simulation + pricing'),
+  ];
+  document.getElementById('kpiGrid').innerHTML = html.join('');
+}
+
+function plotlyLayoutBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8D93A8', size: 11 },
+    margin: { l: 55, r: 20, t: 20, b: 40 },
+    xaxis: { gridcolor: '#1A1E2C', zerolinecolor: '#242A3B', linecolor: '#242A3B' },
+    yaxis: { gridcolor: '#1A1E2C', zerolinecolor: '#242A3B', linecolor: '#242A3B' },
+    legend: { orientation: 'h', y: 1.08, font: { color: '#8D93A8' } },
+    hoverlabel: { bgcolor: '#151827', bordercolor: '#242A3B', font: { color: '#E7E9F2', family: 'JetBrains Mono, monospace' } },
+  }, extra || {});
+}
+const PLOTLY_CONFIG = { displayModeBar: false, responsive: true };
+
+function renderPathChart() {
+  const { params, result } = lastRun;
+  const dt = result.dt;
+  const traces = [];
+  const displayCount = result.displayPaths.length;
+  for (let i = 0; i < displayCount; i++) {
+    const series = result.displayPaths[i];
+    const xs = new Array(series.length);
+    for (let s = 0; s < series.length; s++) xs[s] = s * dt;
+    traces.push({ x: xs, y: Array.from(series), mode: 'lines', line: { color: 'rgba(140,124,255,0.12)', width: 1 }, showlegend: false, hoverinfo: 'skip' });
+  }
+  // Mean path across the displayed subset
+  if (displayCount > 0) {
+    const steps = result.displayPaths[0].length;
+    const meanSeries = new Array(steps).fill(0);
+    for (let i = 0; i < displayCount; i++) { const s = result.displayPaths[i]; for (let j = 0; j < steps; j++) meanSeries[j] += s[j]; }
+    for (let j = 0; j < steps; j++) meanSeries[j] /= displayCount;
+    const xs = new Array(steps); for (let s = 0; s < steps; s++) xs[s] = s * dt;
+    traces.push({ x: xs, y: meanSeries, mode: 'lines', line: { color: '#4FD1C5', width: 2.5 }, name: 'Mean path' });
+  }
+  Plotly.newPlot('pathChart', traces, plotlyLayoutBase({
+    xaxis: { title: 'Time (years)', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+    yaxis: { title: 'Asset Price', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+    shapes: [{ type: 'line', x0: 0, x1: params.T, y0: params.K, y1: params.K, line: { color: '#F5A623', width: 1.5, dash: 'dash' } }],
+    annotations: [{ x: params.T, y: params.K, text: 'K', showarrow: false, font: { color: '#F5A623', size: 11 }, xshift: 14 }],
+  }), PLOTLY_CONFIG);
+}
+
+let animFrameIdx = 0;
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (!lastRun || !plotlyReady()) return;
+  if (animTimer) { clearInterval(animTimer); animTimer = null; document.getElementById('playBtn').textContent = '▶ Play Animation'; return; }
+  document.getElementById('playBtn').textContent = '⏸ Stop';
+  const { result } = lastRun;
+  const dt = result.dt;
+  const steps = result.displayPaths.length ? result.displayPaths[0].length : 0;
+  if (steps === 0) return;
+  const frames = 40;
+  animFrameIdx = 0;
+  animTimer = setInterval(() => {
+    animFrameIdx++;
+    const cutoff = Math.max(1, Math.round((animFrameIdx / frames) * steps));
+    const xsAll = [], ysAll = [];
+    for (let i = 0; i < result.displayPaths.length; i++) {
+      const series = result.displayPaths[i];
+      const xs = new Array(cutoff), ys = new Array(cutoff);
+      for (let s = 0; s < cutoff; s++) { xs[s] = s * dt; ys[s] = series[s]; }
+      xsAll.push(xs); ysAll.push(ys);
+    }
+    const traceIdxs = Array.from({ length: result.displayPaths.length }, (_, i) => i);
+    Plotly.restyle('pathChart', { x: xsAll, y: ysAll }, traceIdxs);
+    if (animFrameIdx >= frames) { clearInterval(animTimer); animTimer = null; document.getElementById('playBtn').textContent = '▶ Play Animation'; renderPathChart(); }
+  }, 60);
+});
+
+function renderTerminalChart() {
+  const { params, result } = lastRun;
+  const meanST = mean(result.terminalPrices);
+  const medianST = percentileSorted(sortedCopy(result.terminalPrices), 50);
+  Plotly.newPlot('terminalChart', [{
+    x: Array.from(result.terminalPrices), type: 'histogram',
+    marker: { color: 'rgba(140,124,255,0.55)', line: { color: '#8C7CFF', width: 0.5 } }, nbinsx: 60,
+  }], plotlyLayoutBase({
+    xaxis: { title: 'Terminal Price S_T', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+    yaxis: { title: 'Count', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+    shapes: [
+      { type: 'line', x0: params.K, x1: params.K, y0: 0, y1: 1, yref: 'paper', line: { color: '#F5A623', width: 1.5, dash: 'dash' } },
+      { type: 'line', x0: meanST, x1: meanST, y0: 0, y1: 1, yref: 'paper', line: { color: '#3DD68C', width: 1.5, dash: 'dot' } },
+    ],
+    annotations: [
+      { x: params.K, y: 1.0, yref: 'paper', text: 'K', showarrow: false, font: { color: '#F5A623', size: 10 }, yshift: 10 },
+      { x: meanST, y: 1.0, yref: 'paper', text: 'mean', showarrow: false, font: { color: '#3DD68C', size: 10 }, yshift: 24 },
+    ],
+  }), PLOTLY_CONFIG);
+}
+
+function renderPayoffChart() {
+  const { result } = lastRun;
+  const meanPayoff = mean(result.payoffs);
+  Plotly.newPlot('payoffChart', [{
+    x: Array.from(result.payoffs), type: 'histogram',
+    marker: { color: 'rgba(79,209,197,0.55)', line: { color: '#4FD1C5', width: 0.5 } }, nbinsx: 60,
+  }], plotlyLayoutBase({
+    xaxis: { title: 'Payoff at Maturity', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+    yaxis: { title: 'Count', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+    shapes: [{ type: 'line', x0: meanPayoff, x1: meanPayoff, y0: 0, y1: 1, yref: 'paper', line: { color: '#3DD68C', width: 1.5, dash: 'dot' } }],
+    annotations: [{ x: meanPayoff, y: 1.0, yref: 'paper', text: `mean = ${meanPayoff.toFixed(3)}`, showarrow: false, font: { color: '#3DD68C', size: 10 }, yshift: 10 }],
+  }), PLOTLY_CONFIG);
+}
+
+function renderCompareChart() {
+  const st = computeSummaryStats();
+  Plotly.newPlot('compareChart', [{
+    x: ['Monte Carlo', 'Black-Scholes'], y: [st.mcPrice, st.bsPrice], type: 'bar',
+    marker: { color: ['#8C7CFF', '#4FD1C5'] },
+    error_y: { type: 'data', array: [1.96 * st.se, 0], visible: true, color: '#E7E9F2', thickness: 1.5, width: 6 },
+    text: [fmtNum(st.mcPrice, 3), fmtNum(st.bsPrice, 3)], textposition: 'outside', textfont: { color: '#E7E9F2', family: 'JetBrains Mono, monospace' },
+  }], plotlyLayoutBase({
+    yaxis: { title: 'Option Price', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+    margin: { l: 55, r: 20, t: 30, b: 40 },
+  }), PLOTLY_CONFIG);
+}
+
+function renderCompareTable() {
+  const st = computeSummaryStats();
+  document.getElementById('compareTableBody').innerHTML = `
+    <tr><td>Monte Carlo Price</td><td>${fmtNum(st.mcPrice, 4)}</td></tr>
+    <tr><td>Black-Scholes Price</td><td>${fmtNum(st.bsPrice, 4)}</td></tr>
+    <tr><td>Absolute Error</td><td>${fmtNum(st.absError, 4)}</td></tr>
+    <tr><td>Percentage Error</td><td>${fmtNum(st.pctError, 3)}%</td></tr>
+    <tr><td>Standard Error</td><td>${fmtNum(st.se, 5)}</td></tr>
+    <tr><td>95% CI Lower</td><td>${fmtNum(st.ciLow, 4)}</td></tr>
+    <tr><td>95% CI Upper</td><td>${fmtNum(st.ciHigh, 4)}</td></tr>
+    <tr><td>Paths (N)</td><td>${st.params.paths.toLocaleString()}</td></tr>
+    <tr><td>Time Steps</td><td>${st.params.steps}</td></tr>
+    <tr><td>Runtime</td><td>${fmtNum(st.runtimeMs, 0)} ms</td></tr>
+  `;
+}
+
+function renderConvergenceChart() {
+  const { result, bsPrice } = lastRun;
+  const N = result.discountedPayoffs.length;
+  const checkpoints = logSpacedCheckpoints(N, 60);
+  const cs = cumulativeStats(result.discountedPayoffs, checkpoints);
+  const xs = cs.map(c => c.N);
+  const means = cs.map(c => c.mean);
+  const hi = cs.map(c => c.mean + 1.96 * c.se);
+  const lo = cs.map(c => c.mean - 1.96 * c.se);
+
+  const traces = [
+    { x: xs.concat([...xs].reverse()), y: hi.concat([...lo].reverse()), fill: 'toself', fillcolor: 'rgba(140,124,255,0.14)', line: { color: 'rgba(0,0,0,0)' }, hoverinfo: 'skip', showlegend: false, name: '95% CI' },
+    { x: xs, y: means, mode: 'lines', line: { color: '#8C7CFF', width: 2.5 }, name: 'Cumulative MC price' },
+    { x: [xs[0], xs[xs.length - 1]], y: [bsPrice, bsPrice], mode: 'lines', line: { color: '#4FD1C5', width: 2, dash: 'dash' }, name: 'Black-Scholes' },
+  ];
+  Plotly.newPlot('convergenceChart', traces, plotlyLayoutBase({
+    xaxis: { title: 'Number of Paths (N)', type: 'log', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+    yaxis: { title: 'Option Price', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderErrorDecayChart() {
+  const { result, bsPrice } = lastRun;
+  const N = result.discountedPayoffs.length;
+  const checkpoints = logSpacedCheckpoints(N, 60).filter(n => n >= 2);
+  const cs = cumulativeStats(result.discountedPayoffs, checkpoints);
+  const xs = cs.map(c => c.N);
+  const errs = cs.map(c => Math.max(Math.abs(c.mean - bsPrice), 1e-8));
+
+  // Theoretical O(1/sqrt(N)) reference, anchored to match the error at the
+  // smallest checkpoint so the slope (not the level) is what's compared.
+  const s = stdev(result.discountedPayoffs, mean(result.discountedPayoffs));
+  const refYs = xs.map(n => (1.96 * s) / Math.sqrt(n));
+
+  // Empirical slope via log-log linear regression on the actual error curve
+  const logX = xs.map(Math.log), logY = errs.map(Math.log);
+  const nPts = logX.length;
+  const mx = mean(logX), my = mean(logY);
+  let num = 0, den = 0;
+  for (let i = 0; i < nPts; i++) { num += (logX[i] - mx) * (logY[i] - my); den += (logX[i] - mx) ** 2; }
+  const slope = den !== 0 ? num / den : NaN;
+
+  Plotly.newPlot('errorDecayChart', [
+    { x: xs, y: errs, mode: 'lines+markers', line: { color: '#8C7CFF', width: 2 }, marker: { size: 4 }, name: '|MC − BS| (actual)' },
+    { x: xs, y: refYs, mode: 'lines', line: { color: '#F5A623', width: 2, dash: 'dot' }, name: '1.96·s/√N (theoretical CI half-width)' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Number of Paths (N, log scale)', type: 'log', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+    yaxis: { title: 'Absolute Error (log scale)', type: 'log', gridcolor: '#1A1E2C', linecolor: '#242A3B' },
+  }), PLOTLY_CONFIG);
+
+  document.getElementById('slopeHint').innerHTML =
+    `Fitted log-log slope of the actual error curve: <b style="color:var(--text-dim);">${isFinite(slope) ? slope.toFixed(3) : '—'}</b> ` +
+    `(theory predicts ≈ −0.5 for pure Monte Carlo sampling error — noisy at low N, should sharpen as N grows).`;
+}
+
+/* ---------------------------------------------------------------------
+   INITIAL RUN
+   --------------------------------------------------------------------- */
+runAll();
+</script>
+</body>
+</html>
