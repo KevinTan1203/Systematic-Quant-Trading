@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IV Surface Terminal — Synthetic Volatility Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#06080D;
+  --bg-elev:#0A0D14;
+  --panel:#0E1219;
+  --panel-2:#12171F;
+  --panel-3:#171D28;
+  --border:#1C2430;
+  --border-hi:#2A3545;
+  --text:#DCE3ED;
+  --text-2:#8B96A8;
+  --text-3:#5A6578;
+  --green:#00D68F;
+  --green-dim:#00A86B;
+  --red:#FF5C5C;
+  --amber:#FFB020;
+  --blue:#4C9AFF;
+  --cyan:#22D3EE;
+  --purple:#9B8CFF;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+  --display:'Space Grotesk',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:13px;
+  line-height:1.45;
+  overflow-x:hidden;
+}
+::selection{background:var(--purple);color:#fff;}
+
+/* ===== Terminal chrome ===== */
+.terminal{
+  display:grid;
+  grid-template-rows:36px 1fr;
+  min-height:100vh;
+}
+.topbar{
+  display:flex;align-items:center;gap:16px;
+  background:var(--bg-elev);
+  border-bottom:1px solid var(--border);
+  padding:0 14px;
+  font-family:var(--mono);
+  font-size:11px;
+}
+.topbar .logo{
+  font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.3px;
+  color:var(--text);display:flex;align-items:center;gap:8px;
+}
+.logo-mark{
+  width:18px;height:18px;border-radius:3px;
+  background:linear-gradient(135deg,var(--purple),var(--cyan));
+}
+.topbar .pill{
+  border:1px solid var(--border-hi);border-radius:3px;padding:2px 8px;
+  color:var(--text-2);background:var(--panel);
+}
+.pill.warn{color:var(--amber);border-color:rgba(255,176,32,.35);}
+.pill.live{color:var(--green);border-color:rgba(0,214,143,.3);}
+.topbar .spacer{flex:1;}
+.topbar .clock{color:var(--text-3);}
+
+/* ===== Body layout ===== */
+.body{
+  display:grid;
+  grid-template-columns:300px 1fr;
+  min-height:calc(100vh - 36px);
+}
+@media(max-width:1100px){
+  .body{grid-template-columns:1fr;}
+  .rail{position:static;height:auto;max-height:none;border-right:none;border-bottom:1px solid var(--border);}
+}
+
+/* ===== Left rail ===== */
+.rail{
+  background:var(--panel);
+  border-right:1px solid var(--border);
+  overflow-y:auto;
+  max-height:calc(100vh - 36px);
+  position:sticky;top:36px;
+  padding:0 0 24px;
+}
+.rail-section{
+  border-bottom:1px solid var(--border);
+  padding:12px 14px;
+}
+.rail-section h3{
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  letter-spacing:.8px;text-transform:uppercase;color:var(--text-3);
+  margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;
+}
+.fld{margin-bottom:9px;}
+.fld:last-child{margin-bottom:0;}
+.fld-h{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-size:11px;color:var(--text-2);margin-bottom:3px;
+}
+.fld-h .v{font-family:var(--mono);color:var(--text);font-weight:500;font-size:11.5px;}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:3px;border-radius:1px;
+  background:var(--border);outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:11px;height:11px;border-radius:1px;
+  background:var(--purple);cursor:pointer;border:none;
+}
+.hint{font-size:10px;color:var(--text-3);margin-top:3px;line-height:1.35;}
+.seg{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:2px;
+  background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:2px;
+}
+.seg button{
+  border:none;background:transparent;color:var(--text-3);
+  font-family:var(--mono);font-size:10px;padding:5px 2px;border-radius:2px;cursor:pointer;
+}
+.seg button.on{background:var(--panel-3);color:var(--cyan);}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
+.btn{
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  padding:7px 8px;border-radius:3px;border:1px solid var(--border-hi);
+  background:var(--panel-2);color:var(--text-2);cursor:pointer;
+}
+.btn:hover{border-color:var(--purple);color:var(--text);}
+.btn.pri{background:var(--purple);border-color:var(--purple);color:#fff;}
+.btn.pri:hover{filter:brightness(1.1);}
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.presets .btn{padding:5px 4px;font-size:10px;}
+
+/* ===== Main workspace ===== */
+.workspace{
+  padding:12px 14px 32px;
+  background:
+    linear-gradient(180deg, rgba(155,140,255,.03), transparent 120px),
+    var(--bg);
+}
+.banner{
+  font-family:var(--mono);font-size:10.5px;
+  background:rgba(255,176,32,.07);
+  border:1px solid rgba(255,176,32,.25);
+  color:var(--amber);
+  padding:7px 11px;border-radius:3px;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+}
+.banner::before{content:"◆";font-size:8px;}
+
+.row{display:grid;gap:10px;margin-bottom:10px;}
+.row-4{grid-template-columns:repeat(4,1fr);}
+.row-3{grid-template-columns:repeat(3,1fr);}
+.row-2{grid-template-columns:1.25fr 1fr;}
+.row-6{grid-template-columns:repeat(6,1fr);}
+@media(max-width:1200px){
+  .row-4,.row-6{grid-template-columns:repeat(2,1fr);}
+  .row-3,.row-2{grid-template-columns:1fr;}
+}
+
+.tile{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:3px;
+  padding:10px 12px;
+  position:relative;
+}
+.tile.kpi::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--purple);
+}
+.tile.kpi.g::before{background:var(--green);}
+.tile.kpi.a::before{background:var(--amber);}
+.tile.kpi.r::before{background:var(--red);}
+.tile.kpi.b::before{background:var(--blue);}
+.tile.kpi.c::before{background:var(--cyan);}
+.k-lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--text-3);}
+.k-val{font-family:var(--mono);font-size:18px;font-weight:600;margin-top:4px;letter-spacing:-.3px;}
+.k-sub{font-size:10.5px;color:var(--text-3);margin-top:2px;font-family:var(--mono);}
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:3px;
+  overflow:hidden;
+}
+.panel-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;border-bottom:1px solid var(--border);
+  background:var(--panel-2);
+}
+.panel-hd h2{
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--text-2);
+}
+.panel-hd .meta{font-family:var(--mono);font-size:10px;color:var(--text-3);}
+.panel-bd{padding:8px 10px 10px;}
+
+table.grid{
+  width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;
+}
+table.grid th,table.grid td{
+  padding:5px 7px;text-align:right;border-bottom:1px solid var(--border);
+}
+table.grid th:first-child,table.grid td:first-child{text-align:left;color:var(--text-2);}
+table.grid th{
+  color:var(--text-3);font-weight:500;font-size:9.5px;
+  letter-spacing:.4px;text-transform:uppercase;
+  background:var(--panel-2);border-bottom:1px solid var(--border-hi);
+  position:sticky;top:0;
+}
+table.grid tr:last-child td{border-bottom:none;}
+table.grid tr.hi td{background:rgba(155,140,255,.1);}
+table.grid tr.clk{cursor:pointer;}
+table.grid tr.clk:hover td{background:rgba(76,154,255,.06);}
+.pos{color:var(--green);}
+.neg{color:var(--red);}
+.chain-wrap{max-height:340px;overflow:auto;}
+
+.footer{
+  margin-top:18px;padding-top:12px;border-top:1px solid var(--border);
+  font-family:var(--mono);font-size:10px;color:var(--text-3);line-height:1.6;
+}
+
+.formula{
+  font-family:var(--mono);font-size:11.5px;color:var(--cyan);
+  background:var(--bg);border:1px solid var(--border);
+  padding:8px 10px;border-radius:3px;margin:6px 0;
+}
+.edu{margin-top:14px;}
+.edu details{
+  background:var(--panel);border:1px solid var(--border);border-radius:3px;
+  padding:10px 12px;margin-bottom:6px;
+}
+.edu summary{
+  font-family:var(--mono);font-size:11.5px;font-weight:500;cursor:pointer;
+  list-style:none;color:var(--text);
+}
+.edu summary::-webkit-details-marker{display:none;}
+.edu summary::before{content:"▸ ";color:var(--purple);}
+.edu details[open] summary::before{content:"▾ ";}
+.edu .body-txt{margin-top:8px;color:var(--text-2);font-size:12px;line-height:1.55;}
+.edu .body-txt ul{padding-left:16px;margin:6px 0;}
+</style>
+</head>
+<body>
+<div class="terminal">
+  <header class="topbar">
+    <div class="logo"><div class="logo-mark"></div>IV SURFACE TERMINAL</div>
+    <span class="pill warn">SYNTHETIC SURFACE</span>
+    <span class="pill">BSM PRICER</span>
+    <span class="pill live" id="statusPill">READY</span>
+    <div class="spacer"></div>
+    <span class="clock" id="clock">—</span>
+  </header>
+
+  <div class="body">
+    <!-- ========== RAIL ========== -->
+    <aside class="rail">
+      <div class="rail-section">
+        <h3>Desk Presets</h3>
+        <div class="presets">
+          <button class="btn" data-preset="equity">Equity Skew</button>
+          <button class="btn" data-preset="index">Index</button>
+          <button class="btn" data-preset="flat">Flat</button>
+          <button class="btn" data-preset="inverted">Inv. Term</button>
+        </div>
+      </div>
+
+      <div class="rail-section">
+        <h3>Underlying</h3>
+        <div class="fld">
+          <div class="fld-h"><span>Spot S</span><span class="v" id="v_S">100.00</span></div>
+          <input type="range" id="S" min="40" max="250" step="0.25" value="100">
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Rate r</span><span class="v" id="v_r">4.00%</span></div>
+          <input type="range" id="r" min="0" max="12" step="0.05" value="4">
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Div yield q</span><span class="v" id="v_q">1.50%</span></div>
+          <input type="range" id="q" min="0" max="8" step="0.05" value="1.5">
+        </div>
+      </div>
+
+      <div class="rail-section">
+        <h3>Surface Parameters</h3>
+        <div class="fld">
+          <div class="fld-h"><span>ATM₀ IV</span><span class="v" id="v_atm">18.00%</span></div>
+          <input type="range" id="atm" min="4" max="70" step="0.25" value="18">
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Term slope</span><span class="v" id="v_term">+3.00%</span></div>
+          <input type="range" id="term" min="-12" max="18" step="0.25" value="3">
+          <div class="hint">ATM(T)=ATM₀+slope·√T</div>
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Skew β₁</span><span class="v" id="v_skew">−0.140</span></div>
+          <input type="range" id="skew" min="-0.50" max="0.25" step="0.005" value="-0.14">
+          <div class="hint">Linear in m=ln(K/F) · neg = put skew</div>
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Curvature β₂</span><span class="v" id="v_curv">0.420</span></div>
+          <input type="range" id="curv" min="0" max="1.5" step="0.01" value="0.42">
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Skew decay ν</span><span class="v" id="v_decay">0.45</span></div>
+          <input type="range" id="decay" min="0" max="1" step="0.05" value="0.45">
+          <div class="hint">Skew/curv scale as T^(−ν/2)</div>
+        </div>
+      </div>
+
+      <div class="rail-section">
+        <h3>Selected Contract</h3>
+        <div class="fld">
+          <div class="fld-h"><span>Strike K</span><span class="v" id="v_K">100</span></div>
+          <input type="range" id="K" min="50" max="180" step="0.5" value="100">
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Expiry T</span><span class="v" id="v_T">0.50y</span></div>
+          <input type="range" id="T" min="0.02" max="3" step="0.01" value="0.50">
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Type</span></div>
+          <div class="seg" id="segType">
+            <button class="on" data-v="call">Call</button>
+            <button data-v="put">Put</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="rail-section">
+        <h3>Display</h3>
+        <div class="fld">
+          <div class="fld-h"><span>X dimension</span></div>
+          <div class="seg" id="segX">
+            <button class="on" data-v="K">K</button>
+            <button data-v="KS">K/S</button>
+            <button data-v="m">ln(K/F)</button>
+          </div>
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Z metric</span></div>
+          <div class="seg" id="segZ">
+            <button class="on" data-v="iv">IV</button>
+            <button data-v="delta">Δ</button>
+            <button data-v="gamma">Γ</button>
+            <button data-v="vega">Vega</button>
+          </div>
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>T max (surface)</span><span class="v" id="v_tmax">2.0y</span></div>
+          <input type="range" id="tmax" min="0.5" max="5" step="0.25" value="2">
+        </div>
+        <div class="fld">
+          <div class="fld-h"><span>Moneyness span</span><span class="v" id="v_span">±30%</span></div>
+          <input type="range" id="span" min="15" max="50" step="5" value="30">
+        </div>
+      </div>
+
+      <div class="rail-section">
+        <div class="btn-row">
+          <button class="btn pri" id="btnRun">UPDATE</button>
+          <button class="btn" id="btnReset">RESET</button>
+        </div>
+        <div class="hint" style="margin-top:8px;" id="railStatus">Parametric surface · client-side BSM</div>
+      </div>
+    </aside>
+
+    <!-- ========== WORKSPACE ========== -->
+    <main class="workspace">
+      <div class="banner">SYNTHETIC DATA — Parametric IV surface generated from desk inputs. Not exchange quotes. No live market data connected.</div>
+
+      <!-- KPIs -->
+      <div class="row row-6" id="kpis"></div>
+
+      <!-- 3D + heatmap -->
+      <div class="row row-2">
+        <div class="panel">
+          <div class="panel-hd">
+            <h2>3D Volatility Surface</h2>
+            <span class="meta" id="meta3d">IV · drag to rotate</span>
+          </div>
+          <div class="panel-bd"><div id="c3d" style="height:440px;"></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-hd">
+            <h2>IV Heatmap</h2>
+            <span class="meta">K × T grid</span>
+          </div>
+          <div class="panel-bd"><div id="cHeat" style="height:440px;"></div></div>
+        </div>
+      </div>
+
+      <!-- Smile + term -->
+      <div class="row row-2">
+        <div class="panel">
+          <div class="panel-hd">
+            <h2>Volatility Smile</h2>
+            <span class="meta" id="metaSmile">slice @ selected T</span>
+          </div>
+          <div class="panel-bd"><div id="cSmile" style="height:280px;"></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-hd">
+            <h2>ATM Term Structure</h2>
+            <span class="meta">ATM(T) and selected K</span>
+          </div>
+          <div class="panel-bd"><div id="cTerm" style="height:280px;"></div></div>
+        </div>
+      </div>
+
+      <!-- Analytics + chain -->
+      <div class="row row-2">
+        <div class="panel">
+          <div class="panel-hd">
+            <h2>Selected Option Analytics</h2>
+            <span class="meta" id="metaSel">—</span>
+          </div>
+          <div class="panel-bd">
+            <table class="grid" id="analyticsTable">
+              <tbody></tbody>
+            </table>
+            <div style="margin-top:12px;">
+              <div class="row row-2" style="margin:0;">
+                <div id="cPayoff" style="height:200px;"></div>
+                <div id="cGreekSlice" style="height:200px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hd">
+            <h2>Option Chain</h2>
+            <span class="meta" id="metaChain">expiry slice</span>
+          </div>
+          <div class="chain-wrap">
+            <table class="grid">
+              <thead>
+                <tr>
+                  <th>K</th><th>IV</th><th>Bid C*</th><th>Ask C*</th>
+                  <th>Bid P*</th><th>Ask P*</th><th>Δc</th><th>Vega</th>
+                </tr>
+              </thead>
+              <tbody id="chainBody"></tbody>
+            </table>
+          </div>
+          <div class="panel-bd">
+            <div class="hint">* Synthetic mid ± 0.5 vol-point for illustration only — not a market microstructure model.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wing metrics -->
+      <div class="row row-4" id="wingKpis"></div>
+
+      <!-- Greeks strip -->
+      <div class="panel" style="margin-bottom:10px;">
+        <div class="panel-hd">
+          <h2>Greeks vs Strike</h2>
+          <span class="meta" id="metaGreeks">selected expiry · selected type</span>
+        </div>
+        <div class="panel-bd"><div id="cGreeks" style="height:300px;"></div></div>
+      </div>
+
+      <!-- Model card -->
+      <div class="panel" style="margin-bottom:10px;">
+        <div class="panel-hd"><h2>Surface Model Specification</h2></div>
+        <div class="panel-bd">
+          <div class="formula">F = S · e^{(r−q)T}</div>
+          <div class="formula">m = ln(K / F)</div>
+          <div class="formula">ATM(T) = ATM₀ + slope · √T</div>
+          <div class="formula">IV(K,T) = clip[ ATM(T) + β₁·T^(−ν/2)·m + β₂·T^(−ν/2)·m² , σ_min, σ_max ]</div>
+          <div class="hint" style="margin-top:8px;">
+            Forward moneyness anchors the smile to the forward. Time decay of skew/curvature follows a power law.
+            Prices use Black–Scholes–Merton with continuous yield q. This is a teaching terminal, not a production vol-surface stack.
+          </div>
+        </div>
+      </div>
+
+      <div class="edu">
+        <details open>
+          <summary>Terminal notes — reading the surface</summary>
+          <div class="body-txt">
+            <p>The surface maps implied volatility to strike and maturity. Traders read <b style="color:var(--text)">skew</b> (left–right tilt), <b style="color:var(--text)">smile</b> (wings), and <b style="color:var(--text)">term structure</b> (front vs back) as a compact summary of distributional risk premia.</p>
+          </div>
+        </details>
+        <details>
+          <summary>Black–Scholes price &amp; Greeks on a local IV</summary>
+          <div class="body-txt">
+            <p>Each (K,T) is valued with a single σ = IV(K,T) inside BSM. That is the definition of Black implied vol. Delta/Gamma/Vega/Theta/Rho shown here are pure BSM Greeks at that local σ — not sticky-delta or model-free dual deltas.</p>
+          </div>
+        </details>
+        <details>
+          <summary>Why this is labelled synthetic</summary>
+          <div class="body-txt">
+            <ul>
+              <li>No exchange feed, no NBBO, no calibration to listed quotes.</li>
+              <li>No butterfly/calendar arbitrage projection.</li>
+              <li>Bid/ask in the chain are cosmetic spreads around model mid.</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+
+      <div class="footer">
+        IV SURFACE TERMINAL · synthetic parametric model · BSM analytics · for education only · not trading advice · not a regulated venue display
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   IV SURFACE TERMINAL — ENGINE
+   ===================================================================== */
+const UI = {
+  type: 'call',
+  xMode: 'K',
+  zMode: 'iv',
+};
+
+/* ---- special functions ---- */
+function nPdf(x){ return Math.exp(-0.5*x*x)/Math.sqrt(2*Math.PI); }
+function erf(x){
+  const s=x<0?-1:1; x=Math.abs(x);
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const t=1/(1+p*x);
+  return s*(1-((((a5*t+a4)*t)+a3)*t+a2)*t*a1*t*Math.exp(-x*x));
+}
+function nCdf(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
+
+function forward(S,r,q,T){ return S*Math.exp((r-q)*T); }
+
+function ivOf(K,T,p){
+  const F = forward(p.S,p.r,p.q,T);
+  const m = Math.log(Math.max(K,1e-12)/Math.max(F,1e-12));
+  const atm = Math.max(0.03, p.atm0 + p.term*Math.sqrt(Math.max(T,0)));
+  const scale = Math.pow(Math.max(T,0.03), -0.5*p.decay);
+  const iv = atm + p.skew*scale*m + p.curv*scale*m*m;
+  return Math.max(0.04, Math.min(1.25, iv));
+}
+
+function bsmPrice(S,K,T,r,q,sig,type){
+  if(T<1e-6){
+    return type==='call'?Math.max(S-K,0):Math.max(K-S,0);
+  }
+  if(sig<1e-8){
+    const F=forward(S,r,q,T), df=Math.exp(-r*T);
+    return type==='call'?df*Math.max(F-K,0):df*Math.max(K-F,0);
+  }
+  const sT=Math.sqrt(T);
+  const d1=(Math.log(S/K)+(r-q+0.5*sig*sig)*T)/(sig*sT);
+  const d2=d1-sig*sT;
+  const dq=Math.exp(-q*T), dr=Math.exp(-r*T);
+  if(type==='call') return S*dq*nCdf(d1)-K*dr*nCdf(d2);
+  return K*dr*nCdf(-d2)-S*dq*nCdf(-d1);
+}
+
+function bsmGreeks(S,K,T,r,q,sig,type){
+  if(T<1e-6||sig<1e-8){
+    const d = type==='call'?(S>=K?1:0):(S<=K?-1:0);
+    return {delta:d*Math.exp(-q*T),gamma:0,vega:0,theta:0,rho:0,d1:0,d2:0};
+  }
+  const sT=Math.sqrt(T);
+  const d1=(Math.log(S/K)+(r-q+0.5*sig*sig)*T)/(sig*sT);
+  const d2=d1-sig*sT;
+  const dq=Math.exp(-q*T), dr=Math.exp(-r*T);
+  const delta = type==='call'? dq*nCdf(d1) : dq*(nCdf(d1)-1);
+  const gamma = dq*nPdf(d1)/(S*sig*sT);
+  const vega  = S*dq*nPdf(d1)*sT; // per 1.00 vol
+  let theta;
+  if(type==='call')
+    theta = -S*dq*nPdf(d1)*sig/(2*sT) - r*K*dr*nCdf(d2) + q*S*dq*nCdf(d1);
+  else
+    theta = -S*dq*nPdf(d1)*sig/(2*sT) + r*K*dr*nCdf(-d2) - q*S*dq*nCdf(-d1);
+  const rho = type==='call'? K*T*dr*nCdf(d2) : -K*T*dr*nCdf(-d2);
+  return {delta,gamma,vega,theta,rho,d1,d2};
+}
+
+function strikeByDelta(target,type,T,p){
+  let lo=p.S*0.35, hi=p.S*2.2;
+  for(let i=0;i<48;i++){
+    const mid=0.5*(lo+hi);
+    const sig=ivOf(mid,T,p);
+    const d=bsmGreeks(p.S,mid,T,p.r,p.q,sig,type).delta;
+    if(type==='call'){ if(d>target) lo=mid; else hi=mid; }
+    else { if(d<target) lo=mid; else hi=mid; }
+  }
+  return 0.5*(lo+hi);
+}
+
+/* ---- params ---- */
+function P(){
+  return {
+    S:+document.getElementById('S').value,
+    r:+document.getElementById('r').value/100,
+    q:+document.getElementById('q').value/100,
+    atm0:+document.getElementById('atm').value/100,
+    term:+document.getElementById('term').value/100,
+    skew:+document.getElementById('skew').value,
+    curv:+document.getElementById('curv').value,
+    decay:+document.getElementById('decay').value,
+    K:+document.getElementById('K').value,
+    T:+document.getElementById('T').value,
+    tmax:+document.getElementById('tmax').value,
+    span:+document.getElementById('span').value/100,
+  };
+}
+function sync(){
+  const p=P();
+  document.getElementById('v_S').textContent=p.S.toFixed(2);
+  document.getElementById('v_r').textContent=(p.r*100).toFixed(2)+'%';
+  document.getElementById('v_q').textContent=(p.q*100).toFixed(2)+'%';
+  document.getElementById('v_atm').textContent=(p.atm0*100).toFixed(2)+'%';
+  const ts=p.term*100;
+  document.getElementById('v_term').textContent=(ts>=0?'+':'')+ts.toFixed(2)+'%';
+  document.getElementById('v_skew').textContent=p.skew.toFixed(3);
+  document.getElementById('v_curv').textContent=p.curv.toFixed(3);
+  document.getElementById('v_decay').textContent=p.decay.toFixed(2);
+  document.getElementById('v_K').textContent=p.K.toFixed(1);
+  document.getElementById('v_T').textContent=p.T.toFixed(2)+'y';
+  document.getElementById('v_tmax').textContent=p.tmax.toFixed(1)+'y';
+  document.getElementById('v_span').textContent='±'+(p.span*100).toFixed(0)+'%';
+}
+function fmt(x,d=2){return isFinite(x)?x.toFixed(d):'—';}
+function pct(x,d=2){return isFinite(x)?(x*100).toFixed(d)+'%':'—';}
+
+function xMap(K,p){
+  if(UI.xMode==='K') return K;
+  if(UI.xMode==='KS') return K/p.S;
+  return Math.log(K/forward(p.S,p.r,p.q,p.T));
+}
+function xTitle(){
+  return UI.xMode==='K'?'Strike K':UI.xMode==='KS'?'K/S':'ln(K/F)';
+}
+function zTitle(){
+  return {iv:'IV %',delta:'Delta',gamma:'Gamma',vega:'Vega / 1%'}[UI.zMode];
+}
+function zVal(K,T,p){
+  const iv=ivOf(K,T,p);
+  if(UI.zMode==='iv') return iv*100;
+  const g=bsmGreeks(p.S,K,T,p.r,p.q,iv,UI.type);
+  if(UI.zMode==='delta') return g.delta;
+  if(UI.zMode==='gamma') return g.gamma;
+  return g.vega/100;
+}
+
+function buildGrid(p){
+  const strikes=[], tenors=[];
+  const lo=1-p.span, hi=1+p.span;
+  for(let m=lo;m<=hi+1e-9;m+=0.02) strikes.push(+(p.S*m).toFixed(4));
+  for(let t=0.03;t<=p.tmax+1e-9;t+=Math.max(0.03,p.tmax/40)) tenors.push(+t.toFixed(4));
+  const Z=tenors.map(T=>strikes.map(K=>zVal(K,T,p)));
+  const X=strikes.map(K=>xMap(K,p));
+  return {strikes,tenors,X,Z};
+}
+
+/* ---- plot helpers ---- */
+function layout(extra){
+  return Object.assign({
+    paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)',
+    font:{family:'IBM Plex Mono, monospace', color:'#8B96A8', size:10},
+    margin:{l:48,r:18,t:8,b:40},
+    xaxis:{gridcolor:'#1C2430', linecolor:'#1C2430', zerolinecolor:'#1C2430'},
+    yaxis:{gridcolor:'#1C2430', linecolor:'#1C2430', zerolinecolor:'#1C2430'},
+    legend:{orientation:'h', y:1.15, font:{size:10}},
+  }, extra||{});
+}
+const CFG={displayModeBar:false, responsive:true};
+
+function kpi(lab,val,sub,cls){
+  return `<div class="tile kpi ${cls||''}"><div class="k-lab">${lab}</div><div class="k-val">${val}</div><div class="k-sub">${sub||''}</div></div>`;
+}
+
+/* ---- main render ---- */
+function render(){
+  const p=P();
+  const iv=ivOf(p.K,p.T,p);
+  const px=bsmPrice(p.S,p.K,p.T,p.r,p.q,iv,UI.type);
+  const g=bsmGreeks(p.S,p.K,p.T,p.r,p.q,iv,UI.type);
+  const F=forward(p.S,p.r,p.q,p.T);
+  const m=Math.log(p.K/F);
+
+  document.getElementById('kpis').innerHTML=[
+    kpi('Spot / Fwd', `${fmt(p.S,2)} / ${fmt(F,2)}`, `r=${pct(p.r,1)} q=${pct(p.q,1)}`),
+    kpi('Selected IV', pct(iv,2), `m=${fmt(m,3)}`, 'c'),
+    kpi(`${UI.type} mid`, fmt(px,3), `K=${fmt(p.K,1)} T=${fmt(p.T,2)}y`, 'g'),
+    kpi('Delta', fmt(g.delta,4), '', 'b'),
+    kpi('Gamma', fmt(g.gamma,5), `Θ/d ${fmt(g.theta/365,3)}`, 'a'),
+    kpi('Vega /1%', fmt(g.vega/100,3), `ρ ${fmt(g.rho,3)}`, 'c'),
+  ].join('');
+
+  // analytics table
+  document.getElementById('metaSel').textContent = `${UI.type.toUpperCase()} ${fmt(p.K,1)} · ${fmt(p.T*365,0)}d`;
+  const rows=[
+    ['Forward F', fmt(F,4)],
+    ['Log-moneyness m', fmt(m,4)],
+    ['Implied vol', pct(iv,3)],
+    ['ATM vol', pct(Math.max(0.03,p.atm0+p.term*Math.sqrt(p.T)),3)],
+    ['Model price', fmt(px,4)],
+    ['Intrinsic', fmt(UI.type==='call'?Math.max(p.S-p.K,0):Math.max(p.K-p.S,0),4)],
+    ['Time value', fmt(px-(UI.type==='call'?Math.max(p.S-p.K,0):Math.max(p.K-p.S,0)),4)],
+    ['Delta', fmt(g.delta,5)],
+    ['Gamma', fmt(g.gamma,6)],
+    ['Vega (per 1%)', fmt(g.vega/100,4)],
+    ['Theta (per day)', fmt(g.theta/365,4)],
+    ['Rho (per 1% rate)', fmt(g.rho/100,4)],
+    ['d₁ / d₂', `${fmt(g.d1,4)} / ${fmt(g.d2,4)}`],
+  ];
+  document.querySelector('#analyticsTable tbody').innerHTML =
+    rows.map(([a,b])=>`<tr><td>${a}</td><td>${b}</td></tr>`).join('');
+
+  // wing metrics
+  const Kc=strikeByDelta(0.25,'call',p.T,p);
+  const Kp=strikeByDelta(-0.25,'put',p.T,p);
+  const ivc=ivOf(Kc,p.T,p), ivp=ivOf(Kp,p.T,p);
+  const atmT=Math.max(0.03,p.atm0+p.term*Math.sqrt(p.T));
+  const rr=ivc-ivp, bf=0.5*(ivc+ivp)-atmT;
+  document.getElementById('wingKpis').innerHTML=[
+    kpi('25Δ Call K · IV', `${fmt(Kc,1)} · ${pct(ivc)}`, 'Δ≈0.25'),
+    kpi('25Δ Put K · IV', `${fmt(Kp,1)} · ${pct(ivp)}`, 'Δ≈−0.25', 'r'),
+    kpi('25Δ Risk Reversal', pct(rr,2), 'IVc − IVp', 'a'),
+    kpi('25Δ Butterfly', pct(bf,2), '½(IVc+IVp)−ATM', 'c'),
+  ].join('');
+
+  // chain
+  document.getElementById('metaChain').textContent = `T=${fmt(p.T,2)}y · synthetic spread`;
+  const strikes=[];
+  const step=Math.max(1, Math.round(p.S/40));
+  for(let k=Math.round(p.S*(1-p.span)); k<=Math.round(p.S*(1+p.span)); k+=step) strikes.push(k);
+  document.getElementById('chainBody').innerHTML = strikes.map(K=>{
+    const sig=ivOf(K,p.T,p);
+    const sigA=sig+0.005, sigB=Math.max(0.04,sig-0.005);
+    const cM=bsmPrice(p.S,K,p.T,p.r,p.q,sig,'call');
+    const cB=bsmPrice(p.S,K,p.T,p.r,p.q,sigB,'call');
+    const cA=bsmPrice(p.S,K,p.T,p.r,p.q,sigA,'call');
+    const pM=bsmPrice(p.S,K,p.T,p.r,p.q,sig,'put');
+    const pB=bsmPrice(p.S,K,p.T,p.r,p.q,sigB,'put');
+    const pA=bsmPrice(p.S,K,p.T,p.r,p.q,sigA,'put');
+    const gc=bsmGreeks(p.S,K,p.T,p.r,p.q,sig,'call');
+    const hi=Math.abs(K-p.K)<step*0.6;
+    return `<tr class="${hi?'hi':'clk'}" data-k="${K}">
+      <td>${K}</td><td>${pct(sig,1)}</td>
+      <td>${fmt(Math.min(cB,cA),2)}</td><td>${fmt(Math.max(cB,cA),2)}</td>
+      <td>${fmt(Math.min(pB,pA),2)}</td><td>${fmt(Math.max(pB,pA),2)}</td>
+      <td>${fmt(gc.delta,3)}</td><td>${fmt(gc.vega/100,2)}</td>
+    </tr>`;
+  }).join('');
+  document.querySelectorAll('#chainBody tr.clk').forEach(tr=>{
+    tr.onclick=()=>{ document.getElementById('K').value=tr.dataset.k; sync(); render(); };
+  });
+
+  document.getElementById('meta3d').textContent = `${zTitle()} · ${xTitle()}`;
+  document.getElementById('metaSmile').textContent = `T=${fmt(p.T,2)}y`;
+  document.getElementById('metaGreeks').textContent = `${UI.type} · T=${fmt(p.T,2)}y`;
+  document.getElementById('statusPill').textContent = 'UPDATED';
+  document.getElementById('railStatus').textContent =
+    `IV ${pct(iv)} · ${UI.type} ${fmt(px,3)} · F=${fmt(F,2)}`;
+
+  if(typeof Plotly!=='undefined'){
+    draw3D(p); drawHeat(p); drawSmile(p); drawTerm(p);
+    drawPayoff(p,iv,px); drawGreekMini(p); drawGreeks(p);
+  }
+}
+
+function draw3D(p){
+  const g=buildGrid(p);
+  const ivSel=ivOf(p.K,p.T,p);
+  const zSel=zVal(p.K,p.T,p);
+  Plotly.newPlot('c3d',[
+    {
+      type:'surface', x:g.X, y:g.tenors, z:g.Z,
+      colorscale:[[0,'#0A0D14'],[0.25,'#2E1065'],[0.5,'#9B8CFF'],[0.75,'#22D3EE'],[1,'#FFB020']],
+      showscale:true,
+      colorbar:{thickness:11,len:0.7,tickfont:{color:'#8B96A8',size:9},title:{text:zTitle(),font:{size:9,color:'#8B96A8'}}},
+      hovertemplate:`${xTitle()}=%{x:.3f}<br>T=%{y:.3f}y<br>${zTitle()}=%{z:.3f}<extra></extra>`
+    },
+    {
+      type:'scatter3d', mode:'markers',
+      x:[xMap(p.K,p)], y:[p.T], z:[zSel],
+      marker:{size:5,color:'#FF5C5C',symbol:'diamond'},
+      name:'Selected', hoverinfo:'skip'
+    }
+  ],{
+    paper_bgcolor:'rgba(0,0,0,0)',
+    font:{family:'IBM Plex Mono, monospace',color:'#8B96A8',size:10},
+    margin:{l:0,r:0,t:4,b:0},
+    scene:{
+      xaxis:{title:xTitle(),backgroundcolor:'#0A0D14',gridcolor:'#1C2430',color:'#8B96A8'},
+      yaxis:{title:'T (y)',backgroundcolor:'#0A0D14',gridcolor:'#1C2430',color:'#8B96A8'},
+      zaxis:{title:zTitle(),backgroundcolor:'#0A0D14',gridcolor:'#1C2430',color:'#8B96A8'},
+      camera:{eye:{x:1.55,y:1.45,z:1.15}},
+      aspectmode:'manual', aspectratio:{x:1.25,y:1,z:0.7}
+    }
+  },CFG);
+}
+
+function drawHeat(p){
+  const g=buildGrid(p);
+  Plotly.newPlot('cHeat',[{
+    type:'heatmap', x:g.X, y:g.tenors, z:g.Z,
+    colorscale:[[0,'#0A0D14'],[0.3,'#2E1065'],[0.55,'#9B8CFF'],[0.8,'#22D3EE'],[1,'#FFB020']],
+    colorbar:{thickness:11,tickfont:{color:'#8B96A8',size:9}},
+    hovertemplate:`${xTitle()}=%{x:.3f}<br>T=%{y:.3f}<br>z=%{z:.3f}<extra></extra>`
+  }],layout({
+    xaxis:{title:xTitle(),gridcolor:'#1C2430'},
+    yaxis:{title:'Expiry T',gridcolor:'#1C2430'},
+    margin:{l:48,r:36,t:8,b:40}
+  }),CFG);
+}
+
+function drawSmile(p){
+  const xs=[], ivs=[], ks=[];
+  for(let m=1-p.span;m<=1+p.span+1e-9;m+=0.008){
+    const K=p.S*m; ks.push(K);
+    xs.push(xMap(K,p));
+    ivs.push(ivOf(K,p.T,p)*100);
+  }
+  Plotly.newPlot('cSmile',[
+    {x:xs,y:ivs,mode:'lines',line:{color:'#9B8CFF',width:2.2},name:'IV'},
+    {x:[xMap(p.K,p)],y:[ivOf(p.K,p.T,p)*100],mode:'markers',
+      marker:{size:9,color:'#FF5C5C',symbol:'diamond'},name:'Selected'}
+  ],layout({
+    xaxis:{title:xTitle(),gridcolor:'#1C2430'},
+    yaxis:{title:'IV %',gridcolor:'#1C2430'},
+    showlegend:false, margin:{l:44,r:12,t:8,b:40}
+  }),CFG);
+}
+
+function drawTerm(p){
+  const ts=[], atm=[], sel=[];
+  for(let t=0.03;t<=p.tmax+1e-9;t+=0.03){
+    ts.push(+t.toFixed(4));
+    atm.push((p.atm0+p.term*Math.sqrt(t))*100);
+    sel.push(ivOf(p.K,t,p)*100);
+  }
+  Plotly.newPlot('cTerm',[
+    {x:ts,y:atm,mode:'lines',name:'ATM',line:{color:'#22D3EE',width:2}},
+    {x:ts,y:sel,mode:'lines',name:`K=${fmt(p.K,0)}`,line:{color:'#9B8CFF',width:1.6,dash:'dot'}},
+    {x:[p.T],y:[ivOf(p.K,p.T,p)*100],mode:'markers',marker:{size:9,color:'#FFB020',symbol:'diamond'},name:'Selected'}
+  ],layout({
+    xaxis:{title:'T (years)',gridcolor:'#1C2430'},
+    yaxis:{title:'IV %',gridcolor:'#1C2430'},
+    margin:{l:44,r:12,t:8,b:40}
+  }),CFG);
+}
+
+function drawPayoff(p,iv,px){
+  const spots=[], payoff=[], val=[];
+  for(let s=p.S*(1-p.span); s<=p.S*(1+p.span)+1e-9; s+=p.S*0.01){
+    spots.push(s);
+    payoff.push(UI.type==='call'?Math.max(s-p.K,0):Math.max(p.K-s,0));
+    // still-alive value at same T with sticky-strike IV approx using current surface at new spot — simplified: fixed IV
+    val.push(bsmPrice(s,p.K,p.T,p.r,p.q,iv,UI.type));
+  }
+  Plotly.newPlot('cPayoff',[
+    {x:spots,y:payoff,name:'Intrinsic',line:{color:'#5A6578',width:1.4}},
+    {x:spots,y:val,name:'BSM value',line:{color:'#00D68F',width:2}},
+    {x:[p.S],y:[px],mode:'markers',marker:{size:8,color:'#FF5C5C'},name:'Now'}
+  ],layout({
+    margin:{l:40,r:8,t:20,b:32},
+    title:{text:'Value vs spot (fixed IV)',font:{size:10,color:'#8B96A8'}},
+    xaxis:{title:'S',gridcolor:'#1C2430'},
+    yaxis:{title:'Value',gridcolor:'#1C2430'},
+    showlegend:false
+  }),CFG);
+}
+
+function drawGreekMini(p){
+  const xs=[], ds=[];
+  for(let m=1-p.span;m<=1+p.span;m+=0.015){
+    const K=p.S*m;
+    xs.push(xMap(K,p));
+    const iv=ivOf(K,p.T,p);
+    ds.push(bsmGreeks(p.S,K,p.T,p.r,p.q,iv,UI.type).delta);
+  }
+  Plotly.newPlot('cGreekSlice',[{
+    x:xs,y:ds,mode:'lines',line:{color:'#4C9AFF',width:2}
+  }],layout({
+    margin:{l:40,r:8,t:20,b:32},
+    title:{text:'Delta smile slice',font:{size:10,color:'#8B96A8'}},
+    xaxis:{title:xTitle(),gridcolor:'#1C2430'},
+    yaxis:{title:'Δ',gridcolor:'#1C2430'},
+    showlegend:false
+  }),CFG);
+}
+
+function drawGreeks(p){
+  const xs=[], d=[], v=[], g=[];
+  for(let m=1-p.span;m<=1+p.span;m+=0.012){
+    const K=p.S*m; xs.push(xMap(K,p));
+    const iv=ivOf(K,p.T,p);
+    const gr=bsmGreeks(p.S,K,p.T,p.r,p.q,iv,UI.type);
+    d.push(gr.delta); v.push(gr.vega/100); g.push(gr.gamma);
+  }
+  Plotly.newPlot('cGreeks',[
+    {x:xs,y:d,name:'Delta',line:{color:'#4C9AFF',width:2}},
+    {x:xs,y:v,name:'Vega/1%',yaxis:'y2',line:{color:'#00D68F',width:2}},
+    {x:xs,y:g,name:'Gamma',yaxis:'y3',line:{color:'#FFB020',width:1.5,dash:'dot'}},
+  ],layout({
+    xaxis:{title:xTitle(),gridcolor:'#1C2430'},
+    yaxis:{title:'Delta',gridcolor:'#1C2430'},
+    yaxis2:{overlaying:'y',side:'right',title:'Vega',showgrid:false},
+    yaxis3:{overlaying:'y',side:'right',showgrid:false,showticklabels:false},
+    margin:{l:48,r:48,t:8,b:40}
+  }),CFG);
+}
+
+/* ---- wiring ---- */
+function seg(id, key){
+  document.querySelectorAll('#'+id+' button').forEach(b=>{
+    b.onclick=()=>{
+      document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      UI[key]=b.dataset.v;
+      render();
+    };
+  });
+}
+seg('segType','type');
+seg('segX','xMode');
+seg('segZ','zMode');
+
+['S','r','q','atm','term','skew','curv','decay','K','T','tmax','span'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',()=>{sync();render();});
+});
+document.getElementById('btnRun').onclick=render;
+document.getElementById('btnReset').onclick=()=>{
+  const defaults={S:100,r:4,q:1.5,atm:18,term:3,skew:-0.14,curv:0.42,decay:0.45,K:100,T:0.5,tmax:2,span:30};
+  Object.entries(defaults).forEach(([k,v])=>{ const el=document.getElementById(k); if(el) el.value=v; });
+  UI.type='call';UI.xMode='K';UI.zMode='iv';
+  document.querySelectorAll('#segType button').forEach(b=>b.classList.toggle('on',b.dataset.v==='call'));
+  document.querySelectorAll('#segX button').forEach(b=>b.classList.toggle('on',b.dataset.v==='K'));
+  document.querySelectorAll('#segZ button').forEach(b=>b.classList.toggle('on',b.dataset.v==='iv'));
+  sync(); render();
+};
+
+const PRESETS={
+  equity:{atm:18,term:3,skew:-0.14,curv:0.42,decay:0.45},
+  index:{atm:15,term:4,skew:-0.18,curv:0.55,decay:0.5},
+  flat:{atm:20,term:0.5,skew:0,curv:0.08,decay:0.2},
+  inverted:{atm:22,term:-4,skew:-0.1,curv:0.35,decay:0.4},
+};
+document.querySelectorAll('[data-preset]').forEach(btn=>{
+  btn.onclick=()=>{
+    const pr=PRESETS[btn.dataset.preset];
+    Object.entries(pr).forEach(([k,v])=>{ document.getElementById(k).value=v; });
+    sync(); render();
+  };
+});
+
+function tickClock(){
+  const d=new Date();
+  document.getElementById('clock').textContent=
+    d.toISOString().replace('T',' ').slice(0,19)+' UTC';
+}
+tickClock(); setInterval(tickClock,1000);
+
+sync();
+render();
+</script>
+</body>
+</html>

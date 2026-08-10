@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ornstein–Uhlenbeck Mean-Reversion Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0E12;
+    --panel:#11171E;
+    --panel-2:#161D25;
+    --border:#232E3A;
+    --border-soft:#1A2330;
+    --text:#E7ECF2;
+    --muted:#7E8CA0;
+    --muted-2:#57667A;
+    --ou:#E8B339;
+    --ou-dim:#3D311A;
+    --rw:#5B8DEF;
+    --rw-dim:#1A2740;
+    --good:#45D9C0;
+    --grid:#1B2430;
+    --accent:#E8B339;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 20% 0%, #15120A 0%, transparent 42%),
+      radial-gradient(circle at 85% 15%, #0E1624 0%, transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+
+  .app{max-width:1400px;margin:0 auto;padding:28px 22px 60px;}
+
+  /* hero */
+  .hero{
+    border:1px solid var(--border);
+    border-radius:14px;
+    background:linear-gradient(180deg,#12100A 0%, #0C1116 100%);
+    padding:26px 28px;
+    margin-bottom:20px;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+      linear-gradient(0deg, var(--grid) 1px, transparent 1px);
+    background-size:34px 34px;
+    opacity:.3;
+    mask-image:linear-gradient(180deg,#000 0%, transparent 85%);
+    pointer-events:none;
+  }
+  .hero-top{display:flex; justify-content:space-between; align-items:flex-start; gap:20px; position:relative; flex-wrap:wrap;}
+  .eyebrow{
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+    display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--ou); box-shadow:0 0 8px var(--ou); animation:pulse 2.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:28px; font-weight:700; margin:0 0 8px 0; letter-spacing:-.01em;
+  }
+  .hero p.sub{color:var(--muted); font-size:14px; line-height:1.65; max-width:620px; margin:0;}
+  .eq-box{
+    font-family:'JetBrains Mono',monospace;
+    font-size:14px;
+    background:var(--ou-dim);
+    border:1px solid #5A4520;
+    color:var(--ou);
+    padding:12px 16px;
+    border-radius:10px;
+    white-space:nowrap;
+  }
+
+  /* deck */
+  .deck{
+    border:1px solid var(--border);
+    border-radius:14px;
+    background:var(--panel);
+    padding:18px 20px 14px;
+    margin-bottom:20px;
+    position:relative;
+  }
+  .deck-label{
+    font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted-2);
+    position:absolute; top:-9px; left:16px; background:var(--bg); padding:0 8px;
+  }
+  .deck-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));
+    gap:18px 22px;
+    align-items:end;
+  }
+  .ctrl{display:flex; flex-direction:column; gap:6px; min-width:0;}
+  .ctrl label{font-size:11px; color:var(--muted); display:flex; justify-content:space-between; gap:8px;}
+  .ctrl label .val{color:var(--text); font-family:'JetBrains Mono',monospace; font-weight:600; white-space:nowrap;}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:4px; border-radius:2px; background:var(--border);
+    outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:13px;height:13px;border-radius:50%;
+    background:var(--ou); border:2px solid #1A1408; cursor:pointer;
+    box-shadow:0 0 0 3px rgba(232,179,57,.18);
+  }
+  .btn-row{display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; align-items:center;}
+  .btn{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:.03em;
+    padding:9px 16px; border-radius:8px; cursor:pointer; transition:.15s;
+    display:inline-flex; align-items:center; gap:7px;
+  }
+  .btn:hover{border-color:var(--ou); color:var(--ou);}
+  .btn.primary{background:var(--ou-dim); border-color:#5A4520; color:var(--ou);}
+  .btn.primary:hover{background:#4A3A18;}
+  .btn:active{transform:translateY(1px);}
+  .toggle{
+    display:flex; align-items:center; gap:8px;
+    font-size:12px; color:var(--muted); cursor:pointer; user-select:none;
+  }
+  .toggle input{accent-color:var(--ou); width:15px; height:15px; cursor:pointer;}
+
+  /* half-life badge */
+  .halflife{
+    display:flex; flex-wrap:wrap; gap:12px; margin-top:14px;
+  }
+  .hl-card{
+    background:var(--bg);
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    padding:10px 14px;
+    min-width:140px;
+  }
+  .hl-card .k{font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted-2); margin-bottom:4px;}
+  .hl-card .v{font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:600; color:var(--ou);}
+  .hl-card .s{font-size:11px; color:var(--muted); margin-top:2px;}
+
+  /* main layout */
+  .main{display:grid; grid-template-columns:1.35fr 1fr; gap:18px;}
+  @media (max-width:1100px){.main{grid-template-columns:1fr;}}
+
+  .panel{
+    border:1px solid var(--border); border-radius:14px; background:var(--panel);
+    overflow:hidden; display:flex; flex-direction:column;
+  }
+  .panel-head{
+    padding:14px 18px; border-bottom:1px solid var(--border-soft);
+    background:var(--panel-2);
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .ph-name{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;}
+  .ph-tag{margin-left:auto; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted-2); border:1px solid var(--border); padding:2px 8px; border-radius:20px;}
+  .led{width:8px;height:8px;border-radius:50%; box-shadow:0 0 9px currentColor;}
+
+  .chart-wrap{padding:12px 14px;}
+  .chart-title{font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-2); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;}
+  canvas{display:block; width:100%; height:auto; border-radius:6px;}
+
+  .metrics{
+    margin:0 14px 14px; border:1px solid var(--border-soft); border-radius:10px;
+    background:var(--bg); overflow:hidden;
+  }
+  .metrics table{width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:11.5px;}
+  .metrics th{text-align:left; font-weight:500; color:var(--muted-2); padding:8px 10px; font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; border-bottom:1px solid var(--border-soft);}
+  .metrics td{padding:6px 10px; color:var(--text); border-bottom:1px solid var(--border-soft);}
+  .metrics tr:last-child td{border-bottom:none;}
+  .metrics td.k{color:var(--muted); width:55%;}
+
+  .side-stack{display:flex; flex-direction:column; gap:18px;}
+
+  /* dual chart row */
+  .dual{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  @media (max-width:600px){.dual{grid-template-columns:1fr;}}
+
+  /* time snapshot selector */
+  .snap-row{
+    display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;
+  }
+  .snap-btn{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px;
+    background:var(--panel-2); border:1px solid var(--border);
+    color:var(--muted); padding:4px 10px; border-radius:6px; cursor:pointer;
+  }
+  .snap-btn.active{border-color:var(--ou); color:var(--ou); background:var(--ou-dim);}
+
+  /* education */
+  .edu{
+    margin-top:24px;
+    border:1px solid var(--border);
+    border-radius:14px;
+    background:var(--panel);
+    padding:22px 24px;
+  }
+  .edu h2{font-family:'Space Grotesk',sans-serif; font-size:18px; margin:0 0 6px;}
+  .edu p.lead{color:var(--muted); font-size:13.5px; margin:0 0 18px; line-height:1.55;}
+  .edu-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px;}
+  .edu-card{
+    background:var(--bg);
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    padding:14px 16px;
+  }
+  .edu-card h3{font-family:'Space Grotesk',sans-serif; font-size:14px; margin:0 0 8px; color:var(--ou);}
+  .edu-card p{font-size:12.5px; color:var(--muted); line-height:1.6; margin:0;}
+  .edu-card code{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--text); background:var(--panel-2); padding:1px 5px; border-radius:4px;}
+
+  .compare-box{
+    margin-top:16px;
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    overflow:hidden;
+  }
+  table.ctab{width:100%; border-collapse:collapse; font-size:12.5px;}
+  table.ctab th, table.ctab td{padding:10px 14px; text-align:left; border-bottom:1px solid var(--border-soft);}
+  table.ctab th{color:var(--muted); font-weight:500; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; background:var(--panel-2);}
+  table.ctab tr:last-child td{border-bottom:none;}
+  table.ctab td.prop{font-weight:500; color:var(--text);}
+  .yes{color:var(--good); font-weight:600;}
+  .no{color:var(--muted-2);}
+
+  footer{margin-top:22px; text-align:center; color:var(--muted-2); font-size:11.5px; padding-bottom:10px;}
+
+  ::selection{background:var(--ou-dim); color:var(--ou);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="eyebrow"><span class="dot"></span>Quant Notebook · Continuous-time processes</div>
+        <h1>Ornstein–Uhlenbeck Mean-Reversion Simulator</h1>
+        <p class="sub">
+          Explore the canonical mean-reverting diffusion
+          <span class="mono" style="color:var(--ou)">dX<sub>t</sub> = θ(μ − X<sub>t</sub>) dt + σ dW<sub>t</sub></span>.
+          Raise θ and paths snap back faster; raise σ and the stationary cloud spreads.
+          Compare against a pure random walk to see why mean reversion is structurally different from a trading rule.
+        </p>
+      </div>
+      <div class="eq-box">dX = θ(μ−X) dt + σ dW</div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="deck">
+    <span class="deck-label">Parameters &amp; simulation</span>
+    <div class="deck-grid">
+      <div class="ctrl">
+        <label>Speed θ <span class="val" id="vTheta">2.00</span></label>
+        <input type="range" id="cTheta" min="0.05" max="8" step="0.05" value="2">
+      </div>
+      <div class="ctrl">
+        <label>Long-run mean μ <span class="val" id="vMu">100</span></label>
+        <input type="range" id="cMu" min="20" max="200" step="1" value="100">
+      </div>
+      <div class="ctrl">
+        <label>Volatility σ <span class="val" id="vSigma">15</span></label>
+        <input type="range" id="cSigma" min="1" max="60" step="1" value="15">
+      </div>
+      <div class="ctrl">
+        <label>Start X₀ <span class="val" id="vX0">140</span></label>
+        <input type="range" id="cX0" min="20" max="200" step="1" value="140">
+      </div>
+      <div class="ctrl">
+        <label>Horizon T <span class="val" id="vT">3.00</span></label>
+        <input type="range" id="cT" min="0.5" max="10" step="0.25" value="3">
+      </div>
+      <div class="ctrl">
+        <label>Steps / unit time <span class="val" id="vSteps">100</span></label>
+        <input type="range" id="cSteps" min="20" max="400" step="10" value="100">
+      </div>
+      <div class="ctrl">
+        <label>Number of paths <span class="val" id="vN">200</span></label>
+        <input type="range" id="cN" min="20" max="500" step="10" value="200">
+      </div>
+      <div class="ctrl">
+        <label>Paths drawn <span class="val" id="vDraw">40</span></label>
+        <input type="range" id="cDraw" min="5" max="100" step="5" value="40">
+      </div>
+    </div>
+
+    <div class="halflife">
+      <div class="hl-card">
+        <div class="k">Half-life t<sub>½</sub></div>
+        <div class="v" id="vHalf">0.347</div>
+        <div class="s">ln(2) / θ · time units</div>
+      </div>
+      <div class="hl-card">
+        <div class="k">Stationary variance</div>
+        <div class="v" id="vStatVar">56.25</div>
+        <div class="s">σ² / (2θ)</div>
+      </div>
+      <div class="hl-card">
+        <div class="k">Stationary std</div>
+        <div class="v" id="vStatStd">7.50</div>
+        <div class="s">σ / √(2θ)</div>
+      </div>
+      <div class="hl-card">
+        <div class="k">Mean reversion lag</div>
+        <div class="v" id="vLag">~0.50</div>
+        <div class="s">e<sup>−θ·t</sup> residual after t½</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="runBtn">▶ Run / animate</button>
+      <button class="btn" id="reroll">↻ Resample seed</button>
+      <button class="btn" id="pauseBtn">❚❚ Pause</button>
+      <label class="toggle"><input type="checkbox" id="showRW" checked> Overlay random walk</label>
+      <label class="toggle"><input type="checkbox" id="animate" checked> Animate paths</label>
+    </div>
+  </div>
+
+  <!-- MAIN VISUALS -->
+  <div class="main">
+    <!-- left: paths + animation -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="led" style="background:var(--ou);color:var(--ou)"></span>
+        <span class="ph-name">Simulated paths</span>
+        <span class="ph-tag" id="pathTag">OU · 200 paths</span>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title">
+          <span>X<sub>t</sub> vs time · mean path bold · μ dashed</span>
+          <span class="mono" id="animTime" style="color:var(--muted)">t = 0.00</span>
+        </div>
+        <canvas id="chartPaths" height="320"></canvas>
+      </div>
+      <div class="metrics">
+        <table id="metricsOU"></table>
+      </div>
+    </div>
+
+    <!-- right stack -->
+    <div class="side-stack">
+      <!-- distribution snapshots -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="led" style="background:var(--ou);color:var(--ou)"></span>
+          <span class="ph-name">Distribution at selected times</span>
+        </div>
+        <div class="chart-wrap">
+          <div class="snap-row" id="snapBtns"></div>
+          <div class="chart-title"><span>Histogram of X<sub>t</sub></span><span id="snapLabel">t = T</span></div>
+          <canvas id="chartDist" height="160"></canvas>
+        </div>
+      </div>
+
+      <!-- ACF + stationary -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="led" style="background:var(--ou);color:var(--ou)"></span>
+          <span class="ph-name">Autocorrelation &amp; stationary law</span>
+        </div>
+        <div class="chart-wrap dual">
+          <div>
+            <div class="chart-title"><span>ACF of increments</span><span>lag 1–25</span></div>
+            <canvas id="chartACF" height="140"></canvas>
+          </div>
+          <div>
+            <div class="chart-title"><span>Terminal vs stationary</span><span>N(μ, σ²/2θ)</span></div>
+            <canvas id="chartStat" height="140"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- comparison RW -->
+  <div class="panel" style="margin-top:18px;">
+    <div class="panel-head">
+      <span class="led" style="background:var(--rw);color:var(--rw)"></span>
+      <span class="ph-name">OU vs Random Walk</span>
+      <span class="ph-tag">same σ, no restoring force</span>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">
+        <span>Side-by-side: mean-reverting (gold) vs pure diffusion (blue) · same noise draws where possible</span>
+      </div>
+      <canvas id="chartCompare" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- education -->
+  <div class="edu">
+    <h2>What the simulator is teaching</h2>
+    <p class="lead">All paths are generated client-side with Euler–Maruyama. Metrics update live when you move the sliders.</p>
+    <div class="edu-grid">
+      <div class="edu-card">
+        <h3>Stationarity</h3>
+        <p>
+          As <code>t → ∞</code> the OU process converges in law to
+          <code>N(μ, σ²/(2θ))</code>, independent of X₀.
+          Variance stops growing — unlike a random walk whose variance grows linearly with time.
+        </p>
+      </div>
+      <div class="edu-card">
+        <h3>Mean-reversion speed θ</h3>
+        <p>
+          Larger θ pulls X back to μ more aggressively. The expected gap decays as
+          <code>E[X_t − μ] = (X₀ − μ) e<sup>−θt</sup></code>.
+          Double θ and the process forgets its starting point twice as fast.
+        </p>
+      </div>
+      <div class="edu-card">
+        <h3>Half-life t<sub>½</sub> = ln(2)/θ</h3>
+        <p>
+          Time for the expected deviation from μ to halve.
+          At t = t<sub>½</sub> the residual is 50 % of the original gap; at 2·t<sub>½</sub> it is 25 %, and so on.
+        </p>
+      </div>
+      <div class="edu-card">
+        <h3>Long-run variance σ²/(2θ)</h3>
+        <p>
+          Higher σ widens the stationary cloud; higher θ shrinks it.
+          The balance between noise injection and restoring force sets the equilibrium dispersion you see in the terminal histogram.
+        </p>
+      </div>
+      <div class="edu-card">
+        <h3>Process ≠ trading strategy</h3>
+        <p>
+          The SDE describes a statistical law of motion. A trading rule (e.g. “buy when below μ”) is an action on top of that law.
+          Mean reversion of the process does not automatically imply positive expected P&amp;L after costs, risk limits, or regime change.
+        </p>
+      </div>
+      <div class="edu-card">
+        <h3>vs Random walk / pure diffusion</h3>
+        <p>
+          A random walk <code>dX = σ dW</code> has no drift toward any level.
+          Paths wander; variance grows without bound; there is no stationary distribution and no half-life.
+          Overlaying both makes the restoring force visible.
+        </p>
+      </div>
+    </div>
+
+    <div class="compare-box" style="margin-top:18px;">
+      <table class="ctab">
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Ornstein–Uhlenbeck</th>
+            <th>Random walk (σ dW)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="prop">Mean reverting</td>
+            <td><span class="yes">✓ yes</span></td>
+            <td><span class="no">— no</span></td>
+          </tr>
+          <tr>
+            <td class="prop">Stationary distribution</td>
+            <td><span class="yes">✓ N(μ, σ²/2θ)</span></td>
+            <td><span class="no">— none (variance → ∞)</span></td>
+          </tr>
+          <tr>
+            <td class="prop">Half-life</td>
+            <td><span class="yes">✓ ln(2)/θ</span></td>
+            <td><span class="no">— undefined</span></td>
+          </tr>
+          <tr>
+            <td class="prop">Can cross zero / go negative</td>
+            <td><span class="no">yes (Gaussian)</span></td>
+            <td><span class="no">yes</span></td>
+          </tr>
+          <tr>
+            <td class="prop">Continuous paths</td>
+            <td><span class="yes">✓ yes</span></td>
+            <td><span class="yes">✓ yes</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>Euler–Maruyama discretization · educational tool, not investment advice · all randomness generated client-side</footer>
+</div>
+
+<script>
+/* ============================================================
+   RNG
+   ============================================================ */
+let _seed = 20260810;
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rand = mulberry32(_seed);
+function reseed(){ _seed = (Date.now() ^ Math.floor(Math.random()*1e9)) >>> 0; rand = mulberry32(_seed); _spare = null; }
+
+let _spare = null;
+function randn(){
+  if(_spare !== null){ const v = _spare; _spare = null; return v; }
+  let u=0,v=0;
+  while(u===0) u = rand();
+  while(v===0) v = rand();
+  const mag = Math.sqrt(-2.0*Math.log(u));
+  _spare = mag * Math.sin(2*Math.PI*v);
+  return mag * Math.cos(2*Math.PI*v);
+}
+
+/* ============================================================
+   STATS
+   ============================================================ */
+function mean(a){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]; return s/a.length; }
+function variance(a, m){ m = m===undefined?mean(a):m; let s=0; for(let i=0;i<a.length;i++){ const d=a[i]-m; s+=d*d; } return s/(a.length-1 || 1); }
+function stdev(a, m){ return Math.sqrt(variance(a,m)); }
+function skewness(a){
+  const m = mean(a), sd = stdev(a,m), n = a.length;
+  if(sd === 0) return 0;
+  let s = 0; for(let i=0;i<n;i++){ const d=(a[i]-m)/sd; s += d*d*d; }
+  return (n/((n-1)*(n-2))) * s;
+}
+function kurtosisExcess(a){
+  const m = mean(a), sd = stdev(a,m), n = a.length;
+  if(sd === 0) return 0;
+  let s = 0; for(let i=0;i<n;i++){ const d=(a[i]-m)/sd; s += d*d*d*d; }
+  return (s/n) - 3;
+}
+function fmt(x, d=3){
+  if(!isFinite(x)) return '—';
+  if(Math.abs(x) >= 1000) return x.toFixed(1);
+  return x.toFixed(d);
+}
+
+/* ============================================================
+   SIMULATION
+   ============================================================ */
+function simulateOU(theta, mu, sigma, X0, steps, dt, N){
+  const paths = [];
+  const vol = sigma * Math.sqrt(dt);
+  for(let i=0;i<N;i++){
+    const arr = new Float64Array(steps+1);
+    let X = X0;
+    arr[0] = X;
+    for(let t=1;t<=steps;t++){
+      X = X + theta*(mu - X)*dt + vol*randn();
+      arr[t] = X;
+    }
+    paths.push(arr);
+  }
+  return paths;
+}
+
+function simulateRW(sigma, X0, steps, dt, N){
+  const paths = [];
+  const vol = sigma * Math.sqrt(dt);
+  for(let i=0;i<N;i++){
+    const arr = new Float64Array(steps+1);
+    let X = X0;
+    arr[0] = X;
+    for(let t=1;t<=steps;t++){
+      X = X + vol*randn();
+      arr[t] = X;
+    }
+    paths.push(arr);
+  }
+  return paths;
+}
+
+function incrementsOf(paths){
+  const N = paths.length, steps = paths[0].length - 1;
+  const out = [];
+  for(let i=0;i<N;i++){
+    const src = paths[i];
+    const inc = new Float64Array(steps);
+    for(let t=0;t<steps;t++) inc[t] = src[t+1] - src[t];
+    out.push(inc);
+  }
+  return out;
+}
+
+function pooled(incArr){
+  let total = 0;
+  for(const a of incArr) total += a.length;
+  const out = new Float64Array(total);
+  let idx = 0;
+  for(const a of incArr){ out.set(a, idx); idx += a.length; }
+  return out;
+}
+
+function autocorrAvg(incArr, maxLag){
+  const N = incArr.length;
+  const out = new Float64Array(maxLag);
+  let used = 0;
+  for(let i=0;i<N;i++){
+    const a = incArr[i], n = a.length;
+    if(n < maxLag+5) continue;
+    const m = mean(a), v = variance(a, m) * (n-1);
+    if(v === 0) continue;
+    for(let lag=1; lag<=maxLag; lag++){
+      let s = 0;
+      for(let t=0;t<n-lag;t++) s += (a[t]-m)*(a[t+lag]-m);
+      out[lag-1] += s / v;
+    }
+    used++;
+  }
+  if(used>0) for(let l=0;l<maxLag;l++) out[l] /= used;
+  return out;
+}
+
+function histogram(data, bins){
+  let lo = Infinity, hi = -Infinity;
+  for(const v of data){ if(v<lo) lo=v; if(v>hi) hi=v; }
+  if(lo === hi){ lo -= 1; hi += 1; }
+  const counts = new Float64Array(bins);
+  const w = (hi-lo)/bins;
+  for(const v of data){
+    let b = Math.floor((v-lo)/w);
+    if(b<0) b=0; if(b>=bins) b=bins-1;
+    counts[b]++;
+  }
+  return { counts, lo, hi, w };
+}
+
+/* ============================================================
+   CANVAS HELPERS
+   ============================================================ */
+function setupCanvas(canvas, cssW, cssH){
+  const dpr = window.devicePixelRatio || 1;
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+  return ctx;
+}
+
+const PAD = {l:42, r:10, t:8, b:18};
+
+function plotFrame(ctx, w, h, yMin, yMax, xMin, xMax, opts={}){
+  const innerW = w - PAD.l - PAD.r, innerH = h - PAD.t - PAD.b;
+  ctx.strokeStyle = '#1B2430';
+  ctx.lineWidth = 1;
+  ctx.font = "9.5px 'JetBrains Mono', monospace";
+  ctx.fillStyle = '#57667A';
+  const nY = 5;
+  for(let i=0;i<=nY;i++){
+    const y = PAD.t + innerH * (i/nY);
+    ctx.beginPath();
+    ctx.moveTo(PAD.l, y); ctx.lineTo(w-PAD.r, y);
+    ctx.stroke();
+    const val = yMax - (yMax-yMin)*(i/nY);
+    let label = Math.abs(val) >= 100 ? val.toFixed(0) : (Math.abs(val) >= 10 ? val.toFixed(1) : val.toFixed(2));
+    ctx.fillText(label, 2, y+3);
+  }
+  if(opts.zeroLine && yMin < 0 && yMax > 0){
+    const y = PAD.t + innerH * (1 - (0-yMin)/(yMax-yMin));
+    ctx.strokeStyle = '#2B3646';
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(w-PAD.r,y); ctx.stroke();
+  }
+  return {
+    x:(v)=> PAD.l + innerW * (v-xMin)/(xMax-xMin || 1),
+    y:(v)=> PAD.t + innerH * (1 - (v-yMin)/((yMax-yMin)||1)),
+    innerW, innerH
+  };
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  paths: null,
+  rwPaths: null,
+  params: {},
+  animFrame: 0,
+  animPlaying: false,
+  animId: null,
+  snapFrac: 1.0
+};
+
+function readParams(){
+  return {
+    theta: parseFloat(document.getElementById('cTheta').value),
+    mu: parseFloat(document.getElementById('cMu').value),
+    sigma: parseFloat(document.getElementById('cSigma').value),
+    X0: parseFloat(document.getElementById('cX0').value),
+    T: parseFloat(document.getElementById('cT').value),
+    stepsPer: parseInt(document.getElementById('cSteps').value),
+    N: parseInt(document.getElementById('cN').value),
+    draw: parseInt(document.getElementById('cDraw').value)
+  };
+}
+
+function syncLabels(){
+  const p = readParams();
+  document.getElementById('vTheta').textContent = p.theta.toFixed(2);
+  document.getElementById('vMu').textContent = p.mu.toFixed(0);
+  document.getElementById('vSigma').textContent = p.sigma.toFixed(0);
+  document.getElementById('vX0').textContent = p.X0.toFixed(0);
+  document.getElementById('vT').textContent = p.T.toFixed(2);
+  document.getElementById('vSteps').textContent = p.stepsPer;
+  document.getElementById('vN').textContent = p.N;
+  document.getElementById('vDraw').textContent = p.draw;
+
+  const half = Math.log(2) / p.theta;
+  const statVar = (p.sigma*p.sigma) / (2*p.theta);
+  const statStd = Math.sqrt(statVar);
+  document.getElementById('vHalf').textContent = half.toFixed(3);
+  document.getElementById('vStatVar').textContent = statVar.toFixed(2);
+  document.getElementById('vStatStd').textContent = statStd.toFixed(2);
+  document.getElementById('vLag').textContent = '~' + (0.5).toFixed(2);
+}
+
+/* ============================================================
+   DRAW PATHS (with animation cutoff)
+   ============================================================ */
+function drawPaths(canvas, paths, rwPaths, p, upToStep){
+  const boxW = canvas.parentElement.clientWidth - 8;
+  const h = 300;
+  const ctx = setupCanvas(canvas, boxW, h);
+  const drawN = Math.min(p.draw, paths.length);
+  const len = paths[0].length;
+  const end = Math.min(upToStep ?? len-1, len-1);
+
+  let yMin=Infinity, yMax=-Infinity;
+  for(let i=0;i<drawN;i++){
+    const a = paths[i];
+    for(let t=0;t<=end;t++){ if(a[t]<yMin) yMin=a[t]; if(a[t]>yMax) yMax=a[t]; }
+  }
+  if(document.getElementById('showRW').checked && rwPaths){
+    for(let i=0;i<Math.min(8, rwPaths.length);i++){
+      const a = rwPaths[i];
+      for(let t=0;t<=end;t++){ if(a[t]<yMin) yMin=a[t]; if(a[t]>yMax) yMax=a[t]; }
+    }
+  }
+  yMin = Math.min(yMin, p.mu);
+  yMax = Math.max(yMax, p.mu);
+  const padY = (yMax-yMin)*0.1 || 5;
+  yMin -= padY; yMax += padY;
+
+  const s = plotFrame(ctx, boxW, h, yMin, yMax, 0, len-1);
+
+  // RW faint paths
+  if(document.getElementById('showRW').checked && rwPaths){
+    ctx.lineWidth = 1;
+    for(let i=0;i<Math.min(8, rwPaths.length);i++){
+      const a = rwPaths[i];
+      ctx.strokeStyle = '#5B8DEF22';
+      ctx.beginPath();
+      for(let t=0;t<=end;t++){
+        const X = s.x(t), Y = s.y(a[t]);
+        if(t===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // OU paths
+  ctx.lineWidth = 1;
+  for(let i=0;i<drawN;i++){
+    const a = paths[i];
+    ctx.strokeStyle = '#E8B33928';
+    ctx.beginPath();
+    for(let t=0;t<=end;t++){
+      const X = s.x(t), Y = s.y(a[t]);
+      if(t===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+  }
+
+  // mean path
+  const N = paths.length;
+  const meanArr = new Float64Array(end+1);
+  for(let t=0;t<=end;t++){
+    let sum=0; for(let i=0;i<N;i++) sum+=paths[i][t];
+    meanArr[t]=sum/N;
+  }
+  ctx.strokeStyle = '#E8B339';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  for(let t=0;t<=end;t++){
+    const X=s.x(t), Y=s.y(meanArr[t]);
+    if(t===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+  }
+  ctx.stroke();
+
+  // theoretical mean: mu + (X0-mu)e^{-theta t}
+  const steps = len-1;
+  const dt = p.T / steps;
+  ctx.setLineDash([5,4]);
+  ctx.strokeStyle = '#F5D78A88';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  for(let t=0;t<=end;t++){
+    const time = t * dt;
+    const thMean = p.mu + (p.X0 - p.mu) * Math.exp(-p.theta * time);
+    const X=s.x(t), Y=s.y(thMean);
+    if(t===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // long-run mean μ
+  ctx.setLineDash([4,3]);
+  ctx.strokeStyle = '#9AA7B8';
+  ctx.lineWidth = 1.2;
+  const Ymu = s.y(p.mu);
+  ctx.beginPath(); ctx.moveTo(PAD.l, Ymu); ctx.lineTo(boxW-PAD.r, Ymu); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#9AA7B8';
+  ctx.font = "10px 'JetBrains Mono', monospace";
+  ctx.fillText('μ = ' + p.mu, PAD.l + 4, Ymu - 5);
+
+  // half-life marker
+  const half = Math.log(2) / p.theta;
+  if(half < p.T){
+    const tIdx = Math.min(end, Math.round((half / p.T) * steps));
+    const Xx = s.x(tIdx);
+    ctx.strokeStyle = '#E8B33966';
+    ctx.setLineDash([2,2]);
+    ctx.beginPath(); ctx.moveTo(Xx, PAD.t); ctx.lineTo(Xx, h-PAD.b); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#E8B339';
+    ctx.fillText('t½', Xx + 3, PAD.t + 12);
+  }
+
+  const timeNow = (end / steps) * p.T;
+  document.getElementById('animTime').textContent = 't = ' + timeNow.toFixed(2);
+}
+
+/* ============================================================
+   DISTRIBUTION
+   ============================================================ */
+function drawDist(canvas, paths, p, frac){
+  const boxW = canvas.parentElement.clientWidth - 8;
+  const h = 150;
+  const ctx = setupCanvas(canvas, boxW, h);
+  const steps = paths[0].length - 1;
+  const idx = Math.min(steps, Math.round(frac * steps));
+  const data = new Float64Array(paths.length);
+  for(let i=0;i<paths.length;i++) data[i] = paths[i][idx];
+
+  const bins = 28;
+  const hgm = histogram(data, bins);
+  let cMax = 0; for(const c of hgm.counts) if(c>cMax) cMax = c;
+
+  // theoretical density at this time
+  const time = (idx / steps) * p.T;
+  const m = p.mu + (p.X0 - p.mu) * Math.exp(-p.theta * time);
+  const v = (p.sigma*p.sigma/(2*p.theta)) * (1 - Math.exp(-2*p.theta*time));
+  const sTheo = Math.sqrt(Math.max(v, 1e-9));
+
+  // expand range a bit for density
+  const lo = Math.min(hgm.lo, m - 3.5*sTheo);
+  const hi = Math.max(hgm.hi, m + 3.5*sTheo);
+
+  const s = plotFrame(ctx, boxW, h, 0, cMax*1.12, lo, hi);
+  const barW = s.innerW / bins;
+  const binW = (hgm.hi - hgm.lo) / bins;
+
+  ctx.fillStyle = '#E8B33955';
+  ctx.strokeStyle = '#E8B339';
+  for(let b=0;b<bins;b++){
+    const xCenter = hgm.lo + (b+0.5)*binW;
+    const x0 = s.x(xCenter) - barW*0.4;
+    const y0 = s.y(hgm.counts[b]);
+    const yBase = s.y(0);
+    ctx.fillRect(x0, y0, Math.max(barW*0.8,1), yBase-y0);
+    ctx.strokeRect(x0, y0, Math.max(barW*0.8,1), yBase-y0);
+  }
+
+  // theoretical Gaussian
+  ctx.strokeStyle = '#F3F6FA';
+  ctx.setLineDash([3,2]);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const nPts = 90;
+  const scaleToCount = data.length * binW;
+  for(let i=0;i<=nPts;i++){
+    const xv = lo + (hi-lo)*(i/nPts);
+    const dens = (1/(sTheo*Math.sqrt(2*Math.PI))) * Math.exp(-Math.pow(xv-m,2)/(2*sTheo*sTheo));
+    const X = s.x(xv), Y = s.y(dens * scaleToCount);
+    if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // mu line
+  ctx.strokeStyle = '#9AA7B8';
+  ctx.setLineDash([3,3]);
+  const Xx = s.x(p.mu);
+  ctx.beginPath(); ctx.moveTo(Xx, PAD.t); ctx.lineTo(Xx, h-PAD.b); ctx.stroke();
+  ctx.setLineDash([]);
+
+  document.getElementById('snapLabel').textContent = 't = ' + time.toFixed(2) + '  (step ' + idx + ')';
+}
+
+/* ============================================================
+   ACF
+   ============================================================ */
+function drawACF(canvas, paths){
+  const boxW = canvas.parentElement.clientWidth - 8;
+  const h = 130;
+  const ctx = setupCanvas(canvas, boxW, h);
+  const incArr = incrementsOf(paths);
+  const acf = autocorrAvg(incArr, 25);
+  const sigBand = 2 / Math.sqrt(incArr[0].length);
+
+  let vMax = 0.2, vMin = -0.15;
+  for(const v of acf){ if(v>vMax) vMax=v; if(v<vMin) vMin=v; }
+  const s = plotFrame(ctx, boxW, h, vMin, vMax, 0, acf.length, {zeroLine:true});
+  const barW = s.innerW / acf.length;
+  const yZero = s.y(0);
+
+  for(let i=0;i<acf.length;i++){
+    const v = acf[i];
+    const x0 = PAD.l + barW*i + barW*0.15;
+    const y0 = s.y(Math.max(v,0));
+    const y1 = s.y(Math.min(v,0));
+    ctx.fillStyle = Math.abs(v) > sigBand ? '#E8B339' : '#E8B33966';
+    ctx.fillRect(x0, Math.min(y0,yZero), barW*0.7, Math.abs(y1-y0) || 1);
+  }
+  ctx.strokeStyle = '#3A4759';
+  ctx.setLineDash([2,2]);
+  ctx.beginPath(); ctx.moveTo(PAD.l, s.y(sigBand)); ctx.lineTo(boxW-PAD.r, s.y(sigBand)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PAD.l, s.y(-sigBand)); ctx.lineTo(boxW-PAD.r, s.y(-sigBand)); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/* ============================================================
+   STATIONARY vs TERMINAL
+   ============================================================ */
+function drawStationary(canvas, paths, p){
+  const boxW = canvas.parentElement.clientWidth - 8;
+  const h = 130;
+  const ctx = setupCanvas(canvas, boxW, h);
+  const terminal = new Float64Array(paths.length);
+  for(let i=0;i<paths.length;i++) terminal[i] = paths[i][paths[i].length-1];
+
+  const bins = 26;
+  const hgm = histogram(terminal, bins);
+  let cMax = 0; for(const c of hgm.counts) if(c>cMax) cMax = c;
+
+  const statVar = (p.sigma*p.sigma)/(2*p.theta);
+  const sTheo = Math.sqrt(statVar);
+  const lo = Math.min(hgm.lo, p.mu - 3.8*sTheo);
+  const hi = Math.max(hgm.hi, p.mu + 3.8*sTheo);
+
+  const s = plotFrame(ctx, boxW, h, 0, cMax*1.12, lo, hi);
+  const barW = s.innerW / bins;
+  const binW = (hgm.hi - hgm.lo) / bins;
+
+  ctx.fillStyle = '#E8B33944';
+  ctx.strokeStyle = '#E8B339';
+  for(let b=0;b<bins;b++){
+    const xCenter = hgm.lo + (b+0.5)*binW;
+    const x0 = s.x(xCenter) - barW*0.4;
+    const y0 = s.y(hgm.counts[b]);
+    const yBase = s.y(0);
+    ctx.fillRect(x0, y0, Math.max(barW*0.8,1), yBase-y0);
+  }
+
+  // stationary density
+  ctx.strokeStyle = '#45D9C0';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  const nPts = 90;
+  const scaleToCount = terminal.length * binW;
+  for(let i=0;i<=nPts;i++){
+    const xv = lo + (hi-lo)*(i/nPts);
+    const dens = (1/(sTheo*Math.sqrt(2*Math.PI))) * Math.exp(-Math.pow(xv-p.mu,2)/(2*statVar));
+    const X = s.x(xv), Y = s.y(dens * scaleToCount);
+    if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = '#45D9C0';
+  ctx.font = "9.5px 'JetBrains Mono', monospace";
+  ctx.fillText('stationary', PAD.l + 4, PAD.t + 12);
+}
+
+/* ============================================================
+   COMPARE OU vs RW
+   ============================================================ */
+function drawCompare(canvas, paths, rwPaths, p){
+  const boxW = canvas.parentElement.clientWidth - 8;
+  const h = 200;
+  const ctx = setupCanvas(canvas, boxW, h);
+  const drawN = Math.min(25, paths.length);
+  const len = paths[0].length;
+
+  let yMin=Infinity, yMax=-Infinity;
+  for(let i=0;i<drawN;i++){
+    for(let t=0;t<len;t++){
+      if(paths[i][t]<yMin) yMin=paths[i][t];
+      if(paths[i][t]>yMax) yMax=paths[i][t];
+      if(rwPaths[i][t]<yMin) yMin=rwPaths[i][t];
+      if(rwPaths[i][t]>yMax) yMax=rwPaths[i][t];
+    }
+  }
+  const padY = (yMax-yMin)*0.08 || 5;
+  yMin -= padY; yMax += padY;
+  const s = plotFrame(ctx, boxW, h, yMin, yMax, 0, len-1);
+
+  // RW
+  ctx.lineWidth = 1;
+  for(let i=0;i<drawN;i++){
+    ctx.strokeStyle = '#5B8DEF30';
+    ctx.beginPath();
+    for(let t=0;t<len;t++){
+      const X=s.x(t), Y=s.y(rwPaths[i][t]);
+      if(t===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+  }
+  // OU
+  for(let i=0;i<drawN;i++){
+    ctx.strokeStyle = '#E8B33935';
+    ctx.beginPath();
+    for(let t=0;t<len;t++){
+      const X=s.x(t), Y=s.y(paths[i][t]);
+      if(t===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+  }
+
+  // means
+  const meanOU = new Float64Array(len);
+  const meanRW = new Float64Array(len);
+  for(let t=0;t<len;t++){
+    let sOU=0, sRW=0;
+    for(let i=0;i<paths.length;i++){ sOU+=paths[i][t]; sRW+=rwPaths[i][t]; }
+    meanOU[t]=sOU/paths.length;
+    meanRW[t]=sRW/rwPaths.length;
+  }
+  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = '#5B8DEF';
+  ctx.beginPath();
+  for(let t=0;t<len;t++){ const X=s.x(t),Y=s.y(meanRW[t]); if(t===0)ctx.moveTo(X,Y); else ctx.lineTo(X,Y); }
+  ctx.stroke();
+  ctx.strokeStyle = '#E8B339';
+  ctx.beginPath();
+  for(let t=0;t<len;t++){ const X=s.x(t),Y=s.y(meanOU[t]); if(t===0)ctx.moveTo(X,Y); else ctx.lineTo(X,Y); }
+  ctx.stroke();
+
+  // μ
+  ctx.setLineDash([4,3]);
+  ctx.strokeStyle = '#9AA7B8';
+  ctx.lineWidth = 1;
+  const Ymu = s.y(p.mu);
+  ctx.beginPath(); ctx.moveTo(PAD.l, Ymu); ctx.lineTo(boxW-PAD.r, Ymu); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // legend
+  ctx.font = "11px 'JetBrains Mono', monospace";
+  ctx.fillStyle = '#E8B339'; ctx.fillText('● OU mean', PAD.l + 8, PAD.t + 14);
+  ctx.fillStyle = '#5B8DEF'; ctx.fillText('● RW mean', PAD.l + 100, PAD.t + 14);
+}
+
+/* ============================================================
+   METRICS
+   ============================================================ */
+function renderMetrics(paths, p){
+  const steps = paths[0].length - 1;
+  const dt = p.T / steps;
+  const incArr = incrementsOf(paths);
+  const pooledInc = pooled(incArr);
+  const terminal = new Float64Array(paths.length);
+  for(let i=0;i<paths.length;i++) terminal[i] = paths[i][steps];
+
+  const incMean = mean(pooledInc) / dt;
+  const incVol = stdev(pooledInc) / Math.sqrt(dt);
+  const sk = skewness(pooledInc);
+  const ku = kurtosisExcess(pooledInc);
+  const termMean = mean(terminal);
+  const termStd = stdev(terminal, termMean);
+  let termMin = Infinity, termMax = -Infinity;
+  for(const v of terminal){ if(v<termMin) termMin=v; if(v>termMax) termMax=v; }
+
+  const half = Math.log(2)/p.theta;
+  const statStd = Math.sqrt((p.sigma*p.sigma)/(2*p.theta));
+  const theoMeanT = p.mu + (p.X0 - p.mu)*Math.exp(-p.theta * p.T);
+  const theoVarT = (p.sigma*p.sigma/(2*p.theta))*(1-Math.exp(-2*p.theta*p.T));
+
+  const rows = [
+    ['Half-life t<sub>½</sub>', fmt(half,3)],
+    ['Ann. mean (drift est.)', fmt(incMean,3)],
+    ['Ann. volatility (est.)', fmt(incVol,3)],
+    ['Skewness (increments)', fmt(sk,3)],
+    ['Excess kurtosis', fmt(ku,3)],
+    ['Terminal mean / std', fmt(termMean,2) + ' / ' + fmt(termStd,2)],
+    ['Theo. mean / std at T', fmt(theoMeanT,2) + ' / ' + fmt(Math.sqrt(theoVarT),2)],
+    ['Stationary std σ/√(2θ)', fmt(statStd,2)],
+    ['Terminal min / max', fmt(termMin,2) + ' / ' + fmt(termMax,2)],
+  ];
+  document.getElementById('metricsOU').innerHTML =
+    rows.map(r => `<tr><td class="k">${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  document.getElementById('pathTag').textContent = 'OU · ' + paths.length + ' paths';
+}
+
+/* ============================================================
+   SNAPSHOT BUTTONS
+   ============================================================ */
+function buildSnapBtns(){
+  const fracs = [0.1, 0.25, 0.5, 0.75, 1.0];
+  const el = document.getElementById('snapBtns');
+  el.innerHTML = '';
+  fracs.forEach(f => {
+    const b = document.createElement('button');
+    b.className = 'snap-btn' + (f === state.snapFrac ? ' active' : '');
+    b.textContent = f === 1 ? 'T' : (f*100)+'%';
+    b.addEventListener('click', ()=>{
+      state.snapFrac = f;
+      buildSnapBtns();
+      if(state.paths){
+        const p = readParams();
+        drawDist(document.getElementById('chartDist'), state.paths, p, f);
+      }
+    });
+    el.appendChild(b);
+  });
+}
+
+/* ============================================================
+   MAIN RUN
+   ============================================================ */
+function runSimulation(animate){
+  syncLabels();
+  const p = readParams();
+  const steps = Math.max(10, Math.round(p.T * p.stepsPer));
+  const dt = p.T / steps;
+
+  reseed(); // fresh noise each full run when called from button; slider uses schedule
+  // Actually keep seed stable on slider — only reseed on Resample.
+  // We'll manage seed outside.
+
+  state.paths = simulateOU(p.theta, p.mu, p.sigma, p.X0, steps, dt, p.N);
+  state.rwPaths = simulateRW(p.sigma, p.X0, steps, dt, p.N);
+  state.params = p;
+  state.animFrame = 0;
+
+  renderAll(animate);
+}
+
+function renderAll(animate){
+  const p = state.params;
+  const paths = state.paths;
+  const rw = state.rwPaths;
+  if(!paths) return;
+
+  if(animate && document.getElementById('animate').checked){
+    startAnimation();
+  } else {
+    stopAnimation();
+    drawPaths(document.getElementById('chartPaths'), paths, rw, p, paths[0].length-1);
+  }
+
+  drawDist(document.getElementById('chartDist'), paths, p, state.snapFrac);
+  drawACF(document.getElementById('chartACF'), paths);
+  drawStationary(document.getElementById('chartStat'), paths, p);
+  drawCompare(document.getElementById('chartCompare'), paths, rw, p);
+  renderMetrics(paths, p);
+}
+
+function startAnimation(){
+  stopAnimation();
+  state.animPlaying = true;
+  const paths = state.paths;
+  const len = paths[0].length;
+  const p = state.params;
+  let frame = 0;
+  const stepPerFrame = Math.max(1, Math.floor(len / 90));
+
+  function tick(){
+    if(!state.animPlaying) return;
+    frame = Math.min(frame + stepPerFrame, len-1);
+    drawPaths(document.getElementById('chartPaths'), paths, state.rwPaths, p, frame);
+    if(frame >= len-1){
+      state.animPlaying = false;
+      return;
+    }
+    state.animId = requestAnimationFrame(tick);
+  }
+  state.animId = requestAnimationFrame(tick);
+}
+
+function stopAnimation(){
+  state.animPlaying = false;
+  if(state.animId) cancelAnimationFrame(state.animId);
+  state.animId = null;
+}
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+let runTimer = null;
+function scheduleRun(){
+  clearTimeout(runTimer);
+  runTimer = setTimeout(()=>{
+    // preserve seed across slider moves
+    const saved = _seed;
+    rand = mulberry32(saved);
+    _spare = null;
+    const p = readParams();
+    const steps = Math.max(10, Math.round(p.T * p.stepsPer));
+    const dt = p.T / steps;
+    state.paths = simulateOU(p.theta, p.mu, p.sigma, p.X0, steps, dt, p.N);
+    // re-init RNG for RW with offset seed so different but reproducible
+    rand = mulberry32((saved + 7919) >>> 0);
+    _spare = null;
+    state.rwPaths = simulateRW(p.sigma, p.X0, steps, dt, p.N);
+    rand = mulberry32(saved);
+    _spare = null;
+    state.params = p;
+    syncLabels();
+    renderAll(false);
+  }, 80);
+}
+
+['cTheta','cMu','cSigma','cX0','cT','cSteps','cN','cDraw'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', ()=>{
+    syncLabels();
+    scheduleRun();
+  });
+});
+
+document.getElementById('runBtn').addEventListener('click', ()=>{
+  reseed();
+  const p = readParams();
+  const steps = Math.max(10, Math.round(p.T * p.stepsPer));
+  const dt = p.T / steps;
+  const saved = _seed;
+  state.paths = simulateOU(p.theta, p.mu, p.sigma, p.X0, steps, dt, p.N);
+  rand = mulberry32((saved + 7919) >>> 0);
+  _spare = null;
+  state.rwPaths = simulateRW(p.sigma, p.X0, steps, dt, p.N);
+  rand = mulberry32(saved);
+  _spare = null;
+  state.params = p;
+  syncLabels();
+  renderAll(true);
+});
+
+document.getElementById('reroll').addEventListener('click', ()=>{
+  reseed();
+  document.getElementById('runBtn').click();
+});
+
+document.getElementById('pauseBtn').addEventListener('click', ()=>{
+  if(state.animPlaying){
+    stopAnimation();
+    document.getElementById('pauseBtn').textContent = '▶ Resume';
+  } else if(state.paths){
+    document.getElementById('pauseBtn').textContent = '❚❚ Pause';
+    startAnimation();
+  }
+});
+
+document.getElementById('showRW').addEventListener('change', ()=>{
+  if(state.paths) renderAll(false);
+});
+
+document.getElementById('animate').addEventListener('change', ()=>{
+  if(!document.getElementById('animate').checked) stopAnimation();
+});
+
+window.addEventListener('resize', ()=>{ if(state.paths) renderAll(false); });
+
+buildSnapBtns();
+syncLabels();
+// initial run
+(function init(){
+  const p = readParams();
+  const steps = Math.max(10, Math.round(p.T * p.stepsPer));
+  const dt = p.T / steps;
+  const saved = _seed;
+  state.paths = simulateOU(p.theta, p.mu, p.sigma, p.X0, steps, dt, p.N);
+  rand = mulberry32((saved + 7919) >>> 0);
+  _spare = null;
+  state.rwPaths = simulateRW(p.sigma, p.X0, steps, dt, p.N);
+  rand = mulberry32(saved);
+  _spare = null;
+  state.params = p;
+  renderAll(true);
+})();
+</script>
+</body>
+</html>

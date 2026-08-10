@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stochastic Process Comparison Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0E12;
+    --panel:#11171E;
+    --panel-2:#161D25;
+    --border:#232E3A;
+    --border-soft:#1A2330;
+    --text:#E7ECF2;
+    --muted:#7E8CA0;
+    --muted-2:#57667A;
+    --gbm:#45D9C0;
+    --gbm-dim:#1D3B37;
+    --ou:#E8B339;
+    --ou-dim:#3D311A;
+    --mrt:#E85D5D;
+    --mrt-dim:#3A2020;
+    --grid:#1B2430;
+    --good:#45D9C0;
+    --bad:#5A6779;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% 0%, #0E1620 0%, transparent 45%),
+      radial-gradient(circle at 85% 10%, #150F17 0%, transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+
+  /* ---------- layout shell ---------- */
+  .app{max-width:1480px;margin:0 auto;padding:28px 22px 60px;}
+
+  /* ---------- header ---------- */
+  .hero{
+    border:1px solid var(--border);
+    border-radius:14px;
+    background:linear-gradient(180deg,#0F151C 0%, #0C1116 100%);
+    padding:26px 28px;
+    margin-bottom:20px;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+      linear-gradient(0deg, var(--grid) 1px, transparent 1px);
+    background-size:34px 34px;
+    opacity:.35;
+    mask-image:linear-gradient(180deg,#000 0%, transparent 85%);
+    pointer-events:none;
+  }
+  .hero-top{display:flex; justify-content:space-between; align-items:flex-start; gap:20px; position:relative;}
+  .eyebrow{
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+    display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--gbm); box-shadow:0 0 8px var(--gbm); animation:pulse 2.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:30px; font-weight:700; margin:0 0 8px 0; letter-spacing:-.01em;
+  }
+  .hero p.sub{color:var(--muted); font-size:14px; line-height:1.6; max-width:640px; margin:0;}
+  .legend-eqs{display:flex; flex-direction:column; gap:6px; font-size:12.5px; text-align:right;}
+  .legend-eqs div{display:flex; gap:8px; align-items:center; justify-content:flex-end;}
+  .legend-eqs .swatch{width:9px;height:9px;border-radius:2px;}
+  .legend-eqs .eq{color:var(--muted); }
+  .legend-eqs .eq b{color:var(--text); font-weight:500;}
+
+  /* ---------- control deck ---------- */
+  .deck{
+    border:1px solid var(--border);
+    border-radius:14px;
+    background:var(--panel);
+    padding:16px 20px;
+    margin-bottom:22px;
+    display:flex; flex-wrap:wrap; align-items:end; gap:26px;
+    position:relative;
+  }
+  .deck-label{
+    font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted-2);
+    position:absolute; top:-9px; left:16px; background:var(--bg); padding:0 8px;
+  }
+  .ctrl{display:flex; flex-direction:column; gap:6px; min-width:150px;}
+  .ctrl label{font-size:11px; color:var(--muted); display:flex; justify-content:space-between;}
+  .ctrl label .val{color:var(--text); font-family:'JetBrains Mono',monospace; font-weight:600;}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:4px; border-radius:2px; background:var(--border);
+    outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:13px;height:13px;border-radius:50%;
+    background:var(--gbm); border:2px solid #061613; cursor:pointer;
+    box-shadow:0 0 0 3px rgba(69,217,192,.15);
+  }
+  .btn{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:.03em;
+    padding:9px 16px; border-radius:8px; cursor:pointer; transition:.15s;
+    display:flex; align-items:center; gap:7px;
+  }
+  .btn:hover{border-color:var(--gbm); color:var(--gbm);}
+  .btn:active{transform:translateY(1px);}
+
+  /* ---------- panels grid ---------- */
+  .panels{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+  @media (max-width:1150px){.panels{grid-template-columns:1fr;}}
+
+  .panel{
+    border:1px solid var(--border); border-radius:14px; background:var(--panel);
+    overflow:hidden; display:flex; flex-direction:column;
+  }
+  .panel-head{
+    padding:16px 18px 14px; border-bottom:1px solid var(--border-soft);
+    background:var(--panel-2);
+  }
+  .ph-row{display:flex; align-items:center; gap:9px; margin-bottom:4px;}
+  .led{width:8px;height:8px;border-radius:50%; box-shadow:0 0 9px currentColor;}
+  .ph-name{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;}
+  .ph-tag{margin-left:auto; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted-2); border:1px solid var(--border); padding:2px 7px; border-radius:20px;}
+  .ph-eq{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); margin-top:6px;}
+
+  .params{padding:12px 18px 6px; display:flex; flex-direction:column; gap:11px; border-bottom:1px solid var(--border-soft);}
+  .params .ctrl{min-width:0;}
+
+  .charts{padding:14px 16px; display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .chart-box{
+    border:1px solid var(--border-soft); border-radius:10px; background:var(--bg);
+    padding:9px 10px 6px;
+  }
+  .chart-title{font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-2); margin-bottom:4px; display:flex; justify-content:space-between;}
+  canvas{display:block; width:100%; height:auto;}
+
+  .metrics{
+    margin:0 16px 16px; border:1px solid var(--border-soft); border-radius:10px;
+    background:var(--bg); overflow:hidden;
+  }
+  .metrics table{width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:11.5px;}
+  .metrics th{text-align:left; font-weight:500; color:var(--muted-2); padding:8px 10px; font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; border-bottom:1px solid var(--border-soft);}
+  .metrics td{padding:6px 10px; color:var(--text); border-bottom:1px solid var(--border-soft);}
+  .metrics tr:last-child td{border-bottom:none;}
+  .metrics td.k{color:var(--muted); width:56%;}
+
+  /* ---------- comparison table ---------- */
+  .compare{
+    margin-top:26px; border:1px solid var(--border); border-radius:14px;
+    background:var(--panel); padding:22px 24px 6px;
+  }
+  .compare h2{font-family:'Space Grotesk',sans-serif; font-size:18px; margin:0 0 3px;}
+  .compare p{color:var(--muted); font-size:13px; margin:0 0 16px;}
+  table.ctab{width:100%; border-collapse:collapse; font-size:13px; margin-bottom:20px;}
+  table.ctab th, table.ctab td{padding:11px 14px; text-align:left; border-bottom:1px solid var(--border-soft);}
+  table.ctab th{color:var(--muted); font-weight:500; font-size:11px; letter-spacing:.05em; text-transform:uppercase;}
+  table.ctab th.model-col{text-align:center;}
+  table.ctab td.model-col{text-align:center; font-family:'JetBrains Mono',monospace;}
+  table.ctab td.prop{color:var(--text); font-weight:500;}
+  table.ctab td.sub{color:var(--muted); font-size:11.5px; display:block; font-weight:400; margin-top:2px;}
+  .yes{color:var(--gbm); font-weight:700;}
+  .no{color:var(--muted-2);}
+  .model-head{display:flex; align-items:center; justify-content:center; gap:6px;}
+
+  footer{margin-top:22px; text-align:center; color:var(--muted-2); font-size:11.5px; padding-bottom:10px;}
+  footer a{color:var(--muted);}
+
+  ::selection{background:var(--gbm-dim); color:var(--gbm);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="eyebrow"><span class="dot"></span>Stochastic Process Comparison Lab</div>
+        <h1>Diffusion, Reversion &amp; Shock</h1>
+        <p class="sub">Three canonical continuous-time models simulated side by side. Same clock, same random-number machinery &mdash; only the drift, restoring force, and jump structure change. Adjust the deck to feel how each behaves.</p>
+      </div>
+      <div class="legend-eqs">
+        <div><span class="swatch" style="background:var(--gbm)"></span><span class="eq">GBM &nbsp;<b>dS/S = &mu; dt + &sigma; dW</b></span></div>
+        <div><span class="swatch" style="background:var(--ou)"></span><span class="eq">OU &nbsp;<b>dX = &theta;(&mu;&minus;X) dt + &sigma; dW</b></span></div>
+        <div><span class="swatch" style="background:var(--mrt)"></span><span class="eq">Jump &nbsp;<b>dS/S = (&mu;&minus;&lambda;k) dt + &sigma; dW + (J&minus;1) dN</b></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="deck">
+    <span class="deck-label">Global controls</span>
+    <div class="ctrl">
+      <label>Time horizon (yrs) <span class="val" id="vT">1.0</span></label>
+      <input type="range" id="cT" min="0.25" max="5" step="0.25" value="1">
+    </div>
+    <div class="ctrl">
+      <label>Steps / year <span class="val" id="vSteps">252</span></label>
+      <input type="range" id="cSteps" min="52" max="504" step="4" value="252">
+    </div>
+    <div class="ctrl">
+      <label>Number of paths <span class="val" id="vN">250</span></label>
+      <input type="range" id="cN" min="20" max="600" step="10" value="250">
+    </div>
+    <div class="ctrl">
+      <label>Paths drawn <span class="val" id="vDraw">45</span></label>
+      <input type="range" id="cDraw" min="5" max="120" step="5" value="45">
+    </div>
+    <button class="btn" id="reroll">&#8635; Resample (new seed)</button>
+    <button class="btn" id="runBtn">&#9654; Run simulation</button>
+  </div>
+
+  <div class="panels" id="panels"></div>
+
+  <div class="compare">
+    <h2>Reading the differences</h2>
+    <p>Same noise budget, three different laws of motion. This is the structural cheat-sheet.</p>
+    <table class="ctab">
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th class="model-col"><div class="model-head"><span class="led" style="background:var(--gbm)"></span>GBM</div></th>
+          <th class="model-col"><div class="model-head"><span class="led" style="background:var(--ou)"></span>Ornstein&ndash;Uhlenbeck</div></th>
+          <th class="model-col"><div class="model-head"><span class="led" style="background:var(--mrt)"></span>Merton Jump</div></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="prop">Mean reverting?<span class="sub">pulled back toward a long-run level</span></td>
+          <td class="model-col"><span class="no">&mdash; no</span></td>
+          <td class="model-col"><span class="yes">&#10003; yes</span></td>
+          <td class="model-col"><span class="no">&mdash; no</span></td>
+        </tr>
+        <tr>
+          <td class="prop">Jumps?<span class="sub">discontinuous shocks on top of diffusion</span></td>
+          <td class="model-col"><span class="no">&mdash; no</span></td>
+          <td class="model-col"><span class="no">&mdash; no</span></td>
+          <td class="model-col"><span class="yes">&#10003; yes (Poisson)</span></td>
+        </tr>
+        <tr>
+          <td class="prop">Positive-price constraint?<span class="sub">can the process hit or cross zero</span></td>
+          <td class="model-col"><span class="yes">&#10003; S &gt; 0 always</span></td>
+          <td class="model-col"><span class="no">&mdash; can go negative</span></td>
+          <td class="model-col"><span class="yes">&#10003; S &gt; 0 always</span></td>
+        </tr>
+        <tr>
+          <td class="prop">Continuous paths?<span class="sub">no discontinuities in the sample path</span></td>
+          <td class="model-col"><span class="yes">&#10003; yes</span></td>
+          <td class="model-col"><span class="yes">&#10003; yes</span></td>
+          <td class="model-col"><span class="no">&mdash; no, jump-discontinuous</span></td>
+        </tr>
+        <tr>
+          <td class="prop">Stationary?<span class="sub">distribution settles to a fixed shape over time</span></td>
+          <td class="model-col"><span class="no">&mdash; no, variance grows with t</span></td>
+          <td class="model-col"><span class="yes">&#10003; yes, has stationary dist.</span></td>
+          <td class="model-col"><span class="no">&mdash; no, variance grows with t</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>Simulated with Euler&ndash;Maruyama discretization &middot; educational tool, not investment advice &middot; all randomness generated client-side</footer>
+</div>
+
+<script>
+/* ============================================================
+   RNG
+   ============================================================ */
+let _seed = 20260810;
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rand = mulberry32(_seed);
+function reseed(){ _seed = (Date.now() ^ Math.floor(Math.random()*1e9)) >>> 0; rand = mulberry32(_seed); }
+
+let _spare = null;
+function randn(){
+  if(_spare !== null){ const v = _spare; _spare = null; return v; }
+  let u=0,v=0;
+  while(u===0) u = rand();
+  while(v===0) v = rand();
+  const mag = Math.sqrt(-2.0*Math.log(u));
+  _spare = mag * Math.sin(2*Math.PI*v);
+  return mag * Math.cos(2*Math.PI*v);
+}
+function poisson(lambda){
+  if(lambda <= 0) return 0;
+  if(lambda < 30){
+    const L = Math.exp(-lambda);
+    let k = 0, p = 1;
+    do{ k++; p *= rand(); } while(p > L);
+    return k - 1;
+  }
+  // normal approx for larger lambda (not expected in practice here)
+  return Math.max(0, Math.round(lambda + Math.sqrt(lambda)*randn()));
+}
+
+/* ============================================================
+   STATS HELPERS
+   ============================================================ */
+function mean(a){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]; return s/a.length; }
+function variance(a, m){ m = m===undefined?mean(a):m; let s=0; for(let i=0;i<a.length;i++){ const d=a[i]-m; s+=d*d; } return s/(a.length-1); }
+function stdev(a, m){ return Math.sqrt(variance(a,m)); }
+function skewness(a){
+  const m = mean(a), sd = stdev(a,m), n = a.length;
+  if(sd === 0) return 0;
+  let s = 0; for(let i=0;i<n;i++){ const d=(a[i]-m)/sd; s += d*d*d; }
+  return (n/((n-1)*(n-2))) * s;
+}
+function kurtosisExcess(a){
+  const m = mean(a), sd = stdev(a,m), n = a.length;
+  if(sd === 0) return 0;
+  let s = 0; for(let i=0;i<n;i++){ const d=(a[i]-m)/sd; s += d*d*d*d; }
+  const g2 = (s/n);
+  return g2 - 3;
+}
+function fmt(x, d=3){
+  if(!isFinite(x)) return '&mdash;';
+  if(Math.abs(x) >= 1000) return x.toFixed(1);
+  return x.toFixed(d);
+}
+function fmtPct(x, d=2){ return (x*100).toFixed(d) + '%'; }
+
+/* ============================================================
+   SIMULATION ENGINES
+   All return: { paths: Float64Array[] (N of length steps+1), times, jumpMarkers (optional per-path arrays of step idx) }
+   ============================================================ */
+function simulateGBM(p, steps, dt, N){
+  const paths = [];
+  const logDrift = (p.mu - 0.5*p.sigma*p.sigma) * dt;
+  const vol = p.sigma * Math.sqrt(dt);
+  for(let i=0;i<N;i++){
+    const arr = new Float64Array(steps+1);
+    let logS = Math.log(p.S0);
+    arr[0] = p.S0;
+    for(let t=1;t<=steps;t++){
+      logS += logDrift + vol*randn();
+      arr[t] = Math.exp(logS);
+    }
+    paths.push(arr);
+  }
+  return { paths };
+}
+
+function simulateOU(p, steps, dt, N){
+  const paths = [];
+  const vol = p.sigma * Math.sqrt(dt);
+  for(let i=0;i<N;i++){
+    const arr = new Float64Array(steps+1);
+    let X = p.X0;
+    arr[0] = X;
+    for(let t=1;t<=steps;t++){
+      X = X + p.theta*(p.mu - X)*dt + vol*randn();
+      arr[t] = X;
+    }
+    paths.push(arr);
+  }
+  return { paths };
+}
+
+function simulateMerton(p, steps, dt, N){
+  const paths = [];
+  const jumpFlags = []; // boolean array per path: did a jump occur at this step
+  const k = Math.exp(p.muJ + 0.5*p.sigmaJ*p.sigmaJ) - 1; // E[J-1]
+  const logDrift = (p.mu - p.lambda*k - 0.5*p.sigma*p.sigma) * dt;
+  const vol = p.sigma * Math.sqrt(dt);
+  for(let i=0;i<N;i++){
+    const arr = new Float64Array(steps+1);
+    const jf = new Uint8Array(steps+1);
+    let logS = Math.log(p.S0);
+    arr[0] = p.S0;
+    for(let t=1;t<=steps;t++){
+      let jumpSum = 0;
+      const nJumps = poisson(p.lambda*dt);
+      if(nJumps > 0){
+        for(let j=0;j<nJumps;j++){ jumpSum += (p.muJ + p.sigmaJ*randn()); }
+        jf[t] = 1;
+      }
+      logS += logDrift + vol*randn() + jumpSum;
+      arr[t] = Math.exp(logS);
+    }
+    paths.push(arr);
+    jumpFlags.push(jf);
+  }
+  return { paths, jumpFlags };
+}
+
+/* ============================================================
+   DERIVED SERIES / METRICS
+   ============================================================ */
+function incrementsOf(paths, additive){
+  // additive=true -> dX (OU); additive=false -> log-returns (GBM/Merton)
+  const N = paths.length, steps = paths[0].length - 1;
+  const out = [];
+  for(let i=0;i<N;i++){
+    const src = paths[i];
+    const inc = new Float64Array(steps);
+    for(let t=0;t<steps;t++){
+      inc[t] = additive ? (src[t+1]-src[t]) : Math.log(src[t+1]/src[t]);
+    }
+    out.push(inc);
+  }
+  return out;
+}
+
+function pooled(incArr){
+  let total = 0;
+  for(const a of incArr) total += a.length;
+  const out = new Float64Array(total);
+  let idx = 0;
+  for(const a of incArr){ out.set(a, idx); idx += a.length; }
+  return out;
+}
+
+function drawdownSeries(paths, additive){
+  // returns per-path drawdown arrays (same length as path), and array of per-path max drawdown
+  const N = paths.length, len = paths[0].length;
+  const dd = [];
+  const maxDD = new Float64Array(N);
+  for(let i=0;i<N;i++){
+    const src = paths[i];
+    const d = new Float64Array(len);
+    let peak = src[0];
+    let worst = 0;
+    for(let t=0;t<len;t++){
+      if(src[t] > peak) peak = src[t];
+      let cur;
+      if(additive){ cur = peak - src[t]; }
+      else{ cur = peak !== 0 ? (peak - src[t]) / peak : 0; }
+      d[t] = cur;
+      if(cur > worst) worst = cur;
+    }
+    dd.push(d);
+    maxDD[i] = worst;
+  }
+  return { series: dd, maxDD };
+}
+
+function avgSeries(seriesArr){
+  const len = seriesArr[0].length, N = seriesArr.length;
+  const out = new Float64Array(len);
+  for(let t=0;t<len;t++){
+    let s=0; for(let i=0;i<N;i++) s += seriesArr[i][t];
+    out[t] = s/N;
+  }
+  return out;
+}
+
+function autocorrAvg(incArr, maxLag){
+  const N = incArr.length;
+  const out = new Float64Array(maxLag);
+  let used = 0;
+  for(let i=0;i<N;i++){
+    const a = incArr[i], n = a.length;
+    if(n < maxLag+5) continue;
+    const m = mean(a), v = variance(a, m) * (n-1); // sum of squared dev
+    if(v === 0) continue;
+    for(let lag=1; lag<=maxLag; lag++){
+      let s = 0;
+      for(let t=0;t<n-lag;t++){ s += (a[t]-m)*(a[t+lag]-m); }
+      out[lag-1] += s / v;
+    }
+    used++;
+  }
+  if(used>0) for(let l=0;l<maxLag;l++) out[l] /= used;
+  return out;
+}
+
+function histogram(data, bins){
+  let lo = Infinity, hi = -Infinity;
+  for(const v of data){ if(v<lo) lo=v; if(v>hi) hi=v; }
+  if(lo === hi){ lo -= 1; hi += 1; }
+  const counts = new Float64Array(bins);
+  const w = (hi-lo)/bins;
+  for(const v of data){
+    let b = Math.floor((v-lo)/w);
+    if(b<0) b=0; if(b>=bins) b=bins-1;
+    counts[b]++;
+  }
+  return { counts, lo, hi, w };
+}
+
+/* ============================================================
+   CANVAS DRAWING HELPERS
+   ============================================================ */
+function setupCanvas(canvas, cssW, cssH){
+  const dpr = window.devicePixelRatio || 1;
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+  return ctx;
+}
+
+const PAD = {l:38, r:8, t:6, b:16};
+
+function plotFrame(ctx, w, h, yMin, yMax, xMin, xMax, opts={}){
+  const innerW = w - PAD.l - PAD.r, innerH = h - PAD.t - PAD.b;
+  ctx.strokeStyle = '#1B2430';
+  ctx.lineWidth = 1;
+  ctx.font = "9.5px 'JetBrains Mono', monospace";
+  ctx.fillStyle = '#57667A';
+  // horizontal gridlines + y labels
+  const nY = 4;
+  for(let i=0;i<=nY;i++){
+    const y = PAD.t + innerH * (i/nY);
+    ctx.beginPath();
+    ctx.moveTo(PAD.l, y); ctx.lineTo(w-PAD.r, y);
+    ctx.stroke();
+    const val = yMax - (yMax-yMin)*(i/nY);
+    let label = Math.abs(val) >= 1000 ? val.toFixed(0) : (Math.abs(val) >= 10 ? val.toFixed(1) : val.toFixed(2));
+    ctx.fillText(label, 2, y+3);
+  }
+  // zero line emphasis if in range and requested
+  if(opts.zeroLine && yMin < 0 && yMax > 0){
+    const y = PAD.t + innerH * (1 - (0-yMin)/(yMax-yMin));
+    ctx.strokeStyle = '#2B3646';
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(w-PAD.r,y); ctx.stroke();
+  }
+  return {
+    x:(v)=> PAD.l + innerW * (v-xMin)/(xMax-xMin || 1),
+    y:(v)=> PAD.t + innerH * (1 - (v-yMin)/((yMax-yMin)||1)),
+    innerW, innerH
+  };
+}
+
+function drawPathsChart(canvas, w, h, sim, color, opts){
+  const ctx = setupCanvas(canvas, w, h);
+  const drawN = Math.min(opts.drawCount, sim.paths.length);
+  const len = sim.paths[0].length;
+  let yMin=Infinity, yMax=-Infinity;
+  for(let i=0;i<drawN;i++){
+    const a = sim.paths[i];
+    for(let t=0;t<len;t++){ if(a[t]<yMin) yMin=a[t]; if(a[t]>yMax) yMax=a[t]; }
+  }
+  // also include mean-level markers for range
+  if(opts.refLevel !== undefined){ if(opts.refLevel<yMin) yMin=opts.refLevel; if(opts.refLevel>yMax) yMax=opts.refLevel; }
+  const padY = (yMax-yMin)*0.08 || 1;
+  yMin -= padY; yMax += padY;
+  const s = plotFrame(ctx, w, h, yMin, yMax, 0, len-1);
+
+  ctx.lineWidth = 1;
+  for(let i=0;i<drawN;i++){
+    const a = sim.paths[i];
+    ctx.strokeStyle = color + '33';
+    ctx.beginPath();
+    for(let t=0;t<len;t++){
+      const X = s.x(t), Y = s.y(a[t]);
+      if(t===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+  }
+  // mean path across ALL sim paths
+  const N = sim.paths.length;
+  const meanArr = new Float64Array(len);
+  for(let t=0;t<len;t++){ let sum=0; for(let i=0;i<N;i++) sum+=sim.paths[i][t]; meanArr[t]=sum/N; }
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for(let t=0;t<len;t++){ const X=s.x(t), Y=s.y(meanArr[t]); if(t===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y); }
+  ctx.stroke();
+
+  // reference / long-run level dashed
+  if(opts.refLevel !== undefined){
+    ctx.setLineDash([4,3]);
+    ctx.strokeStyle = '#9AA7B8';
+    ctx.lineWidth = 1;
+    const Y = s.y(opts.refLevel);
+    ctx.beginPath(); ctx.moveTo(PAD.l, Y); ctx.lineTo(w-PAD.r, Y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // jump markers (Merton) - use first drawn path's jump flags
+  if(opts.jumpFlags){
+    ctx.fillStyle = '#FFD7D2';
+    ctx.strokeStyle = color;
+    for(let t=0;t<len;t++){
+      if(opts.jumpFlags[t]){
+        const X = s.x(t), Y = s.y(sim.paths[0][t]);
+        ctx.beginPath();
+        ctx.arc(X, Y, 2.6, 0, Math.PI*2);
+        ctx.fill(); ctx.stroke();
+      }
+    }
+  }
+}
+
+function drawHistogramChart(canvas, w, h, data, color, opts={}){
+  const ctx = setupCanvas(canvas, w, h);
+  const bins = 26;
+  const hgm = histogram(data, bins);
+  let cMax = 0; for(const c of hgm.counts) if(c>cMax) cMax = c;
+  const s = plotFrame(ctx, w, h, 0, cMax*1.08, hgm.lo, hgm.hi);
+  const innerW = s.innerW;
+  const barW = innerW/bins;
+  ctx.fillStyle = color + '55';
+  ctx.strokeStyle = color;
+  for(let b=0;b<bins;b++){
+    const x0 = PAD.l + barW*b;
+    const y0 = s.y(hgm.counts[b]);
+    const yBase = s.y(0);
+    ctx.fillRect(x0+0.5, y0, Math.max(barW-1,1), yBase-y0);
+    ctx.strokeRect(x0+0.5, y0, Math.max(barW-1,1), yBase-y0);
+  }
+  // theoretical density overlay
+  if(opts.density){
+    ctx.strokeStyle = '#F3F6FA';
+    ctx.setLineDash([3,2]);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    const nPts = 80;
+    const binWidth = hgm.w;
+    const scaleToCount = data.length * binWidth;
+    for(let i=0;i<=nPts;i++){
+      const xv = hgm.lo + (hgm.hi-hgm.lo)*(i/nPts);
+      const dens = opts.density(xv) * scaleToCount;
+      const X = s.x(xv), Y = s.y(dens);
+      if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawBarChart(canvas, w, h, values, color, opts={}){
+  const ctx = setupCanvas(canvas, w, h);
+  let vMax=-Infinity, vMin=Infinity;
+  for(const v of values){ if(v>vMax) vMax=v; if(v<vMin) vMin=v; }
+  vMax = Math.max(vMax, 0.15); vMin = Math.min(vMin, -0.05);
+  const s = plotFrame(ctx, w, h, vMin, vMax, 0, values.length, {zeroLine:true});
+  const barW = s.innerW/values.length;
+  const yZero = s.y(0);
+  for(let i=0;i<values.length;i++){
+    const v = values[i];
+    const x0 = PAD.l + barW*i + barW*0.15;
+    const y0 = s.y(Math.max(v,0));
+    const y1 = s.y(Math.min(v,0));
+    ctx.fillStyle = Math.abs(v) > (opts.sig||0.15) ? color : color+'66';
+    ctx.fillRect(x0, Math.min(y0,yZero), barW*0.7, Math.abs(y1-y0)|| Math.abs(yZero-y0)||1);
+  }
+  // significance band
+  if(opts.sig){
+    ctx.strokeStyle = '#3A4759';
+    ctx.setLineDash([2,2]);
+    ctx.beginPath(); ctx.moveTo(PAD.l, s.y(opts.sig)); ctx.lineTo(w-PAD.r, s.y(opts.sig)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PAD.l, s.y(-opts.sig)); ctx.lineTo(w-PAD.r, s.y(-opts.sig)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawDrawdownChart(canvas, w, h, ddAvg, color, isPct){
+  const ctx = setupCanvas(canvas, w, h);
+  let vMin=0, vMax=-Infinity;
+  for(const v of ddAvg) if(v>vMax) vMax=v;
+  vMax = Math.max(vMax*1.15, 0.02);
+  const s = plotFrame(ctx, w, h, -vMax, vMax*0.08, 0, ddAvg.length-1);
+  const zeroY = s.y(0);
+  ctx.beginPath();
+  ctx.moveTo(s.x(0), zeroY);
+  for(let t=0;t<ddAvg.length;t++){ ctx.lineTo(s.x(t), s.y(-ddAvg[t])); }
+  ctx.lineTo(s.x(ddAvg.length-1), zeroY);
+  ctx.closePath();
+  ctx.fillStyle = color + '30';
+  ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  for(let t=0;t<ddAvg.length;t++){ const X=s.x(t), Y=s.y(-ddAvg[t]); if(t===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y); }
+  ctx.stroke();
+}
+
+/* ============================================================
+   MODEL DEFINITIONS (params, UI)
+   ============================================================ */
+const MODELS = [
+  {
+    id:'gbm', name:'Geometric Brownian Motion', tag:'Diffusion', color:'var(--gbm)', colorHex:'#45D9C0',
+    eq:'dS/S = &mu; dt + &sigma; dW',
+    additive:false,
+    params:[
+      {key:'mu', label:'Drift &mu;', min:-0.3, max:0.5, step:0.01, def:0.08, fmt:v=>v.toFixed(2)},
+      {key:'sigma', label:'Volatility &sigma;', min:0.02, max:0.8, step:0.01, def:0.20, fmt:v=>v.toFixed(2)},
+      {key:'S0', label:'Start price S&#8320;', min:10, max:300, step:1, def:100, fmt:v=>v.toFixed(0)},
+    ],
+    simulate:(p, steps, dt, N)=> simulateGBM(p, steps, dt, N),
+    refLevel:(p)=> undefined,
+    density:(p, T)=>{
+      const m = Math.log(p.S0) + (p.mu-0.5*p.sigma*p.sigma)*T;
+      const s = p.sigma*Math.sqrt(T);
+      return (x)=>{
+        if(x<=0) return 0;
+        return (1/(x*s*Math.sqrt(2*Math.PI))) * Math.exp(-Math.pow(Math.log(x)-m,2)/(2*s*s));
+      };
+    }
+  },
+  {
+    id:'ou', name:'Ornstein\u2013Uhlenbeck', tag:'Mean Reversion', color:'var(--ou)', colorHex:'#E8B339',
+    eq:'dX = &theta;(&mu;&minus;X) dt + &sigma; dW',
+    additive:true,
+    params:[
+      {key:'theta', label:'Speed &theta;', min:0.1, max:8, step:0.1, def:2.0, fmt:v=>v.toFixed(1)},
+      {key:'mu', label:'Long-run level &mu;', min:20, max:200, step:1, def:100, fmt:v=>v.toFixed(0)},
+      {key:'sigma', label:'Volatility &sigma;', min:1, max:60, step:1, def:15, fmt:v=>v.toFixed(0)},
+      {key:'X0', label:'Start level X&#8320;', min:20, max:200, step:1, def:140, fmt:v=>v.toFixed(0)},
+    ],
+    simulate:(p, steps, dt, N)=> simulateOU(p, steps, dt, N),
+    refLevel:(p)=> p.mu,
+    density:(p, T)=>{
+      const m = p.mu + (p.X0-p.mu)*Math.exp(-p.theta*T);
+      const v = (p.sigma*p.sigma/(2*p.theta)) * (1-Math.exp(-2*p.theta*T));
+      const s = Math.sqrt(Math.max(v,1e-9));
+      return (x)=> (1/(s*Math.sqrt(2*Math.PI))) * Math.exp(-Math.pow(x-m,2)/(2*s*s));
+    }
+  },
+  {
+    id:'merton', name:'Merton Jump Diffusion', tag:'Discontinuous', color:'var(--mrt)', colorHex:'#E85D5D',
+    eq:'dS/S = (&mu;&minus;&lambda;k) dt + &sigma; dW + (J&minus;1) dN',
+    additive:false,
+    params:[
+      {key:'mu', label:'Drift &mu;', min:-0.3, max:0.5, step:0.01, def:0.08, fmt:v=>v.toFixed(2)},
+      {key:'sigma', label:'Diffusive vol &sigma;', min:0.02, max:0.6, step:0.01, def:0.15, fmt:v=>v.toFixed(2)},
+      {key:'lambda', label:'Jump intensity &lambda; /yr', min:0, max:15, step:0.5, def:3, fmt:v=>v.toFixed(1)},
+      {key:'muJ', label:'Mean jump size ln(J)', min:-0.4, max:0.2, step:0.01, def:-0.06, fmt:v=>v.toFixed(2)},
+      {key:'sigmaJ', label:'Jump vol', min:0.01, max:0.5, step:0.01, def:0.10, fmt:v=>v.toFixed(2)},
+      {key:'S0', label:'Start price S&#8320;', min:10, max:300, step:1, def:100, fmt:v=>v.toFixed(0)},
+    ],
+    simulate:(p, steps, dt, N)=> simulateMerton(p, steps, dt, N),
+    refLevel:(p)=> undefined,
+    density:null
+  }
+];
+
+/* ============================================================
+   BUILD PANEL DOM
+   ============================================================ */
+const panelsEl = document.getElementById('panels');
+const state = {}; // per-model current param values + last sim result
+
+MODELS.forEach(model=>{
+  state[model.id] = { params:{}, sim:null };
+  model.params.forEach(pp=> state[model.id].params[pp.key] = pp.def);
+
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.innerHTML = `
+    <div class="panel-head">
+      <div class="ph-row">
+        <span class="led" style="background:${model.colorHex}"></span>
+        <span class="ph-name">${model.name}</span>
+        <span class="ph-tag">${model.tag}</span>
+      </div>
+      <div class="ph-eq mono">${model.eq}</div>
+    </div>
+    <div class="params" id="params-${model.id}"></div>
+    <div class="charts">
+      <div class="chart-box">
+        <div class="chart-title"><span>Simulated paths</span><span id="pn-${model.id}"></span></div>
+        <canvas id="chart-paths-${model.id}"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title"><span>Terminal distribution</span><span>S<sub>T</sub></span></div>
+        <canvas id="chart-dist-${model.id}"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title"><span>Autocorrelation</span><span>lag 1&ndash;20</span></div>
+        <canvas id="chart-acf-${model.id}"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title"><span>Drawdown</span><span>mean across paths</span></div>
+        <canvas id="chart-dd-${model.id}"></canvas>
+      </div>
+    </div>
+    <div class="metrics"><table id="metrics-${model.id}"></table></div>
+  `;
+  panelsEl.appendChild(panel);
+
+  const paramsEl = panel.querySelector(`#params-${model.id}`);
+  model.params.forEach(pp=>{
+    const row = document.createElement('div');
+    row.className = 'ctrl';
+    row.innerHTML = `
+      <label>${pp.label} <span class="val" id="val-${model.id}-${pp.key}">${pp.fmt(pp.def)}</span></label>
+      <input type="range" id="in-${model.id}-${pp.key}" min="${pp.min}" max="${pp.max}" step="${pp.step}" value="${pp.def}">
+    `;
+    paramsEl.appendChild(row);
+    const input = row.querySelector('input');
+    input.addEventListener('input', ()=>{
+      state[model.id].params[pp.key] = parseFloat(input.value);
+      document.getElementById(`val-${model.id}-${pp.key}`).innerHTML = pp.fmt(state[model.id].params[pp.key]);
+      scheduleRun(model.id);
+    });
+  });
+});
+
+/* ============================================================
+   GLOBAL CONTROLS
+   ============================================================ */
+const gCtrl = {
+  T: document.getElementById('cT'), vT: document.getElementById('vT'),
+  Steps: document.getElementById('cSteps'), vSteps: document.getElementById('vSteps'),
+  N: document.getElementById('cN'), vN: document.getElementById('vN'),
+  Draw: document.getElementById('cDraw'), vDraw: document.getElementById('vDraw'),
+};
+function syncGlobalLabels(){
+  gCtrl.vT.textContent = parseFloat(gCtrl.T.value).toFixed(2);
+  gCtrl.vSteps.textContent = gCtrl.Steps.value;
+  gCtrl.vN.textContent = gCtrl.N.value;
+  gCtrl.vDraw.textContent = gCtrl.Draw.value;
+}
+[gCtrl.T, gCtrl.Steps, gCtrl.N, gCtrl.Draw].forEach(el=>{
+  el.addEventListener('input', ()=>{ syncGlobalLabels(); scheduleRun('all'); });
+});
+document.getElementById('reroll').addEventListener('click', ()=>{ reseed(); scheduleRun('all'); });
+document.getElementById('runBtn').addEventListener('click', ()=> scheduleRun('all'));
+
+let runTimer = null;
+function scheduleRun(which){
+  clearTimeout(runTimer);
+  runTimer = setTimeout(()=> runAll(which), 90);
+}
+
+/* ============================================================
+   MAIN RUN / RENDER
+   ============================================================ */
+function runAll(which){
+  syncGlobalLabels();
+  const T = parseFloat(gCtrl.T.value);
+  const stepsPerYear = parseInt(gCtrl.Steps.value);
+  const steps = Math.max(4, Math.round(T*stepsPerYear));
+  const dt = T/steps;
+  const N = parseInt(gCtrl.N.value);
+  const drawCount = parseInt(gCtrl.Draw.value);
+
+  MODELS.forEach(model=>{
+    if(which !== 'all' && which !== model.id) return;
+    const p = state[model.id].params;
+    const sim = model.simulate(p, steps, dt, N);
+    state[model.id].sim = sim;
+    renderModel(model, p, sim, T, steps, dt, drawCount);
+  });
+}
+
+function renderModel(model, p, sim, T, steps, dt, drawCount){
+  const box = document.querySelector(`#chart-paths-${model.id}`).closest('.chart-box').parentElement.closest('.panel');
+  const cw = box.querySelector('.chart-box canvas').parentElement.clientWidth || 260;
+
+  document.getElementById(`pn-${model.id}`).textContent = sim.paths.length + ' paths';
+
+  // ----- paths chart -----
+  const pathsCanvas = document.getElementById(`chart-paths-${model.id}`);
+  const boxW = pathsCanvas.parentElement.clientWidth - 20;
+  const jf0 = sim.jumpFlags ? sim.jumpFlags[0] : null;
+  drawPathsChart(pathsCanvas, boxW, 130, sim, model.colorHex, {
+    drawCount, refLevel: model.refLevel(p), jumpFlags: jf0
+  });
+
+  // ----- increments / stats -----
+  const incArr = incrementsOf(sim.paths, model.additive);
+  const pooledInc = pooled(incArr);
+  const terminal = new Float64Array(sim.paths.length);
+  for(let i=0;i<sim.paths.length;i++) terminal[i] = sim.paths[i][sim.paths[i].length-1];
+
+  // annualized mean/vol of increments
+  const incMean = mean(pooledInc)/dt;
+  const incVol = stdev(pooledInc)/Math.sqrt(dt);
+  const sk = skewness(pooledInc);
+  const ku = kurtosisExcess(pooledInc);
+
+  // ----- distribution chart -----
+  const distCanvas = document.getElementById(`chart-dist-${model.id}`);
+  let densityFn = null;
+  if(model.density){ densityFn = model.density(p, T); }
+  drawHistogramChart(distCanvas, boxW, 110, terminal, model.colorHex, { density: densityFn });
+
+  // ----- autocorrelation chart -----
+  const acfCanvas = document.getElementById(`chart-acf-${model.id}`);
+  const acf = autocorrAvg(incArr, 20);
+  const sigBand = 2/Math.sqrt((incArr[0].length));
+  drawBarChart(acfCanvas, boxW, 110, Array.from(acf), model.colorHex, { sig: sigBand });
+
+  // ----- drawdown chart -----
+  const ddCanvas = document.getElementById(`chart-dd-${model.id}`);
+  const dd = drawdownSeries(sim.paths, model.additive === true ? true : false);
+  const ddAvgSeries = avgSeries(dd.series);
+  drawDrawdownChart(ddCanvas, boxW, 110, ddAvgSeries, model.colorHex, !model.additive);
+  const avgMaxDD = mean(dd.maxDD);
+  const worstMaxDD = Math.max(...dd.maxDD);
+
+  // ----- metrics table -----
+  const ddLabel = model.additive ? 'Max drawdown (level)' : 'Max drawdown (%)';
+  const ddAvgStr = model.additive ? fmt(avgMaxDD,2) : fmtPct(avgMaxDD);
+  const ddWorstStr = model.additive ? fmt(worstMaxDD,2) : fmtPct(worstMaxDD);
+  const termMean = mean(terminal), termStd = stdev(terminal, termMean);
+  let termMin = Infinity, termMax = -Infinity;
+  for(const v of terminal){ if(v<termMin) termMin=v; if(v>termMax) termMax=v; }
+
+  const rows = [
+    ['Ann. mean (drift)', fmt(incMean, model.additive?2:4) + (model.additive?'':'  ('+fmtPct(incMean)+')')],
+    ['Ann. volatility', fmt(incVol, model.additive?2:4) + (model.additive?'':'  ('+fmtPct(incVol)+')')],
+    ['Skewness', fmt(sk,3)],
+    ['Excess kurtosis', fmt(ku,3)],
+    [ddLabel + ' &middot; avg / worst', ddAvgStr + ' / ' + ddWorstStr],
+    ['Terminal mean / std', fmt(termMean,2) + ' / ' + fmt(termStd,2)],
+    ['Terminal min / max', fmt(termMin,2) + ' / ' + fmt(termMax,2)],
+  ];
+  const tbl = document.getElementById(`metrics-${model.id}`);
+  tbl.innerHTML = rows.map(r=>`<tr><td class="k">${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('resize', ()=> runAll('all'));
+syncGlobalLabels();
+runAll('all');
+</script>
+</body>
+</html>

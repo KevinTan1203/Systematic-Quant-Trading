@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hidden Markov Model — Regime-Switching Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#080B11;
+  --bg-2:#0B0F16;
+  --panel:#10151E;
+  --panel-2:#151C28;
+  --border:#1E2838;
+  --border-soft:#172030;
+  --text:#E8ECF4;
+  --text-dim:#8B95A8;
+  --text-faint:#556070;
+  --r0:#34D399;
+  --r1:#FBBF24;
+  --r2:#F87171;
+  --accent:#22D3EE;
+  --accent-dim:#0891B2;
+  --accent-purple:#A78BFA;
+  --accent-blue:#60A5FA;
+  --mono:'JetBrains Mono',monospace;
+  --display:'Space Grotesk',sans-serif;
+  --body:'Inter',sans-serif;
+  --radius:10px;
+  --shadow:0 8px 28px rgba(0,0,0,.42);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 560px at 10% -12%, rgba(34,211,238,.07), transparent),
+    radial-gradient(900px 480px at 100% 0%, rgba(248,113,113,.05), transparent),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  font-size:14px;
+  line-height:1.5;
+}
+::selection{background:var(--accent);color:#042f2e;}
+
+.app{display:grid;grid-template-columns:350px 1fr;min-height:100vh;}
+@media(max-width:1050px){
+  .app{grid-template-columns:1fr;}
+  .sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);}
+}
+
+.sidebar{
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+  background:linear-gradient(180deg,var(--panel),var(--bg-2));
+  border-right:1px solid var(--border);
+  padding:18px 15px 40px;
+}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:3px;}
+.brand-mark{
+  width:30px;height:30px;border-radius:8px;
+  background:conic-gradient(from 160deg,var(--r0),var(--r1),var(--r2),var(--accent),var(--r0));
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-weight:700;color:#042f2e;font-size:10px;
+}
+.brand-name{font-family:var(--display);font-weight:700;font-size:15px;}
+.brand-sub{font-family:var(--mono);font-size:10px;color:var(--text-faint);margin:2px 0 14px;letter-spacing:.4px;text-transform:uppercase;}
+
+.ctrl-group{
+  border:1px solid var(--border-soft);border-radius:var(--radius);
+  background:rgba(255,255,255,.015);
+  padding:11px 12px 13px;margin-bottom:10px;
+}
+.ctrl-group h4{
+  margin:0 0 9px;font-family:var(--display);font-size:10.5px;letter-spacing:.55px;
+  text-transform:uppercase;color:var(--text-dim);font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.field{margin-bottom:10px;}
+.field:last-child{margin-bottom:0;}
+.field-label{
+  display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;
+  font-size:11px;color:var(--text-dim);
+}
+.field-label .val{font-family:var(--mono);color:var(--text);font-weight:600;font-size:11.5px;}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:3.5px;border-radius:2px;
+  background:var(--border);outline:none;margin:4px 0 2px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--accent);cursor:pointer;border:2px solid #042f2e;
+  box-shadow:0 0 0 2px rgba(34,211,238,.22);
+}
+select,input[type=text],input[type=number]{
+  width:100%;background:var(--panel-2);border:1px solid var(--border);
+  color:var(--text);border-radius:6px;padding:6px 8px;font-family:var(--mono);font-size:11.5px;
+}
+.hint{font-size:10px;color:var(--text-faint);margin-top:3px;line-height:1.4;}
+.btn{
+  width:100%;padding:8px 11px;border-radius:7px;border:1px solid var(--border);
+  background:var(--panel-2);color:var(--text);font-weight:600;font-size:12px;cursor:pointer;transition:.15s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn-primary{
+  background:linear-gradient(135deg,var(--accent),var(--accent-dim));
+  color:#042f2e;border:none;font-weight:700;
+}
+.btn-primary:hover{filter:brightness(1.08);color:#042f2e;}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:3px;}
+.preset-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.preset-btn{padding:6px 3px;font-size:10.5px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:2px 0;font-size:11.5px;color:var(--text-dim);}
+.switch{position:relative;width:34px;height:18px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.slider-tog{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:20px;transition:.15s;}
+.slider-tog:before{content:"";position:absolute;width:12px;height:12px;left:3px;top:3px;background:var(--text-dim);border-radius:50%;transition:.15s;}
+.switch input:checked + .slider-tog{background:rgba(34,211,238,.35);}
+.switch input:checked + .slider-tog:before{transform:translateX(15px);background:var(--accent);}
+.status-line{
+  font-family:var(--mono);font-size:10px;color:var(--text-faint);margin-top:11px;
+  border-top:1px dashed var(--border-soft);padding-top:9px;line-height:1.5;
+}
+.status-line b{color:var(--accent);font-weight:600;}
+
+.regime-tabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;}
+.regime-tab{
+  font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:5px;
+  border:1px solid var(--border);background:var(--panel-2);color:var(--text-dim);cursor:pointer;
+}
+.regime-tab.active{font-weight:600;}
+
+.matrix-grid{display:grid;gap:4px;margin-top:4px;}
+.matrix-cell{
+  background:var(--panel-2);border:1px solid var(--border);border-radius:5px;
+  padding:4px 6px;text-align:center;
+}
+.matrix-cell input[type=range]{margin:2px 0;}
+.matrix-cell .mc-label{font-family:var(--mono);font-size:9.5px;color:var(--text-faint);}
+.matrix-cell .mc-val{font-family:var(--mono);font-size:11px;color:var(--text);font-weight:600;}
+.matrix-head{font-family:var(--mono);font-size:9.5px;color:var(--text-faint);text-align:center;padding:2px;}
+
+.main{padding:24px 26px 56px;max-width:1420px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);}
+.page-title{font-family:var(--display);font-size:27px;font-weight:700;margin:5px 0 7px;letter-spacing:-.3px;}
+.page-desc{color:var(--text-dim);max-width:860px;font-size:13.5px;}
+
+.section{margin-top:26px;}
+.section-head{display:flex;align-items:baseline;gap:10px;margin-bottom:11px;}
+.section-num{font-family:var(--mono);color:var(--accent);font-size:12px;}
+.section-title{font-family:var(--display);font-weight:600;font-size:16px;}
+.section-desc{color:var(--text-dim);font-size:12.5px;margin:-3px 0 11px;max-width:860px;}
+
+.card{
+  background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:15px;box-shadow:var(--shadow);
+}
+.grid{display:grid;gap:11px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media(max-width:1200px){.grid-4{grid-template-columns:repeat(2,1fr);}.grid-3{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{
+  background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:12px 14px;position:relative;overflow:hidden;
+}
+.kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2.5px;background:var(--accent);}
+.kpi.g:before{background:var(--r0);}
+.kpi.y:before{background:var(--r1);}
+.kpi.r:before{background:var(--r2);}
+.kpi.p:before{background:var(--accent-purple);}
+.kpi-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono);}
+.kpi-value{font-family:var(--mono);font-size:18px;font-weight:600;margin-top:4px;letter-spacing:-.3px;}
+.kpi-sub{font-size:10.5px;color:var(--text-faint);margin-top:2px;}
+
+table.data-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px;}
+table.data-table th,table.data-table td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child,table.data-table td:first-child{text-align:left;color:var(--text-dim);font-family:var(--body);}
+table.data-table th{color:var(--text-dim);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.35px;border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+
+.formula-block{
+  background:var(--panel-2);border:1px solid var(--border-soft);border-radius:8px;
+  padding:12px 14px;margin-bottom:10px;
+}
+.formula-block .f-title{font-family:var(--display);font-size:12.5px;font-weight:600;color:var(--accent);margin-bottom:5px;}
+.formula-block .f-math{font-family:var(--mono);font-size:13px;color:var(--text);margin-bottom:5px;overflow-x:auto;}
+.formula-block .f-note{font-size:11.5px;color:var(--text-dim);}
+
+details.disclosure{
+  background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:12px 15px;margin-bottom:9px;
+}
+details.disclosure>summary{
+  cursor:pointer;font-family:var(--display);font-weight:600;font-size:13.5px;list-style:none;
+  display:flex;align-items:center;gap:8px;
+}
+details.disclosure>summary::-webkit-details-marker{display:none;}
+details.disclosure>summary:before{content:"›";color:var(--accent);font-size:16px;transition:transform .15s;}
+details.disclosure[open]>summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:10px;color:var(--text-dim);font-size:12.5px;}
+.disclosure-body h5{color:var(--text);font-family:var(--display);font-size:12.5px;margin:11px 0 4px;}
+.disclosure-body p{margin:4px 0 8px;}
+.disclosure-body ul{margin:4px 0 8px;padding-left:18px;}
+
+.legend-row{display:flex;gap:12px;align-items:center;font-size:11px;color:var(--text-dim);margin-bottom:8px;flex-wrap:wrap;}
+.legend-dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;}
+
+.footer-note{
+  margin-top:36px;padding-top:14px;border-top:1px solid var(--border-soft);
+  color:var(--text-faint);font-size:11.5px;line-height:1.7;
+}
+.two-col{display:grid;grid-template-columns:1.15fr 1fr;gap:12px;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+@media(max-width:980px){.two-col,.three-col{grid-template-columns:1fr;}}
+
+.overlay-loading{
+  position:fixed;inset:0;background:rgba(5,8,12,.78);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:10px;
+}
+.overlay-loading.active{display:flex;}
+.spinner{
+  width:32px;height:32px;border-radius:50%;border:3px solid var(--border);
+  border-top-color:var(--accent);animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.overlay-loading span{font-family:var(--mono);font-size:12px;color:var(--text-dim);}
+
+.pi-row{display:grid;grid-template-columns:1fr;gap:6px;}
+.filter-box{
+  background:var(--panel-2);border:1px solid var(--border-soft);border-radius:8px;
+  padding:12px 14px;font-family:var(--mono);font-size:11.5px;color:var(--text-dim);min-height:80px;
+}
+.filter-box .fb-row{display:flex;justify-content:space-between;padding:2px 0;}
+.filter-box .fb-row span:last-child{color:var(--text);font-weight:600;}
+</style>
+</head>
+<body>
+
+<div class="overlay-loading" id="loadingOverlay"><div class="spinner"></div><span id="loadingText">Simulating HMM path…</span></div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">HM</div>
+      <div class="brand-name">HMM Regime Lab</div>
+    </div>
+    <div class="brand-sub">Hidden Markov · Regime Switching</div>
+
+    <div class="ctrl-group">
+      <h4>Presets</h4>
+      <div class="preset-row">
+        <button class="btn preset-btn" data-preset="classic">Classic 3-state</button>
+        <button class="btn preset-btn" data-preset="twostate">2-state Bull/Bear</button>
+        <button class="btn preset-btn" data-preset="persistent">High persistence</button>
+        <button class="btn preset-btn" data-preset="volatile">Fast switching</button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Model structure</h4>
+      <div class="field">
+        <div class="field-label"><span>Number of regimes K</span><span class="val" id="v_K">3</span></div>
+        <input type="range" id="K" min="2" max="3" step="1" value="3">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Path length T</span><span class="val" id="v_T">500</span></div>
+        <input type="range" id="T" min="100" max="1500" step="50" value="500">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Steps / year</span><span class="val" id="v_spy">252</span></div>
+        <input type="range" id="spy" min="52" max="252" step="4" value="252">
+        <div class="hint">Returns are daily-scale; μ,σ entered annualized.</div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Initial price S₀</span><span class="val" id="v_S0">100</span></div>
+        <input type="range" id="S0" min="50" max="500" step="10" value="100">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Random seed</span></div>
+        <input type="text" id="seed" value="2026">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Regime parameters</h4>
+      <div class="regime-tabs" id="regimeTabs"></div>
+      <div id="regimeEditors"></div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Start probabilities π</h4>
+      <div class="pi-row" id="piEditors"></div>
+      <div class="hint">Renormalized to sum to 1 after edits.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Transition matrix P</h4>
+      <div class="hint" style="margin-bottom:6px;">Rows = from, columns = to. Each row renormalized to sum to 1.</div>
+      <div id="matrixEditors"></div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Filtering demo</h4>
+      <div class="toggle-row">
+        <span>Show forward filter α̂<sub>t</sub></span>
+        <label class="switch"><input type="checkbox" id="showFilter" checked><span class="slider-tog"></span></label>
+      </div>
+      <div class="hint">Online Bayesian update of regime probabilities from observed returns (true P, μ, σ known).</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="runBtn">▶ Simulate</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+    <div class="status-line" id="statusLine">Ready. Configure regimes and click <b>Simulate</b>.</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Time-Series · Latent State Models</div>
+      <h1 class="page-title">Hidden Markov Regime-Switching Simulator</h1>
+      <p class="page-desc">
+        An interactive lab for a discrete-time HMM on returns:
+        latent regime <span style="font-family:var(--mono);color:var(--accent);">S<sub>t</sub> ∈ {1…K}</span>
+        follows a Markov chain with transition matrix P, while emissions are Gaussian
+        <span style="font-family:var(--mono);color:var(--accent);">R<sub>t</sub> | S<sub>t</sub> ∼ N(μ<sub>S<sub>t</sub></sub>, σ<sub>S<sub>t</sub></sub>²)</span>.
+        Everything below is simulated from your parameters — including optional forward filtering of regime probabilities.
+      </p>
+    </div>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Regime Snapshot</span></div>
+      <div class="grid grid-3" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Simulated Price, Returns &amp; Hidden State</span></div>
+      <p class="section-desc">Top: price path colored by true latent regime. Middle: returns. Bottom: true state index (and filtered belief if enabled).</p>
+      <div class="card">
+        <div class="legend-row" id="regimeLegend"></div>
+        <div id="priceChart" style="width:100%;height:280px;"></div>
+        <div id="returnChart" style="width:100%;height:220px;margin-top:8px;"></div>
+        <div id="stateChart" style="width:100%;height:200px;margin-top:8px;"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Transition Matrix &amp; Stationary Distribution</span></div>
+      <div class="two-col">
+        <div class="card">
+          <div id="transHeatmap" style="width:100%;height:320px;"></div>
+        </div>
+        <div class="card">
+          <div id="stationaryChart" style="width:100%;height:200px;"></div>
+          <table class="data-table" style="margin-top:10px;">
+            <thead><tr><th>Regime</th><th>π∞</th><th>E[duration]</th><th>Emp. share</th></tr></thead>
+            <tbody id="statTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Regime Probabilities Over Time</span></div>
+      <p class="section-desc">True one-hot state vs filtered probabilities P(S<sub>t</sub>=j | R<sub>1:t</sub>). Filtering uses the known model (not estimated).</p>
+      <div class="card">
+        <div id="filterChart" style="width:100%;height:340px;"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Volatility &amp; Return by Regime</span></div>
+      <div class="two-col">
+        <div class="card">
+          <div id="volByRegime" style="width:100%;height:300px;"></div>
+        </div>
+        <div class="card">
+          <div id="retHist" style="width:100%;height:300px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Persistence, Clustering &amp; Diagnostics</span></div>
+      <div class="grid grid-4" id="diagGrid"></div>
+      <div class="card" style="margin-top:12px;">
+        <table class="data-table">
+          <thead>
+            <tr><th>Regime</th><th>μ (ann.)</th><th>σ (ann.)</th><th>P(stay)</th><th>Runs</th><th>Avg run</th><th>Max run</th></tr>
+          </thead>
+          <tbody id="persistTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Forward-Filter Step Inspector</span></div>
+      <p class="section-desc">Pick a time index to see the Bayes update: predict with P, then reweight by Gaussian likelihood of the observed return.</p>
+      <div class="card">
+        <div class="row2" style="margin-bottom:12px;align-items:end;">
+          <div class="field" style="margin:0;">
+            <div class="field-label"><span>Time index t</span><span class="val" id="v_tInspect">50</span></div>
+            <input type="range" id="tInspect" min="1" max="499" step="1" value="50">
+          </div>
+          <button class="btn" id="inspectBtn" style="width:auto;padding:8px 16px;">Inspect update</button>
+        </div>
+        <div class="two-col">
+          <div class="filter-box" id="filterDetail">Run a simulation, then inspect a time step.</div>
+          <div id="filterStepChart" style="width:100%;height:220px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Latent Markov chain</div>
+        <div class="f-math">P(S<sub>t</sub>=j | S<sub>t−1</sub>=i) = P<sub>ij</sub> &nbsp;&nbsp;·&nbsp;&nbsp; S<sub>t</sub> ∈ {1,…,K}</div>
+        <div class="f-note">The regime is hidden. Only returns are observed. Diagonal P<sub>ii</sub> large ⇒ persistent regimes.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Gaussian emissions</div>
+        <div class="f-math">R<sub>t</sub> | S<sub>t</sub>=j ∼ N(μ<sub>j</sub>, σ<sub>j</sub>²)</div>
+        <div class="f-note">Annual μ,σ are converted to per-step mean μ/spy and vol σ/√spy.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Forward filter (predict–update)</div>
+        <div class="f-math">α<sub>t|t−1</sub> = P<sup>⊤</sup> α<sub>t−1|t−1</sub> &nbsp;&nbsp;·&nbsp;&nbsp; α<sub>t|t</sub> ∝ diag(ℓ<sub>t</sub>) α<sub>t|t−1</sub></div>
+        <div class="f-note">ℓ<sub>t</sub>(j) = φ(R<sub>t</sub>; μ<sub>j</sub>, σ<sub>j</sub>) is the emission density. Normalize α<sub>t|t</sub> to sum to 1.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Expected regime duration</div>
+        <div class="f-math">E[duration | state i] = 1 / (1 − P<sub>ii</sub>)</div>
+        <div class="f-note">Geometric holding time under constant exit probability 1−P<sub>ii</sub>.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Stationary distribution π∞</div>
+        <div class="f-math">π∞ = π∞ P &nbsp;&nbsp;·&nbsp;&nbsp; π∞ 1 = 1</div>
+        <div class="f-note">Left eigenvector of P for eigenvalue 1 (when the chain is irreducible).</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">09</span><span class="section-title">Educational Explanation</span></div>
+      <details class="disclosure" open>
+        <summary>Hidden states vs observed returns</summary>
+        <div class="disclosure-body">
+          <p>The regime S<sub>t</sub> is a latent discrete variable. You never observe it directly — only R<sub>t</sub> (or prices). Different regimes change the <b style="color:var(--text)">conditional distribution</b> of returns (mean and volatility). Clustering of high-volatility episodes is a hallmark of regime-switching vs a single Gaussian.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Transition probabilities &amp; persistence</summary>
+        <div class="disclosure-body">
+          <p>P<sub>ij</sub> is the probability of moving from i to j in one step. Large diagonal entries mean regimes are sticky: once in “Crisis,” you tend to stay there for a geometrically distributed number of days. That produces <b style="color:var(--text)">volatility clustering</b> without needing GARCH.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Why HMMs help with regime detection</summary>
+        <div class="disclosure-body">
+          <ul>
+            <li>They formalize “market state” as a probabilistic object with dynamics.</li>
+            <li>Filtering/smoothing yields time-varying regime probabilities useful for risk, allocation, or signal design.</li>
+            <li>They can generate realistic multi-modal return distributions and sudden risk-on/risk-off shifts.</li>
+          </ul>
+          <p>Limitations: discrete regimes are a simplification; parameters must be estimated (EM/Baum–Welch) in practice; misspecified K or Gaussian emissions can mislead.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Filtering vs the true path</summary>
+        <div class="disclosure-body">
+          <p>This lab knows the true parameters, so the filter is the optimal online belief. In real applications you estimate P, μ, σ first; estimation error blurs regime calls. Even with known parameters, filter uncertainty remains when regimes have overlapping emission densities (similar μ,σ).</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational HMM simulator. Paths, filters, and statistics are generated client-side from your inputs. Presets are illustrative. Not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   HIDDEN MARKOV MODEL — REGIME SWITCHING LAB
+   ===================================================================== */
+
+const REGIME_COLORS = ['#34D399', '#FBBF24', '#F87171'];
+const DEFAULT_NAMES = [
+  ['Low Vol', 'High Vol'],
+  ['Low Vol', 'High Vol', 'Crisis']
+];
+
+const state = {
+  K: 3,
+  activeRegime: 0,
+  names: ['Low Vol', 'High Vol', 'Crisis'],
+  mu: [8, 4, -12],       // annual %
+  sigma: [10, 22, 40],   // annual %
+  pi: [0.55, 0.35, 0.10],
+  // row-stochastic-ish raw weights (renormalized)
+  P: [
+    [0.97, 0.025, 0.005],
+    [0.04, 0.93, 0.03],
+    [0.01, 0.14, 0.85]
+  ],
+  result: null,
+};
+
+/* ---------- RNG ---------- */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (a >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeNormal(rng) {
+  let spare = null;
+  return function () {
+    if (spare !== null) { const v = spare; spare = null; return v; }
+    let u, v, s;
+    do { u = rng()*2-1; v = rng()*2-1; s = u*u+v*v; } while (s >= 1 || s === 0);
+    const mul = Math.sqrt(-2*Math.log(s)/s);
+    spare = v * mul;
+    return u * mul;
+  };
+}
+function sampleCategorical(rng, probs) {
+  let u = rng(), c = 0;
+  for (let i = 0; i < probs.length; i++) {
+    c += probs[i];
+    if (u <= c) return i;
+  }
+  return probs.length - 1;
+}
+
+/* ---------- Linear algebra helpers ---------- */
+function normalize(v) {
+  const s = v.reduce((a, b) => a + b, 0);
+  if (s <= 0) return v.map(() => 1 / v.length);
+  return v.map(x => x / s);
+}
+function normalizeRows(M) {
+  return M.map(row => normalize(row.slice()));
+}
+function stationaryDist(P) {
+  // Power iteration on P^T
+  const K = P.length;
+  let pi = Array(K).fill(1 / K);
+  for (let iter = 0; iter < 200; iter++) {
+    const next = Array(K).fill(0);
+    for (let j = 0; j < K; j++)
+      for (let i = 0; i < K; i++)
+        next[j] += pi[i] * P[i][j];
+    let diff = 0;
+    for (let i = 0; i < K; i++) diff += Math.abs(next[i] - pi[i]);
+    pi = normalize(next);
+    if (diff < 1e-14) break;
+  }
+  return pi;
+}
+
+function gaussLogPdf(x, mu, sig) {
+  const v = sig * sig;
+  return -0.5 * Math.log(2 * Math.PI * v) - 0.5 * (x - mu) * (x - mu) / v;
+}
+function gaussPdf(x, mu, sig) {
+  return Math.exp(gaussLogPdf(x, mu, sig));
+}
+
+/* ---------- Simulate HMM ---------- */
+function simulateHMM(params) {
+  const { K, T, spy, S0, seed, names, muAnn, sigAnn, pi0, P } = params;
+  const mu = muAnn.map(m => m / spy);           // per step
+  const sig = sigAnn.map(s => s / Math.sqrt(spy));
+  const Prow = normalizeRows(P);
+  const pi = normalize(pi0.slice());
+
+  const rng = mulberry32(seed);
+  const normal = makeNormal(rng);
+
+  const regimes = new Int32Array(T);
+  const returns = new Float64Array(T);
+  const prices = new Float64Array(T + 1);
+  prices[0] = S0;
+
+  regimes[0] = sampleCategorical(rng, pi);
+  returns[0] = mu[regimes[0]] + sig[regimes[0]] * normal();
+  prices[1] = prices[0] * Math.exp(returns[0]); // interpret returns as log-returns
+
+  for (let t = 1; t < T; t++) {
+    regimes[t] = sampleCategorical(rng, Prow[regimes[t - 1]]);
+    returns[t] = mu[regimes[t]] + sig[regimes[t]] * normal();
+    prices[t + 1] = prices[t] * Math.exp(returns[t]);
+  }
+
+  // Forward filter
+  const filter = Array.from({ length: T }, () => Array(K).fill(0));
+  // t=0
+  {
+    const logA = Array(K);
+    let maxL = -Infinity;
+    for (let j = 0; j < K; j++) {
+      logA[j] = Math.log(Math.max(pi[j], 1e-300)) + gaussLogPdf(returns[0], mu[j], sig[j]);
+      if (logA[j] > maxL) maxL = logA[j];
+    }
+    let s = 0;
+    for (let j = 0; j < K; j++) { filter[0][j] = Math.exp(logA[j] - maxL); s += filter[0][j]; }
+    for (let j = 0; j < K; j++) filter[0][j] /= s;
+  }
+  for (let t = 1; t < T; t++) {
+    // predict
+    const pred = Array(K).fill(0);
+    for (let j = 0; j < K; j++)
+      for (let i = 0; i < K; i++)
+        pred[j] += filter[t - 1][i] * Prow[i][j];
+    // update
+    const logA = Array(K);
+    let maxL = -Infinity;
+    for (let j = 0; j < K; j++) {
+      logA[j] = Math.log(Math.max(pred[j], 1e-300)) + gaussLogPdf(returns[t], mu[j], sig[j]);
+      if (logA[j] > maxL) maxL = logA[j];
+    }
+    let s = 0;
+    for (let j = 0; j < K; j++) { filter[t][j] = Math.exp(logA[j] - maxL); s += filter[t][j]; }
+    for (let j = 0; j < K; j++) filter[t][j] /= s;
+  }
+
+  // Diagnostics: run lengths, empirical shares
+  const counts = Array(K).fill(0);
+  const runs = Array.from({ length: K }, () => []);
+  let runStart = 0;
+  for (let t = 1; t <= T; t++) {
+    counts[regimes[Math.min(t, T - 1)] >= 0 ? regimes[Math.min(t - 1, T - 1)] : 0]++;
+    if (t === T || regimes[t] !== regimes[t - 1]) {
+      const len = t - runStart;
+      runs[regimes[runStart]].push(len);
+      runStart = t;
+    }
+  }
+  // recount properly
+  for (let j = 0; j < K; j++) counts[j] = 0;
+  for (let t = 0; t < T; t++) counts[regimes[t]]++;
+
+  const empShare = counts.map(c => c / T);
+  const piInf = stationaryDist(Prow);
+  const expDuration = Prow.map((row, i) => 1 / Math.max(1e-12, 1 - row[i]));
+
+  // Filter accuracy: % of time argmax filter == true state
+  let correct = 0;
+  for (let t = 0; t < T; t++) {
+    let best = 0, bv = filter[t][0];
+    for (let j = 1; j < K; j++) if (filter[t][j] > bv) { bv = filter[t][j]; best = j; }
+    if (best === regimes[t]) correct++;
+  }
+
+  // Mean filtered confidence
+  let conf = 0;
+  for (let t = 0; t < T; t++) conf += Math.max(...filter[t]);
+  conf /= T;
+
+  return {
+    regimes, returns, prices, filter,
+    mu, sig, muAnn, sigAnn, P: Prow, pi, piInf, empShare, expDuration, runs, counts,
+    names, K, T, spy, S0,
+    filterAccuracy: correct / T,
+    meanConfidence: conf
+  };
+}
+
+/* ---------- Format ---------- */
+function fmtPct(x, d=2){ if(!isFinite(x))return '—'; return (x*100).toFixed(d)+'%'; }
+function fmtNum(x, d=2){ if(!isFinite(x))return '—'; return x.toFixed(d); }
+
+/* ---------- Sidebar editors ---------- */
+function ensureModelSize() {
+  const K = state.K;
+  while (state.mu.length < K) state.mu.push(0);
+  while (state.sigma.length < K) state.sigma.push(15);
+  while (state.pi.length < K) state.pi.push(0.1);
+  state.mu = state.mu.slice(0, K);
+  state.sigma = state.sigma.slice(0, K);
+  state.pi = normalize(state.pi.slice(0, K));
+  // P
+  const old = state.P;
+  state.P = Array.from({ length: K }, (_, i) =>
+    Array.from({ length: K }, (_, j) => (old[i] && old[i][j] !== undefined) ? old[i][j] : (i === j ? 0.9 : 0.1 / Math.max(K - 1, 1)))
+  );
+  state.P = normalizeRows(state.P);
+  state.names = (K === 2 ? DEFAULT_NAMES[0] : DEFAULT_NAMES[1]).slice();
+  if (state.activeRegime >= K) state.activeRegime = 0;
+}
+
+function renderRegimeTabs() {
+  const el = document.getElementById('regimeTabs');
+  el.innerHTML = '';
+  for (let i = 0; i < state.K; i++) {
+    const b = document.createElement('button');
+    b.className = 'regime-tab' + (i === state.activeRegime ? ' active' : '');
+    b.textContent = state.names[i];
+    b.style.borderColor = i === state.activeRegime ? REGIME_COLORS[i] : '';
+    b.style.color = i === state.activeRegime ? REGIME_COLORS[i] : '';
+    b.onclick = () => { state.activeRegime = i; renderRegimeTabs(); renderRegimeEditor(); };
+    el.appendChild(b);
+  }
+}
+
+function renderRegimeEditor() {
+  const i = state.activeRegime;
+  const el = document.getElementById('regimeEditors');
+  el.innerHTML = `
+    <div class="field">
+      <div class="field-label"><span>Mean μ (ann. %)</span><span class="val" id="v_mu">${state.mu[i].toFixed(1)}%</span></div>
+      <input type="range" id="ed_mu" min="-30" max="30" step="0.5" value="${state.mu[i]}">
+    </div>
+    <div class="field">
+      <div class="field-label"><span>Volatility σ (ann. %)</span><span class="val" id="v_sig">${state.sigma[i].toFixed(1)}%</span></div>
+      <input type="range" id="ed_sig" min="3" max="80" step="0.5" value="${state.sigma[i]}">
+    </div>
+  `;
+  document.getElementById('ed_mu').oninput = e => {
+    state.mu[i] = parseFloat(e.target.value);
+    document.getElementById('v_mu').textContent = state.mu[i].toFixed(1) + '%';
+    scheduleRun();
+  };
+  document.getElementById('ed_sig').oninput = e => {
+    state.sigma[i] = parseFloat(e.target.value);
+    document.getElementById('v_sig').textContent = state.sigma[i].toFixed(1) + '%';
+    scheduleRun();
+  };
+}
+
+function renderPiEditors() {
+  const el = document.getElementById('piEditors');
+  el.innerHTML = '';
+  for (let i = 0; i < state.K; i++) {
+    const row = document.createElement('div');
+    row.className = 'field';
+    row.innerHTML = `
+      <div class="field-label"><span style="color:${REGIME_COLORS[i]}">π₀ · ${state.names[i]}</span><span class="val" id="v_pi${i}">${state.pi[i].toFixed(2)}</span></div>
+      <input type="range" id="pi${i}" min="0.01" max="0.98" step="0.01" value="${state.pi[i]}">
+    `;
+    el.appendChild(row);
+    row.querySelector('input').oninput = e => {
+      state.pi[i] = parseFloat(e.target.value);
+      state.pi = normalize(state.pi);
+      for (let j = 0; j < state.K; j++) {
+        const inp = document.getElementById('pi' + j);
+        const lab = document.getElementById('v_pi' + j);
+        if (inp) inp.value = state.pi[j];
+        if (lab) lab.textContent = state.pi[j].toFixed(2);
+      }
+      scheduleRun();
+    };
+  }
+}
+
+function renderMatrixEditors() {
+  const el = document.getElementById('matrixEditors');
+  const K = state.K;
+  let html = `<div class="matrix-grid" style="grid-template-columns:repeat(${K+1},1fr);">`;
+  html += `<div class="matrix-head"></div>`;
+  for (let j = 0; j < K; j++) html += `<div class="matrix-head" style="color:${REGIME_COLORS[j]}">→${j + 1}</div>`;
+  for (let i = 0; i < K; i++) {
+    html += `<div class="matrix-head" style="color:${REGIME_COLORS[i]}">${i + 1}→</div>`;
+    for (let j = 0; j < K; j++) {
+      const v = state.P[i][j];
+      html += `<div class="matrix-cell">
+        <div class="mc-val" id="pv_${i}_${j}">${v.toFixed(2)}</div>
+        <input type="range" min="0.001" max="0.999" step="0.001" value="${v}" data-i="${i}" data-j="${j}">
+      </div>`;
+    }
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+  el.querySelectorAll('input[type=range]').forEach(inp => {
+    inp.oninput = () => {
+      const i = +inp.dataset.i, j = +inp.dataset.j;
+      state.P[i][j] = parseFloat(inp.value);
+      state.P = normalizeRows(state.P);
+      for (let jj = 0; jj < K; jj++) {
+        const cell = document.getElementById(`pv_${i}_${jj}`);
+        const slider = el.querySelector(`input[data-i="${i}"][data-j="${jj}"]`);
+        if (cell) cell.textContent = state.P[i][jj].toFixed(2);
+        if (slider) slider.value = state.P[i][jj];
+      }
+      scheduleRun();
+    };
+  });
+}
+
+function syncTopLabels() {
+  document.getElementById('v_K').textContent = state.K;
+  document.getElementById('v_T').textContent = document.getElementById('T').value;
+  document.getElementById('v_spy').textContent = document.getElementById('spy').value;
+  document.getElementById('v_S0').textContent = document.getElementById('S0').value;
+}
+
+function rebuildSidebar() {
+  ensureModelSize();
+  renderRegimeTabs();
+  renderRegimeEditor();
+  renderPiEditors();
+  renderMatrixEditors();
+  syncTopLabels();
+}
+
+/* ---------- Charts & render ---------- */
+function kpiCard(label, value, sub, cls) {
+  return `<div class="kpi ${cls||''}"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub||''}</div></div>`;
+}
+
+function plotLayout(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8B95A8', size: 10 },
+    margin: { l: 48, r: 16, t: 24, b: 36 },
+    xaxis: { gridcolor: '#172030', linecolor: '#1E2838', zerolinecolor: '#1E2838' },
+    yaxis: { gridcolor: '#172030', linecolor: '#1E2838', zerolinecolor: '#1E2838' },
+    legend: { orientation: 'h', y: 1.12, font: { size: 10 } },
+    hoverlabel: { bgcolor: '#151C28', bordercolor: '#1E2838', font: { color: '#E8ECF4', family: 'JetBrains Mono, monospace' } },
+  }, extra || {});
+}
+const PCFG = { displayModeBar: false, responsive: true };
+
+function renderAll() {
+  const R = state.result;
+  if (!R) return;
+  const showFilter = document.getElementById('showFilter').checked;
+
+  // Legend
+  document.getElementById('regimeLegend').innerHTML = R.names.map((n, i) =>
+    `<span><span class="legend-dot" style="background:${REGIME_COLORS[i]}"></span>${n}</span>`
+  ).join('');
+
+  // KPIs
+  document.getElementById('kpiGrid').innerHTML = R.names.map((n, i) =>
+    kpiCard(n, `σ=${R.sigAnn[i].toFixed(0)}%`, `μ=${R.muAnn[i].toFixed(1)}% · π∞=${fmtPct(R.piInf[i],1)} · stay P<sub>ii</sub>=${fmtPct(R.P[i][i],1)}`, i===0?'g':i===1?'y':'r')
+  ).join('');
+
+  // Diagnostics
+  document.getElementById('diagGrid').innerHTML = [
+    kpiCard('Filter accuracy', fmtPct(R.filterAccuracy,1), 'argmax α̂<sub>t</sub> = true S<sub>t</sub>', 'p'),
+    kpiCard('Mean filter confidence', fmtPct(R.meanConfidence,1), 'avg max<sub>j</sub> α̂<sub>t</sub>(j)'),
+    kpiCard('Regimes K', String(R.K), `${R.T} steps · spy=${R.spy}`),
+    kpiCard('Terminal price', fmtNum(R.prices[R.T], 2), `S₀=${R.S0}`),
+  ].join('');
+
+  // Persistence table
+  document.getElementById('persistTable').innerHTML = R.names.map((n, i) => {
+    const runs = R.runs[i];
+    const avg = runs.length ? runs.reduce((a,b)=>a+b,0)/runs.length : 0;
+    const mx = runs.length ? Math.max(...runs) : 0;
+    return `<tr>
+      <td style="color:${REGIME_COLORS[i]}">${n}</td>
+      <td>${R.muAnn[i].toFixed(1)}%</td>
+      <td>${R.sigAnn[i].toFixed(1)}%</td>
+      <td>${fmtPct(R.P[i][i],1)}</td>
+      <td>${runs.length}</td>
+      <td>${fmtNum(avg,1)}</td>
+      <td>${mx}</td>
+    </tr>`;
+  }).join('');
+
+  // Stationary table
+  document.getElementById('statTable').innerHTML = R.names.map((n, i) =>
+    `<tr>
+      <td style="color:${REGIME_COLORS[i]}">${n}</td>
+      <td>${fmtPct(R.piInf[i],1)}</td>
+      <td>${fmtNum(R.expDuration[i],1)} steps</td>
+      <td>${fmtPct(R.empShare[i],1)}</td>
+    </tr>`
+  ).join('');
+
+  // t inspect max
+  const tinsp = document.getElementById('tInspect');
+  tinsp.max = R.T - 1;
+  if (+tinsp.value > R.T - 1) tinsp.value = Math.min(50, R.T - 1);
+  document.getElementById('v_tInspect').textContent = tinsp.value;
+
+  if (typeof Plotly !== 'undefined') {
+    renderPriceReturnState(R, showFilter);
+    renderTransHeatmap(R);
+    renderStationary(R);
+    renderFilter(R, showFilter);
+    renderVolRegime(R);
+    renderRetHist(R);
+    renderFilterStep(+tinsp.value);
+  }
+}
+
+function regimeShapes(R, y0, y1) {
+  // optional background bands — skip for performance on long T; use colored markers instead
+  return [];
+}
+
+function renderPriceReturnState(R, showFilter) {
+  const t = Array.from({ length: R.T }, (_, i) => i);
+  const tP = Array.from({ length: R.T + 1 }, (_, i) => i);
+
+  // Price colored by regime segments
+  const priceTraces = [];
+  // split into segments for coloring
+  let segStart = 0;
+  for (let i = 1; i <= R.T; i++) {
+    if (i === R.T || R.regimes[i] !== R.regimes[i - 1]) {
+      const reg = R.regimes[segStart];
+      const xs = [], ys = [];
+      for (let k = segStart; k <= i; k++) {
+        xs.push(k);
+        ys.push(R.prices[k]);
+      }
+      priceTraces.push({
+        x: xs, y: ys, mode: 'lines',
+        line: { color: REGIME_COLORS[reg], width: 1.6 },
+        showlegend: false, hoverinfo: 'skip'
+      });
+      segStart = i;
+    }
+  }
+  Plotly.newPlot('priceChart', priceTraces, plotLayout({
+    title: { text: 'Price path (colored by true regime)', font: { size: 12, color: '#8B95A8' } },
+    margin: { l: 48, r: 16, t: 32, b: 28 },
+    yaxis: { title: 'Price', gridcolor: '#172030', linecolor: '#1E2838' },
+    xaxis: { title: '', gridcolor: '#172030', linecolor: '#1E2838' },
+  }), PCFG);
+
+  // Returns as markers colored by regime
+  Plotly.newPlot('returnChart', [{
+    x: t,
+    y: Array.from(R.returns).map(v => v * 100),
+    mode: 'markers',
+    marker: {
+      size: 3.5,
+      color: Array.from(R.regimes).map(r => REGIME_COLORS[r]),
+      opacity: 0.75
+    },
+    showlegend: false,
+    hovertemplate: 't=%{x}<br>r=%{y:.3f}%<extra></extra>'
+  }], plotLayout({
+    title: { text: 'Log-returns (%)', font: { size: 12, color: '#8B95A8' } },
+    margin: { l: 48, r: 16, t: 32, b: 28 },
+    yaxis: { title: '%', gridcolor: '#172030', linecolor: '#1E2838', zerolinecolor: '#2a3548' },
+  }), PCFG);
+
+  // State path
+  const stateTraces = [{
+    x: t,
+    y: Array.from(R.regimes),
+    mode: 'lines',
+    name: 'True Sₜ',
+    line: { color: '#E8ECF4', width: 1.5, shape: 'hv' },
+  }];
+  if (showFilter) {
+    // MAP estimate
+    const map = R.filter.map(row => {
+      let b = 0; for (let j = 1; j < row.length; j++) if (row[j] > row[b]) b = j; return b;
+    });
+    stateTraces.push({
+      x: t, y: map, mode: 'lines', name: 'Filter MAP',
+      line: { color: '#22D3EE', width: 1.2, dash: 'dot', shape: 'hv' }
+    });
+  }
+  Plotly.newPlot('stateChart', stateTraces, plotLayout({
+    title: { text: 'Hidden regime index', font: { size: 12, color: '#8B95A8' } },
+    margin: { l: 48, r: 16, t: 32, b: 36 },
+    yaxis: {
+      title: 'State',
+      tickvals: R.names.map((_, i) => i),
+      ticktext: R.names,
+      gridcolor: '#172030', linecolor: '#1E2838',
+      range: [-0.2, R.K - 0.8]
+    },
+    xaxis: { title: 't', gridcolor: '#172030', linecolor: '#1E2838' },
+  }), PCFG);
+}
+
+function renderTransHeatmap(R) {
+  const z = R.P;
+  const labels = R.names;
+  const text = z.map(row => row.map(v => v.toFixed(2)));
+  Plotly.newPlot('transHeatmap', [{
+    z, x: labels.map((n,j)=>'→ '+n), y: labels.map((n,i)=>n+' →'),
+    type: 'heatmap',
+    colorscale: [[0,'#0B0F16'],[0.5,'#0e7490'],[1,'#22D3EE']],
+    zmin: 0, zmax: 1,
+    text, texttemplate: '%{text}',
+    textfont: { family: 'JetBrains Mono, monospace', size: 12, color: '#E8ECF4' },
+    hovertemplate: 'P(%{y} to %{x}) = %{z:.3f}<extra></extra>',
+    colorbar: { thickness: 12, tickfont: { color: '#8B95A8', size: 10 } }
+  }], plotLayout({
+    title: { text: 'Transition matrix P', font: { size: 12, color: '#8B95A8' } },
+    margin: { l: 90, r: 40, t: 36, b: 60 },
+    xaxis: { side: 'bottom', gridcolor: '#172030' },
+    yaxis: { autorange: 'reversed', gridcolor: '#172030' },
+  }), PCFG);
+}
+
+function renderStationary(R) {
+  Plotly.newPlot('stationaryChart', [{
+    x: R.names,
+    y: R.piInf.map(v => v * 100),
+    type: 'bar',
+    marker: { color: REGIME_COLORS.slice(0, R.K) },
+    name: 'π∞'
+  }, {
+    x: R.names,
+    y: R.empShare.map(v => v * 100),
+    type: 'bar',
+    marker: { color: REGIME_COLORS.slice(0, R.K).map(c => c + '66'), line: { color: REGIME_COLORS.slice(0, R.K), width: 1 } },
+    name: 'Empirical share'
+  }], plotLayout({
+    barmode: 'group',
+    title: { text: 'Stationary vs realized occupancy (%)', font: { size: 12, color: '#8B95A8' } },
+    margin: { l: 44, r: 12, t: 36, b: 40 },
+    yaxis: { title: '%', gridcolor: '#172030' },
+  }), PCFG);
+}
+
+function renderFilter(R, showFilter) {
+  const t = Array.from({ length: R.T }, (_, i) => i);
+  const traces = [];
+  for (let j = 0; j < R.K; j++) {
+    // true indicator faint
+    traces.push({
+      x: t,
+      y: Array.from(R.regimes).map(s => s === j ? 1 : 0),
+      mode: 'lines',
+      name: `True ${R.names[j]}`,
+      line: { color: REGIME_COLORS[j], width: 1, shape: 'hv' },
+      opacity: 0.25,
+    });
+    if (showFilter) {
+      traces.push({
+        x: t,
+        y: R.filter.map(row => row[j]),
+        mode: 'lines',
+        name: `P(S=${R.names[j]}|R₁:ₜ)`,
+        line: { color: REGIME_COLORS[j], width: 1.8 },
+      });
+    }
+  }
+  Plotly.newPlot('filterChart', traces, plotLayout({
+    yaxis: { title: 'Probability', range: [-0.02, 1.05], gridcolor: '#172030' },
+    xaxis: { title: 't', gridcolor: '#172030' },
+    margin: { l: 48, r: 16, t: 20, b: 40 },
+  }), PCFG);
+}
+
+function renderVolRegime(R) {
+  // realized abs return average by regime + model σ
+  const absMean = Array(R.K).fill(0);
+  const cnt = Array(R.K).fill(0);
+  for (let t = 0; t < R.T; t++) {
+    const j = R.regimes[t];
+    absMean[j] += Math.abs(R.returns[t]);
+    cnt[j]++;
+  }
+  for (let j = 0; j < R.K; j++) absMean[j] = cnt[j] ? absMean[j] / cnt[j] : 0;
+
+  Plotly.newPlot('volByRegime', [{
+    x: R.names,
+    y: R.sigAnn,
+    type: 'bar',
+    name: 'Model σ (ann. %)',
+    marker: { color: REGIME_COLORS.slice(0, R.K) }
+  }, {
+    x: R.names,
+    y: absMean.map(v => v * Math.sqrt(R.spy) * 100), // rough ann. from MAD-ish
+    type: 'bar',
+    name: 'Realized |r|·√spy (%)',
+    marker: { color: REGIME_COLORS.slice(0, R.K).map(c => c + '55'), line: { color: '#E8ECF4', width: 1 } }
+  }], plotLayout({
+    barmode: 'group',
+    title: { text: 'Volatility by regime', font: { size: 12, color: '#8B95A8' } },
+    yaxis: { title: '%', gridcolor: '#172030' },
+  }), PCFG);
+}
+
+function renderRetHist(R) {
+  const traces = [];
+  for (let j = 0; j < R.K; j++) {
+    const data = [];
+    for (let t = 0; t < R.T; t++) if (R.regimes[t] === j) data.push(R.returns[t] * 100);
+    if (!data.length) continue;
+    traces.push({
+      x: data, type: 'histogram', histnorm: 'probability density',
+      name: R.names[j],
+      opacity: 0.55,
+      marker: { color: REGIME_COLORS[j] },
+      nbinsx: 35
+    });
+  }
+  Plotly.newPlot('retHist', traces, plotLayout({
+    barmode: 'overlay',
+    title: { text: 'Return density by true regime', font: { size: 12, color: '#8B95A8' } },
+    xaxis: { title: 'Return (%)', gridcolor: '#172030' },
+    yaxis: { title: 'Density', gridcolor: '#172030' },
+  }), PCFG);
+}
+
+function renderFilterStep(t) {
+  const R = state.result;
+  if (!R || typeof Plotly === 'undefined') return;
+  t = Math.max(1, Math.min(R.T - 1, t|0));
+  const K = R.K;
+  const prev = R.filter[t - 1];
+  // predict
+  const pred = Array(K).fill(0);
+  for (let j = 0; j < K; j++)
+    for (let i = 0; i < K; i++)
+      pred[j] += prev[i] * R.P[i][j];
+  // likelihood
+  const like = Array(K);
+  for (let j = 0; j < K; j++) like[j] = gaussPdf(R.returns[t], R.mu[j], R.sig[j]);
+  const post = R.filter[t];
+
+  document.getElementById('filterDetail').innerHTML = `
+    <div class="fb-row"><span>Time t</span><span>${t}</span></div>
+    <div class="fb-row"><span>Observed r<sub>t</sub></span><span>${(R.returns[t]*100).toFixed(4)}%</span></div>
+    <div class="fb-row"><span>True regime</span><span style="color:${REGIME_COLORS[R.regimes[t]]}">${R.names[R.regimes[t]]}</span></div>
+    <hr style="border:none;border-top:1px solid #1E2838;margin:8px 0;">
+    ${R.names.map((n,j) => `
+      <div class="fb-row"><span style="color:${REGIME_COLORS[j]}">${n}</span><span></span></div>
+      <div class="fb-row"><span>α<sub>t−1</sub></span><span>${prev[j].toFixed(4)}</span></div>
+      <div class="fb-row"><span>predict</span><span>${pred[j].toFixed(4)}</span></div>
+      <div class="fb-row"><span>likelihood</span><span>${like[j].toExponential(3)}</span></div>
+      <div class="fb-row"><span>α<sub>t</sub> posterior</span><span>${post[j].toFixed(4)}</span></div>
+    `).join('<div style="height:6px"></div>')}
+  `;
+
+  Plotly.newPlot('filterStepChart', [
+    { x: R.names, y: prev, type: 'bar', name: 'α̂ₜ₋₁', marker: { color: REGIME_COLORS.slice(0,K).map(c=>c+'66') } },
+    { x: R.names, y: pred, type: 'bar', name: 'Predict', marker: { color: '#60A5FA' } },
+    { x: R.names, y: post, type: 'bar', name: 'Posterior α̂ₜ', marker: { color: REGIME_COLORS.slice(0,K) } },
+  ], plotLayout({
+    barmode: 'group',
+    title: { text: `Filter update at t=${t}`, font: { size: 12, color: '#8B95A8' } },
+    yaxis: { title: 'Probability', range: [0, 1], gridcolor: '#172030' },
+    margin: { l: 44, r: 10, t: 36, b: 40 },
+  }), PCFG);
+}
+
+/* ---------- Run ---------- */
+function readSeed() {
+  let seed = parseInt(document.getElementById('seed').value, 10);
+  if (!Number.isFinite(seed)) {
+    seed = 0;
+    const str = String(document.getElementById('seed').value || 'seed');
+    for (let i = 0; i < str.length; i++) seed = (seed * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return seed >>> 0;
+}
+
+function runAll() {
+  document.getElementById('loadingOverlay').classList.add('active');
+  setTimeout(() => {
+    const t0 = performance.now();
+    const params = {
+      K: state.K,
+      T: parseInt(document.getElementById('T').value, 10),
+      spy: parseInt(document.getElementById('spy').value, 10),
+      S0: parseFloat(document.getElementById('S0').value),
+      seed: readSeed(),
+      names: state.names.slice(),
+      muAnn: state.mu.map(m => m / 100),
+      sigAnn: state.sigma.map(s => s / 100),
+      pi0: state.pi.slice(),
+      P: state.P.map(r => r.slice()),
+    };
+    state.result = simulateHMM(params);
+    // store ann % back for tables
+    state.result.muAnn = state.mu.slice();
+    state.result.sigAnn = state.sigma.slice();
+    const t1 = performance.now();
+    document.getElementById('statusLine').innerHTML =
+      `T=<b>${params.T}</b> · K=<b>${params.K}</b> · filter acc. <b>${fmtPct(state.result.filterAccuracy,1)}</b><br>Time: <b>${(t1-t0).toFixed(0)} ms</b>`;
+    renderAll();
+    document.getElementById('loadingOverlay').classList.remove('active');
+  }, 20);
+}
+
+let timer = null;
+function scheduleRun() {
+  clearTimeout(timer);
+  timer = setTimeout(runAll, 140);
+}
+
+document.getElementById('K').oninput = () => {
+  state.K = parseInt(document.getElementById('K').value, 10);
+  rebuildSidebar();
+  scheduleRun();
+};
+['T','spy','S0'].forEach(id => {
+  document.getElementById(id).oninput = () => { syncTopLabels(); scheduleRun(); };
+});
+document.getElementById('showFilter').onchange = () => { if (state.result) renderAll(); };
+document.getElementById('runBtn').onclick = runAll;
+document.getElementById('tInspect').oninput = e => {
+  document.getElementById('v_tInspect').textContent = e.target.value;
+};
+document.getElementById('inspectBtn').onclick = () => {
+  renderFilterStep(+document.getElementById('tInspect').value);
+};
+document.getElementById('tInspect').addEventListener('change', () => {
+  renderFilterStep(+document.getElementById('tInspect').value);
+});
+
+document.getElementById('resetBtn').onclick = () => {
+  state.K = 3;
+  state.mu = [8, 4, -12];
+  state.sigma = [10, 22, 40];
+  state.pi = [0.55, 0.35, 0.10];
+  state.P = [[0.97,0.025,0.005],[0.04,0.93,0.03],[0.01,0.14,0.85]];
+  document.getElementById('K').value = 3;
+  document.getElementById('T').value = 500;
+  document.getElementById('spy').value = 252;
+  document.getElementById('S0').value = 100;
+  document.getElementById('seed').value = '2026';
+  document.getElementById('showFilter').checked = true;
+  rebuildSidebar();
+  runAll();
+};
+
+const PRESETS = {
+  classic: () => {
+    state.K = 3;
+    state.mu = [8, 4, -12]; state.sigma = [10, 22, 40];
+    state.pi = [0.55, 0.35, 0.10];
+    state.P = [[0.97,0.025,0.005],[0.04,0.93,0.03],[0.01,0.14,0.85]];
+  },
+  twostate: () => {
+    state.K = 2;
+    state.mu = [10, -5]; state.sigma = [12, 28];
+    state.pi = [0.7, 0.3];
+    state.P = [[0.98, 0.02],[0.05, 0.95]];
+  },
+  persistent: () => {
+    state.K = 3;
+    state.mu = [7, 3, -15]; state.sigma = [9, 20, 45];
+    state.pi = [0.6, 0.3, 0.1];
+    state.P = [[0.99,0.008,0.002],[0.015,0.97,0.015],[0.005,0.045,0.95]];
+  },
+  volatile: () => {
+    state.K = 3;
+    state.mu = [6, 2, -8]; state.sigma = [14, 25, 38];
+    state.pi = [0.4, 0.4, 0.2];
+    state.P = [[0.85,0.10,0.05],[0.12,0.78,0.10],[0.08,0.17,0.75]];
+  }
+};
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.onclick = () => {
+    PRESETS[btn.dataset.preset]();
+    document.getElementById('K').value = state.K;
+    rebuildSidebar();
+    runAll();
+  };
+});
+
+rebuildSidebar();
+runAll();
+</script>
+</body>
+</html>

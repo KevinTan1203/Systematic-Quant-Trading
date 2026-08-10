@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Correlation &amp; Portfolio Diversification Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#0A0D14;
+  --bg-2:#0D1119;
+  --panel:#121722;
+  --panel-2:#161d2b;
+  --border:#212a3a;
+  --border-soft:#1a2230;
+  --text:#E7EAF0;
+  --text-dim:#8A93A6;
+  --text-faint:#5B6478;
+  --accent:#17E3B5;
+  --accent-dim:#0e9c7e;
+  --accent-blue:#5B8DEF;
+  --accent-warn:#F5A623;
+  --accent-loss:#EF5B5B;
+  --accent-gain:#3DD68C;
+  --accent-purple:#A78BFA;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px;
+  --shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(23,227,181,0.06), transparent),
+    radial-gradient(1000px 500px at 100% 0%, rgba(91,141,239,0.05), transparent),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  font-size:14px;
+  line-height:1.5;
+}
+::selection{background:var(--accent);color:#00120d;}
+
+.app{display:grid; grid-template-columns:340px 1fr; min-height:100vh;}
+@media (max-width:1000px){
+  .app{grid-template-columns:1fr;}
+  .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}
+}
+
+.sidebar{
+  position:sticky; top:0; height:100vh; overflow-y:auto;
+  background:linear-gradient(180deg, var(--panel), var(--bg-2));
+  border-right:1px solid var(--border);
+  padding:20px 16px 40px;
+}
+.brand{display:flex; align-items:center; gap:10px; margin-bottom:4px;}
+.brand-mark{
+  width:30px;height:30px;border-radius:8px;
+  background:conic-gradient(from 200deg, var(--accent), var(--accent-blue), var(--accent-purple), var(--accent));
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono); font-weight:700; color:#00120d; font-size:12px;
+}
+.brand-name{font-family:var(--display); font-weight:700; font-size:15px; letter-spacing:0.2px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 16px 0; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{
+  border:1px solid var(--border-soft); border-radius:var(--radius);
+  background:rgba(255,255,255,0.015);
+  padding:12px 12px 14px; margin-bottom:11px;
+}
+.ctrl-group h4{
+  margin:0 0 10px 0; font-family:var(--display); font-size:11px; letter-spacing:0.6px;
+  text-transform:uppercase; color:var(--text-dim); font-weight:600;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.field{margin-bottom:11px;}
+.field:last-child{margin-bottom:0;}
+.field-label{
+  display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;
+  font-size:11.5px; color:var(--text-dim);
+}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12px;}
+input[type=range]{
+  -webkit-appearance:none; width:100%; height:4px; border-radius:2px;
+  background:var(--border); outline:none; margin:5px 0 2px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:13px; height:13px; border-radius:50%;
+  background:var(--accent); cursor:pointer; border:2px solid #00120d;
+  box-shadow:0 0 0 2px rgba(23,227,181,0.22);
+}
+select, input[type=number], input[type=text]{
+  width:100%; background:var(--panel-2); border:1px solid var(--border);
+  color:var(--text); border-radius:6px; padding:6px 8px; font-family:var(--mono); font-size:12px;
+}
+.hint{font-size:10.5px; color:var(--text-faint); margin-top:4px; line-height:1.4;}
+.btn{
+  width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border);
+  background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600;
+  font-size:12.5px; cursor:pointer; transition:all .15s ease;
+}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{
+  background:linear-gradient(135deg, var(--accent), var(--accent-dim));
+  color:#00160f; border:none; font-weight:700;
+}
+.btn-primary:hover{filter:brightness(1.08); color:#00160f;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;}
+.preset-row{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.preset-btn{padding:7px 4px; font-size:11px;}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.toggle-row{display:flex; align-items:center; justify-content:space-between; padding:2px 0; font-size:12px; color:var(--text-dim);}
+.switch{position:relative; width:36px; height:20px; flex-shrink:0;}
+.switch input{opacity:0; width:0; height:0;}
+.slider-tog{position:absolute; cursor:pointer; inset:0; background:var(--border); border-radius:20px; transition:.15s;}
+.slider-tog:before{content:""; position:absolute; width:14px; height:14px; left:3px; top:3px; background:var(--text-dim); border-radius:50%; transition:.15s;}
+.switch input:checked + .slider-tog{background:rgba(23,227,181,0.35);}
+.switch input:checked + .slider-tog:before{transform:translateX(16px); background:var(--accent);}
+.status-line{
+  font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin-top:12px;
+  border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.55;
+}
+.status-line b{color:var(--accent); font-weight:600;}
+.asset-tabs{display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;}
+.asset-tab{
+  font-family:var(--mono); font-size:10.5px; padding:4px 8px; border-radius:5px;
+  border:1px solid var(--border); background:var(--panel-2); color:var(--text-dim); cursor:pointer;
+}
+.asset-tab.active{border-color:var(--accent); color:var(--accent); background:rgba(23,227,181,0.08);}
+.pair-list{max-height:180px; overflow-y:auto; margin-top:6px;}
+.pair-row{display:grid; grid-template-columns:72px 1fr 42px; gap:6px; align-items:center; margin-bottom:6px; font-size:11px;}
+.pair-row .pair-name{font-family:var(--mono); color:var(--text-dim); font-size:10.5px;}
+.pair-row .pair-val{font-family:var(--mono); color:var(--text); font-size:11px; text-align:right;}
+.badge{
+  display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:20px;
+  border:1px solid var(--border); color:var(--text-dim); margin-left:6px;
+}
+.badge.warn{color:var(--accent-warn); border-color:rgba(245,166,35,0.4);}
+.badge.ok{color:var(--accent); border-color:rgba(23,227,181,0.35);}
+
+.main{padding:26px 28px 60px; max-width:1380px;}
+.page-header{margin-bottom:20px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:28px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:780px; font-size:13.5px;}
+
+.section{margin-top:30px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16.5px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px 0; max-width:780px;}
+
+.card{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+  padding:16px 16px 14px; box-shadow:var(--shadow);
+}
+.grid{display:grid; gap:12px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+  padding:13px 15px; position:relative; overflow:hidden;
+}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.warn:before{background:var(--accent-warn);}
+.kpi.loss:before{background:var(--accent-loss);}
+.kpi.blue:before{background:var(--accent-blue);}
+.kpi.purple:before{background:var(--accent-purple);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:21px; font-weight:600; margin-top:5px; letter-spacing:-0.3px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+.kpi-sub b{color:var(--text-dim); font-weight:600;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+table.data-table th, table.data-table td{
+  padding:7px 9px; text-align:right; border-bottom:1px solid var(--border-soft);
+}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left; color:var(--text-dim); font-family:var(--body);}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+
+.formula-block{
+  background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px;
+  padding:13px 15px; margin-bottom:11px;
+}
+.formula-block .f-title{font-family:var(--display); font-size:12.5px; font-weight:600; color:var(--accent); margin-bottom:5px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13.5px; color:var(--text); margin-bottom:5px; overflow-x:auto;}
+.formula-block .f-note{font-size:11.5px; color:var(--text-dim);}
+
+details.disclosure{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+  padding:13px 16px; margin-bottom:10px;
+}
+details.disclosure > summary{
+  cursor:pointer; font-family:var(--display); font-weight:600; font-size:14px; list-style:none;
+  display:flex; align-items:center; gap:8px;
+}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:17px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:11px; color:var(--text-dim); font-size:12.5px;}
+.disclosure-body h5{color:var(--text); font-family:var(--display); font-size:12.5px; margin:12px 0 4px;}
+.disclosure-body p{margin:4px 0 9px;}
+.disclosure-body ul{margin:4px 0 9px; padding-left:18px;}
+
+.legend-row{display:flex; gap:16px; align-items:center; font-size:11.5px; color:var(--text-dim); margin-bottom:8px; flex-wrap:wrap;}
+.legend-dot{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px;}
+
+.footer-note{
+  margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft);
+  color:var(--text-faint); font-size:11.5px; line-height:1.7;
+}
+
+.two-col{display:grid; grid-template-columns:1.15fr 1fr; gap:14px;}
+@media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+.overlay-loading{
+  position:fixed; inset:0; background:rgba(8,10,15,0.72); backdrop-filter:blur(2px);
+  display:none; align-items:center; justify-content:center; z-index:999; flex-direction:column; gap:10px;
+}
+.overlay-loading.active{display:flex;}
+.spinner{
+  width:34px; height:34px; border-radius:50%; border:3px solid var(--border);
+  border-top-color:var(--accent); animation:spin 0.8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.overlay-loading span{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+
+.matrix-warn{
+  font-family:var(--mono); font-size:11px; padding:8px 12px; border-radius:6px;
+  background:rgba(245,166,35,0.08); border:1px solid rgba(245,166,35,0.3);
+  color:var(--accent-warn); margin-bottom:10px; display:none;
+}
+.matrix-warn.show{display:block;}
+.matrix-ok{
+  font-family:var(--mono); font-size:11px; padding:8px 12px; border-radius:6px;
+  background:rgba(23,227,181,0.06); border:1px solid rgba(23,227,181,0.25);
+  color:var(--accent); margin-bottom:10px; display:none;
+}
+.matrix-ok.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="overlay-loading" id="loadingOverlay"><div class="spinner"></div><span id="loadingText">Computing portfolio…</span></div>
+
+<div class="app">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">ρ</div>
+      <div class="brand-name">Diversification Lab</div>
+    </div>
+    <div class="brand-sub">Correlation · Covariance · Risk</div>
+
+    <div class="ctrl-group">
+      <h4>Scenario Presets</h4>
+      <div class="preset-row">
+        <button class="btn preset-btn" data-preset="diversified">Diversified</button>
+        <button class="btn preset-btn" data-preset="concentrated">Concentrated</button>
+        <button class="btn preset-btn" data-preset="crisis">Crisis (ρ↑)</button>
+        <button class="btn preset-btn" data-preset="negative">Negative ρ</button>
+      </div>
+      <div class="hint">Presets illustrate regimes — not empirical market calibrations.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Universe</h4>
+      <div class="field">
+        <div class="field-label"><span>Number of assets</span><span class="val" id="v_nAssets">6</span></div>
+        <input type="range" id="nAssets" min="3" max="8" step="1" value="6">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Edit asset</span></div>
+        <div class="asset-tabs" id="assetTabs"></div>
+      </div>
+      <div id="assetEditors"></div>
+      <div class="hint" style="margin-top:8px;">Weights are renormalized to sum to 100% after each change.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Correlation Structure</h4>
+      <div class="field">
+        <div class="field-label"><span>Global ρ (all pairs)</span><span class="val" id="v_globalRho">0.30</span></div>
+        <input type="range" id="globalRho" min="-0.95" max="0.95" step="0.05" value="0.30">
+        <div class="hint">Sets every pairwise correlation. Individual pairs can then be overridden.</div>
+      </div>
+      <div class="row2" style="margin-bottom:8px;">
+        <button class="btn" id="setRhoNeg1" style="font-size:11px; padding:6px;">ρ → −1</button>
+        <button class="btn" id="setRho0" style="font-size:11px; padding:6px;">ρ → 0</button>
+      </div>
+      <div class="row2">
+        <button class="btn" id="setRhoPos1" style="font-size:11px; padding:6px;">ρ → +1</button>
+        <button class="btn" id="resetPairs" style="font-size:11px; padding:6px;">Reset pairs</button>
+      </div>
+      <div class="pair-list" id="pairList"></div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Monte Carlo (optional)</h4>
+      <div class="toggle-row">
+        <span>Enable MC distribution</span>
+        <label class="switch"><input type="checkbox" id="enableMC" checked><span class="slider-tog"></span></label>
+      </div>
+      <div class="field" style="margin-top:8px;">
+        <div class="field-label"><span>MC paths</span><span class="val" id="v_mcPaths">5000</span></div>
+        <input type="range" id="mcPaths" min="500" max="15000" step="500" value="5000">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Horizon (years)</span><span class="val" id="v_horizon">1.0</span></div>
+        <input type="range" id="horizon" min="0.25" max="5" step="0.25" value="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Random seed</span></div>
+        <input type="text" id="seed" value="42">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="runBtn">▶ Compute</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+
+    <div class="status-line" id="statusLine">
+      Ready. Adjust parameters and click <b>Compute</b>.
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Quantitative Finance · Portfolio Theory</div>
+      <h1 class="page-title">Correlation &amp; Portfolio Diversification Lab</h1>
+      <p class="page-desc">
+        Interactive laboratory for the classic mean–variance identities
+        <span style="font-family:var(--mono); color:var(--accent);">μ<sub>p</sub> = w′μ</span>
+        and
+        <span style="font-family:var(--mono); color:var(--accent);">σ<sub>p</sub> = √(w′Σw)</span>.
+        Move the global correlation slider toward −1, 0, and +1 to watch diversification appear and vanish.
+        All metrics and charts recompute from the live covariance matrix.
+      </p>
+    </div>
+
+    <!-- KPIs -->
+    <section class="section" id="sec-kpi">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Portfolio KPIs</span></div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <!-- Correlation heatmap -->
+    <section class="section" id="sec-corr">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Correlation Matrix</span></div>
+      <p class="section-desc">Heatmap of pairwise correlations ρ<sub>ij</sub>. Diagonal is always 1. Off-diagonal values are driven by the global slider and any pair overrides.</p>
+      <div class="card">
+        <div class="matrix-warn" id="matrixWarn">⚠ Covariance matrix is not positive semi-definite. Pairwise correlations were projected onto the nearest usable PSD matrix for variance calculations.</div>
+        <div class="matrix-ok" id="matrixOk">✓ Correlation / covariance matrix is positive semi-definite (eigenvalues ≥ 0).</div>
+        <div id="corrHeatmap" style="width:100%; height:420px;"></div>
+      </div>
+    </section>
+
+    <!-- Vol vs correlation -->
+    <section class="section" id="sec-volrho">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Portfolio Volatility vs Correlation</span></div>
+      <p class="section-desc">Sweep ρ from −1 to +1 (holding weights and asset vols fixed) and plot σ<sub>p</sub>(ρ). The horizontal line is the weighted-average asset volatility — the diversification gap is the vertical distance below that line.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-dot" style="background:var(--accent);"></span>Portfolio volatility σ<sub>p</sub></span>
+          <span><span class="legend-dot" style="background:var(--accent-warn);"></span>Weighted avg asset vol Σ wᵢσᵢ</span>
+          <span><span class="legend-dot" style="background:var(--accent-blue);"></span>Current ρ</span>
+        </div>
+        <div id="volRhoChart" style="width:100%; height:380px;"></div>
+      </div>
+    </section>
+
+    <!-- Risk contribution -->
+    <section class="section" id="sec-rc">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Risk Contribution</span></div>
+      <p class="section-desc">Marginal and component risk contributions. Component RC<sub>i</sub> = wᵢ · (Σw)ᵢ / σ<sub>p</sub> so that Σ RC<sub>i</sub> = σ<sub>p</sub>. Percent of risk can differ sharply from weight when correlations and vols are uneven.</p>
+      <div class="two-col">
+        <div class="card">
+          <div id="rcChart" style="width:100%; height:360px;"></div>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <thead>
+              <tr><th>Asset</th><th>Weight</th><th>σᵢ</th><th>RC</th><th>% Risk</th></tr>
+            </thead>
+            <tbody id="rcTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Asset table -->
+    <section class="section" id="sec-assets">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Asset Inputs &amp; Portfolio Math</span></div>
+      <div class="card">
+        <table class="data-table">
+          <thead>
+            <tr><th>Asset</th><th>μ (ann.)</th><th>σ (ann.)</th><th>Weight</th><th>w·μ</th></tr>
+          </thead>
+          <tbody id="assetTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Monte Carlo -->
+    <section class="section" id="sec-mc">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Monte Carlo Portfolio Return Distribution</span></div>
+      <p class="section-desc">Optional Gaussian multi-asset simulation over horizon T using the current mean vector and (PSD-projected) covariance. Terminal portfolio returns R<sub>p</sub> = w′R are histogrammed.</p>
+      <div class="card">
+        <div id="mcChart" style="width:100%; height:380px;"></div>
+        <div class="grid grid-4" style="margin-top:14px;" id="mcKpiGrid"></div>
+      </div>
+    </section>
+
+    <!-- Diversification demo -->
+    <section class="section" id="sec-demo">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Diversification at ρ = −1, 0, +1</span></div>
+      <p class="section-desc">Same weights and volatilities, three extreme correlation regimes. When ρ → +1, portfolio vol approaches the weighted average of asset vols. When ρ → −1 (two-asset case), perfect hedging can drive risk toward zero.</p>
+      <div class="card">
+        <table class="data-table">
+          <thead>
+            <tr><th>Regime</th><th>σ<sub>p</sub></th><th>Weighted avg σ</th><th>Diversification benefit</th><th>σ<sub>p</sub> / avg σ</th></tr>
+          </thead>
+          <tbody id="regimeTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Formulas -->
+    <section class="section" id="sec-formulas">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Portfolio expected return</div>
+        <div class="f-math">μ<sub>p</sub> = w′μ = Σ<sub>i</sub> wᵢ μᵢ</div>
+        <div class="f-note">Linear in weights — diversification does not change the weighted average of expected returns.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Portfolio variance</div>
+        <div class="f-math">σ<sub>p</sub>² = w′Σw = Σ<sub>i</sub> Σ<sub>j</sub> wᵢ wⱼ Cov(rᵢ, rⱼ)</div>
+        <div class="f-note">Quadratic form. Off-diagonal covariances are the entire diversification mechanism.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Portfolio volatility</div>
+        <div class="f-math">σ<sub>p</sub> = √(w′Σw)</div>
+        <div class="f-note">Not equal to Σ wᵢσᵢ in general. Equality holds only in the limit ρ<sub>ij</sub> → 1 for all pairs (or a single-asset portfolio).</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Correlation ↔ covariance</div>
+        <div class="f-math">Cov(rᵢ, rⱼ) = ρ<sub>ij</sub> σᵢ σⱼ &nbsp;&nbsp;·&nbsp;&nbsp; ρ<sub>ij</sub> = Cov(rᵢ, rⱼ) / (σᵢ σⱼ)</div>
+        <div class="f-note">Correlation is the scale-free version of covariance; both live in the covariance matrix Σ.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Component risk contribution</div>
+        <div class="f-math">RCᵢ = wᵢ · (Σw)ᵢ / σ<sub>p</sub> &nbsp;&nbsp;·&nbsp;&nbsp; Σᵢ RCᵢ = σ<sub>p</sub></div>
+        <div class="f-note">Euler allocation of portfolio risk. Percent of risk = RCᵢ / σ<sub>p</sub>.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Diversification benefit</div>
+        <div class="f-math">Benefit = (Σᵢ wᵢ σᵢ) − σ<sub>p</sub></div>
+        <div class="f-note">How much volatility is “saved” relative to a perfect-correlation benchmark with the same weights.</div>
+      </div>
+    </section>
+
+    <!-- Education -->
+    <section class="section" id="sec-edu">
+      <div class="section-head"><span class="section-num">09</span><span class="section-title">Educational Explanation</span></div>
+      <details class="disclosure" open>
+        <summary>Covariance, correlation, and the matrix Σ</summary>
+        <div class="disclosure-body">
+          <p><b style="color:var(--text);">Covariance</b> measures co-movement in the same units as variance (return²). Positive covariance means assets tend to move together; negative means they move opposite.</p>
+          <p><b style="color:var(--text);">Correlation</b> rescales covariance into [−1, +1]. ρ = +1 is perfect lockstep; ρ = −1 is perfect opposition; ρ = 0 is linear independence (not necessarily statistical independence).</p>
+          <p>The <b style="color:var(--text);">covariance matrix</b> Σ stacks every pairwise Cov(rᵢ, rⱼ). It must be symmetric and positive semi-definite (all eigenvalues ≥ 0) for portfolio variance to be non-negative for every weight vector. This lab projects invalid matrices onto the nearest PSD matrix when needed.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Why weighted-average volatility is not portfolio volatility</summary>
+        <div class="disclosure-body">
+          <p>Expected return is linear: μ<sub>p</sub> = Σ wᵢμᵢ. Volatility is not. Expanding σ<sub>p</sub>² = Σᵢ wᵢ²σᵢ² + Σ<sub>i≠j</sub> wᵢwⱼρ<sub>ij</sub>σᵢσⱼ shows the cross terms. When ρ<sub>ij</sub> &lt; 1 those terms shrink variance relative to the all-ρ=1 case, which collapses exactly to (Σ wᵢσᵢ)².</p>
+          <p>Hence σ<sub>p</sub> ≤ Σ wᵢσᵢ, with equality only under perfect positive correlation (or degenerate portfolios). That gap is the diversification benefit.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>What happens as ρ → −1, 0, +1</summary>
+        <div class="disclosure-body">
+          <ul>
+            <li><b style="color:var(--text);">ρ → +1</b> — assets behave like scaled copies of one risk factor. Diversification disappears; σ<sub>p</sub> approaches the weighted average of asset vols.</li>
+            <li><b style="color:var(--text);">ρ → 0</b> — linear co-movement vanishes. Variance is dominated by the diagonal terms Σ wᵢ²σᵢ²; risk falls materially below the weighted average.</li>
+            <li><b style="color:var(--text);">ρ → −1</b> — (especially with two assets) offsets can cancel. In the classic two-asset case with equal vol and equal weight, σ<sub>p</sub> → 0. With more than two assets a single common ρ = −1 is often not PSD; the lab projects to the nearest usable matrix.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Process vs strategy — a caution</summary>
+        <div class="disclosure-body">
+          <p>These identities describe statistical risk under a fixed mean vector and covariance. They are not a trading strategy. Realized correlations change in stress (often rising toward +1), expected returns are estimated with error, and leverage, costs, and constraints alter the outcome. The lab is a sandbox for the math of diversification, not a portfolio recommendation.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational mean–variance tool. All figures are generated from the parameters you select. Scenario presets are illustrative. Covariance matrices that are not positive semi-definite are projected for numerical usability. Nothing here constitutes investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   CORRELATION & PORTFOLIO DIVERSIFICATION LAB
+   ===================================================================== */
+
+const ASSET_NAMES = ['A','B','C','D','E','F','G','H'];
+const ASSET_COLORS = ['#17E3B5','#5B8DEF','#A78BFA','#F5A623','#EF5B5B','#3DD68C','#60A5FA','#F472B6'];
+
+/* Default asset params: mu (%), sigma (%), weight (%) */
+const DEFAULT_ASSETS = [
+  { mu: 8,  sigma: 12, w: 20 },
+  { mu: 10, sigma: 18, w: 20 },
+  { mu: 6,  sigma: 10, w: 15 },
+  { mu: 12, sigma: 22, w: 15 },
+  { mu: 7,  sigma: 14, w: 15 },
+  { mu: 9,  sigma: 16, w: 15 },
+  { mu: 5,  sigma: 9,  w: 10 },
+  { mu: 11, sigma: 20, w: 10 },
+];
+
+let state = {
+  n: 6,
+  assets: [],
+  globalRho: 0.30,
+  pairOverrides: {}, // key "i,j" (i<j) -> rho
+  activeAsset: 0,
+  lastMetrics: null,
+};
+
+function initAssets(n) {
+  state.n = n;
+  state.assets = [];
+  for (let i = 0; i < n; i++) {
+    const d = DEFAULT_ASSETS[i] || { mu: 8, sigma: 15, w: 100 / n };
+    state.assets.push({ mu: d.mu, sigma: d.sigma, w: d.w });
+  }
+  renormalizeWeights();
+  state.pairOverrides = {};
+  state.activeAsset = 0;
+}
+
+function renormalizeWeights() {
+  const sum = state.assets.reduce((s, a) => s + a.w, 0);
+  if (sum <= 0) {
+    const eq = 100 / state.n;
+    state.assets.forEach(a => a.w = eq);
+  } else {
+    state.assets.forEach(a => { a.w = (a.w / sum) * 100; });
+  }
+}
+
+/* ---------- Matrix helpers ---------- */
+function buildCorrMatrix() {
+  const n = state.n;
+  const C = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    C[i][i] = 1;
+    for (let j = i + 1; j < n; j++) {
+      const key = i + ',' + j;
+      let rho = (key in state.pairOverrides) ? state.pairOverrides[key] : state.globalRho;
+      rho = Math.max(-0.999, Math.min(0.999, rho));
+      C[i][j] = C[j][i] = rho;
+    }
+  }
+  return C;
+}
+
+function corrToCov(C) {
+  const n = state.n;
+  const sig = state.assets.map(a => a.sigma / 100);
+  const Sigma = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      Sigma[i][j] = C[i][j] * sig[i] * sig[j];
+    }
+  }
+  return Sigma;
+}
+
+/* Symmetric eigen-decomposition via Jacobi (sufficient for n ≤ 8) */
+function jacobiEigen(Ain) {
+  const n = Ain.length;
+  const A = Ain.map(row => row.slice());
+  const V = Array.from({ length: n }, (_, i) => {
+    const r = Array(n).fill(0); r[i] = 1; return r;
+  });
+  const maxIter = 40;
+  for (let iter = 0; iter < maxIter; iter++) {
+    let maxVal = 0, p = 0, q = 1;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const v = Math.abs(A[i][j]);
+        if (v > maxVal) { maxVal = v; p = i; q = j; }
+      }
+    }
+    if (maxVal < 1e-12) break;
+    const app = A[p][p], aqq = A[q][q], apq = A[p][q];
+    const phi = 0.5 * Math.atan2(2 * apq, aqq - app);
+    const c = Math.cos(phi), s = Math.sin(phi);
+    for (let i = 0; i < n; i++) {
+      if (i !== p && i !== q) {
+        const aip = A[i][p], aiq = A[i][q];
+        A[i][p] = A[p][i] = c * aip - s * aiq;
+        A[i][q] = A[q][i] = s * aip + c * aiq;
+      }
+    }
+    A[p][p] = c * c * app - 2 * s * c * apq + s * s * aqq;
+    A[q][q] = s * s * app + 2 * s * c * apq + c * c * aqq;
+    A[p][q] = A[q][p] = 0;
+    for (let i = 0; i < n; i++) {
+      const vip = V[i][p], viq = V[i][q];
+      V[i][p] = c * vip - s * viq;
+      V[i][q] = s * vip + c * viq;
+    }
+  }
+  const eig = [];
+  for (let i = 0; i < n; i++) eig.push({ value: A[i][i], vector: V.map(row => row[i]) });
+  eig.sort((a, b) => b.value - a.value);
+  return eig;
+}
+
+function projectPSD(Sigma) {
+  const eig = jacobiEigen(Sigma);
+  const n = Sigma.length;
+  let minEig = Infinity;
+  eig.forEach(e => { if (e.value < minEig) minEig = e.value; });
+  const wasPSD = minEig >= -1e-10;
+  // Reconstruct with max(eig, 0)
+  const out = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let k = 0; k < n; k++) {
+    const lam = Math.max(eig[k].value, 0);
+    const v = eig[k].vector;
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        out[i][j] += lam * v[i] * v[j];
+      }
+    }
+  }
+  // Symmetrize
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const avg = 0.5 * (out[i][j] + out[j][i]);
+      out[i][j] = out[j][i] = avg;
+    }
+  }
+  return { Sigma: out, wasPSD, minEig };
+}
+
+function covToCorr(Sigma) {
+  const n = Sigma.length;
+  const C = Array.from({ length: n }, () => Array(n).fill(0));
+  const s = Sigma.map((row, i) => Math.sqrt(Math.max(row[i], 0)));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      C[i][j] = (s[i] > 0 && s[j] > 0) ? Sigma[i][j] / (s[i] * s[j]) : (i === j ? 1 : 0);
+    }
+    C[i][i] = 1;
+  }
+  return C;
+}
+
+/* ---------- Portfolio math ---------- */
+function portfolioMetrics(Sigma) {
+  const n = state.n;
+  const w = state.assets.map(a => a.w / 100);
+  const mu = state.assets.map(a => a.mu / 100);
+  const sig = state.assets.map(a => a.sigma / 100);
+
+  let muP = 0;
+  for (let i = 0; i < n; i++) muP += w[i] * mu[i];
+
+  // Sigma w
+  const Sw = Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) Sw[i] += Sigma[i][j] * w[j];
+  }
+  let varP = 0;
+  for (let i = 0; i < n; i++) varP += w[i] * Sw[i];
+  varP = Math.max(varP, 0);
+  const sigP = Math.sqrt(varP);
+
+  let weightedVol = 0;
+  for (let i = 0; i < n; i++) weightedVol += w[i] * sig[i];
+
+  const benefit = weightedVol - sigP;
+  const ratio = weightedVol > 0 ? sigP / weightedVol : 1;
+
+  // Risk contributions
+  const RC = Sw.map((v, i) => (sigP > 1e-12 ? (w[i] * v) / sigP : 0));
+  const pctRisk = RC.map(r => (sigP > 1e-12 ? r / sigP : 0));
+
+  return { muP, sigP, varP, weightedVol, benefit, ratio, w, mu, sig, Sw, RC, pctRisk };
+}
+
+function volAtRho(rho) {
+  // Temporary equal-correlation matrix, PSD-projected
+  const n = state.n;
+  const C = Array.from({ length: n }, () => Array(n).fill(rho));
+  for (let i = 0; i < n; i++) C[i][i] = 1;
+  let Sigma = corrToCov(C);
+  const proj = projectPSD(Sigma);
+  return portfolioMetrics(proj.Sigma).sigP;
+}
+
+/* ---------- RNG for MC ---------- */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeNormal(rng) {
+  let spare = null;
+  return function () {
+    if (spare !== null) { const v = spare; spare = null; return v; }
+    let u, v, s;
+    do { u = rng()*2-1; v = rng()*2-1; s = u*u+v*v; } while (s >= 1 || s === 0);
+    const mul = Math.sqrt(-2 * Math.log(s) / s);
+    spare = v * mul;
+    return u * mul;
+  };
+}
+
+/* Cholesky of PSD matrix (with tiny jitter if needed) */
+function cholesky(S) {
+  const n = S.length;
+  const L = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      let sum = 0;
+      for (let k = 0; k < j; k++) sum += L[i][k] * L[j][k];
+      if (i === j) {
+        const v = S[i][i] - sum;
+        L[i][j] = Math.sqrt(Math.max(v, 0));
+      } else {
+        L[i][j] = L[j][j] > 1e-14 ? (S[i][j] - sum) / L[j][j] : 0;
+      }
+    }
+  }
+  return L;
+}
+
+function runMonteCarlo(Sigma, muP, sigP, paths, T, seed) {
+  const n = state.n;
+  const w = state.assets.map(a => a.w / 100);
+  const mu = state.assets.map(a => a.mu / 100);
+  // Annual means / cov → scale to horizon T (simple, non-compounded Gaussian returns)
+  const muT = mu.map(m => m * T);
+  const SigmaT = Sigma.map(row => row.map(v => v * T));
+  const L = cholesky(SigmaT);
+  const rng = mulberry32(seed);
+  const normal = makeNormal(rng);
+  const portR = new Float64Array(paths);
+  for (let p = 0; p < paths; p++) {
+    const z = Array(n);
+    for (let i = 0; i < n; i++) z[i] = normal();
+    // r = muT + L z
+    let rp = 0;
+    for (let i = 0; i < n; i++) {
+      let ri = muT[i];
+      for (let k = 0; k <= i; k++) ri += L[i][k] * z[k];
+      rp += w[i] * ri;
+    }
+    portR[p] = rp;
+  }
+  return portR;
+}
+
+/* ---------- Stats helpers ---------- */
+function mean(arr) {
+  let s = 0; for (let i = 0; i < arr.length; i++) s += arr[i];
+  return s / arr.length;
+}
+function stdev(arr, m) {
+  if (m === undefined) m = mean(arr);
+  let s = 0; for (let i = 0; i < arr.length; i++) { const d = arr[i]-m; s += d*d; }
+  return Math.sqrt(s / Math.max(arr.length - 1, 1));
+}
+function sortedCopy(arr) {
+  const c = Array.from(arr); c.sort((a,b)=>a-b); return c;
+}
+function percentileSorted(sorted, p) {
+  const n = sorted.length;
+  if (!n) return NaN;
+  const idx = (p/100)*(n-1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo]*(1-(idx-lo)) + sorted[hi]*(idx-lo);
+}
+function fmtPct(x, d=2) {
+  if (!isFinite(x)) return '—';
+  return (x*100).toFixed(d) + '%';
+}
+function fmtNum(x, d=2) {
+  if (!isFinite(x)) return '—';
+  return x.toFixed(d);
+}
+
+/* ---------- UI: asset editors ---------- */
+function renderAssetTabs() {
+  const el = document.getElementById('assetTabs');
+  el.innerHTML = '';
+  for (let i = 0; i < state.n; i++) {
+    const b = document.createElement('button');
+    b.className = 'asset-tab' + (i === state.activeAsset ? ' active' : '');
+    b.textContent = ASSET_NAMES[i];
+    b.style.borderColor = i === state.activeAsset ? ASSET_COLORS[i] : '';
+    b.style.color = i === state.activeAsset ? ASSET_COLORS[i] : '';
+    b.onclick = () => { state.activeAsset = i; renderAssetTabs(); renderAssetEditor(); };
+    el.appendChild(b);
+  }
+}
+
+function renderAssetEditor() {
+  const i = state.activeAsset;
+  const a = state.assets[i];
+  const el = document.getElementById('assetEditors');
+  el.innerHTML = `
+    <div class="field">
+      <div class="field-label"><span>Expected return μ (${ASSET_NAMES[i]})</span><span class="val" id="v_mu">${a.mu.toFixed(1)}%</span></div>
+      <input type="range" id="ed_mu" min="-5" max="25" step="0.5" value="${a.mu}">
+    </div>
+    <div class="field">
+      <div class="field-label"><span>Volatility σ</span><span class="val" id="v_sig">${a.sigma.toFixed(1)}%</span></div>
+      <input type="range" id="ed_sig" min="1" max="50" step="0.5" value="${a.sigma}">
+    </div>
+    <div class="field">
+      <div class="field-label"><span>Weight</span><span class="val" id="v_w">${a.w.toFixed(1)}%</span></div>
+      <input type="range" id="ed_w" min="0" max="100" step="0.5" value="${a.w}">
+    </div>
+  `;
+  document.getElementById('ed_mu').oninput = (e) => {
+    state.assets[i].mu = parseFloat(e.target.value);
+    document.getElementById('v_mu').textContent = state.assets[i].mu.toFixed(1) + '%';
+    scheduleCompute();
+  };
+  document.getElementById('ed_sig').oninput = (e) => {
+    state.assets[i].sigma = parseFloat(e.target.value);
+    document.getElementById('v_sig').textContent = state.assets[i].sigma.toFixed(1) + '%';
+    scheduleCompute();
+  };
+  document.getElementById('ed_w').oninput = (e) => {
+    state.assets[i].w = parseFloat(e.target.value);
+    renormalizeWeights();
+    document.getElementById('v_w').textContent = state.assets[i].w.toFixed(1) + '%';
+    // refresh displayed weight after renorm
+    document.getElementById('ed_w').value = state.assets[i].w;
+    scheduleCompute();
+  };
+}
+
+function renderPairList() {
+  const el = document.getElementById('pairList');
+  el.innerHTML = '';
+  for (let i = 0; i < state.n; i++) {
+    for (let j = i + 1; j < state.n; j++) {
+      const key = i + ',' + j;
+      const rho = (key in state.pairOverrides) ? state.pairOverrides[key] : state.globalRho;
+      const row = document.createElement('div');
+      row.className = 'pair-row';
+      row.innerHTML = `
+        <span class="pair-name">${ASSET_NAMES[i]}–${ASSET_NAMES[j]}</span>
+        <input type="range" min="-0.95" max="0.95" step="0.05" value="${rho}" data-key="${key}">
+        <span class="pair-val">${rho.toFixed(2)}</span>
+      `;
+      const input = row.querySelector('input');
+      const val = row.querySelector('.pair-val');
+      input.oninput = () => {
+        const v = parseFloat(input.value);
+        state.pairOverrides[key] = v;
+        val.textContent = v.toFixed(2);
+        scheduleCompute();
+      };
+      el.appendChild(row);
+    }
+  }
+}
+
+/* ---------- Compute & render ---------- */
+let computeTimer = null;
+function scheduleCompute() {
+  clearTimeout(computeTimer);
+  computeTimer = setTimeout(computeAll, 60);
+}
+
+function showLoading(t) {
+  document.getElementById('loadingText').textContent = t || 'Computing…';
+  document.getElementById('loadingOverlay').classList.add('active');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+function plotlyReady() {
+  return typeof Plotly !== 'undefined';
+}
+
+function plotlyLayoutBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8A93A6', size: 11 },
+    margin: { l: 55, r: 20, t: 24, b: 44 },
+    xaxis: { gridcolor: '#1a2230', zerolinecolor: '#212a3a', linecolor: '#212a3a' },
+    yaxis: { gridcolor: '#1a2230', zerolinecolor: '#212a3a', linecolor: '#212a3a' },
+    legend: { orientation: 'h', y: 1.1, font: { color: '#8A93A6' } },
+    hoverlabel: { bgcolor: '#161d2b', bordercolor: '#212a3a', font: { color: '#E7EAF0', family: 'JetBrains Mono, monospace' } },
+  }, extra || {});
+}
+const PLOTLY_CONFIG = { displayModeBar: false, responsive: true };
+
+function computeAll() {
+  const enableMC = document.getElementById('enableMC').checked;
+  if (enableMC) showLoading('Running Monte Carlo…');
+  setTimeout(() => {
+    const t0 = performance.now();
+    const Craw = buildCorrMatrix();
+    const SigmaRaw = corrToCov(Craw);
+    const proj = projectPSD(SigmaRaw);
+    const Sigma = proj.Sigma;
+    const Cused = covToCorr(Sigma);
+    const metrics = portfolioMetrics(Sigma);
+    metrics.wasPSD = proj.wasPSD;
+    metrics.minEig = proj.minEig;
+    metrics.C = Cused;
+    metrics.Craw = Craw;
+    metrics.Sigma = Sigma;
+
+    // Vol vs rho curve
+    const rhos = [];
+    const vols = [];
+    for (let r = -1; r <= 1.001; r += 0.05) {
+      const rr = Math.max(-0.999, Math.min(0.999, r));
+      rhos.push(+rr.toFixed(3));
+      vols.push(volAtRho(rr));
+    }
+    metrics.rhoSweep = { rhos, vols };
+
+    // Regime table
+    metrics.regimes = [
+      { name: 'ρ → −1', rho: -0.999 },
+      { name: 'ρ → 0', rho: 0 },
+      { name: 'ρ → +1', rho: 0.999 },
+      { name: 'Current', rho: null },
+    ].map(reg => {
+      let sigP, weightedVol;
+      if (reg.rho === null) {
+        sigP = metrics.sigP; weightedVol = metrics.weightedVol;
+      } else {
+        const s = volAtRho(reg.rho);
+        sigP = s; weightedVol = metrics.weightedVol;
+      }
+      return {
+        name: reg.name,
+        sigP,
+        weightedVol,
+        benefit: weightedVol - sigP,
+        ratio: weightedVol > 0 ? sigP / weightedVol : 1
+      };
+    });
+
+    // Monte Carlo
+    metrics.mc = null;
+    if (enableMC) {
+      let seedVal = parseInt(document.getElementById('seed').value, 10);
+      if (!Number.isFinite(seedVal)) {
+        seedVal = 0;
+        const str = String(document.getElementById('seed').value || 'seed');
+        for (let i = 0; i < str.length; i++) seedVal = (seedVal * 31 + str.charCodeAt(i)) >>> 0;
+      }
+      const paths = parseInt(document.getElementById('mcPaths').value, 10);
+      const T = parseFloat(document.getElementById('horizon').value);
+      const portR = runMonteCarlo(Sigma, metrics.muP, metrics.sigP, paths, T, seedVal >>> 0);
+      const sorted = sortedCopy(portR);
+      const m = mean(portR);
+      const s = stdev(portR, m);
+      metrics.mc = {
+        returns: portR,
+        mean: m,
+        std: s,
+        p5: percentileSorted(sorted, 5),
+        p50: percentileSorted(sorted, 50),
+        p95: percentileSorted(sorted, 95),
+        T, paths
+      };
+    }
+
+    state.lastMetrics = metrics;
+    const t1 = performance.now();
+    document.getElementById('statusLine').innerHTML =
+      `Computed <b>${state.n}</b> assets · σ<sub>p</sub> = <b>${fmtPct(metrics.sigP)}</b> · ` +
+      `benefit = <b>${fmtPct(metrics.benefit)}</b><br>Time: <b>${(t1-t0).toFixed(0)} ms</b>` +
+      (proj.wasPSD ? '' : ' · <span style="color:var(--accent-warn)">PSD projection applied</span>');
+
+    renderAll();
+    hideLoading();
+  }, enableMC ? 20 : 0);
+}
+
+function kpiCard(label, value, sub, cls) {
+  return `<div class="kpi ${cls||''}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    <div class="kpi-sub">${sub||''}</div>
+  </div>`;
+}
+
+function renderAll() {
+  const m = state.lastMetrics;
+  if (!m) return;
+
+  // Matrix status
+  document.getElementById('matrixWarn').classList.toggle('show', !m.wasPSD);
+  document.getElementById('matrixOk').classList.toggle('show', m.wasPSD);
+
+  // KPIs
+  document.getElementById('kpiGrid').innerHTML = [
+    kpiCard('Portfolio return μₚ', fmtPct(m.muP), 'w′μ · annualized'),
+    kpiCard('Portfolio volatility σₚ', fmtPct(m.sigP), '√(w′Σw)', 'blue'),
+    kpiCard('Weighted avg asset vol', fmtPct(m.weightedVol), 'Σ wᵢσᵢ · no diversification', 'warn'),
+    kpiCard('Diversification benefit', fmtPct(m.benefit), `σₚ is ${(m.ratio*100).toFixed(1)}% of weighted avg`, m.benefit > 0.001 ? '' : 'loss'),
+  ].join('');
+
+  // Asset table
+  let rows = '';
+  for (let i = 0; i < state.n; i++) {
+    const a = state.assets[i];
+    rows += `<tr>
+      <td style="color:${ASSET_COLORS[i]}">${ASSET_NAMES[i]}</td>
+      <td>${a.mu.toFixed(1)}%</td>
+      <td>${a.sigma.toFixed(1)}%</td>
+      <td>${a.w.toFixed(1)}%</td>
+      <td>${(a.w/100 * a.mu).toFixed(2)}%</td>
+    </tr>`;
+  }
+  rows += `<tr style="font-weight:600">
+    <td>Portfolio</td><td>${fmtPct(m.muP)}</td><td>${fmtPct(m.sigP)}</td><td>100%</td><td>${fmtPct(m.muP)}</td>
+  </tr>`;
+  document.getElementById('assetTableBody').innerHTML = rows;
+
+  // Risk contribution table
+  let rcRows = '';
+  for (let i = 0; i < state.n; i++) {
+    rcRows += `<tr>
+      <td style="color:${ASSET_COLORS[i]}">${ASSET_NAMES[i]}</td>
+      <td>${(m.w[i]*100).toFixed(1)}%</td>
+      <td>${(m.sig[i]*100).toFixed(1)}%</td>
+      <td>${fmtPct(m.RC[i])}</td>
+      <td>${fmtPct(m.pctRisk[i])}</td>
+    </tr>`;
+  }
+  document.getElementById('rcTableBody').innerHTML = rcRows;
+
+  // Regime table
+  document.getElementById('regimeTableBody').innerHTML = m.regimes.map(r =>
+    `<tr>
+      <td>${r.name}</td>
+      <td>${fmtPct(r.sigP)}</td>
+      <td>${fmtPct(r.weightedVol)}</td>
+      <td>${fmtPct(r.benefit)}</td>
+      <td>${(r.ratio*100).toFixed(1)}%</td>
+    </tr>`
+  ).join('');
+
+  if (plotlyReady()) {
+    renderHeatmap(m);
+    renderVolRho(m);
+    renderRC(m);
+    renderMC(m);
+  }
+}
+
+function renderHeatmap(m) {
+  const n = state.n;
+  const labels = ASSET_NAMES.slice(0, n);
+  const z = m.C;
+  const text = z.map(row => row.map(v => v.toFixed(2)));
+  const trace = {
+    z, x: labels, y: labels,
+    type: 'heatmap',
+    colorscale: [
+      [0, '#EF5B5B'],
+      [0.5, '#1a2230'],
+      [1, '#17E3B5']
+    ],
+    zmin: -1, zmax: 1,
+    text, texttemplate: '%{text}',
+    textfont: { family: 'JetBrains Mono, monospace', size: 12, color: '#E7EAF0' },
+    hovertemplate: 'ρ(%{y},%{x}) = %{z:.3f}<extra></extra>',
+    showscale: true,
+    colorbar: { thickness: 12, tickfont: { color: '#8A93A6', size: 10 } }
+  };
+  Plotly.newPlot('corrHeatmap', [trace], plotlyLayoutBase({
+    margin: { l: 40, r: 20, t: 10, b: 40 },
+    xaxis: { side: 'bottom', gridcolor: '#1a2230', linecolor: '#212a3a' },
+    yaxis: { autorange: 'reversed', gridcolor: '#1a2230', linecolor: '#212a3a' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderVolRho(m) {
+  const avgLine = m.rhoSweep.rhos.map(() => m.weightedVol * 100);
+  const traces = [
+    {
+      x: m.rhoSweep.rhos,
+      y: m.rhoSweep.vols.map(v => v * 100),
+      mode: 'lines',
+      name: 'σₚ(ρ)',
+      line: { color: '#17E3B5', width: 2.5 }
+    },
+    {
+      x: m.rhoSweep.rhos,
+      y: avgLine,
+      mode: 'lines',
+      name: 'Σ wᵢσᵢ',
+      line: { color: '#F5A623', width: 1.8, dash: 'dash' }
+    },
+  ];
+  // Current rho marker — approximate from average off-diagonal of raw C
+  let sumRho = 0, cnt = 0;
+  for (let i = 0; i < state.n; i++) {
+    for (let j = i + 1; j < state.n; j++) {
+      sumRho += m.Craw[i][j]; cnt++;
+    }
+  }
+  const avgRho = cnt ? sumRho / cnt : 0;
+  traces.push({
+    x: [avgRho],
+    y: [m.sigP * 100],
+    mode: 'markers',
+    name: 'Current',
+    marker: { color: '#5B8DEF', size: 12, symbol: 'diamond', line: { color: '#E7EAF0', width: 1 } }
+  });
+
+  Plotly.newPlot('volRhoChart', traces, plotlyLayoutBase({
+    xaxis: { title: 'Common correlation ρ', gridcolor: '#1a2230', linecolor: '#212a3a', range: [-1.05, 1.05] },
+    yaxis: { title: 'Volatility (%)', gridcolor: '#1a2230', linecolor: '#212a3a' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderRC(m) {
+  const labels = ASSET_NAMES.slice(0, state.n);
+  const traces = [
+    {
+      x: labels,
+      y: m.w.map(v => v * 100),
+      type: 'bar',
+      name: 'Weight %',
+      marker: { color: 'rgba(91,141,239,0.55)' }
+    },
+    {
+      x: labels,
+      y: m.pctRisk.map(v => v * 100),
+      type: 'bar',
+      name: '% of risk',
+      marker: { color: 'rgba(23,227,181,0.7)' }
+    }
+  ];
+  Plotly.newPlot('rcChart', traces, plotlyLayoutBase({
+    barmode: 'group',
+    xaxis: { title: 'Asset', gridcolor: '#1a2230', linecolor: '#212a3a' },
+    yaxis: { title: '%', gridcolor: '#1a2230', linecolor: '#212a3a' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderMC(m) {
+  if (!m.mc) {
+    Plotly.purge('mcChart');
+    document.getElementById('mcKpiGrid').innerHTML = '<div class="hint">Monte Carlo disabled — enable in the sidebar.</div>';
+    return;
+  }
+  const mc = m.mc;
+  const traces = [{
+    x: Array.from(mc.returns).map(r => r * 100),
+    type: 'histogram',
+    nbinsx: 50,
+    marker: { color: 'rgba(23,227,181,0.55)', line: { color: '#17E3B5', width: 0.5 } },
+    name: 'Portfolio return'
+  }];
+  const shapes = [
+    { type: 'line', x0: mc.mean*100, x1: mc.mean*100, y0: 0, y1: 1, yref: 'paper', line: { color: '#F5A623', width: 1.5, dash: 'dash' } },
+    { type: 'line', x0: mc.p5*100, x1: mc.p5*100, y0: 0, y1: 1, yref: 'paper', line: { color: '#EF5B5B', width: 1.2, dash: 'dot' } },
+    { type: 'line', x0: mc.p95*100, x1: mc.p95*100, y0: 0, y1: 1, yref: 'paper', line: { color: '#3DD68C', width: 1.2, dash: 'dot' } },
+  ];
+  Plotly.newPlot('mcChart', traces, plotlyLayoutBase({
+    xaxis: { title: `Portfolio return over T=${mc.T}y (%)`, gridcolor: '#1a2230', linecolor: '#212a3a' },
+    yaxis: { title: 'Count', gridcolor: '#1a2230', linecolor: '#212a3a' },
+    shapes,
+    annotations: [
+      { x: mc.mean*100, y: 1, yref: 'paper', text: 'mean', showarrow: false, font: { color: '#F5A623', size: 10 }, yshift: 10 },
+      { x: mc.p5*100, y: 1, yref: 'paper', text: '5%', showarrow: false, font: { color: '#EF5B5B', size: 10 }, yshift: 10 },
+      { x: mc.p95*100, y: 1, yref: 'paper', text: '95%', showarrow: false, font: { color: '#3DD68C', size: 10 }, yshift: 10 },
+    ]
+  }), PLOTLY_CONFIG);
+
+  document.getElementById('mcKpiGrid').innerHTML = [
+    kpiCard('MC mean return', fmtPct(mc.mean), `${mc.paths.toLocaleString()} paths · T=${mc.T}y`),
+    kpiCard('MC volatility', fmtPct(mc.std), 'std of simulated Rₚ', 'blue'),
+    kpiCard('5th percentile', fmtPct(mc.p5), 'left tail', 'loss'),
+    kpiCard('95th percentile', fmtPct(mc.p95), 'right tail'),
+  ].join('');
+}
+
+/* ---------- Wiring ---------- */
+function syncGlobalLabels() {
+  document.getElementById('v_nAssets').textContent = document.getElementById('nAssets').value;
+  document.getElementById('v_globalRho').textContent = parseFloat(document.getElementById('globalRho').value).toFixed(2);
+  document.getElementById('v_mcPaths').textContent = document.getElementById('mcPaths').value;
+  document.getElementById('v_horizon').textContent = parseFloat(document.getElementById('horizon').value).toFixed(2);
+}
+
+document.getElementById('nAssets').addEventListener('input', () => {
+  const n = parseInt(document.getElementById('nAssets').value, 10);
+  initAssets(n);
+  syncGlobalLabels();
+  renderAssetTabs();
+  renderAssetEditor();
+  renderPairList();
+  scheduleCompute();
+});
+
+document.getElementById('globalRho').addEventListener('input', () => {
+  state.globalRho = parseFloat(document.getElementById('globalRho').value);
+  // Clear overrides when global moves? Keep overrides; only update non-overridden display
+  syncGlobalLabels();
+  renderPairList();
+  scheduleCompute();
+});
+
+document.getElementById('setRhoNeg1').onclick = () => {
+  document.getElementById('globalRho').value = -0.95;
+  state.globalRho = -0.95;
+  state.pairOverrides = {};
+  syncGlobalLabels(); renderPairList(); scheduleCompute();
+};
+document.getElementById('setRho0').onclick = () => {
+  document.getElementById('globalRho').value = 0;
+  state.globalRho = 0;
+  state.pairOverrides = {};
+  syncGlobalLabels(); renderPairList(); scheduleCompute();
+};
+document.getElementById('setRhoPos1').onclick = () => {
+  document.getElementById('globalRho').value = 0.95;
+  state.globalRho = 0.95;
+  state.pairOverrides = {};
+  syncGlobalLabels(); renderPairList(); scheduleCompute();
+};
+document.getElementById('resetPairs').onclick = () => {
+  state.pairOverrides = {};
+  renderPairList(); scheduleCompute();
+};
+
+['mcPaths','horizon'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => { syncGlobalLabels(); });
+});
+
+document.getElementById('runBtn').onclick = () => computeAll();
+document.getElementById('enableMC').onchange = () => computeAll();
+
+document.getElementById('resetBtn').onclick = () => {
+  document.getElementById('nAssets').value = 6;
+  document.getElementById('globalRho').value = 0.30;
+  document.getElementById('mcPaths').value = 5000;
+  document.getElementById('horizon').value = 1;
+  document.getElementById('seed').value = '42';
+  document.getElementById('enableMC').checked = true;
+  initAssets(6);
+  state.globalRho = 0.30;
+  syncGlobalLabels();
+  renderAssetTabs();
+  renderAssetEditor();
+  renderPairList();
+  computeAll();
+};
+
+/* Presets */
+const PRESETS = {
+  diversified: () => {
+    initAssets(6);
+    state.globalRho = 0.15;
+    document.getElementById('globalRho').value = 0.15;
+    state.pairOverrides = {};
+  },
+  concentrated: () => {
+    initAssets(4);
+    document.getElementById('nAssets').value = 4;
+    state.assets[0].w = 55; state.assets[1].w = 25; state.assets[2].w = 12; state.assets[3].w = 8;
+    renormalizeWeights();
+    state.globalRho = 0.55;
+    document.getElementById('globalRho').value = 0.55;
+    state.pairOverrides = {};
+  },
+  crisis: () => {
+    initAssets(6);
+    state.globalRho = 0.85;
+    document.getElementById('globalRho').value = 0.85;
+    state.pairOverrides = {};
+  },
+  negative: () => {
+    initAssets(4);
+    document.getElementById('nAssets').value = 4;
+    state.globalRho = -0.4;
+    document.getElementById('globalRho').value = -0.4;
+    state.pairOverrides = {};
+  }
+};
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    PRESETS[btn.dataset.preset]();
+    syncGlobalLabels();
+    renderAssetTabs();
+    renderAssetEditor();
+    renderPairList();
+    computeAll();
+  });
+});
+
+/* Init */
+initAssets(6);
+syncGlobalLabels();
+renderAssetTabs();
+renderAssetEditor();
+renderPairList();
+computeAll();
+</script>
+</body>
+</html>

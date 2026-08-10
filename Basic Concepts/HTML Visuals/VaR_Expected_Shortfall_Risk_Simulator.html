@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VaR &amp; Expected Shortfall — Risk Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.33.1/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#090C12;
+  --bg-2:#0C1018;
+  --panel:#121722;
+  --panel-2:#161D2A;
+  --border:#222B3C;
+  --border-soft:#1A2230;
+  --text:#E8ECF4;
+  --text-dim:#8B95A8;
+  --text-faint:#566070;
+  --accent:#FF6B6B;
+  --accent-dim:#D94A4A;
+  --accent-teal:#2DD4BF;
+  --accent-amber:#FBBF24;
+  --accent-blue:#60A5FA;
+  --accent-purple:#A78BFA;
+  --accent-green:#34D399;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px;
+  --shadow:0 8px 28px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 560px at 12% -10%, rgba(255,107,107,0.07), transparent),
+    radial-gradient(900px 480px at 100% 0%, rgba(45,212,191,0.05), transparent),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  font-size:14px;
+  line-height:1.5;
+}
+::selection{background:var(--accent);color:#1a0505;}
+
+.app{display:grid;grid-template-columns:332px 1fr;min-height:100vh;}
+@media(max-width:1000px){
+  .app{grid-template-columns:1fr;}
+  .sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);}
+}
+
+.sidebar{
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+  background:linear-gradient(180deg,var(--panel),var(--bg-2));
+  border-right:1px solid var(--border);
+  padding:20px 16px 40px;
+}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+.brand-mark{
+  width:30px;height:30px;border-radius:8px;
+  background:conic-gradient(from 200deg,var(--accent),var(--accent-amber),var(--accent-teal),var(--accent));
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-weight:700;color:#1a0505;font-size:11px;
+}
+.brand-name{font-family:var(--display);font-weight:700;font-size:15px;}
+.brand-sub{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin:2px 0 16px;letter-spacing:.4px;text-transform:uppercase;}
+
+.ctrl-group{
+  border:1px solid var(--border-soft);border-radius:var(--radius);
+  background:rgba(255,255,255,.015);
+  padding:12px 12px 14px;margin-bottom:11px;
+}
+.ctrl-group h4{
+  margin:0 0 10px;font-family:var(--display);font-size:11px;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--text-dim);font-weight:600;
+}
+.field{margin-bottom:11px;}
+.field:last-child{margin-bottom:0;}
+.field-label{
+  display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;
+  font-size:11.5px;color:var(--text-dim);
+}
+.field-label .val{font-family:var(--mono);color:var(--text);font-weight:600;font-size:12px;}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:4px;border-radius:2px;
+  background:var(--border);outline:none;margin:5px 0 2px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+  background:var(--accent);cursor:pointer;border:2px solid #1a0505;
+  box-shadow:0 0 0 2px rgba(255,107,107,.25);
+}
+select,input[type=text],input[type=number]{
+  width:100%;background:var(--panel-2);border:1px solid var(--border);
+  color:var(--text);border-radius:6px;padding:6px 8px;font-family:var(--mono);font-size:12px;
+}
+.hint{font-size:10.5px;color:var(--text-faint);margin-top:4px;line-height:1.4;}
+.btn{
+  width:100%;padding:9px 12px;border-radius:7px;border:1px solid var(--border);
+  background:var(--panel-2);color:var(--text);font-weight:600;font-size:12.5px;cursor:pointer;transition:.15s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn-primary{
+  background:linear-gradient(135deg,var(--accent),var(--accent-dim));
+  color:#fff;border:none;font-weight:700;
+}
+.btn-primary:hover{filter:brightness(1.08);color:#fff;}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
+.preset-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.preset-btn{padding:7px 4px;font-size:11px;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:2px 0;font-size:12px;color:var(--text-dim);}
+.switch{position:relative;width:36px;height:20px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.slider-tog{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:20px;transition:.15s;}
+.slider-tog:before{content:"";position:absolute;width:14px;height:14px;left:3px;top:3px;background:var(--text-dim);border-radius:50%;transition:.15s;}
+.switch input:checked + .slider-tog{background:rgba(255,107,107,.35);}
+.switch input:checked + .slider-tog:before{transform:translateX(16px);background:var(--accent);}
+.status-line{
+  font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin-top:12px;
+  border-top:1px dashed var(--border-soft);padding-top:10px;line-height:1.55;
+}
+.status-line b{color:var(--accent-teal);font-weight:600;}
+
+.main{padding:26px 28px 60px;max-width:1400px;}
+.page-header{margin-bottom:20px;}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);}
+.page-title{font-family:var(--display);font-size:28px;font-weight:700;margin:6px 0 8px;letter-spacing:-.3px;}
+.page-desc{color:var(--text-dim);max-width:820px;font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;}
+.section-num{font-family:var(--mono);color:var(--accent);font-size:12px;}
+.section-title{font-family:var(--display);font-weight:600;font-size:16.5px;}
+.section-desc{color:var(--text-dim);font-size:12.5px;margin:-4px 0 12px;max-width:820px;}
+
+.card{
+  background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:16px;box-shadow:var(--shadow);
+}
+.grid{display:grid;gap:12px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media(max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);}.grid-3{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{
+  background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:13px 15px;position:relative;overflow:hidden;
+}
+.kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2.5px;background:var(--accent);}
+.kpi.teal:before{background:var(--accent-teal);}
+.kpi.amber:before{background:var(--accent-amber);}
+.kpi.blue:before{background:var(--accent-blue);}
+.kpi.purple:before{background:var(--accent-purple);}
+.kpi.green:before{background:var(--accent-green);}
+.kpi-label{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono);}
+.kpi-value{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:5px;letter-spacing:-.3px;}
+.kpi-sub{font-size:11px;color:var(--text-faint);margin-top:3px;}
+.kpi-sub b{color:var(--text-dim);font-weight:600;}
+
+table.data-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;}
+table.data-table th,table.data-table td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child,table.data-table td:first-child{text-align:left;color:var(--text-dim);font-family:var(--body);}
+table.data-table th{color:var(--text-dim);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+
+.formula-block{
+  background:var(--panel-2);border:1px solid var(--border-soft);border-radius:8px;
+  padding:13px 15px;margin-bottom:11px;
+}
+.formula-block .f-title{font-family:var(--display);font-size:12.5px;font-weight:600;color:var(--accent);margin-bottom:5px;}
+.formula-block .f-math{font-family:var(--mono);font-size:13.5px;color:var(--text);margin-bottom:5px;overflow-x:auto;}
+.formula-block .f-note{font-size:11.5px;color:var(--text-dim);}
+
+details.disclosure{
+  background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:13px 16px;margin-bottom:10px;
+}
+details.disclosure>summary{
+  cursor:pointer;font-family:var(--display);font-weight:600;font-size:14px;list-style:none;
+  display:flex;align-items:center;gap:8px;
+}
+details.disclosure>summary::-webkit-details-marker{display:none;}
+details.disclosure>summary:before{content:"›";color:var(--accent);font-size:17px;transition:transform .15s;}
+details.disclosure[open]>summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:11px;color:var(--text-dim);font-size:12.5px;}
+.disclosure-body h5{color:var(--text);font-family:var(--display);font-size:12.5px;margin:12px 0 4px;}
+.disclosure-body p{margin:4px 0 9px;}
+.disclosure-body ul{margin:4px 0 9px;padding-left:18px;}
+
+.legend-row{display:flex;gap:14px;align-items:center;font-size:11.5px;color:var(--text-dim);margin-bottom:8px;flex-wrap:wrap;}
+.legend-dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;}
+
+.footer-note{
+  margin-top:40px;padding-top:16px;border-top:1px solid var(--border-soft);
+  color:var(--text-faint);font-size:11.5px;line-height:1.7;
+}
+.two-col{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;}
+@media(max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+.overlay-loading{
+  position:fixed;inset:0;background:rgba(6,8,14,.75);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:10px;
+}
+.overlay-loading.active{display:flex;}
+.spinner{
+  width:34px;height:34px;border-radius:50%;border:3px solid var(--border);
+  border-top-color:var(--accent);animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.overlay-loading span{font-family:var(--mono);font-size:12px;color:var(--text-dim);}
+
+.dist-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.dist-tab{
+  font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:6px;
+  border:1px solid var(--border);background:var(--panel-2);color:var(--text-dim);cursor:pointer;
+}
+.dist-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(255,107,107,.1);}
+</style>
+</head>
+<body>
+
+<div class="overlay-loading" id="loadingOverlay"><div class="spinner"></div><span id="loadingText">Simulating returns…</span></div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">VR</div>
+      <div class="brand-name">VaR / ES Console</div>
+    </div>
+    <div class="brand-sub">Tail Risk · Quantile · Shortfall</div>
+
+    <div class="ctrl-group">
+      <h4>Scenario Presets</h4>
+      <div class="preset-row">
+        <button class="btn preset-btn" data-preset="calm">Calm</button>
+        <button class="btn preset-btn" data-preset="normal">Normal Mkt</button>
+        <button class="btn preset-btn" data-preset="stress">Stress</button>
+        <button class="btn preset-btn" data-preset="fattail">Fat Tail</button>
+      </div>
+      <div class="hint">Illustrative parameter sets — not calibrated market estimates.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Portfolio</h4>
+      <div class="field">
+        <div class="field-label"><span>Portfolio value ($)</span><span class="val" id="v_V">1,000,000</span></div>
+        <input type="range" id="V" min="100000" max="10000000" step="50000" value="1000000">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Mean return μ (ann.)</span><span class="val" id="v_mu">8.0%</span></div>
+        <input type="range" id="mu" min="-10" max="25" step="0.5" value="8">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Volatility σ (ann.)</span><span class="val" id="v_sigma">20.0%</span></div>
+        <input type="range" id="sigma" min="5" max="60" step="0.5" value="20">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Horizon (days)</span><span class="val" id="v_horizon">10</span></div>
+        <input type="range" id="horizon" min="1" max="63" step="1" value="10">
+        <div class="hint">Scaled with √(h/252) for vol, h/252 for mean.</div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Distribution &amp; Confidence</h4>
+      <div class="field">
+        <div class="field-label"><span>Primary confidence α</span><span class="val" id="v_alpha">99%</span></div>
+        <input type="range" id="alpha" min="90" max="99.5" step="0.5" value="99">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Student-t df (ν)</span><span class="val" id="v_df">5</span></div>
+        <input type="range" id="df" min="3" max="30" step="1" value="5">
+        <div class="hint">Lower ν → heavier tails. ν→∞ approaches Normal.</div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>MC / sample size N</span><span class="val" id="v_N">20000</span></div>
+        <input type="range" id="N" min="2000" max="50000" step="1000" value="20000">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Historical kurtosis boost</span><span class="val" id="v_kurt">4.0</span></div>
+        <input type="range" id="kurt" min="3" max="12" step="0.5" value="4">
+        <div class="hint">Synthetic “historical” returns via scaled mixture (excess kurtosis control).</div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Random seed</span></div>
+        <input type="text" id="seed" value="42">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="runBtn">▶ Compute Risk</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+    <div class="status-line" id="statusLine">Ready. Adjust inputs and click <b>Compute Risk</b>.</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Market Risk · Quantile Measures</div>
+      <h1 class="page-title">VaR &amp; Expected Shortfall Simulator</h1>
+      <p class="page-desc">
+        Compare tail risk under Normal, Student-t, synthetic historical-style, and Monte Carlo return distributions.
+        All figures are generated from your inputs:
+        <span style="font-family:var(--mono);color:var(--accent);">VaR<sub>α</sub> = −q<sub>1−α</sub>(R)</span>
+        and
+        <span style="font-family:var(--mono);color:var(--accent);">ES<sub>α</sub> = −E[R | R ≤ q<sub>1−α</sub>]</span>.
+      </p>
+    </div>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Primary Risk KPIs</span></div>
+      <p class="section-desc">Metrics for the <b id="primaryDistLabel" style="color:var(--text)">Student-t</b> distribution at the selected confidence level (plus fixed 95% / 99% reference cards).</p>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Return Distribution &amp; Tail Regions</span></div>
+      <p class="section-desc">Histogram of simulated horizon returns. Red shade marks the VaR tail (R ≤ quantile); darker band approximates the ES region (mean of losses beyond VaR).</p>
+      <div class="card">
+        <div class="dist-tabs" id="distTabs"></div>
+        <div class="legend-row">
+          <span><span class="legend-dot" style="background:var(--accent-blue);"></span>Return density</span>
+          <span><span class="legend-dot" style="background:rgba(255,107,107,.45);"></span>VaR tail (≤ q)</span>
+          <span><span class="legend-dot" style="background:rgba(251,191,36,.5);"></span>Mean of tail (ES level)</span>
+        </div>
+        <div id="distChart" style="width:100%;height:420px;"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Cross-Distribution Comparison</span></div>
+      <p class="section-desc">Same μ, σ, horizon — different tail assumptions. Student-t and fat historical-style samples typically inflate extreme quantiles relative to Normal.</p>
+      <div class="card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th style="color:#60A5FA">Normal</th>
+              <th style="color:#A78BFA">Student-t</th>
+              <th style="color:#FBBF24">Historical-style</th>
+              <th style="color:#2DD4BF">Monte Carlo</th>
+            </tr>
+          </thead>
+          <tbody id="compareBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">VaR &amp; ES vs Confidence Level</span></div>
+      <p class="section-desc">Sweep α from 90% to 99.5%. The gap between ES and VaR widens in the far tail under heavy-tailed laws.</p>
+      <div class="card">
+        <div id="confChart" style="width:100%;height:400px;"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Model Comparison Bars</span></div>
+      <div class="two-col">
+        <div class="card">
+          <div id="barVaR" style="width:100%;height:320px;"></div>
+        </div>
+        <div class="card">
+          <div id="barES" style="width:100%;height:320px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Tail Diagnostics</span></div>
+      <div class="grid grid-4" id="diagGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Value at Risk</div>
+        <div class="f-math">VaR<sub>α</sub>(R) = −q<sub>1−α</sub>(R) = −inf{x : P(R ≤ x) ≥ 1−α}</div>
+        <div class="f-note">A positive VaR is reported as a loss magnitude. At 99% confidence, only 1% of outcomes are worse than −VaR on the return scale.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Expected Shortfall (CVaR / AVaR)</div>
+        <div class="f-math">ES<sub>α</sub>(R) = −E[R | R ≤ q<sub>1−α</sub>(R)]</div>
+        <div class="f-note">Average loss given that you are already in the VaR tail. Sensitive to how bad the bad cases are — not only the threshold.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Horizon scaling (simple)</div>
+        <div class="f-math">μ<sub>h</sub> = μ · (h/252) &nbsp;&nbsp;·&nbsp;&nbsp; σ<sub>h</sub> = σ · √(h/252)</div>
+        <div class="f-note">Standard square-root-of-time scaling used here for illustration. Real P&amp;L may need full revaluation and serial dependence.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Student-t standardization</div>
+        <div class="f-math">R = μ<sub>h</sub> + σ<sub>h</sub> · √((ν−2)/ν) · T<sub>ν</sub></div>
+        <div class="f-note">Scale factor matches variance to σ<sub>h</sub>² for ν &gt; 2. Lower ν fatten tails while keeping the same variance.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Currency loss</div>
+        <div class="f-math">Loss_$ = V₀ · VaR<sub>α</sub> &nbsp;&nbsp;(and likewise for ES)</div>
+        <div class="f-note">Linear translation from return quantile to portfolio-value terms (no convexity / gamma effects in this lab).</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Educational Explanation</span></div>
+      <details class="disclosure" open>
+        <summary>What VaR does — and does not — tell you</summary>
+        <div class="disclosure-body">
+          <p>VaR answers: “How bad can it get <b style="color:var(--text)">with probability α</b>?” It is a quantile of the P&amp;L/return distribution. It does <b style="color:var(--text)">not</b> say how severe losses are beyond that threshold. Two distributions can share the same VaR and have very different crash severity.</p>
+          <ul>
+            <li>Not subadditive in general → can discourage diversification in pathological cases.</li>
+            <li>Silent on tail shape beyond the quantile.</li>
+            <li>Easy to game if the distribution is manipulated just beyond the cutoff.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Why Expected Shortfall captures tail severity</summary>
+        <div class="disclosure-body">
+          <p>ES averages all outcomes in the worst (1−α) mass. If crashes get worse, ES rises even when the VaR threshold is unchanged. Under standard conditions ES is coherent (including subadditive). Regulators (e.g. FRTB) moved from VaR toward ES partly for this reason.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Normal vs Student-t: fat tails</summary>
+        <div class="disclosure-body">
+          <p>Matching mean and variance is not enough for risk. A Student-t with small ν puts more probability on extreme moves. At 99% and beyond, t-based VaR/ES can exceed Normal figures by a wide margin — visible in the comparison table and confidence sweep.</p>
+        </div>
+      </details>
+      <details class="disclosure">
+        <summary>Model inventory in this lab</summary>
+        <div class="disclosure-body">
+          <ul>
+            <li><b style="color:var(--text)">Normal</b> — Gaussian with μ<sub>h</sub>, σ<sub>h</sub>.</li>
+            <li><b style="color:var(--text)">Student-t</b> — variance-matched heavy tails with degrees of freedom ν.</li>
+            <li><b style="color:var(--text)">Historical-style</b> — synthetic sample from a Gaussian scale-mixture (fat tails + mild skew control via kurtosis boost).</li>
+            <li><b style="color:var(--text)">Monte Carlo</b> — large Normal sample (sampling noise only); converges toward analytical Normal quantiles as N grows.</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational risk lab. Distributions and risk figures are simulated from the parameters you select. Presets are illustrative. Not a regulatory capital model and not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   VaR & EXPECTED SHORTFALL SIMULATOR
+   ===================================================================== */
+
+const DIST_META = {
+  normal:  { name: 'Normal',           color: '#60A5FA' },
+  student: { name: 'Student-t',        color: '#A78BFA' },
+  hist:    { name: 'Historical-style', color: '#FBBF24' },
+  mc:      { name: 'Monte Carlo',      color: '#2DD4BF' },
+};
+
+const state = {
+  activeDist: 'student',
+  result: null,
+};
+
+/* ---------- RNG ---------- */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (a >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeNormal(rng) {
+  let spare = null;
+  return function () {
+    if (spare !== null) { const v = spare; spare = null; return v; }
+    let u, v, s;
+    do { u = rng()*2-1; v = rng()*2-1; s = u*u + v*v; } while (s >= 1 || s === 0);
+    const mul = Math.sqrt(-2 * Math.log(s) / s);
+    spare = v * mul;
+    return u * mul;
+  };
+}
+/* Marsaglia chi-square / gamma for chi2(df) when df is integer-ish */
+function sampleChi2(rng, normal, nu) {
+  // For integer nu: sum of nu squared standards
+  // For non-integer use Wilson-Hilferty approx via normal
+  if (nu >= 3 && Math.abs(nu - Math.round(nu)) < 1e-9) {
+    const n = Math.round(nu);
+    let s = 0;
+    for (let i = 0; i < n; i++) { const z = normal(); s += z*z; }
+    return s;
+  }
+  // Fallback: 2*Gamma(nu/2) approx via normal for large, or sum
+  const n = Math.max(3, Math.round(nu));
+  let s = 0;
+  for (let i = 0; i < n; i++) { const z = normal(); s += z*z; }
+  return s * (nu / n);
+}
+function sampleStudent(normal, rng, nu) {
+  const z = normal();
+  const c = sampleChi2(rng, normal, nu);
+  return z / Math.sqrt(c / nu);
+}
+
+/* ---------- Stats ---------- */
+function mean(a){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]; return s/a.length; }
+function stdev(a,m){ if(m===undefined)m=mean(a); let s=0; for(let i=0;i<a.length;i++){const d=a[i]-m;s+=d*d;} return Math.sqrt(s/Math.max(a.length-1,1)); }
+function sortedCopy(a){ const c=Array.from(a); c.sort((x,y)=>x-y); return c; }
+function quantileSorted(s, q){
+  // q in [0,1]
+  const n = s.length;
+  if (!n) return NaN;
+  const idx = q * (n - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return s[lo];
+  return s[lo]*(1-(idx-lo)) + s[hi]*(idx-lo);
+}
+function skewness(a){
+  const m=mean(a), sd=stdev(a,m), n=a.length;
+  if(sd<1e-15) return 0;
+  let s=0; for(let i=0;i<n;i++) s+=Math.pow((a[i]-m)/sd,3);
+  return n/((n-1)*(n-2))*s;
+}
+function excessKurtosis(a){
+  const m=mean(a), sd=stdev(a,m), n=a.length;
+  if(sd<1e-15) return 0;
+  let s=0; for(let i=0;i<n;i++) s+=Math.pow((a[i]-m)/sd,4);
+  // unbiased-ish excess
+  const g2 = (n*(n+1))/((n-1)*(n-2)*(n-3))*s - (3*(n-1)*(n-1))/((n-2)*(n-3));
+  return g2;
+}
+
+/* Analytical normal quantile via Acklam / Beasley-Springer rational approx */
+function normsInv(p){
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const plow = 0.02425, phigh = 1 - plow;
+  let q, r;
+  if (p < plow) {
+    q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+  if (p > phigh) {
+    q = Math.sqrt(-2 * Math.log(1-p));
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+  q = p - 0.5; r = q*q;
+  return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+}
+
+/* ---------- Simulate returns ---------- */
+function simulateReturns(params) {
+  const { mu, sigma, horizon, N, df, kurtBoost, seed } = params;
+  const h = horizon / 252;
+  const muH = mu * h;
+  const sigH = sigma * Math.sqrt(h);
+
+  const rng = mulberry32(seed);
+  const normal = makeNormal(rng);
+
+  // Normal analytical + sample for charts
+  const normalSample = new Float64Array(N);
+  for (let i = 0; i < N; i++) normalSample[i] = muH + sigH * normal();
+
+  // Student-t variance-matched
+  const scale = (df > 2) ? Math.sqrt((df - 2) / df) : 1;
+  const studentSample = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    studentSample[i] = muH + sigH * scale * sampleStudent(normal, rng, df);
+  }
+
+  // Historical-style: Gaussian scale mixture
+  // R = mu + sig * sqrt(W) * Z, W chosen so excess kurtosis ~ kurtBoost-related
+  // For variance-gamma-ish: if W ~ inv scaling, Kurt(R) = 3*E[W^2]/(E[W])^2
+  // Simple: W = exp(s*G - 0.5 s^2) lognormal multiplier on variance, E[W]=1
+  // excess kurt ≈ 3*(exp(s^2)-1) for this construction on the shock
+  const targetExKurt = Math.max(0, kurtBoost - 3);
+  const s2 = Math.log(1 + targetExKurt / 3);
+  const s = Math.sqrt(Math.max(s2, 0));
+  const histSample = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    const g = normal();
+    const W = Math.exp(s * g - 0.5 * s * s); // E[W]=1
+    const z = normal();
+    histSample[i] = muH + sigH * Math.sqrt(W) * z;
+  }
+
+  // Monte Carlo: independent Normal sample (another stream)
+  const rng2 = mulberry32((seed + 9973) >>> 0);
+  const normal2 = makeNormal(rng2);
+  const mcSample = new Float64Array(N);
+  for (let i = 0; i < N; i++) mcSample[i] = muH + sigH * normal2();
+
+  return { muH, sigH, normalSample, studentSample, histSample, mcSample };
+}
+
+function riskFromSample(sample, alpha) {
+  // alpha e.g. 0.99 → tail mass 0.01 → quantile at 0.01
+  const sorted = sortedCopy(sample);
+  const q = quantileSorted(sorted, 1 - alpha);
+  const VaR = -q;
+  // ES: mean of returns <= q
+  let sum = 0, cnt = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i] <= q + 1e-15) { sum += sorted[i]; cnt++; }
+    else break;
+  }
+  const ES = cnt ? -sum / cnt : VaR;
+  return {
+    VaR, ES, quantile: q,
+    mean: mean(sample),
+    std: stdev(sample),
+    skew: skewness(sample),
+    exKurt: excessKurtosis(sample),
+    sorted, sample
+  };
+}
+
+function analyticalNormalRisk(muH, sigH, alpha) {
+  const z = normsInv(1 - alpha);
+  const q = muH + sigH * z;
+  const VaR = -q;
+  // ES for normal: -mu + sig * phi(z) / (1-alpha)  where z = normsInv(1-alpha) is negative for alpha>0.5
+  // phi density
+  const phi = Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
+  const ES = -muH + sigH * phi / (1 - alpha);
+  return { VaR, ES, quantile: q };
+}
+
+function computeAllRisk(params) {
+  const sim = simulateReturns(params);
+  const alphas = [0.95, 0.99, params.alpha];
+
+  const packs = {};
+  const keys = [
+    ['normal', sim.normalSample],
+    ['student', sim.studentSample],
+    ['hist', sim.histSample],
+    ['mc', sim.mcSample],
+  ];
+  keys.forEach(([k, sample]) => {
+    packs[k] = {
+      sample,
+      at: {},
+      diagnostics: riskFromSample(sample, params.alpha)
+    };
+    alphas.forEach(a => {
+      packs[k].at[a] = riskFromSample(sample, a);
+    });
+  });
+
+  // Analytical normal overlay for reference
+  const analyt = {};
+  alphas.forEach(a => { analyt[a] = analyticalNormalRisk(sim.muH, sim.sigH, a); });
+
+  // Confidence sweep for charts
+  const sweepAlphas = [];
+  for (let a = 0.90; a <= 0.995 + 1e-9; a += 0.005) sweepAlphas.push(+a.toFixed(3));
+  const sweep = {};
+  keys.forEach(([k, sample]) => {
+    sweep[k] = sweepAlphas.map(a => {
+      const r = riskFromSample(sample, a);
+      return { alpha: a, VaR: r.VaR, ES: r.ES };
+    });
+  });
+
+  return { sim, packs, analyt, sweep, sweepAlphas, params };
+}
+
+/* ---------- Format ---------- */
+function fmtPct(x, d=2) {
+  if (!isFinite(x)) return '—';
+  return (x * 100).toFixed(d) + '%';
+}
+function fmtMoney(x) {
+  if (!isFinite(x)) return '—';
+  const sign = x < 0 ? '-' : '';
+  const v = Math.abs(x);
+  return sign + '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+function fmtNum(x, d=2) {
+  if (!isFinite(x)) return '—';
+  return x.toFixed(d);
+}
+
+/* ---------- UI labels ---------- */
+function syncLabels() {
+  const V = parseFloat(document.getElementById('V').value);
+  document.getElementById('v_V').textContent = V.toLocaleString();
+  document.getElementById('v_mu').textContent = parseFloat(document.getElementById('mu').value).toFixed(1) + '%';
+  document.getElementById('v_sigma').textContent = parseFloat(document.getElementById('sigma').value).toFixed(1) + '%';
+  document.getElementById('v_horizon').textContent = document.getElementById('horizon').value;
+  document.getElementById('v_alpha').textContent = parseFloat(document.getElementById('alpha').value).toFixed(1) + '%';
+  document.getElementById('v_df').textContent = document.getElementById('df').value;
+  document.getElementById('v_N').textContent = parseInt(document.getElementById('N').value,10).toLocaleString();
+  document.getElementById('v_kurt').textContent = parseFloat(document.getElementById('kurt').value).toFixed(1);
+}
+
+function readParams() {
+  let seed = parseInt(document.getElementById('seed').value, 10);
+  if (!Number.isFinite(seed)) {
+    seed = 0;
+    const str = String(document.getElementById('seed').value || 'seed');
+    for (let i = 0; i < str.length; i++) seed = (seed * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return {
+    V: parseFloat(document.getElementById('V').value),
+    mu: parseFloat(document.getElementById('mu').value) / 100,
+    sigma: parseFloat(document.getElementById('sigma').value) / 100,
+    horizon: parseInt(document.getElementById('horizon').value, 10),
+    alpha: parseFloat(document.getElementById('alpha').value) / 100,
+    df: parseFloat(document.getElementById('df').value),
+    N: parseInt(document.getElementById('N').value, 10),
+    kurtBoost: parseFloat(document.getElementById('kurt').value),
+    seed: seed >>> 0,
+  };
+}
+
+/* ---------- Render ---------- */
+function kpiCard(label, value, sub, cls) {
+  return `<div class="kpi ${cls||''}"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub||''}</div></div>`;
+}
+
+function renderDistTabs() {
+  const el = document.getElementById('distTabs');
+  el.innerHTML = '';
+  Object.keys(DIST_META).forEach(k => {
+    const b = document.createElement('button');
+    b.className = 'dist-tab' + (state.activeDist === k ? ' active' : '');
+    b.textContent = DIST_META[k].name;
+    b.style.borderColor = state.activeDist === k ? DIST_META[k].color : '';
+    b.style.color = state.activeDist === k ? DIST_META[k].color : '';
+    b.onclick = () => { state.activeDist = k; renderDistTabs(); renderPrimary(); renderDistChart(); };
+    el.appendChild(b);
+  });
+}
+
+function renderPrimary() {
+  const R = state.result;
+  if (!R) return;
+  const p = R.params;
+  const pack = R.packs[state.activeDist];
+  const a = p.alpha;
+  const r = pack.at[a];
+  const r95 = pack.at[0.95];
+  const r99 = pack.at[0.99];
+  document.getElementById('primaryDistLabel').textContent = DIST_META[state.activeDist].name;
+  document.getElementById('primaryDistLabel').style.color = DIST_META[state.activeDist].color;
+
+  document.getElementById('kpiGrid').innerHTML = [
+    kpiCard(`VaR ${fmtPct(a,1)}`, fmtPct(r.VaR), `${fmtMoney(r.VaR * p.V)} on V₀`, ''),
+    kpiCard(`ES ${fmtPct(a,1)}`, fmtPct(r.ES), `${fmtMoney(r.ES * p.V)} avg tail loss`, 'amber'),
+    kpiCard('VaR 95% / 99%', `${fmtPct(r95.VaR)} · ${fmtPct(r99.VaR)}`, `${fmtMoney(r95.VaR*p.V)} · ${fmtMoney(r99.VaR*p.V)}`, 'blue'),
+    kpiCard('ES 95% / 99%', `${fmtPct(r95.ES)} · ${fmtPct(r99.ES)}`, `${fmtMoney(r95.ES*p.V)} · ${fmtMoney(r99.ES*p.V)}`, 'purple'),
+  ].join('');
+}
+
+function renderCompare() {
+  const R = state.result;
+  const p = R.params;
+  const rows = [
+    ['VaR 95%', k => fmtPct(R.packs[k].at[0.95].VaR)],
+    ['VaR 99%', k => fmtPct(R.packs[k].at[0.99].VaR)],
+    [`VaR ${fmtPct(p.alpha,1)}`, k => fmtPct(R.packs[k].at[p.alpha].VaR)],
+    ['ES 95%', k => fmtPct(R.packs[k].at[0.95].ES)],
+    ['ES 99%', k => fmtPct(R.packs[k].at[0.99].ES)],
+    [`ES ${fmtPct(p.alpha,1)}`, k => fmtPct(R.packs[k].at[p.alpha].ES)],
+    ['VaR 99% ($)', k => fmtMoney(R.packs[k].at[0.99].VaR * p.V)],
+    ['ES 99% ($)', k => fmtMoney(R.packs[k].at[0.99].ES * p.V)],
+    ['Sample mean', k => fmtPct(R.packs[k].diagnostics.mean)],
+    ['Sample σ', k => fmtPct(R.packs[k].diagnostics.std)],
+    ['Excess kurtosis', k => fmtNum(R.packs[k].diagnostics.exKurt, 2)],
+    ['Skewness', k => fmtNum(R.packs[k].diagnostics.skew, 2)],
+  ];
+  const keys = ['normal','student','hist','mc'];
+  document.getElementById('compareBody').innerHTML = rows.map(([label, fn]) =>
+    `<tr><td>${label}</td>${keys.map(k => `<td>${fn(k)}</td>`).join('')}</tr>`
+  ).join('');
+}
+
+function renderDiag() {
+  const R = state.result;
+  const p = R.params;
+  const st = R.packs.student.at[0.99];
+  const nm = R.packs.normal.at[0.99];
+  const ratio = nm.VaR > 1e-12 ? st.VaR / nm.VaR : NaN;
+  document.getElementById('diagGrid').innerHTML = [
+    kpiCard('Horizon μ / σ', `${fmtPct(R.sim.muH, 3)} · ${fmtPct(R.sim.sigH, 3)}`, `${p.horizon} trading days`, 'teal'),
+    kpiCard('t vs N VaR₉₉ ratio', fmtNum(ratio, 2) + '×', 'Student-t / Normal', 'purple'),
+    kpiCard('ES − VaR (t, 99%)', fmtPct(st.ES - st.VaR), 'extra severity beyond quantile', 'amber'),
+    kpiCard('Analytical N VaR₉₉', fmtPct(R.analyt[0.99].VaR), 'closed-form Gaussian check', 'blue'),
+  ].join('');
+}
+
+function renderDistChart() {
+  if (typeof Plotly === 'undefined' || !state.result) return;
+  const R = state.result;
+  const p = R.params;
+  const pack = R.packs[state.activeDist];
+  const sample = pack.sample;
+  const risk = pack.at[p.alpha];
+  const color = DIST_META[state.activeDist].color;
+
+  const traces = [{
+    x: Array.from(sample).map(v => v * 100),
+    type: 'histogram',
+    histnorm: 'probability density',
+    nbinsx: 60,
+    marker: { color: color + '99', line: { color: color, width: 0.5 } },
+    name: DIST_META[state.activeDist].name,
+    opacity: 0.85,
+  }];
+
+  // Vertical lines for VaR quantile and -ES
+  const qPct = risk.quantile * 100;
+  const varLine = -risk.VaR * 100;
+  const esLine = -risk.ES * 100;
+
+  const shapes = [
+    {
+      type: 'rect', xref: 'x', yref: 'paper',
+      x0: Math.min(...sample)*100 - 1, x1: qPct,
+      y0: 0, y1: 1,
+      fillcolor: 'rgba(255,107,107,0.12)',
+      line: { width: 0 }, layer: 'below'
+    },
+    {
+      type: 'line', xref: 'x', yref: 'paper',
+      x0: varLine, x1: varLine, y0: 0, y1: 1,
+      line: { color: '#FF6B6B', width: 2, dash: 'dash' }
+    },
+    {
+      type: 'line', xref: 'x', yref: 'paper',
+      x0: esLine, x1: esLine, y0: 0, y1: 1,
+      line: { color: '#FBBF24', width: 2, dash: 'dot' }
+    },
+  ];
+
+  Plotly.newPlot('distChart', traces, {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8B95A8', size: 11 },
+    margin: { l: 55, r: 20, t: 30, b: 45 },
+    xaxis: { title: 'Horizon return (%)', gridcolor: '#1A2230', linecolor: '#222B3C' },
+    yaxis: { title: 'Density', gridcolor: '#1A2230', linecolor: '#222B3C' },
+    shapes,
+    annotations: [
+      { x: varLine, y: 1, yref: 'paper', text: `−VaR ${fmtPct(p.alpha,1)}`, showarrow: false, font: { color: '#FF6B6B', size: 10 }, yshift: 12 },
+      { x: esLine, y: 1, yref: 'paper', text: `−ES`, showarrow: false, font: { color: '#FBBF24', size: 10 }, yshift: 26 },
+    ],
+    bargap: 0.05,
+  }, { displayModeBar: false, responsive: true });
+}
+
+function renderConfChart() {
+  if (typeof Plotly === 'undefined' || !state.result) return;
+  const R = state.result;
+  const traces = [];
+  Object.keys(DIST_META).forEach(k => {
+    const sw = R.sweep[k];
+    traces.push({
+      x: sw.map(d => d.alpha * 100),
+      y: sw.map(d => d.VaR * 100),
+      mode: 'lines',
+      name: DIST_META[k].name + ' VaR',
+      line: { color: DIST_META[k].color, width: 2 }
+    });
+    traces.push({
+      x: sw.map(d => d.alpha * 100),
+      y: sw.map(d => d.ES * 100),
+      mode: 'lines',
+      name: DIST_META[k].name + ' ES',
+      line: { color: DIST_META[k].color, width: 1.5, dash: 'dot' }
+    });
+  });
+  Plotly.newPlot('confChart', traces, {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8B95A8', size: 11 },
+    margin: { l: 55, r: 20, t: 20, b: 45 },
+    xaxis: { title: 'Confidence α (%)', gridcolor: '#1A2230', linecolor: '#222B3C' },
+    yaxis: { title: 'Loss metric (%)', gridcolor: '#1A2230', linecolor: '#222B3C' },
+    legend: { orientation: 'h', y: 1.15, font: { size: 10 } },
+  }, { displayModeBar: false, responsive: true });
+}
+
+function renderBars() {
+  if (typeof Plotly === 'undefined' || !state.result) return;
+  const R = state.result;
+  const keys = ['normal','student','hist','mc'];
+  const names = keys.map(k => DIST_META[k].name);
+  const colors = keys.map(k => DIST_META[k].color);
+
+  const var95 = keys.map(k => R.packs[k].at[0.95].VaR * 100);
+  const var99 = keys.map(k => R.packs[k].at[0.99].VaR * 100);
+  const es95 = keys.map(k => R.packs[k].at[0.95].ES * 100);
+  const es99 = keys.map(k => R.packs[k].at[0.99].ES * 100);
+
+  const layoutBase = {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8B95A8', size: 11 },
+    margin: { l: 45, r: 15, t: 40, b: 40 },
+    barmode: 'group',
+    legend: { orientation: 'h', y: 1.15, font: { size: 10 } },
+    xaxis: { gridcolor: '#1A2230', linecolor: '#222B3C' },
+    yaxis: { title: '%', gridcolor: '#1A2230', linecolor: '#222B3C' },
+  };
+
+  Plotly.newPlot('barVaR', [
+    { x: names, y: var95, type: 'bar', name: 'VaR 95%', marker: { color: colors.map(c => c + '99') } },
+    { x: names, y: var99, type: 'bar', name: 'VaR 99%', marker: { color: colors } },
+  ], Object.assign({}, layoutBase, { title: { text: 'VaR by model', font: { size: 13, color: '#8B95A8' } } }),
+  { displayModeBar: false, responsive: true });
+
+  Plotly.newPlot('barES', [
+    { x: names, y: es95, type: 'bar', name: 'ES 95%', marker: { color: colors.map(c => c + '99') } },
+    { x: names, y: es99, type: 'bar', name: 'ES 99%', marker: { color: colors } },
+  ], Object.assign({}, layoutBase, { title: { text: 'Expected Shortfall by model', font: { size: 13, color: '#8B95A8' } } }),
+  { displayModeBar: false, responsive: true });
+}
+
+function renderAll() {
+  renderDistTabs();
+  renderPrimary();
+  renderCompare();
+  renderDiag();
+  renderDistChart();
+  renderConfChart();
+  renderBars();
+}
+
+/* ---------- Run ---------- */
+function showLoading(t) {
+  document.getElementById('loadingText').textContent = t || 'Simulating returns…';
+  document.getElementById('loadingOverlay').classList.add('active');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+function runAll() {
+  showLoading('Simulating distributions…');
+  setTimeout(() => {
+    const t0 = performance.now();
+    const params = readParams();
+    state.result = computeAllRisk(params);
+    const t1 = performance.now();
+    document.getElementById('statusLine').innerHTML =
+      `N=<b>${params.N.toLocaleString()}</b> · horizon <b>${params.horizon}d</b> · α=<b>${fmtPct(params.alpha,1)}</b> · ` +
+      `ν=<b>${params.df}</b><br>Time: <b>${(t1-t0).toFixed(0)} ms</b>`;
+    renderAll();
+    hideLoading();
+  }, 20);
+}
+
+let timer = null;
+function scheduleRun() {
+  clearTimeout(timer);
+  timer = setTimeout(runAll, 100);
+}
+
+['V','mu','sigma','horizon','alpha','df','N','kurt'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => { syncLabels(); scheduleRun(); });
+});
+document.getElementById('runBtn').onclick = runAll;
+document.getElementById('resetBtn').onclick = () => {
+  document.getElementById('V').value = 1000000;
+  document.getElementById('mu').value = 8;
+  document.getElementById('sigma').value = 20;
+  document.getElementById('horizon').value = 10;
+  document.getElementById('alpha').value = 99;
+  document.getElementById('df').value = 5;
+  document.getElementById('N').value = 20000;
+  document.getElementById('kurt').value = 4;
+  document.getElementById('seed').value = '42';
+  state.activeDist = 'student';
+  syncLabels();
+  runAll();
+};
+
+const PRESETS = {
+  calm:    { mu: 6, sigma: 12, horizon: 10, df: 12, kurt: 3.5, alpha: 99 },
+  normal:  { mu: 8, sigma: 20, horizon: 10, df: 8,  kurt: 4,   alpha: 99 },
+  stress:  { mu: 4, sigma: 35, horizon: 10, df: 5,  kurt: 6,   alpha: 99 },
+  fattail: { mu: 8, sigma: 22, horizon: 10, df: 3,  kurt: 9,   alpha: 99 },
+};
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.onclick = () => {
+    const p = PRESETS[btn.dataset.preset];
+    document.getElementById('mu').value = p.mu;
+    document.getElementById('sigma').value = p.sigma;
+    document.getElementById('horizon').value = p.horizon;
+    document.getElementById('df').value = p.df;
+    document.getElementById('kurt').value = p.kurt;
+    document.getElementById('alpha').value = p.alpha;
+    syncLabels();
+    runAll();
+  };
+});
+
+syncLabels();
+runAll();
+</script>
+</body>
+</html>
