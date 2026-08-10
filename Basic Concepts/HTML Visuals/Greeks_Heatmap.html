@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Greeks Heatmap Explorer // BSM Derivatives Desk</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.32.0/plotly.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#080b10; --bg-1:#0d131b; --bg-2:#121a24; --bg-3:#182233;
+    --line:#1f2b3a; --line-soft:#161f2b;
+    --text-hi:#e8eef4; --text-mid:#9fb0c0; --text-lo:#5d6d7e;
+    --amber:#ffb020; --amber-dim:#8a6420;
+    --cyan:#4fd1c5; --cyan-dim:#1f6b64;
+    --green:#3ecf7e; --red:#f0555a; --violet:#9d8cff;
+    --mono:'IBM Plex Mono', monospace; --sans:'Space Grotesk','IBM Plex Sans',sans-serif; --ui:'IBM Plex Sans', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg-0);color:var(--text-hi);font-family:var(--ui);}
+  body{background-image:radial-gradient(circle at 12% 0%, rgba(157,140,255,0.05), transparent 42%),radial-gradient(circle at 88% 10%, rgba(79,209,197,0.04), transparent 45%); min-height:100vh;}
+  ::selection{background:var(--amber);color:#000;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:var(--bg-1);}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--amber-dim);}
+
+  header.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg-1),var(--bg-0));position:sticky;top:0;z-index:50;backdrop-filter:blur(6px);flex-wrap:wrap;gap:10px;}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand .mark{width:38px;height:38px;border:1px solid var(--cyan-dim);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;color:var(--cyan);font-size:14px;background:rgba(79,209,197,0.07);}
+  .brand h1{font-family:var(--sans);font-size:17px;font-weight:600;margin:0;letter-spacing:0.02em;}
+  .brand .sub{font-family:var(--mono);font-size:10.5px;color:var(--text-lo);letter-spacing:0.08em;margin-top:2px;text-transform:uppercase;}
+  .status{display:flex;gap:22px;align-items:center;}
+  .status .pill{font-family:var(--mono);font-size:11px;color:var(--text-mid);border:1px solid var(--line);padding:5px 10px;border-radius:20px;display:flex;align-items:center;gap:6px;}
+  .status .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);}
+
+  .layout{display:grid;grid-template-columns:320px 1fr;gap:0;align-items:start;}
+  @media (max-width:1020px){.layout{grid-template-columns:1fr;}}
+  aside.controls{position:sticky;top:61px;height:calc(100vh - 61px);overflow-y:auto;border-right:1px solid var(--line);background:var(--bg-1);padding:20px 18px 60px 18px;}
+  @media (max-width:1020px){aside.controls{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line);}}
+  main.content{padding:24px 28px 60px 28px;min-width:0;}
+
+  .section-label{font-family:var(--mono);font-size:10.5px;letter-spacing:0.12em;color:var(--text-lo);text-transform:uppercase;margin:22px 0 10px 0;display:flex;align-items:center;gap:8px;}
+  .section-label:first-child{margin-top:0;}
+  .section-label::after{content:'';flex:1;height:1px;background:var(--line);}
+
+  .field{margin-bottom:14px;}
+  .field label{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--text-mid);margin-bottom:5px;}
+  .field label .val{font-family:var(--mono);color:var(--amber);font-size:12.5px;font-weight:600;}
+  .field input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--line);outline:none;margin:6px 0;}
+  .field input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:var(--amber);cursor:pointer;border:2px solid #1a1207;box-shadow:0 0 0 3px rgba(255,176,32,0.15);}
+  .field input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--amber);cursor:pointer;border:2px solid #1a1207;}
+  .field input[type=number]{width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--text-hi);font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:4px;outline:none;}
+  .field input[type=number]:focus{border-color:var(--amber-dim);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .row2 .mini label{font-size:10.5px;color:var(--text-lo);margin-bottom:4px;display:block;}
+
+  .toggle-group{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .toggle-group button{flex:1;background:var(--bg-2);color:var(--text-mid);border:none;padding:9px 0;font-family:var(--mono);font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.04em;transition:background .15s,color .15s;}
+  .toggle-group button.active.call{background:rgba(62,207,126,0.14);color:var(--green);}
+  .toggle-group button.active.put{background:rgba(240,85,90,0.14);color:var(--red);}
+  .toggle-group button:not(.active):hover{background:var(--bg-3);}
+
+  .seg{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--bg-2);}
+  .seg button{background:transparent;border:none;color:var(--text-mid);font-family:var(--ui);font-size:11.5px;padding:8px 10px;border-radius:4px;cursor:pointer;text-align:left;transition:background .15s,color .15s;}
+  .seg button.active{background:rgba(79,209,197,0.14);color:var(--cyan);}
+  .seg button:not(.active):hover{background:var(--bg-3);}
+
+  .greek-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .greek-grid button{background:var(--bg-2);border:1px solid var(--line);color:var(--text-mid);font-family:var(--mono);font-size:11.5px;font-weight:600;padding:9px 4px;border-radius:5px;cursor:pointer;transition:all .15s;}
+  .greek-grid button.active{background:rgba(255,176,32,0.14);color:var(--amber);border-color:var(--amber-dim);}
+  .greek-grid button:not(.active):hover{background:var(--bg-3);color:var(--text-hi);}
+  .greek-grid button.full{grid-column:1/3;}
+
+  .assumptions{font-family:var(--ui);font-size:10.8px;color:var(--text-lo);line-height:1.55;border-top:1px solid var(--line);padding-top:14px;margin-top:22px;}
+  .assumptions b{color:var(--text-mid);}
+
+  h2.page-title{font-family:var(--sans);font-size:19px;font-weight:600;margin:0 0 4px 0;}
+  p.page-sub{font-family:var(--ui);font-size:12px;color:var(--text-lo);margin:0 0 20px 0;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+  @media (max-width:1400px){.kpi-grid{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+  .kpi{background:linear-gradient(180deg,var(--bg-2),var(--bg-1));border:1px solid var(--line);border-radius:8px;padding:12px 14px;position:relative;overflow:hidden;}
+  .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--kpi-accent,var(--amber));}
+  .kpi .k-label{font-family:var(--mono);font-size:9.5px;color:var(--text-lo);text-transform:uppercase;letter-spacing:0.07em;}
+  .kpi .k-value{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--text-hi);margin-top:5px;}
+  .kpi.hero .k-value{font-size:20px;color:var(--amber);}
+  .kpi .k-sub{font-family:var(--ui);font-size:9.5px;color:var(--text-mid);margin-top:3px;}
+
+  .selector-bar{display:flex;gap:18px;align-items:center;flex-wrap:wrap;background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin-top:14px;}
+  .selector-bar .grp{display:flex;flex-direction:column;gap:4px;min-width:220px;flex:1;}
+  .selector-bar label{font-family:var(--mono);font-size:10px;color:var(--text-lo);text-transform:uppercase;letter-spacing:0.06em;display:flex;justify-content:space-between;}
+  .selector-bar label .v{color:var(--amber);font-weight:600;}
+  .selector-bar input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--line);}
+  .selector-bar input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--cyan);cursor:pointer;border:2px solid #06231f;}
+
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
+  @media (max-width:1080px){.chart-grid{grid-template-columns:1fr;}}
+  .chart-card{background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:16px 16px 6px 16px;}
+  .chart-card.full{grid-column:1/-1;}
+  .chart-card h3{font-family:var(--sans);font-size:13px;font-weight:600;margin:0 0 2px 0;}
+  .chart-card p.desc{font-family:var(--ui);font-size:11px;color:var(--text-lo);margin:0 0 8px 0;}
+  .plot{width:100%;height:320px;}
+  .plot.tall{height:460px;}
+
+  .insights-panel{background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin-top:16px;}
+  .insights-panel ul{margin:8px 0 0 0;padding-left:0;list-style:none;}
+  .insights-panel li{font-family:var(--ui);font-size:12.5px;color:var(--text-mid);line-height:1.6;padding:9px 0 9px 22px;border-bottom:1px solid var(--line-soft);position:relative;}
+  .insights-panel li:last-child{border-bottom:none;}
+  .insights-panel li::before{content:'▸';position:absolute;left:2px;color:var(--cyan);font-size:12px;}
+  .insights-panel li b{color:var(--text-hi);font-family:var(--mono);}
+  .insights-panel .caveat{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);font-family:var(--ui);font-size:11px;color:var(--text-lo);line-height:1.6;}
+
+  .edu-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;}
+  @media (max-width:980px){.edu-grid{grid-template-columns:1fr;}}
+  details.formula-card{background:var(--bg-1);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  details.formula-card summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;font-family:var(--sans);font-size:13px;font-weight:600;}
+  details.formula-card summary::-webkit-details-marker{display:none;}
+  details.formula-card summary::after{content:'+';font-family:var(--mono);color:var(--amber);font-size:16px;transition:transform .2s;}
+  details.formula-card[open] summary::after{transform:rotate(45deg);}
+  details.formula-card summary:hover{background:var(--bg-2);}
+  .formula-body{padding:0 16px 16px 16px;font-family:var(--ui);font-size:12.5px;color:var(--text-mid);line-height:1.65;}
+  .formula-body .eq{font-family:var(--mono);font-size:12px;color:var(--cyan);background:var(--bg-2);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin:8px 0;overflow-x:auto;white-space:pre;}
+
+  footer{padding:22px 28px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--text-lo);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+
+  .moneytag{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:0.05em;display:inline-block;}
+  .moneytag.itm{background:rgba(62,207,126,0.15);color:var(--green);}
+  .moneytag.atm{background:rgba(255,176,32,0.15);color:var(--amber);}
+  .moneytag.otm{background:rgba(240,85,90,0.15);color:var(--red);}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="mark">&Delta;</div>
+    <div>
+      <h1>Greeks Heatmap Explorer</h1>
+      <div class="sub">Black-Scholes-Merton &middot; Sensitivity Surfaces</div>
+    </div>
+  </div>
+  <div class="status">
+    <div class="pill"><span class="dot"></span> Long-Position Sign Convention</div>
+    <div class="pill" id="clockPill">--:--:--</div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="controls">
+    <div class="section-label">Option Type</div>
+    <div class="toggle-group">
+      <button id="btnCall" class="active call">CALL</button>
+      <button id="btnPut" class="put">PUT</button>
+    </div>
+
+    <div class="section-label">Market Inputs</div>
+    <div class="field">
+      <label>Spot Price S <span class="val" id="valS">100.00</span></label>
+      <input type="range" id="rangeS" min="1" max="300" step="0.5" value="100">
+    </div>
+    <div class="field">
+      <label>Volatility &sigma; <span class="val" id="valSigma">25.00%</span></label>
+      <input type="range" id="rangeSigma" min="1" max="150" step="0.5" value="25">
+    </div>
+    <div class="field">
+      <label>Risk-Free Rate r <span class="val" id="valR">5.00%</span></label>
+      <input type="range" id="rangeR" min="-2" max="15" step="0.05" value="5">
+    </div>
+    <div class="field">
+      <label>Dividend Yield q <span class="val" id="valQ">0.00%</span></label>
+      <input type="range" id="rangeQ" min="0" max="12" step="0.05" value="0">
+    </div>
+
+    <div class="section-label">Strike &amp; Expiry Range</div>
+    <div class="row2">
+      <div class="mini field"><label>Strike Min</label><input type="number" id="numKMin" value="50" step="1"></div>
+      <div class="mini field"><label>Strike Max</label><input type="number" id="numKMax" value="150" step="1"></div>
+    </div>
+    <div class="row2">
+      <div class="mini field"><label>Expiry Min (yrs)</label><input type="number" id="numTMin" value="0.05" step="0.01"></div>
+      <div class="mini field"><label>Expiry Max (yrs)</label><input type="number" id="numTMax" value="2" step="0.05"></div>
+    </div>
+
+    <div class="section-label">X-Axis Mode</div>
+    <div class="seg" id="axisModeGroup">
+      <button data-mode="strike">Absolute Strike (K)</button>
+      <button data-mode="moneyness" class="active">Moneyness (K / S)</button>
+      <button data-mode="logmoneyness">Log-Moneyness ln(K/S)</button>
+    </div>
+
+    <div class="section-label">Greek to Display</div>
+    <div class="greek-grid" id="greekGroup">
+      <button data-greek="delta" class="active">Delta</button>
+      <button data-greek="gamma">Gamma</button>
+      <button data-greek="vega">Vega</button>
+      <button data-greek="theta">Theta</button>
+      <button data-greek="rho" class="full">Rho</button>
+    </div>
+
+    <div class="assumptions">
+      <b>Scope:</b> European-style options under standard Black-Scholes-Merton assumptions (constant &sigma; and r, continuous trading, lognormal returns, continuous dividend yield). Greeks shown are for a <b>long position</b> in the selected option type &mdash; a short position has the opposite sign. American-style early-exercise effects are not modeled.
+    </div>
+  </aside>
+
+  <main class="content">
+    <h2 class="page-title">Sensitivity Surface &amp; Slices</h2>
+    <p class="page-sub">Click anywhere on the heatmap to set the selected strike and expiry, or use the sliders below. Everything recalculates live from the closed-form Black-Scholes-Merton formulas.</p>
+
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="kpi hero" style="--kpi-accent:var(--amber)"><div class="k-label">Price</div><div class="k-value" id="kpiPrice">0.00</div><div class="k-sub" id="kpiMoney">&mdash;</div></div>
+      <div class="kpi" style="--kpi-accent:var(--cyan)"><div class="k-label">Delta</div><div class="k-value" id="kpiDelta">0.00</div><div class="k-sub">$ per $1 spot</div></div>
+      <div class="kpi" style="--kpi-accent:var(--violet)"><div class="k-label">Gamma</div><div class="k-value" id="kpiGamma">0.00</div><div class="k-sub">&Delta; per $1 spot</div></div>
+      <div class="kpi" style="--kpi-accent:var(--green)"><div class="k-label">Vega</div><div class="k-value" id="kpiVega">0.00</div><div class="k-sub">per 1% vol</div></div>
+      <div class="kpi" style="--kpi-accent:var(--red)"><div class="k-label">Theta</div><div class="k-value" id="kpiTheta">0.00</div><div class="k-sub">$ per day</div></div>
+      <div class="kpi" style="--kpi-accent:var(--amber)"><div class="k-label">Rho</div><div class="k-value" id="kpiRho">0.00</div><div class="k-sub">per 1% rate</div></div>
+    </div>
+
+    <div class="selector-bar">
+      <div class="grp">
+        <label>Selected Strike (K) <span class="v" id="selKLabel">100.00</span></label>
+        <input type="range" id="selKRange" min="50" max="150" step="0.5" value="100">
+      </div>
+      <div class="grp">
+        <label>Selected Expiry (T, years) <span class="v" id="selTLabel">0.500</span></label>
+        <input type="range" id="selTRange" min="0.05" max="2" step="0.01" value="0.5">
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card full">
+        <h3 id="heatmapTitle">Delta Surface</h3>
+        <p class="desc">Color = selected Greek. X = strike axis (per mode selected). Y = time to expiry. Crosshair marks the selected strike/expiry.</p>
+        <div id="plotHeatmap" class="plot tall"></div>
+      </div>
+      <div class="chart-card">
+        <h3 id="sliceTitle1">Cross-Section at Selected Expiry</h3>
+        <p class="desc" id="sliceDesc1">Greek value across strikes, holding T fixed at the selected expiry.</p>
+        <div id="plotSliceK" class="plot"></div>
+      </div>
+      <div class="chart-card">
+        <h3 id="sliceTitle2">Term Structure at Selected Strike</h3>
+        <p class="desc" id="sliceDesc2">Greek value across time to expiry, holding K fixed at the selected strike.</p>
+        <div id="plotSliceT" class="plot"></div>
+      </div>
+    </div>
+
+    <div class="section-label">Automated Pattern Insights</div>
+    <div class="insights-panel">
+      <ul id="insightsList"></ul>
+      <div class="caveat" id="insightsCaveat"></div>
+    </div>
+
+    <div class="section-label">Formulas &amp; Interpretation</div>
+    <div class="edu-grid">
+      <details class="formula-card" open>
+        <summary>Delta (&Delta;) &amp; Gamma (&Gamma;)</summary>
+        <div class="formula-body">
+          <div class="eq">&Delta;_call = e^(-qT)&middot;N(d1)
+&Delta;_put  = e^(-qT)&middot;(N(d1) - 1)
+
+&Gamma; = e^(-qT)&middot;n(d1) / (S&middot;&sigma;&middot;&radic;T)   (same for call and put)</div>
+          <p>Delta is the option's directional exposure: the expected $ change in the option for a $1 move in the underlying, and a rough proxy for the probability of finishing in-the-money. Gamma is the rate of change of Delta &mdash; it is largest when small moves in spot cause large relative changes in the likelihood of finishing ITM, which tends to be near-the-money with limited time to expiry.</p>
+        </div>
+      </details>
+      <details class="formula-card">
+        <summary>Vega</summary>
+        <div class="formula-body">
+          <div class="eq">Vega = S&middot;e^(-qT)&middot;n(d1)&middot;&radic;T     (per 1.00 change in &sigma;, shown per 1%)</div>
+          <p>Vega measures sensitivity to implied volatility. Because it scales with &radic;T and is maximized where n(d1) is largest (near d1&asymp;0, i.e. near-the-money), longer-dated at-the-money options tend to carry the most volatility exposure in dollar terms &mdash; though this depends on r and q shifting the ATM point away from K=S.</p>
+        </div>
+      </details>
+      <details class="formula-card">
+        <summary>Theta (&Theta;)</summary>
+        <div class="formula-body">
+          <div class="eq">&Theta;_call = -[S&middot;e^(-qT)&middot;n(d1)&middot;&sigma;/(2&radic;T)] - rK&middot;e^(-rT)N(d2) + qS&middot;e^(-qT)N(d1)
+
+&Theta;_put  = -[S&middot;e^(-qT)&middot;n(d1)&middot;&sigma;/(2&radic;T)] + rK&middot;e^(-rT)N(-d2) - qS&middot;e^(-qT)N(-d1)</div>
+          <p>Theta is the change in value from one day passing, all else equal. For most long option positions Theta is negative and grows larger in magnitude as expiry nears, since less time remains for favorable moves. This is a general tendency, not a universal rule: theta can turn positive for some deep in-the-money European puts when r is high, since the discounted strike received grows faster than the remaining time value lost.</p>
+        </div>
+      </details>
+      <details class="formula-card">
+        <summary>Rho (&rho;)</summary>
+        <div class="formula-body">
+          <div class="eq">Rho_call = K&middot;T&middot;e^(-rT)&middot;N(d2)    (per 1.00 change in r, shown per 1%)
+Rho_put  = -K&middot;T&middot;e^(-rT)&middot;N(-d2)</div>
+          <p>Rho measures sensitivity to the risk-free rate. It is generally larger in magnitude for longer-dated, deeper in-the-money options, since the present value of the strike (paid for calls, received for puts) is more sensitive to discounting the further out and further ITM the option is.</p>
+        </div>
+      </details>
+    </div>
+  </main>
+</div>
+
+<footer>
+  <span>Greeks Heatmap Explorer &middot; Educational tool for European option Greeks under Black-Scholes-Merton assumptions.</span>
+  <span>Not investment advice. All computations run client-side.</span>
+</footer>
+
+<script>
+(function(){
+
+  /* ---------- Math ---------- */
+  function erf(x){
+    var sign = x < 0 ? -1 : 1; x = Math.abs(x);
+    var a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+    var t=1/(1+p*x);
+    var y=1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+    return sign*y;
+  }
+  function normCDF(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
+  function normPDF(x){ return Math.exp(-0.5*x*x)/Math.sqrt(2*Math.PI); }
+  var EPS_T=1e-6, EPS_SIG=1e-4;
+
+  function d1d2(S,K,sigma,r,q,T){
+    var sT = Math.max(sigma,EPS_SIG)*Math.sqrt(Math.max(T,EPS_T));
+    var d1 = (Math.log(S/K)+(r-q+0.5*sigma*sigma)*T)/sT;
+    return [d1, d1-sT];
+  }
+
+  function allGreeks(S,K,sigma,r,q,T,type){
+    if(T<=EPS_T){
+      var intrinsic = type==='call'?Math.max(S-K,0):Math.max(K-S,0);
+      var delta;
+      if(type==='call'){ delta = S>K?1:(S<K?0:0.5); } else { delta = S<K?-1:(S>K?0:-0.5); }
+      return {price:intrinsic, delta:delta, gamma:0, vega:0, theta:0, rho:0};
+    }
+    var dd=d1d2(S,K,sigma,r,q,T), d1=dd[0], d2=dd[1];
+    var nD1=normPDF(d1), eqT=Math.exp(-q*T), erT=Math.exp(-r*T);
+    var sig=Math.max(sigma,EPS_SIG), sqrtT=Math.sqrt(T);
+    var price, delta, thetaAnnual, rho;
+    if(type==='call'){
+      price = S*eqT*normCDF(d1) - K*erT*normCDF(d2);
+      delta = eqT*normCDF(d1);
+      thetaAnnual = -(S*eqT*nD1*sig)/(2*sqrtT) - r*K*erT*normCDF(d2) + q*S*eqT*normCDF(d1);
+      rho = K*T*erT*normCDF(d2)/100;
+    } else {
+      price = K*erT*normCDF(-d2) - S*eqT*normCDF(-d1);
+      delta = eqT*(normCDF(d1)-1);
+      thetaAnnual = -(S*eqT*nD1*sig)/(2*sqrtT) + r*K*erT*normCDF(-d2) - q*S*eqT*normCDF(-d1);
+      rho = -K*T*erT*normCDF(-d2)/100;
+    }
+    var gamma = eqT*nD1/(S*sig*sqrtT);
+    var vega = S*eqT*nD1*sqrtT/100;
+    return {price:price, delta:delta, gamma:gamma, vega:vega, theta:thetaAnnual/365, rho:rho};
+  }
+
+  function fmtMoney(n){
+    if(n===undefined||n===null||isNaN(n)) return '&mdash;';
+    var sign=n<0?'-':''; return sign+'$'+Math.abs(n).toFixed(2).replace(/\\B(?=(\\d{3})+(?!\\d))/g,',');
+  }
+  function fmtNum(n,dp){
+    if(n===undefined||n===null||isNaN(n)) return '&mdash;';
+    dp=dp===undefined?4:dp; return n.toFixed(dp);
+  }
+  function linspace(a,b,n){ var arr=[],step=(b-a)/(n-1); for(var i=0;i<n;i++) arr.push(a+step*i); return arr; }
+  function clamp(v,lo,hi){ return Math.min(hi,Math.max(lo,v)); }
+
+  /* ---------- Greek meta ---------- */
+  var GREEK_META = {
+    delta: { label:'Delta', unit:'$ per $1 spot move', colorscale:[[0,'#f0555a'],[0.5,'#121a24'],[1,'#3ecf7e']], zmid:true, dp:4 },
+    gamma: { label:'Gamma', unit:'change in Delta per $1 spot move', colorscale:[[0,'#121a24'],[1,'#4fd1c5']], zmid:false, dp:4 },
+    vega:  { label:'Vega',  unit:'$ per 1% vol move', colorscale:[[0,'#121a24'],[1,'#9d8cff']], zmid:false, dp:4 },
+    theta: { label:'Theta', unit:'$ per day (long position)', colorscale:[[0,'#f0555a'],[1,'#121a24']], zmid:false, dp:4 },
+    rho:   { label:'Rho',   unit:'$ per 1% rate move', colorscale:[[0,'#121a24'],[1,'#ffb020']], zmid:false, dp:4 }
+  };
+
+  /* ---------- State ---------- */
+  var state = {
+    S:100, sigma:0.25, r:0.05, q:0.00, type:'call',
+    KMin:50, KMax:150, TMin:0.05, TMax:2.0,
+    axisMode:'moneyness', greek:'delta',
+    selK:100, selT:0.5
+  };
+
+  /* ---------- Elements ---------- */
+  var el = {
+    rangeS:document.getElementById('rangeS'), valS:document.getElementById('valS'),
+    rangeSigma:document.getElementById('rangeSigma'), valSigma:document.getElementById('valSigma'),
+    rangeR:document.getElementById('rangeR'), valR:document.getElementById('valR'),
+    rangeQ:document.getElementById('rangeQ'), valQ:document.getElementById('valQ'),
+    btnCall:document.getElementById('btnCall'), btnPut:document.getElementById('btnPut'),
+    numKMin:document.getElementById('numKMin'), numKMax:document.getElementById('numKMax'),
+    numTMin:document.getElementById('numTMin'), numTMax:document.getElementById('numTMax'),
+    selKRange:document.getElementById('selKRange'), selKLabel:document.getElementById('selKLabel'),
+    selTRange:document.getElementById('selTRange'), selTLabel:document.getElementById('selTLabel')
+  };
+
+  function bindSlider(rangeEl, stateKey, scale, valLabelEl, suffix, dp){
+    scale = scale===undefined?1:scale;
+    rangeEl.addEventListener('input', function(){
+      var v = parseFloat(this.value);
+      state[stateKey] = v/scale;
+      if(valLabelEl) valLabelEl.textContent = v.toFixed(dp===undefined?2:dp)+(suffix||'');
+      onCoreChange();
+    });
+  }
+  bindSlider(el.rangeS,'S',1,el.valS,'',2);
+  bindSlider(el.rangeSigma,'sigma',100,el.valSigma,'%',2);
+  bindSlider(el.rangeR,'r',100,el.valR,'%',2);
+  bindSlider(el.rangeQ,'q',100,el.valQ,'%',2);
+
+  el.btnCall.addEventListener('click', function(){ state.type='call'; syncToggle(); onCoreChange(); });
+  el.btnPut.addEventListener('click', function(){ state.type='put'; syncToggle(); onCoreChange(); });
+  function syncToggle(){
+    el.btnCall.classList.toggle('active', state.type==='call');
+    el.btnPut.classList.toggle('active', state.type==='put');
+  }
+
+  function onRangeInputsChange(){
+    var kmin = parseFloat(el.numKMin.value), kmax = parseFloat(el.numKMax.value);
+    var tmin = parseFloat(el.numTMin.value), tmax = parseFloat(el.numTMax.value);
+    if(isNaN(kmin)||isNaN(kmax)||kmax<=kmin) return;
+    if(isNaN(tmin)||isNaN(tmax)||tmax<=tmin || tmin<=0) return;
+    state.KMin=kmin; state.KMax=kmax; state.TMin=tmin; state.TMax=tmax;
+    el.selKRange.min=kmin; el.selKRange.max=kmax;
+    el.selTRange.min=tmin; el.selTRange.max=tmax;
+    state.selK = clamp(state.selK, kmin, kmax);
+    state.selT = clamp(state.selT, tmin, tmax);
+    el.selKRange.value = state.selK; el.selKLabel.textContent = state.selK.toFixed(2);
+    el.selTRange.value = state.selT; el.selTLabel.textContent = state.selT.toFixed(3);
+    onCoreChange();
+  }
+  [el.numKMin,el.numKMax,el.numTMin,el.numTMax].forEach(function(inp){
+    inp.addEventListener('change', onRangeInputsChange);
+  });
+
+  el.selKRange.addEventListener('input', function(){
+    state.selK = parseFloat(this.value);
+    el.selKLabel.textContent = state.selK.toFixed(2);
+    onSelectionChange();
+  });
+  el.selTRange.addEventListener('input', function(){
+    state.selT = parseFloat(this.value);
+    el.selTLabel.textContent = state.selT.toFixed(3);
+    onSelectionChange();
+  });
+
+  document.querySelectorAll('#axisModeGroup button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('#axisModeGroup button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.axisMode = btn.getAttribute('data-mode');
+      onCoreChange();
+    });
+  });
+  document.querySelectorAll('#greekGroup button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('#greekGroup button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.greek = btn.getAttribute('data-greek');
+      onSelectionChange(true);
+    });
+  });
+
+  /* ---------- Plot theming ---------- */
+  var plotFont = { family:'IBM Plex Mono, monospace', size:11, color:'#9fb0c0' };
+  function baseLayout(extra){
+    var l = {
+      paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:plotFont,
+      margin:{l:55,r:20,t:10,b:42},
+      xaxis:{gridcolor:'#1c2430', zerolinecolor:'#1c2430', linecolor:'#1f2b3a'},
+      yaxis:{gridcolor:'#1c2430', zerolinecolor:'#1c2430', linecolor:'#1f2b3a'},
+      legend:{orientation:'h', y:1.15, font:{color:'#9fb0c0', size:10}},
+      hoverlabel:{bgcolor:'#121a24', bordercolor:'#1f2b3a', font:{family:'IBM Plex Mono, monospace', color:'#e8eef4', size:11}}
+    };
+    return Object.assign(l, extra||{});
+  }
+  var plotConfig = {displayModeBar:false, responsive:true};
+  var COLOR_AMBER='#ffb020', COLOR_CYAN='#4fd1c5';
+
+  /* ---------- Axis conversion ---------- */
+  function xAxisArray(n){
+    if(state.axisMode==='strike'){
+      return linspace(state.KMin, state.KMax, n);
+    } else if(state.axisMode==='moneyness'){
+      return linspace(state.KMin/state.S, state.KMax/state.S, n);
+    } else {
+      return linspace(Math.log(state.KMin/state.S), Math.log(state.KMax/state.S), n);
+    }
+  }
+  function xToK(xVal){
+    if(state.axisMode==='strike') return xVal;
+    if(state.axisMode==='moneyness') return xVal*state.S;
+    return state.S*Math.exp(xVal);
+  }
+  function kToX(K){
+    if(state.axisMode==='strike') return K;
+    if(state.axisMode==='moneyness') return K/state.S;
+    return Math.log(K/state.S);
+  }
+  function xAxisTitle(){
+    if(state.axisMode==='strike') return 'Strike (K)';
+    if(state.axisMode==='moneyness') return 'Moneyness (K / S)';
+    return 'Log-Moneyness ln(K/S)';
+  }
+
+  var lastSurface = null; // cache for heatmap-derived insight stats
+
+  function onCoreChange(){
+    buildHeatmap();
+    onSelectionChange();
+  }
+
+  function buildHeatmap(){
+    var NX=45, NY=40;
+    var xArr = xAxisArray(NX);
+    var tArr = linspace(state.TMin, state.TMax, NY);
+    var z = [];
+    var argmax = {gamma:{v:-Infinity}, vega:{v:-Infinity}};
+    for(var j=0;j<NY;j++){
+      var row=[];
+      for(var i=0;i<NX;i++){
+        var K = xToK(xArr[i]);
+        var g = allGreeks(state.S,K,state.sigma,state.r,state.q,tArr[j],state.type);
+        var val = g[state.greek];
+        row.push(val);
+        if(g.gamma>argmax.gamma.v){ argmax.gamma = {v:g.gamma, K:K, T:tArr[j]}; }
+        if(g.vega>argmax.vega.v){ argmax.vega = {v:g.vega, K:K, T:tArr[j]}; }
+      }
+      z.push(row);
+    }
+    lastSurface = { xArr:xArr, tArr:tArr, z:z, argmax:argmax };
+
+    var meta = GREEK_META[state.greek];
+    var heatTrace = {
+      x:xArr, y:tArr, z:z, type:'heatmap',
+      colorscale: meta.colorscale,
+      zmid: meta.zmid ? 0 : undefined,
+      colorbar:{ title:{text:meta.label, font:{color:'#9fb0c0', family:'IBM Plex Mono', size:11}}, tickfont:{color:'#9fb0c0', family:'IBM Plex Mono'} },
+      hovertemplate: xAxisTitle()+': %{x:.3f}<br>T: %{y:.3f}y<br>'+meta.label+': %{z:.4f}<extra></extra>'
+    };
+
+    document.getElementById('heatmapTitle').textContent = meta.label + ' Surface';
+
+    var xSel = kToX(state.selK);
+    var shapes = [
+      { type:'line', x0:xSel, x1:xSel, y0:state.TMin, y1:state.TMax, line:{color:'#e8eef4', width:1.5, dash:'dot'} },
+      { type:'line', x0:xArr[0], x1:xArr[xArr.length-1], y0:state.selT, y1:state.selT, line:{color:'#e8eef4', width:1.5, dash:'dot'} }
+    ];
+
+    Plotly.react('plotHeatmap', [heatTrace], baseLayout({
+      xaxis:Object.assign({title:xAxisTitle()}, baseLayout().xaxis),
+      yaxis:Object.assign({title:'Time to Expiry (years)'}, baseLayout().yaxis),
+      shapes:shapes,
+      margin:{l:60,r:10,t:10,b:42}
+    }), plotConfig);
+
+    var gd = document.getElementById('plotHeatmap');
+    gd.removeAllListeners && gd.removeAllListeners('plotly_click');
+    gd.on('plotly_click', function(data){
+      if(!data || !data.points || !data.points.length) return;
+      var pt = data.points[0];
+      var K = clamp(xToK(pt.x), state.KMin, state.KMax);
+      var T = clamp(pt.y, state.TMin, state.TMax);
+      state.selK = K; state.selT = T;
+      el.selKRange.value = K; el.selKLabel.textContent = K.toFixed(2);
+      el.selTRange.value = T; el.selTLabel.textContent = T.toFixed(3);
+      onSelectionChange();
+    });
+  }
+
+  function onSelectionChange(greekOnly){
+    updateKPI();
+    updateSlices();
+    updateCrosshair();
+    updateInsights();
+    if(greekOnly){
+      // Greek toggled: heatmap colors + title must refresh too
+      buildHeatmap();
+    }
+  }
+
+  function updateCrosshair(){
+    if(!lastSurface) return;
+    var xSel = kToX(state.selK);
+    var xArr = lastSurface.xArr;
+    Plotly.relayout('plotHeatmap', {
+      'shapes[0].x0': xSel, 'shapes[0].x1': xSel,
+      'shapes[1].y0': state.selT, 'shapes[1].y1': state.selT
+    });
+  }
+
+  function updateKPI(){
+    var g = allGreeks(state.S, state.selK, state.sigma, state.r, state.q, state.selT, state.type);
+    document.getElementById('kpiPrice').innerHTML = fmtMoney(g.price);
+    document.getElementById('kpiDelta').textContent = fmtNum(g.delta,4);
+    document.getElementById('kpiGamma').textContent = fmtNum(g.gamma,4);
+    document.getElementById('kpiVega').innerHTML = fmtMoney(g.vega);
+    document.getElementById('kpiTheta').innerHTML = fmtMoney(g.theta);
+    document.getElementById('kpiRho').innerHTML = fmtMoney(g.rho);
+
+    var ratio = state.selK/state.S;
+    var isCall = state.type==='call';
+    var band=0.025, cls;
+    if(Math.abs(ratio-1)<=band) cls='atm';
+    else if(isCall ? ratio<1 : ratio>1) cls='itm';
+    else cls='otm';
+    document.getElementById('kpiMoney').innerHTML = '<span class="moneytag '+cls+'">'+cls.toUpperCase()+'</span> &middot; K/S='+ratio.toFixed(3);
+  }
+
+  function updateSlices(){
+    var meta = GREEK_META[state.greek];
+    var accent = state.type==='call' ? '#3ecf7e' : '#f0555a';
+
+    // Cross-section at selected expiry: sweep K
+    var NX=90;
+    var xArr = xAxisArray(NX);
+    var yK = xArr.map(function(x){ return allGreeks(state.S, xToK(x), state.sigma, state.r, state.q, state.selT, state.type)[state.greek]; });
+    document.getElementById('sliceTitle1').textContent = meta.label + ' vs. ' + xAxisTitle() + ' (T = ' + state.selT.toFixed(3) + 'y)';
+    document.getElementById('sliceDesc1').textContent = meta.label + ' (' + meta.unit + ') across the strike axis, holding expiry fixed at the selected T.';
+    Plotly.react('plotSliceK', [
+      { x:xArr, y:yK, type:'scatter', mode:'lines', name:meta.label, line:{color:COLOR_CYAN,width:2.5} },
+      { x:[kToX(state.selK)], y:[allGreeks(state.S,state.selK,state.sigma,state.r,state.q,state.selT,state.type)[state.greek]], type:'scatter', mode:'markers', name:'Selected', marker:{color:COLOR_AMBER,size:9,line:{color:'#000',width:1}} }
+    ], baseLayout({
+      xaxis:Object.assign({title:xAxisTitle()}, baseLayout().xaxis),
+      yaxis:Object.assign({title:meta.label}, baseLayout().yaxis)
+    }), plotConfig);
+
+    // Term structure at selected strike: sweep T
+    var NT=90;
+    var tArr = linspace(state.TMin, state.TMax, NT);
+    var yT = tArr.map(function(t){ return allGreeks(state.S, state.selK, state.sigma, state.r, state.q, t, state.type)[state.greek]; });
+    document.getElementById('sliceTitle2').textContent = meta.label + ' vs. Time to Expiry (K = ' + state.selK.toFixed(2) + ')';
+    document.getElementById('sliceDesc2').textContent = meta.label + ' (' + meta.unit + ') across time to expiry, holding strike fixed at the selected K.';
+    Plotly.react('plotSliceT', [
+      { x:tArr, y:yT, type:'scatter', mode:'lines', name:meta.label, line:{color:'#9d8cff',width:2.5} },
+      { x:[state.selT], y:[allGreeks(state.S,state.selK,state.sigma,state.r,state.q,state.selT,state.type)[state.greek]], type:'scatter', mode:'markers', name:'Selected', marker:{color:COLOR_AMBER,size:9,line:{color:'#000',width:1}} }
+    ], baseLayout({
+      xaxis:Object.assign({title:'Time to Expiry (years)', autorange:'reversed'}, baseLayout().xaxis),
+      yaxis:Object.assign({title:meta.label}, baseLayout().yaxis)
+    }), plotConfig);
+  }
+
+  function updateInsights(){
+    var isCall = state.type==='call';
+    var list = document.getElementById('insightsList');
+    var items = [];
+
+    // Delta approach at extremes
+    var gDeepITM = allGreeks(state.S, isCall?state.KMin:state.KMax, state.sigma, state.r, state.q, state.TMax, state.type);
+    var gDeepOTM = allGreeks(state.S, isCall?state.KMax:state.KMin, state.sigma, state.r, state.q, state.TMax, state.type);
+    items.push('At the current strike range extremes (T='+state.TMax.toFixed(2)+'y), Delta reads <b>'+fmtNum(gDeepITM.delta,3)+'</b> at the deepest in-the-money strike and <b>'+fmtNum(gDeepOTM.delta,3)+'</b> at the deepest out-of-the-money strike &mdash; consistent with Delta trending toward '+(isCall?'1':'-1')+' deep ITM and toward 0 deep OTM.');
+
+    // Gamma peak
+    if(lastSurface){
+      var gm = lastSurface.argmax.gamma;
+      var ratioAtPeak = gm.K/state.S;
+      items.push('Gamma peaks within the displayed grid at K &asymp; <b>'+gm.K.toFixed(2)+'</b> (K/S &asymp; '+ratioAtPeak.toFixed(3)+') and T &asymp; <b>'+gm.T.toFixed(3)+'y</b>, with a value of <b>'+gm.v.toFixed(4)+'</b> &mdash; the shortest-dated near-the-money corner of the grid, as expected since Gamma concentrates where small spot moves most change the odds of finishing ITM.');
+
+      var vm = lastSurface.argmax.vega;
+      var ratioAtVegaPeak = vm.K/state.S;
+      items.push('Vega peaks at K &asymp; <b>'+vm.K.toFixed(2)+'</b> (K/S &asymp; '+ratioAtVegaPeak.toFixed(3)+') and T &asymp; <b>'+vm.T.toFixed(3)+'y</b>, value <b>'+vm.v.toFixed(4)+'</b> &mdash; near-the-money and toward the longer end of the expiry range shown, matching Vega\'s &radic;T scaling.');
+    }
+
+    // Theta near vs far expiry at ATM
+    var thetaNear = allGreeks(state.S, state.S, state.sigma, state.r, state.q, state.TMin, state.type).theta;
+    var thetaFar = allGreeks(state.S, state.S, state.sigma, state.r, state.q, state.TMax, state.type).theta;
+    items.push('At an at-the-money strike (K=S), Theta for this long '+state.type+' is <b>'+fmtMoney(thetaFar)+'</b>/day at T='+state.TMax.toFixed(2)+'y versus <b>'+fmtMoney(thetaNear)+'</b>/day at T='+state.TMin.toFixed(2)+'y &mdash; time decay accelerates as expiry approaches for this parameter set.');
+
+    // Rho magnitude comparison
+    var rhoNear = allGreeks(state.S, state.selK, state.sigma, state.r, state.q, state.TMin, state.type).rho;
+    var rhoFar = allGreeks(state.S, state.selK, state.sigma, state.r, state.q, state.TMax, state.type).rho;
+    items.push('At the selected strike (K='+state.selK.toFixed(2)+'), Rho grows in magnitude from <b>'+fmtMoney(rhoNear)+'</b> at T='+state.TMin.toFixed(2)+'y to <b>'+fmtMoney(rhoFar)+'</b> at T='+state.TMax.toFixed(2)+'y, reflecting greater rate sensitivity for longer-dated exposure.');
+
+    list.innerHTML = items.map(function(t){ return '<li>'+t+'</li>'; }).join('');
+
+    document.getElementById('insightsCaveat').innerHTML =
+      'These patterns hold for typical parameter ranges under Black-Scholes-Merton assumptions but are not universal: e.g. Theta can turn positive for deep in-the-money European puts when r is large relative to &sigma;, and extreme q or r values can shift where Vega and Gamma peak away from K=S. Signs shown assume a <b style="color:var(--text-mid)">long</b> position; a short position in the same option has the opposite sign on every Greek.';
+  }
+
+  /* ---------- Clock ---------- */
+  function tickClock(){
+    var d=new Date();
+    var hh=String(d.getHours()).padStart(2,'0'), mm=String(d.getMinutes()).padStart(2,'0'), ss=String(d.getSeconds()).padStart(2,'0');
+    document.getElementById('clockPill').textContent = hh+':'+mm+':'+ss+' LOCAL';
+  }
+  tickClock(); setInterval(tickClock,1000);
+
+  /* ---------- Init ---------- */
+  syncToggle();
+  onRangeInputsChange();
+
+  window.addEventListener('resize', function(){
+    ['plotHeatmap','plotSliceK','plotSliceT'].forEach(function(id){
+      Plotly.Plots.resize(document.getElementById(id));
+    });
+  });
+
+})();
+</script>
+</body>
+</html>

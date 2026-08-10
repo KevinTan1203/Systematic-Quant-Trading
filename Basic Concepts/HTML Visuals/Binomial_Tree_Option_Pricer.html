@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRR Binomial Tree Pricer // Derivatives Desk</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.32.0/plotly.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#080b10; --bg-1:#0d131b; --bg-2:#121a24; --bg-3:#182233;
+    --line:#1f2b3a; --line-soft:#161f2b;
+    --text-hi:#e8eef4; --text-mid:#9fb0c0; --text-lo:#5d6d7e;
+    --amber:#ffb020; --amber-dim:#8a6420;
+    --cyan:#4fd1c5; --cyan-dim:#1f6b64;
+    --green:#3ecf7e; --red:#f0555a; --violet:#9d8cff;
+    --mono:'IBM Plex Mono', monospace; --sans:'Space Grotesk','IBM Plex Sans',sans-serif; --ui:'IBM Plex Sans', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg-0);color:var(--text-hi);font-family:var(--ui);}
+  body{background-image:radial-gradient(circle at 10% 0%, rgba(255,176,32,0.04), transparent 40%),radial-gradient(circle at 90% 12%, rgba(79,209,197,0.04), transparent 45%); min-height:100vh;}
+  ::selection{background:var(--amber);color:#000;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:var(--bg-1);}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--amber-dim);}
+
+  header.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg-1),var(--bg-0));position:sticky;top:0;z-index:50;backdrop-filter:blur(6px);flex-wrap:wrap;gap:10px;}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand .mark{width:38px;height:38px;border:1px solid var(--amber-dim);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;color:var(--amber);font-size:14px;background:rgba(255,176,32,0.06);}
+  .brand h1{font-family:var(--sans);font-size:17px;font-weight:600;margin:0;letter-spacing:0.02em;}
+  .brand .sub{font-family:var(--mono);font-size:10.5px;color:var(--text-lo);letter-spacing:0.08em;margin-top:2px;text-transform:uppercase;}
+  .status{display:flex;gap:22px;align-items:center;}
+  .status .pill{font-family:var(--mono);font-size:11px;color:var(--text-mid);border:1px solid var(--line);padding:5px 10px;border-radius:20px;display:flex;align-items:center;gap:6px;}
+  .status .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);}
+
+  .layout{display:grid;grid-template-columns:300px 1fr;gap:0;align-items:start;}
+  @media (max-width:1060px){.layout{grid-template-columns:1fr;}}
+  aside.controls{position:sticky;top:61px;height:calc(100vh - 61px);overflow-y:auto;border-right:1px solid var(--line);background:var(--bg-1);padding:20px 18px 60px 18px;}
+  @media (max-width:1060px){aside.controls{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line);}}
+  main.content{padding:24px 28px 60px 28px;min-width:0;}
+
+  .section-label{font-family:var(--mono);font-size:10.5px;letter-spacing:0.12em;color:var(--text-lo);text-transform:uppercase;margin:22px 0 10px 0;display:flex;align-items:center;gap:8px;}
+  .section-label:first-child{margin-top:0;}
+  .section-label::after{content:'';flex:1;height:1px;background:var(--line);}
+
+  .field{margin-bottom:14px;}
+  .field label{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--text-mid);margin-bottom:5px;}
+  .field label .val{font-family:var(--mono);color:var(--amber);font-size:12.5px;font-weight:600;}
+  .field input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--line);outline:none;margin:6px 0;}
+  .field input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:var(--amber);cursor:pointer;border:2px solid #1a1207;box-shadow:0 0 0 3px rgba(255,176,32,0.15);}
+  .field input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--amber);cursor:pointer;border:2px solid #1a1207;}
+  .field input[type=number]{width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--text-hi);font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:4px;outline:none;}
+  .field input[type=number]:focus{border-color:var(--amber-dim);}
+
+  .toggle-group{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:14px;}
+  .toggle-group button{flex:1;background:var(--bg-2);color:var(--text-mid);border:none;padding:9px 0;font-family:var(--mono);font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.04em;transition:background .15s,color .15s;}
+  .toggle-group button.active.call{background:rgba(62,207,126,0.14);color:var(--green);}
+  .toggle-group button.active.put{background:rgba(240,85,90,0.14);color:var(--red);}
+  .toggle-group button.active.euro{background:rgba(79,209,197,0.14);color:var(--cyan);}
+  .toggle-group button.active.amer{background:rgba(255,176,32,0.14);color:var(--amber);}
+  .toggle-group button:not(.active):hover{background:var(--bg-3);}
+
+  .assumptions{font-family:var(--ui);font-size:10.8px;color:var(--text-lo);line-height:1.55;border-top:1px solid var(--line);padding-top:14px;margin-top:22px;}
+  .assumptions b{color:var(--text-mid);}
+  .warn{font-family:var(--ui);font-size:10.5px;color:var(--amber);background:rgba(255,176,32,0.08);border:1px solid var(--amber-dim);border-radius:6px;padding:8px 10px;margin-top:10px;line-height:1.5;display:none;}
+  .warn.show{display:block;}
+
+  h2.page-title{font-family:var(--sans);font-size:19px;font-weight:600;margin:0 0 4px 0;}
+  p.page-sub{font-family:var(--ui);font-size:12px;color:var(--text-lo);margin:0 0 20px 0;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+  @media (max-width:1400px){.kpi-grid{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+  .kpi{background:linear-gradient(180deg,var(--bg-2),var(--bg-1));border:1px solid var(--line);border-radius:8px;padding:12px 14px;position:relative;overflow:hidden;}
+  .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--kpi-accent,var(--amber));}
+  .kpi .k-label{font-family:var(--mono);font-size:9.5px;color:var(--text-lo);text-transform:uppercase;letter-spacing:0.07em;}
+  .kpi .k-value{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--text-hi);margin-top:5px;}
+  .kpi.hero .k-value{font-size:20px;color:var(--amber);}
+  .kpi .k-sub{font-family:var(--ui);font-size:9.5px;color:var(--text-mid);margin-top:3px;}
+
+  .tree-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:16px 0 0 0;}
+  .tree-toolbar .zoom-controls{display:flex;gap:6px;}
+  .tree-toolbar button{background:var(--bg-2);border:1px solid var(--line);color:var(--text-mid);font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:5px;cursor:pointer;transition:all .15s;}
+  .tree-toolbar button:hover{background:var(--bg-3);color:var(--text-hi);border-color:var(--cyan-dim);}
+  .tree-legend{display:flex;gap:16px;font-family:var(--mono);font-size:10px;color:var(--text-lo);flex-wrap:wrap;align-items:center;}
+  .tree-legend span{display:flex;align-items:center;gap:5px;}
+  .tree-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+
+  .tree-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px;}
+  @media (max-width:1080px){.tree-grid{grid-template-columns:1fr;}}
+  .chart-card{background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:16px 16px 12px 16px;}
+  .chart-card.full{grid-column:1/-1;}
+  .chart-card h3{font-family:var(--sans);font-size:13px;font-weight:600;margin:0 0 2px 0;}
+  .chart-card p.desc{font-family:var(--ui);font-size:11px;color:var(--text-lo);margin:0 0 8px 0;}
+  .tree-svg-wrap{width:100%;height:440px;border:1px solid var(--line-soft);border-radius:6px;overflow:hidden;background:var(--bg-0);cursor:grab;position:relative;}
+  .tree-svg-wrap:active{cursor:grabbing;}
+  .tree-svg-wrap svg{width:100%;height:100%;display:block;}
+  .plot{width:100%;height:320px;}
+
+  .node-panel{background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin-top:16px;}
+  .node-panel .np-head{font-family:var(--sans);font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .node-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  @media (max-width:900px){.node-grid{grid-template-columns:repeat(2,1fr);}}
+  .node-grid .ni{background:var(--bg-2);border:1px solid var(--line);border-radius:6px;padding:9px 11px;}
+  .node-grid .ni .nl{font-family:var(--mono);font-size:9.5px;color:var(--text-lo);text-transform:uppercase;letter-spacing:0.06em;}
+  .node-grid .ni .nv{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text-hi);margin-top:3px;}
+  .node-grid .ni.exercised .nv{color:var(--amber);}
+  .empty-hint{font-family:var(--ui);font-size:12px;color:var(--text-lo);text-align:center;padding:14px 0;}
+
+  .insights-panel{background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin-top:16px;}
+  .insights-panel ul{margin:8px 0 0 0;padding-left:0;list-style:none;}
+  .insights-panel li{font-family:var(--ui);font-size:12.5px;color:var(--text-mid);line-height:1.6;padding:9px 0 9px 22px;border-bottom:1px solid var(--line-soft);position:relative;}
+  .insights-panel li:last-child{border-bottom:none;}
+  .insights-panel li::before{content:'▸';position:absolute;left:2px;color:var(--cyan);font-size:12px;}
+  .insights-panel li b{color:var(--text-hi);font-family:var(--mono);}
+
+  .edu-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;}
+  @media (max-width:980px){.edu-grid{grid-template-columns:1fr;}}
+  details.formula-card{background:var(--bg-1);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  details.formula-card summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;font-family:var(--sans);font-size:13px;font-weight:600;}
+  details.formula-card summary::-webkit-details-marker{display:none;}
+  details.formula-card summary::after{content:'+';font-family:var(--mono);color:var(--amber);font-size:16px;transition:transform .2s;}
+  details.formula-card[open] summary::after{transform:rotate(45deg);}
+  details.formula-card summary:hover{background:var(--bg-2);}
+  .formula-body{padding:0 16px 16px 16px;font-family:var(--ui);font-size:12.5px;color:var(--text-mid);line-height:1.65;}
+  .formula-body .eq{font-family:var(--mono);font-size:12px;color:var(--cyan);background:var(--bg-2);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin:8px 0;overflow-x:auto;white-space:pre;}
+
+  footer{padding:22px 28px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--text-lo);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="mark">&Yopf;</div>
+    <div>
+      <h1>CRR Binomial Tree Pricer</h1>
+      <div class="sub">Cox-Ross-Rubinstein &middot; Backward Induction Lab</div>
+    </div>
+  </div>
+  <div class="status">
+    <div class="pill"><span class="dot"></span> Every node computed live</div>
+    <div class="pill" id="clockPill">--:--:--</div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="controls">
+    <div class="section-label">Option Type</div>
+    <div class="toggle-group">
+      <button id="btnCall" class="active call">CALL</button>
+      <button id="btnPut" class="put">PUT</button>
+    </div>
+    <div class="section-label" style="margin-top:0;">Exercise Style</div>
+    <div class="toggle-group">
+      <button id="btnEuro" class="active euro">EUROPEAN</button>
+      <button id="btnAmer" class="amer">AMERICAN</button>
+    </div>
+
+    <div class="section-label">Market Inputs</div>
+    <div class="field">
+      <label>Spot Price S&#8320; <span class="val" id="valS">100.00</span></label>
+      <input type="range" id="rangeS" min="1" max="300" step="0.5" value="100">
+    </div>
+    <div class="field">
+      <label>Strike Price K <span class="val" id="valK">100.00</span></label>
+      <input type="range" id="rangeK" min="1" max="300" step="0.5" value="100">
+    </div>
+    <div class="field">
+      <label>Volatility &sigma; <span class="val" id="valSigma">25.00%</span></label>
+      <input type="range" id="rangeSigma" min="1" max="150" step="0.5" value="25">
+    </div>
+    <div class="field">
+      <label>Risk-Free Rate r <span class="val" id="valR">5.00%</span></label>
+      <input type="range" id="rangeR" min="-2" max="15" step="0.05" value="5">
+    </div>
+    <div class="field">
+      <label>Dividend Yield q <span class="val" id="valQ">0.00%</span></label>
+      <input type="range" id="rangeQ" min="0" max="12" step="0.05" value="0">
+    </div>
+    <div class="field">
+      <label>Time to Expiry T (yrs) <span class="val" id="valT">1.000</span></label>
+      <input type="range" id="rangeT" min="0.05" max="3" step="0.01" value="1">
+    </div>
+    <div class="field">
+      <label>Tree Steps N <span class="val" id="valN">8</span></label>
+      <input type="range" id="rangeN" min="1" max="40" step="1" value="8">
+    </div>
+    <div class="warn" id="stepWarn">Large step counts render many nodes. Labels hide automatically past ~20 steps &mdash; use zoom/pan or click nodes to inspect values.</div>
+
+    <div class="assumptions">
+      <b>Model:</b> Cox-Ross-Rubinstein recombining binomial tree under risk-neutral valuation. u=e^(&sigma;&radic;&Delta;t), d=1/u, p=[e^((r&minus;q)&Delta;t)&minus;d]/(u&minus;d). Every displayed node value is computed by backward induction from this session's inputs &mdash; nothing is precomputed or hard-coded.
+    </div>
+  </aside>
+
+  <main class="content">
+    <h2 class="page-title">Stock &amp; Option Value Trees</h2>
+    <p class="page-sub">Scroll to zoom, drag to pan either tree. Click any node for its full breakdown &mdash; stock price, option value, exercise value, continuation value, risk-neutral probability, and time.</p>
+
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="kpi hero" style="--kpi-accent:var(--amber)"><div class="k-label">Binomial Price</div><div class="k-value" id="kpiBinom">0.00</div><div class="k-sub" id="kpiBinomSub">N steps</div></div>
+      <div class="kpi" style="--kpi-accent:var(--cyan)"><div class="k-label">Black-Scholes (Euro)</div><div class="k-value" id="kpiBS">0.00</div><div class="k-sub">Analytical reference</div></div>
+      <div class="kpi" style="--kpi-accent:var(--violet)"><div class="k-label">Difference</div><div class="k-value" id="kpiDiff">0.00</div><div class="k-sub" id="kpiDiffSub">Binomial &minus; BS</div></div>
+      <div class="kpi" style="--kpi-accent:var(--green)"><div class="k-label">Up Factor u</div><div class="k-value" id="kpiU">0.0000</div><div class="k-sub">e^(&sigma;&radic;&Delta;t)</div></div>
+      <div class="kpi" style="--kpi-accent:var(--red)"><div class="k-label">Down Factor d</div><div class="k-value" id="kpiD">0.0000</div><div class="k-sub">1 / u</div></div>
+      <div class="kpi" style="--kpi-accent:var(--amber)"><div class="k-label">Risk-Neutral p</div><div class="k-value" id="kpiP">0.0000</div><div class="k-sub">P(up move)</div></div>
+    </div>
+
+    <div class="tree-toolbar">
+      <div class="tree-legend">
+        <span><i style="background:var(--cyan)"></i>Node value</span>
+        <span><i style="background:var(--amber)"></i>Selected node</span>
+        <span><i style="background:var(--red);border-radius:2px;"></i>Early exercise (American)</span>
+      </div>
+      <div class="zoom-controls">
+        <button id="btnZoomOut">&minus;</button>
+        <button id="btnZoomFit">Fit</button>
+        <button id="btnZoomIn">+</button>
+      </div>
+    </div>
+
+    <div class="tree-grid">
+      <div class="chart-card">
+        <h3>Stock Price Tree</h3>
+        <p class="desc">Recombining lattice of underlying prices, S&#8320;&middot;u^j&middot;d^(i&minus;j).</p>
+        <div class="tree-svg-wrap" id="wrapStock"><svg id="svgStock"></svg></div>
+      </div>
+      <div class="chart-card">
+        <h3>Option Value Tree</h3>
+        <p class="desc">Backward-induced option values. Red rings mark nodes where early exercise is optimal.</p>
+        <div class="tree-svg-wrap" id="wrapOption"><svg id="svgOption"></svg></div>
+      </div>
+    </div>
+
+    <div class="node-panel">
+      <div class="np-head">Selected Node</div>
+      <div id="nodePanelBody"><div class="empty-hint">Click any node in either tree above to inspect it here.</div></div>
+    </div>
+
+    <div class="section-label">Convergence to Black-Scholes</div>
+    <div class="chart-card full">
+      <h3>Binomial Price vs. Number of Steps</h3>
+      <p class="desc">Recomputed fresh for each step count from 1 up to the chart's max &mdash; not interpolated. Dashed line is the closed-form European Black-Scholes price for reference.</p>
+      <div id="plotConvergence" class="plot"></div>
+    </div>
+
+    <div class="section-label">What The Tree Is Teaching</div>
+    <div class="insights-panel">
+      <ul id="insightsList"></ul>
+    </div>
+
+    <div class="section-label">Concepts &amp; Formulas</div>
+    <div class="edu-grid">
+      <details class="formula-card" open>
+        <summary>Risk-Neutral Probability</summary>
+        <div class="formula-body">
+          <div class="eq">u = e^(&sigma;&radic;&Delta;t)        d = 1/u
+p = [e^((r&minus;q)&Delta;t) &minus; d] / (u &minus; d)</div>
+          <p>p is not the real-world probability of an up move &mdash; it's the probability under which the discounted expected stock price grows at the risk-free rate net of dividends. It exists purely so that pricing by expectation gives an arbitrage-free value; it is derived from u, d, r, and q, never assumed or observed from historical data.</p>
+        </div>
+      </details>
+      <details class="formula-card">
+        <summary>Replication &amp; No-Arbitrage</summary>
+        <div class="formula-body">
+          <p>At each node, the option's payoff over the next step can be exactly replicated by holding &Delta; shares of stock and lending/borrowing cash at rate r. Because that replicating portfolio matches the option's payoff in both the up and down states, its cost today must equal the option's value today &mdash; otherwise a riskless arbitrage would exist. Risk-neutral pricing with probability p is a shortcut that produces the same answer as building this replicating portfolio at every node.</p>
+        </div>
+      </details>
+      <details class="formula-card">
+        <summary>Backward Induction</summary>
+        <div class="formula-body">
+          <div class="eq">V(i,j) = e^(&minus;r&Delta;t) &middot; [ p&middot;V(i+1,j+1) + (1&minus;p)&middot;V(i+1,j) ]</div>
+          <p>Terminal payoffs are known exactly at expiry. Working backward one step at a time, each node's value is the discounted, probability-weighted average of its two children. By the time the recursion reaches the root, every intermediate node has already been priced &mdash; the root value is the option's price today.</p>
+        </div>
+      </details>
+      <details class="formula-card">
+        <summary>Early Exercise (American Options)</summary>
+        <div class="formula-body">
+          <div class="eq">V(i,j) = max( continuation value, exercise value )</div>
+          <p>For American options, at every node the holder compares immediately exercising (intrinsic value) against continuing to hold (the discounted expected value shown above), and takes whichever is larger. Early exercise can be optimal for calls on stocks with large dividends, and for puts when interest rates are high enough that the present value of receiving the strike now outweighs the option's remaining time value.</p>
+        </div>
+      </details>
+      <details class="formula-card">
+        <summary>Convergence to Black-Scholes</summary>
+        <div class="formula-body">
+          <p>As the number of steps N grows, &Delta;t = T/N shrinks, and the binomial distribution of terminal log-returns approaches a normal distribution by the Central Limit Theorem &mdash; the same lognormal assumption underlying Black-Scholes. In the limit N&rarr;&infin;, the CRR binomial price converges to the Black-Scholes-Merton closed-form price for European options. Convergence is not perfectly monotonic: odd and even step counts can approach from opposite sides, which is why the chart above often shows a slight zig-zag before settling down.</p>
+        </div>
+      </details>
+    </div>
+  </main>
+</div>
+
+<footer>
+  <span>CRR Binomial Tree Pricer &middot; Educational tool for European and American option pricing.</span>
+  <span>Not investment advice. All computations run client-side.</span>
+</footer>
+
+<script>
+(function(){
+
+  /* ---------- Math ---------- */
+  function erf(x){
+    var sign = x < 0 ? -1 : 1; x = Math.abs(x);
+    var a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+    var t=1/(1+p*x);
+    var y=1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+    return sign*y;
+  }
+  function normCDF(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
+
+  function bsPrice(S,K,sigma,r,q,T,type){
+    if(T<=1e-8 || sigma<=1e-6){ return type==='call'?Math.max(S-K,0):Math.max(K-S,0); }
+    var sT = sigma*Math.sqrt(T);
+    var d1 = (Math.log(S/K)+(r-q+0.5*sigma*sigma)*T)/sT;
+    var d2 = d1-sT;
+    if(type==='call') return S*Math.exp(-q*T)*normCDF(d1)-K*Math.exp(-r*T)*normCDF(d2);
+    return K*Math.exp(-r*T)*normCDF(-d2)-S*Math.exp(-q*T)*normCDF(-d1);
+  }
+
+  function buildTree(S0,K,sigma,r,q,T,N,type,style){
+    var dt = T/N;
+    var u = Math.exp(Math.max(sigma,1e-6)*Math.sqrt(dt));
+    var d = 1/u;
+    var disc = Math.exp(-r*dt);
+    var p = (Math.exp((r-q)*dt) - d)/(u-d);
+    var pc = Math.min(1,Math.max(0,p)); // clamp for numerical edge cases, display raw p separately
+
+    var S=[], V=[], exVal=[], contVal=[], exercised=[], prob=[];
+    for(var i=0;i<=N;i++){
+      var rowS=[]; for(var j=0;j<=i;j++){ rowS.push(S0*Math.pow(u,j)*Math.pow(d,i-j)); }
+      S.push(rowS);
+      V.push(new Array(i+1).fill(0));
+      exVal.push(new Array(i+1).fill(0));
+      contVal.push(new Array(i+1).fill(null));
+      exercised.push(new Array(i+1).fill(false));
+      prob.push(new Array(i+1).fill(0));
+    }
+    // reach probabilities (binomial coefficients)
+    for(var i=0;i<=N;i++){
+      for(var j=0;j<=i;j++){
+        prob[i][j] = binomCoef(i,j) * Math.pow(pc,j) * Math.pow(1-pc,i-j);
+      }
+    }
+    for(var j=0;j<=N;j++){
+      var payoff = type==='call'?Math.max(S[N][j]-K,0):Math.max(K-S[N][j],0);
+      V[N][j]=payoff; exVal[N][j]=payoff; contVal[N][j]=null;
+    }
+    for(var i=N-1;i>=0;i--){
+      for(var j=0;j<=i;j++){
+        var cont = disc*(pc*V[i+1][j+1] + (1-pc)*V[i+1][j]);
+        var ev = type==='call'?Math.max(S[i][j]-K,0):Math.max(K-S[i][j],0);
+        contVal[i][j]=cont; exVal[i][j]=ev;
+        if(style==='american' && ev>cont){ V[i][j]=ev; exercised[i][j]=true; }
+        else { V[i][j]=cont; }
+      }
+    }
+    return {S:S,V:V,exVal:exVal,contVal:contVal,exercised:exercised,prob:prob,u:u,d:d,p:p,dt:dt,price:V[0][0],N:N};
+  }
+  function binomCoef(n,k){
+    if(k<0||k>n) return 0;
+    var res=1;
+    for(var i=0;i<k;i++){ res = res*(n-i)/(i+1); }
+    return res;
+  }
+
+  function fmtMoney(n){
+    if(n===undefined||n===null||isNaN(n)) return '&mdash;';
+    var sign=n<0?'-':''; return sign+'$'+Math.abs(n).toFixed(4).replace(/\\B(?=(\\d{3})+(?!\\d)\\.)/g,',');
+  }
+  function fmtMoney2(n){
+    if(n===undefined||n===null||isNaN(n)) return '&mdash;';
+    var sign=n<0?'-':''; return sign+'$'+Math.abs(n).toFixed(2).replace(/\\B(?=(\\d{3})+(?!\\d))/g,',');
+  }
+  function fmtPct(n){ return (n*100).toFixed(2)+'%'; }
+
+  /* ---------- State ---------- */
+  var state = { S:100,K:100,sigma:0.25,r:0.05,q:0.00,T:1.0,N:8,type:'call',style:'european' };
+  var currentTree = null;
+  var selected = null; // {i,j}
+
+  /* ---------- Elements & bindings ---------- */
+  var el = {
+    rangeS:document.getElementById('rangeS'), valS:document.getElementById('valS'),
+    rangeK:document.getElementById('rangeK'), valK:document.getElementById('valK'),
+    rangeSigma:document.getElementById('rangeSigma'), valSigma:document.getElementById('valSigma'),
+    rangeR:document.getElementById('rangeR'), valR:document.getElementById('valR'),
+    rangeQ:document.getElementById('rangeQ'), valQ:document.getElementById('valQ'),
+    rangeT:document.getElementById('rangeT'), valT:document.getElementById('valT'),
+    rangeN:document.getElementById('rangeN'), valN:document.getElementById('valN'),
+    btnCall:document.getElementById('btnCall'), btnPut:document.getElementById('btnPut'),
+    btnEuro:document.getElementById('btnEuro'), btnAmer:document.getElementById('btnAmer'),
+    stepWarn:document.getElementById('stepWarn')
+  };
+
+  function bindSlider(rangeEl, stateKey, scale, valLabelEl, suffix, dp){
+    scale = scale===undefined?1:scale;
+    rangeEl.addEventListener('input', function(){
+      var v = parseFloat(this.value);
+      state[stateKey] = v/scale;
+      if(valLabelEl) valLabelEl.textContent = v.toFixed(dp===undefined?2:dp)+(suffix||'');
+      recompute();
+    });
+  }
+  bindSlider(el.rangeS,'S',1,el.valS,'',2);
+  bindSlider(el.rangeK,'K',1,el.valK,'',2);
+  bindSlider(el.rangeSigma,'sigma',100,el.valSigma,'%',2);
+  bindSlider(el.rangeR,'r',100,el.valR,'%',2);
+  bindSlider(el.rangeQ,'q',100,el.valQ,'%',2);
+  bindSlider(el.rangeT,'T',1,el.valT,'',3);
+  bindSlider(el.rangeN,'N',1,el.valN,'',0);
+
+  el.btnCall.addEventListener('click', function(){ state.type='call'; syncToggles(); recompute(); });
+  el.btnPut.addEventListener('click', function(){ state.type='put'; syncToggles(); recompute(); });
+  el.btnEuro.addEventListener('click', function(){ state.style='european'; syncToggles(); recompute(); });
+  el.btnAmer.addEventListener('click', function(){ state.style='american'; syncToggles(); recompute(); });
+  function syncToggles(){
+    el.btnCall.classList.toggle('active', state.type==='call');
+    el.btnPut.classList.toggle('active', state.type==='put');
+    el.btnEuro.classList.toggle('active', state.style==='european');
+    el.btnAmer.classList.toggle('active', state.style==='american');
+  }
+
+  /* ---------- Pan/Zoom tree renderer ---------- */
+  function makeTreeView(svgId, wrapId){
+    var svg = document.getElementById(svgId);
+    var wrap = document.getElementById(wrapId);
+    var view = { scale:1, tx:0, ty:0, dragging:false, lastX:0, lastY:0 };
+
+    function applyTransform(){
+      var g = svg.querySelector('g.viewport');
+      if(g) g.setAttribute('transform', 'translate('+view.tx+','+view.ty+') scale('+view.scale+')');
+    }
+    wrap.addEventListener('wheel', function(e){
+      e.preventDefault();
+      var rect = wrap.getBoundingClientRect();
+      var mx = e.clientX-rect.left, my = e.clientY-rect.top;
+      var prevScale = view.scale;
+      var factor = e.deltaY<0 ? 1.12 : 0.89;
+      view.scale = Math.min(6, Math.max(0.15, view.scale*factor));
+      // zoom around cursor
+      view.tx = mx - (mx-view.tx)*(view.scale/prevScale);
+      view.ty = my - (my-view.ty)*(view.scale/prevScale);
+      applyTransform();
+    }, {passive:false});
+    wrap.addEventListener('mousedown', function(e){
+      view.dragging=true; view.lastX=e.clientX; view.lastY=e.clientY;
+    });
+    window.addEventListener('mousemove', function(e){
+      if(!view.dragging) return;
+      view.tx += (e.clientX-view.lastX);
+      view.ty += (e.clientY-view.lastY);
+      view.lastX=e.clientX; view.lastY=e.clientY;
+      applyTransform();
+    });
+    window.addEventListener('mouseup', function(){ view.dragging=false; });
+    // touch support
+    var touchState=null;
+    wrap.addEventListener('touchstart', function(e){
+      if(e.touches.length===1){ touchState={x:e.touches[0].clientX,y:e.touches[0].clientY}; }
+    }, {passive:true});
+    wrap.addEventListener('touchmove', function(e){
+      if(e.touches.length===1 && touchState){
+        var dx=e.touches[0].clientX-touchState.x, dy=e.touches[0].clientY-touchState.y;
+        view.tx+=dx; view.ty+=dy;
+        touchState={x:e.touches[0].clientX,y:e.touches[0].clientY};
+        applyTransform();
+      }
+    }, {passive:true});
+    wrap.addEventListener('touchend', function(){ touchState=null; });
+
+    return {
+      svg:svg, wrap:wrap, view:view,
+      setContent: function(innerSVG, contentW, contentH){
+        svg.setAttribute('viewBox', '0 0 '+wrap.clientWidth+' '+wrap.clientHeight);
+        svg.innerHTML = '<g class="viewport">'+innerSVG+'</g>';
+        this.fit(contentW, contentH);
+      },
+      fit: function(contentW, contentH){
+        var ww = wrap.clientWidth, wh = wrap.clientHeight;
+        var margin = 40;
+        var sx = (ww-margin)/contentW, sy=(wh-margin)/contentH;
+        view.scale = Math.min(sx,sy,1.4);
+        view.scale = Math.max(view.scale, 0.15);
+        view.tx = (ww - contentW*view.scale)/2;
+        view.ty = (wh - contentH*view.scale)/2;
+        applyTransform();
+      }
+    };
+  }
+  var treeViewStock = makeTreeView('svgStock','wrapStock');
+  var treeViewOption = makeTreeView('svgOption','wrapOption');
+
+  var lastContentDims = {w:800,h:500};
+
+  function layoutPositions(N){
+    var dx = 92, dy = 46, padX=50, padY=40;
+    var pos = [];
+    for(var i=0;i<=N;i++){
+      var row=[];
+      for(var j=0;j<=i;j++){
+        var x = padX + i*dx;
+        var y = padY + ((N - (2*j - i)) * dy)/2;
+        row.push({x:x,y:y});
+      }
+      pos.push(row);
+    }
+    var w = padX*2 + N*dx;
+    var h = padY*2 + N*dy;
+    return {pos:pos, w:w, h:h};
+  }
+
+  function svgEscape(s){ return String(s); }
+
+  function renderTrees(tree){
+    var N = tree.N;
+    var showLabels = N<=20;
+    var L = layoutPositions(N);
+    lastContentDims = {w:L.w, h:L.h};
+
+    function buildSVG(mode){
+      var parts=[];
+      // edges first
+      for(var i=0;i<N;i++){
+        for(var j=0;j<=i;j++){
+          var p0 = L.pos[i][j];
+          var pUp = L.pos[i+1][j+1];
+          var pDn = L.pos[i+1][j];
+          parts.push('<line x1="'+p0.x+'" y1="'+p0.y+'" x2="'+pUp.x+'" y2="'+pUp.y+'" stroke="#243247" stroke-width="1.4"/>');
+          parts.push('<line x1="'+p0.x+'" y1="'+p0.y+'" x2="'+pDn.x+'" y2="'+pDn.y+'" stroke="#243247" stroke-width="1.4"/>');
+        }
+      }
+      // nodes
+      var r = showLabels ? 20 : 4.5;
+      for(var i=0;i<=N;i++){
+        for(var j=0;j<=i;j++){
+          var p = L.pos[i][j];
+          var isSel = selected && selected.i===i && selected.j===j;
+          var isExercised = tree.exercised[i][j];
+          var fill = mode==='stock' ? '#121a24' : '#121a24';
+          var stroke = isSel ? '#ffb020' : (mode==='option' && isExercised ? '#f0555a' : '#1f2b3a');
+          var strokeW = isSel ? 2.6 : (mode==='option' && isExercised ? 2.2 : 1.3);
+          parts.push('<circle class="node" data-i="'+i+'" data-j="'+j+'" cx="'+p.x+'" cy="'+p.y+'" r="'+r+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+strokeW+'" style="cursor:pointer;"/>');
+          if(showLabels){
+            var val = mode==='stock' ? tree.S[i][j] : tree.V[i][j];
+            var txt = val.toFixed(2);
+            var color = isSel ? '#ffb020' : (mode==='stock' ? '#4fd1c5' : '#e8eef4');
+            parts.push('<text x="'+p.x+'" y="'+(p.y+4)+'" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="'+color+'" style="pointer-events:none;">'+txt+'</text>');
+          }
+        }
+      }
+      return parts.join('');
+    }
+
+    treeViewStock.setContent(buildSVG('stock'), L.w, L.h);
+    treeViewOption.setContent(buildSVG('option'), L.w, L.h);
+
+    // click handlers (delegate)
+    [ {tv:treeViewStock}, {tv:treeViewOption} ].forEach(function(o){
+      o.tv.svg.onclick = function(e){
+        var t = e.target;
+        if(t && t.classList && t.classList.contains('node')){
+          selected = { i:parseInt(t.getAttribute('data-i'),10), j:parseInt(t.getAttribute('data-j'),10) };
+          renderTrees(currentTree);
+          updateNodePanel();
+        }
+      };
+    });
+  }
+
+  function updateNodePanel(){
+    var body = document.getElementById('nodePanelBody');
+    if(!selected || !currentTree){
+      body.innerHTML = '<div class="empty-hint">Click any node in either tree above to inspect it here.</div>';
+      return;
+    }
+    var i=selected.i, j=selected.j, tree=currentTree;
+    var t_i = i*tree.dt;
+    var S_ij = tree.S[i][j];
+    var V_ij = tree.V[i][j];
+    var ex = tree.exVal[i][j];
+    var cont = tree.contVal[i][j];
+    var pr = tree.prob[i][j];
+    var isTerminal = (i===tree.N);
+    var wasExercised = tree.exercised[i][j];
+
+    var cells = [
+      ['Step / Up-moves', i+' / '+j],
+      ['Time', t_i.toFixed(4)+' yrs'],
+      ['Stock Price', fmtMoney2(S_ij)],
+      ['Option Value', fmtMoney(V_ij)],
+      ['Exercise Value', fmtMoney(ex)],
+      ['Continuation Value', isTerminal ? '&mdash; (terminal)' : fmtMoney(cont)],
+      ['Reach Probability', fmtPct(pr)],
+      ['Exercised Early?', state.style==='american' ? (isTerminal ? 'n/a (terminal)' : (wasExercised?'Yes':'No')) : 'n/a (European)']
+    ];
+    body.innerHTML = '<div class="node-grid">' + cells.map(function(c){
+      var exCls = (c[0]==='Exercised Early?' && c[1]==='Yes') ? ' exercised' : '';
+      return '<div class="ni'+exCls+'"><div class="nl">'+c[0]+'</div><div class="nv">'+c[1]+'</div></div>';
+    }).join('') + '</div>';
+  }
+
+  /* ---------- Convergence chart ---------- */
+  var plotFont = { family:'IBM Plex Mono, monospace', size:11, color:'#9fb0c0' };
+  function baseLayout(extra){
+    var l = {
+      paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:plotFont,
+      margin:{l:55,r:20,t:10,b:42},
+      xaxis:{gridcolor:'#1c2430', zerolinecolor:'#1c2430', linecolor:'#1f2b3a'},
+      yaxis:{gridcolor:'#1c2430', zerolinecolor:'#1c2430', linecolor:'#1f2b3a'},
+      legend:{orientation:'h', y:1.15, font:{color:'#9fb0c0', size:10}},
+      hoverlabel:{bgcolor:'#121a24', bordercolor:'#1f2b3a', font:{family:'IBM Plex Mono, monospace', color:'#e8eef4', size:11}}
+    };
+    return Object.assign(l, extra||{});
+  }
+  var plotConfig = {displayModeBar:false, responsive:true};
+
+  function updateConvergenceChart(){
+    var maxN = Math.max(60, state.N+10);
+    var steps = [];
+    var prices = [];
+    for(var n=1;n<=maxN;n++){
+      steps.push(n);
+      prices.push(buildTree(state.S,state.K,state.sigma,state.r,state.q,state.T,n,state.type,state.style).price);
+    }
+    var bs = bsPrice(state.S,state.K,state.sigma,state.r,state.q,state.T,state.type);
+    Plotly.react('plotConvergence', [
+      { x:steps, y:prices, type:'scatter', mode:'lines+markers', name:'Binomial Price', line:{color:'#ffb020',width:2}, marker:{size:4} },
+      { x:[1,maxN], y:[bs,bs], type:'scatter', mode:'lines', name:'Black-Scholes (Euro, reference)', line:{color:'#4fd1c5', width:1.6, dash:'dash'} },
+      { x:[state.N], y:[currentTree.price], type:'scatter', mode:'markers', name:'Current N', marker:{color:'#e8eef4', size:10, symbol:'diamond', line:{color:'#000',width:1}} }
+    ], baseLayout({
+      xaxis:Object.assign({title:'Number of Steps (N)'}, baseLayout().xaxis),
+      yaxis:Object.assign({title:'Option Price'}, baseLayout().yaxis)
+    }), plotConfig);
+  }
+
+  /* ---------- Insights ---------- */
+  function updateInsights(){
+    var list = document.getElementById('insightsList');
+    var items = [];
+    var tree = currentTree;
+    var bs = bsPrice(state.S,state.K,state.sigma,state.r,state.q,state.T,state.type);
+
+    items.push('With N='+state.N+' steps, &Delta;t='+tree.dt.toFixed(5)+' years per step. The risk-neutral probability of an up move is p='+tree.p.toFixed(4)+', derived from u, d, r and q &mdash; not a forecast of the real-world chance the stock rises.');
+
+    var diff = tree.price - bs;
+    items.push('The '+state.N+'-step binomial price is <b>'+fmtMoney2(tree.price)+'</b> versus the Black-Scholes analytical price of <b>'+fmtMoney2(bs)+'</b>, a difference of <b>'+fmtMoney(diff)+'</b>'+(state.style==='american'?' (expected: American exercise flexibility adds value on top of the European benchmark when early exercise is optimal).':' &mdash; this gap shrinks as N increases, since the tree is only an approximation to the continuous-time model.'));
+
+    // count exercised nodes
+    var exCount=0, totalInner=0;
+    for(var i=0;i<tree.N;i++){ for(var j=0;j<=i;j++){ totalInner++; if(tree.exercised[i][j]) exCount++; } }
+    if(state.style==='american'){
+      if(exCount>0){
+        items.push('Early exercise is optimal at <b>'+exCount+' of '+totalInner+'</b> non-terminal nodes in this tree (marked with red rings in the option-value tree) &mdash; typically clustered deep in-the-money, where the certain payoff today outweighs the remaining time value.');
+      } else {
+        items.push('No non-terminal node in this tree shows early exercise as optimal for the current inputs &mdash; consistent with the fact that American calls on non-dividend-paying stock are never exercised early, and American puts/dividend calls only gain early-exercise value under more extreme parameter combinations.');
+      }
+    } else {
+      items.push('Exercise style is set to European, so no early exercise decision is made at any node &mdash; option value at every node is the pure discounted continuation value.');
+    }
+
+    var N50 = buildTree(state.S,state.K,state.sigma,state.r,state.q,state.T,150,state.type,state.style).price;
+    items.push('Extending to 150 steps moves the binomial price to <b>'+fmtMoney2(N50)+'</b>, illustrating convergence: finer time slicing makes the binomial terminal distribution approach the continuous lognormal distribution Black-Scholes assumes.');
+
+    list.innerHTML = items.map(function(t){ return '<li>'+t+'</li>'; }).join('');
+  }
+
+  /* ---------- Main recompute ---------- */
+  function recompute(){
+    currentTree = buildTree(state.S,state.K,state.sigma,state.r,state.q,state.T,state.N,state.type,state.style);
+    var bs = bsPrice(state.S,state.K,state.sigma,state.r,state.q,state.T,state.type);
+
+    document.getElementById('kpiBinom').innerHTML = fmtMoney2(currentTree.price);
+    document.getElementById('kpiBinomSub').textContent = state.N+' steps &middot; '+(state.style==='american'?'American':'European');
+    document.getElementById('kpiBS').innerHTML = fmtMoney2(bs);
+    var diff = currentTree.price - bs;
+    document.getElementById('kpiDiff').innerHTML = fmtMoney2(diff);
+    document.getElementById('kpiDiffSub').textContent = state.style==='american' ? 'Early-exercise premium (approx.)' : 'Shrinks as N grows';
+    document.getElementById('kpiU').textContent = currentTree.u.toFixed(4);
+    document.getElementById('kpiD').textContent = currentTree.d.toFixed(4);
+    document.getElementById('kpiP').textContent = currentTree.p.toFixed(4);
+
+    el.stepWarn.classList.toggle('show', state.N>20);
+
+    // keep selection valid
+    if(selected && (selected.i>state.N || selected.j>selected.i)) selected=null;
+
+    renderTrees(currentTree);
+    updateNodePanel();
+    updateConvergenceChart();
+    updateInsights();
+  }
+
+  /* ---------- Zoom toolbar ---------- */
+  document.getElementById('btnZoomIn').addEventListener('click', function(){
+    [treeViewStock, treeViewOption].forEach(function(tv){
+      tv.view.scale = Math.min(6, tv.view.scale*1.25);
+      tv.svg.querySelector('g.viewport').setAttribute('transform','translate('+tv.view.tx+','+tv.view.ty+') scale('+tv.view.scale+')');
+    });
+  });
+  document.getElementById('btnZoomOut').addEventListener('click', function(){
+    [treeViewStock, treeViewOption].forEach(function(tv){
+      tv.view.scale = Math.max(0.15, tv.view.scale*0.8);
+      tv.svg.querySelector('g.viewport').setAttribute('transform','translate('+tv.view.tx+','+tv.view.ty+') scale('+tv.view.scale+')');
+    });
+  });
+  document.getElementById('btnZoomFit').addEventListener('click', function(){
+    treeViewStock.fit(lastContentDims.w, lastContentDims.h);
+    treeViewOption.fit(lastContentDims.w, lastContentDims.h);
+  });
+
+  /* ---------- Clock ---------- */
+  function tickClock(){
+    var d=new Date();
+    var hh=String(d.getHours()).padStart(2,'0'), mm=String(d.getMinutes()).padStart(2,'0'), ss=String(d.getSeconds()).padStart(2,'0');
+    document.getElementById('clockPill').textContent = hh+':'+mm+':'+ss+' LOCAL';
+  }
+  tickClock(); setInterval(tickClock,1000);
+
+  /* ---------- Init ---------- */
+  syncToggles();
+  recompute();
+
+  window.addEventListener('resize', function(){
+    treeViewStock.fit(lastContentDims.w, lastContentDims.h);
+    treeViewOption.fit(lastContentDims.w, lastContentDims.h);
+    Plotly.Plots.resize(document.getElementById('plotConvergence'));
+  });
+
+})();
+</script>
+</body>
+</html>

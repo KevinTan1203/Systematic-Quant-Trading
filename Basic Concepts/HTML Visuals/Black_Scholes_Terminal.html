@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BSM // Black-Scholes-Merton Option Pricing Terminal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.32.0/plotly.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#080b10;
+    --bg-1:#0d131b;
+    --bg-2:#121a24;
+    --bg-3:#182233;
+    --line:#1f2b3a;
+    --line-soft:#161f2b;
+    --text-hi:#e8eef4;
+    --text-mid:#9fb0c0;
+    --text-lo:#5d6d7e;
+    --amber:#ffb020;
+    --amber-dim:#8a6420;
+    --cyan:#4fd1c5;
+    --cyan-dim:#1f6b64;
+    --green:#3ecf7e;
+    --red:#f0555a;
+    --violet:#9d8cff;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Space Grotesk', 'IBM Plex Sans', sans-serif;
+    --ui: 'IBM Plex Sans', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg-0);color:var(--text-hi);font-family:var(--ui);}
+  body{
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(79,209,197,0.05), transparent 40%),
+      radial-gradient(circle at 85% 15%, rgba(255,176,32,0.04), transparent 45%);
+    min-height:100vh;
+  }
+  ::selection{background:var(--amber);color:#000;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:var(--bg-1);}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--amber-dim);}
+
+  a{color:var(--cyan);}
+
+  /* ---------- Header ---------- */
+  header.topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 28px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, var(--bg-1), var(--bg-0));
+    position:sticky;top:0;z-index:50;
+    backdrop-filter:blur(6px);
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand .mark{
+    width:38px;height:38px;border:1px solid var(--amber-dim);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:700;color:var(--amber);font-size:15px;
+    background:rgba(255,176,32,0.06);
+  }
+  .brand h1{font-family:var(--sans);font-size:17px;font-weight:600;margin:0;letter-spacing:0.02em;color:var(--text-hi);}
+  .brand .sub{font-family:var(--mono);font-size:10.5px;color:var(--text-lo);letter-spacing:0.08em;margin-top:2px;text-transform:uppercase;}
+  .topbar .status{display:flex;gap:22px;align-items:center;}
+  .status .pill{
+    font-family:var(--mono);font-size:11px;color:var(--text-mid);
+    border:1px solid var(--line);padding:5px 10px;border-radius:20px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .status .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);}
+
+  /* ---------- Layout ---------- */
+  .layout{display:grid;grid-template-columns:320px 1fr;gap:0;align-items:start;}
+  @media (max-width:980px){.layout{grid-template-columns:1fr;}}
+
+  aside.controls{
+    position:sticky;top:61px;
+    height:calc(100vh - 61px);
+    overflow-y:auto;
+    border-right:1px solid var(--line);
+    background:var(--bg-1);
+    padding:20px 18px 60px 18px;
+  }
+  @media (max-width:980px){aside.controls{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line);}}
+
+  main.content{padding:24px 28px 60px 28px;min-width:0;}
+
+  .section-label{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:0.12em;color:var(--text-lo);
+    text-transform:uppercase;margin:22px 0 10px 0;display:flex;align-items:center;gap:8px;
+  }
+  .section-label:first-child{margin-top:0;}
+  .section-label::after{content:'';flex:1;height:1px;background:var(--line);}
+
+  /* ---------- Inputs ---------- */
+  .field{margin-bottom:14px;}
+  .field label{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:11.5px;color:var(--text-mid);margin-bottom:5px;font-family:var(--ui);
+  }
+  .field label .val{font-family:var(--mono);color:var(--amber);font-size:12.5px;font-weight:600;}
+  .field input[type=range]{
+    width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
+    background:var(--line);outline:none;margin:6px 0;
+  }
+  .field input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+    background:var(--amber);cursor:pointer;border:2px solid #1a1207;
+    box-shadow:0 0 0 3px rgba(255,176,32,0.15);
+  }
+  .field input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;background:var(--amber);cursor:pointer;border:2px solid #1a1207;
+  }
+  .field .num-row{display:flex;gap:6px;}
+  .field input[type=number]{
+    width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--text-hi);
+    font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:4px;outline:none;
+  }
+  .field input[type=number]:focus{border-color:var(--amber-dim);}
+
+  .toggle-group{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .toggle-group button{
+    flex:1;background:var(--bg-2);color:var(--text-mid);border:none;padding:9px 0;
+    font-family:var(--mono);font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.04em;
+    transition:background .15s, color .15s;
+  }
+  .toggle-group button.active.call{background:rgba(62,207,126,0.14);color:var(--green);}
+  .toggle-group button.active.put{background:rgba(240,85,90,0.14);color:var(--red);}
+  .toggle-group button:not(.active):hover{background:var(--bg-3);}
+
+  .presets{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .presets button{
+    background:var(--bg-2);border:1px solid var(--line);color:var(--text-mid);
+    font-family:var(--ui);font-size:11px;padding:8px 6px;border-radius:5px;cursor:pointer;
+    transition:all .15s;text-align:left;
+  }
+  .presets button:hover{border-color:var(--cyan-dim);color:var(--cyan);background:var(--bg-3);}
+  .presets button.reset{grid-column:1/3;text-align:center;color:var(--amber);border-color:var(--amber-dim);}
+
+  .assumptions{
+    font-family:var(--ui);font-size:10.8px;color:var(--text-lo);line-height:1.55;
+    border-top:1px solid var(--line);padding-top:14px;margin-top:22px;
+  }
+  .assumptions b{color:var(--text-mid);}
+
+  /* ---------- KPI Grid ---------- */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  @media (max-width:1400px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:640px){.kpi-grid{grid-template-columns:1fr;}}
+  .kpi{
+    background:linear-gradient(180deg, var(--bg-2), var(--bg-1));
+    border:1px solid var(--line);border-radius:8px;padding:14px 16px;position:relative;overflow:hidden;
+  }
+  .kpi::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--kpi-accent, var(--amber));
+  }
+  .kpi .k-label{font-family:var(--mono);font-size:10px;color:var(--text-lo);text-transform:uppercase;letter-spacing:0.08em;}
+  .kpi .k-value{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text-hi);margin-top:6px;}
+  .kpi .k-sub{font-family:var(--ui);font-size:10.5px;color:var(--text-mid);margin-top:4px;}
+  .kpi.hero .k-value{font-size:28px;color:var(--amber);}
+  .kpi.pos .k-value{color:var(--green);}
+  .kpi.neg .k-value{color:var(--red);}
+
+  .moneyness-strip{
+    margin-top:14px;background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:16px 18px;
+  }
+  .moneyness-strip .m-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+  .moneyness-strip .m-tag{
+    font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.05em;
+  }
+  .m-tag.itm{background:rgba(62,207,126,0.15);color:var(--green);}
+  .m-tag.atm{background:rgba(255,176,32,0.15);color:var(--amber);}
+  .m-tag.otm{background:rgba(240,85,90,0.15);color:var(--red);}
+  .bar-track{position:relative;height:8px;border-radius:4px;background:var(--bg-3);overflow:visible;}
+  .bar-track .zone{position:absolute;top:0;bottom:0;border-radius:4px;}
+  .bar-track .marker{
+    position:absolute;top:-5px;width:2px;height:18px;background:var(--text-hi);
+    box-shadow:0 0 8px rgba(255,255,255,0.5);
+  }
+  .bar-track .marker .lbl{
+    position:absolute;top:-20px;left:50%;transform:translateX(-50%);
+    font-family:var(--mono);font-size:10px;color:var(--text-hi);white-space:nowrap;
+  }
+  .m-legend{display:flex;gap:16px;margin-top:22px;font-family:var(--mono);font-size:10px;color:var(--text-lo);flex-wrap:wrap;}
+  .m-legend span{display:flex;align-items:center;gap:5px;}
+  .m-legend i{width:8px;height:8px;border-radius:2px;display:inline-block;}
+
+  /* ---------- Charts ---------- */
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;}
+  @media (max-width:1080px){.chart-grid{grid-template-columns:1fr;}}
+  .chart-card{
+    background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:16px 16px 6px 16px;
+  }
+  .chart-card.full{grid-column:1/-1;}
+  .chart-card h3{
+    font-family:var(--sans);font-size:13px;font-weight:600;color:var(--text-hi);margin:0 0 2px 0;
+  }
+  .chart-card p.desc{font-family:var(--ui);font-size:11px;color:var(--text-lo);margin:0 0 8px 0;}
+  .plot{width:100%;height:320px;}
+  .plot.tall{height:440px;}
+
+  /* ---------- Greeks Table ---------- */
+  .greeks-table{width:100%;border-collapse:collapse;margin-top:6px;}
+  .greeks-table th{
+    text-align:left;font-family:var(--mono);font-size:10px;color:var(--text-lo);text-transform:uppercase;
+    letter-spacing:0.06em;padding:8px 10px;border-bottom:1px solid var(--line);
+  }
+  .greeks-table td{padding:10px;border-bottom:1px solid var(--line-soft);font-size:12.5px;vertical-align:top;}
+  .greeks-table td.gname{font-family:var(--sans);font-weight:600;color:var(--text-hi);white-space:nowrap;}
+  .greeks-table td.gval{font-family:var(--mono);font-weight:600;color:var(--cyan);white-space:nowrap;}
+  .greeks-table td.gdesc{color:var(--text-mid);font-family:var(--ui);line-height:1.5;}
+  .greeks-table tr:last-child td{border-bottom:none;}
+
+  /* ---------- Formula / Education ---------- */
+  .edu-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:980px){.edu-grid{grid-template-columns:1fr;}}
+  details.formula-card{
+    background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:0;overflow:hidden;
+  }
+  details.formula-card summary{
+    list-style:none;cursor:pointer;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;
+    font-family:var(--sans);font-size:13px;font-weight:600;color:var(--text-hi);
+  }
+  details.formula-card summary::-webkit-details-marker{display:none;}
+  details.formula-card summary::after{
+    content:'+';font-family:var(--mono);color:var(--amber);font-size:16px;transition:transform .2s;
+  }
+  details.formula-card[open] summary::after{transform:rotate(45deg);}
+  details.formula-card summary:hover{background:var(--bg-2);}
+  .formula-body{padding:0 16px 16px 16px;font-family:var(--ui);font-size:12.5px;color:var(--text-mid);line-height:1.65;}
+  .formula-body .eq{
+    font-family:var(--mono);font-size:12.5px;color:var(--cyan);background:var(--bg-2);border:1px solid var(--line);
+    border-radius:6px;padding:10px 12px;margin:8px 0;overflow-x:auto;white-space:pre;
+  }
+
+  footer{
+    padding:22px 28px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--text-lo);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+  }
+
+  .tooltip-icon{
+    display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;
+    border:1px solid var(--text-lo);color:var(--text-lo);font-size:9px;font-family:var(--mono);cursor:help;
+    margin-left:5px;position:relative;
+  }
+  .tooltip-icon:hover .tip{display:block;}
+  .tip{
+    display:none;position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:220px;
+    background:var(--bg-3);border:1px solid var(--line);border-radius:6px;padding:10px;
+    font-family:var(--ui);font-size:11px;color:var(--text-mid);z-index:60;line-height:1.5;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  h2.page-title{font-family:var(--sans);font-size:19px;font-weight:600;margin:0 0 4px 0;color:var(--text-hi);}
+  p.page-sub{font-family:var(--ui);font-size:12px;color:var(--text-lo);margin:0 0 20px 0;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="mark">&fnof;</div>
+    <div>
+      <h1>BSM Terminal</h1>
+      <div class="sub">Black-Scholes-Merton &middot; Option Pricing Laboratory</div>
+    </div>
+  </div>
+  <div class="status">
+    <div class="pill"><span class="dot"></span> Live Recalculation</div>
+    <div class="pill" id="clockPill">--:--:--</div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="controls">
+    <div class="section-label">Option Type</div>
+    <div class="toggle-group">
+      <button id="btnCall" class="active call">CALL</button>
+      <button id="btnPut" class="put">PUT</button>
+    </div>
+
+    <div class="section-label">Market Inputs</div>
+
+    <div class="field">
+      <label>Spot Price S <span class="val" id="valS">100.00</span></label>
+      <input type="range" id="rangeS" min="1" max="300" step="0.5" value="100">
+      <div class="num-row"><input type="number" id="numS" step="0.01" value="100"></div>
+    </div>
+
+    <div class="field">
+      <label>Strike Price K <span class="val" id="valK">100.00</span></label>
+      <input type="range" id="rangeK" min="1" max="300" step="0.5" value="100">
+      <div class="num-row"><input type="number" id="numK" step="0.01" value="100"></div>
+    </div>
+
+    <div class="field">
+      <label>Volatility &sigma; <span class="val" id="valSigma">20.00%</span></label>
+      <input type="range" id="rangeSigma" min="0.5" max="150" step="0.5" value="20">
+      <div class="num-row"><input type="number" id="numSigma" step="0.1" value="20"></div>
+    </div>
+
+    <div class="field">
+      <label>Risk-Free Rate r <span class="val" id="valR">5.00%</span></label>
+      <input type="range" id="rangeR" min="-2" max="15" step="0.05" value="5">
+      <div class="num-row"><input type="number" id="numR" step="0.01" value="5"></div>
+    </div>
+
+    <div class="field">
+      <label>Dividend Yield q <span class="val" id="valQ">0.00%</span></label>
+      <input type="range" id="rangeQ" min="0" max="12" step="0.05" value="0">
+      <div class="num-row"><input type="number" id="numQ" step="0.01" value="0"></div>
+    </div>
+
+    <div class="field">
+      <label>Time to Expiry T (years) <span class="val" id="valT">1.000</span></label>
+      <input type="range" id="rangeT" min="0" max="3" step="0.005" value="1">
+      <div class="num-row"><input type="number" id="numT" step="0.001" value="1"></div>
+    </div>
+
+    <div class="section-label">Parameter Presets</div>
+    <div class="presets">
+      <button data-preset="atm">At-the-Money</button>
+      <button data-preset="dITM">Deep ITM</button>
+      <button data-preset="dOTM">Deep OTM</button>
+      <button data-preset="hivol">High Volatility</button>
+      <button data-preset="nearexp">Near Expiry</button>
+      <button data-preset="reset" class="reset">Reset Defaults</button>
+    </div>
+
+    <div class="assumptions">
+      <b>Model scope:</b> This calculator prices <b>European-style</b> options only (exercisable at expiry) under the standard Black-Scholes-Merton assumptions: constant &sigma; and r, continuous trading, lognormal returns, no transaction costs, and a continuous dividend yield q. American-style early-exercise premiums are not modeled.
+    </div>
+  </aside>
+
+  <main class="content">
+    <h2 class="page-title">Pricing &amp; Risk Overview</h2>
+    <p class="page-sub">All figures recompute instantly as inputs change. Values shown for the currently selected option type.</p>
+
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="kpi hero" style="--kpi-accent:var(--amber)">
+        <div class="k-label">Theoretical Price</div>
+        <div class="k-value" id="kpiPrice">0.00</div>
+        <div class="k-sub" id="kpiPriceSub">&mdash;</div>
+      </div>
+      <div class="kpi" style="--kpi-accent:var(--cyan)">
+        <div class="k-label">Intrinsic Value</div>
+        <div class="k-value" id="kpiIntrinsic">0.00</div>
+        <div class="k-sub">Value if exercised now</div>
+      </div>
+      <div class="kpi" style="--kpi-accent:var(--violet)">
+        <div class="k-label">Time Value</div>
+        <div class="k-value" id="kpiTimeValue">0.00</div>
+        <div class="k-sub">Price minus intrinsic value</div>
+      </div>
+      <div class="kpi" style="--kpi-accent:var(--green)">
+        <div class="k-label">Breakeven at Expiry</div>
+        <div class="k-value" id="kpiBreakeven">0.00</div>
+        <div class="k-sub" id="kpiBreakevenSub">Spot needed to break even</div>
+      </div>
+    </div>
+
+    <div class="moneyness-strip">
+      <div class="m-top">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-lo);">MONEYNESS &middot; S / K = <span id="moneynessRatio" style="color:var(--text-hi)">1.000</span></div>
+        <div class="m-tag atm" id="moneynessTag">ATM</div>
+      </div>
+      <div class="bar-track" id="barTrack">
+        <div class="zone" id="zoneOtm" style="left:0;background:rgba(240,85,90,0.18);"></div>
+        <div class="zone" id="zoneAtm" style="background:rgba(255,176,32,0.22);"></div>
+        <div class="zone" id="zoneItm" style="right:0;background:rgba(62,207,126,0.18);"></div>
+        <div class="marker" id="spotMarker"><span class="lbl" id="spotMarkerLbl">S</span></div>
+      </div>
+      <div class="m-legend">
+        <span><i style="background:var(--red)"></i>Out-of-the-money</span>
+        <span><i style="background:var(--amber)"></i>At-the-money (&plusmn;2.5%)</span>
+        <span><i style="background:var(--green)"></i>In-the-money</span>
+      </div>
+    </div>
+
+    <div class="section-label">Sensitivity Charts</div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Option Price vs. Spot Price</h3>
+        <p class="desc">Payoff curve shape and current price marker across a spot price range.</p>
+        <div id="plotSpot" class="plot"></div>
+      </div>
+      <div class="chart-card">
+        <h3>Option Price vs. Volatility</h3>
+        <p class="desc">Vega exposure &mdash; how implied volatility changes theoretical value.</p>
+        <div id="plotVol" class="plot"></div>
+      </div>
+      <div class="chart-card">
+        <h3>Option Price vs. Time to Expiry</h3>
+        <p class="desc">Time decay path from today to expiration (theta effect).</p>
+        <div id="plotTime" class="plot"></div>
+      </div>
+      <div class="chart-card">
+        <h3>Call vs. Put Comparison</h3>
+        <p class="desc">Both option prices across spot, holding all else constant.</p>
+        <div id="plotCompare" class="plot"></div>
+      </div>
+      <div class="chart-card full">
+        <h3>3D Price Surface &mdash; Spot &times; Volatility</h3>
+        <p class="desc">Theoretical price as a joint function of spot price and volatility, at the current T, K, r and q.</p>
+        <div id="plotSurface" class="plot tall"></div>
+      </div>
+    </div>
+
+    <div class="section-label">Greeks &amp; Risk Sensitivities</div>
+    <div class="chart-card full" style="padding-bottom:16px;">
+      <table class="greeks-table">
+        <thead>
+          <tr><th>Greek</th><th>Value</th><th>Plain-English Interpretation</th></tr>
+        </thead>
+        <tbody id="greeksBody"></tbody>
+      </table>
+    </div>
+
+    <div class="section-label">Formulas &amp; Explanations</div>
+    <div class="edu-grid">
+
+      <details class="formula-card" open>
+        <summary>Black-Scholes-Merton Pricing Formula</summary>
+        <div class="formula-body">
+          <p>The model prices a European option as the discounted, probability-weighted payoff under a risk-neutral measure.</p>
+          <div class="eq">C = S&middot;e^(-qT)&middot;N(d1) - K&middot;e^(-rT)&middot;N(d2)
+P = K&middot;e^(-rT)&middot;N(-d2) - S&middot;e^(-qT)&middot;N(-d1)
+
+d1 = [ln(S/K) + (r - q + 0.5&sigma;&sup2;)T] / (&sigma;&radic;T)
+d2 = d1 - &sigma;&radic;T</div>
+          <p>N(&middot;) is the standard normal cumulative distribution function. Intuitively, N(d2) is the risk-neutral probability the option finishes in-the-money, while the S&middot;e^(-qT)&middot;N(d1) term is the present value of the asset received conditional on exercise.</p>
+        </div>
+      </details>
+
+      <details class="formula-card">
+        <summary>Intrinsic Value vs. Time Value</summary>
+        <div class="formula-body">
+          <p><b style="color:var(--text-hi)">Intrinsic value</b> is what the option would be worth if exercised immediately: max(S&minus;K, 0) for a call, max(K&minus;S, 0) for a put. It can never be negative.</p>
+          <p><b style="color:var(--text-hi)">Time value</b> is the remainder of the price: Price &minus; Intrinsic Value. It reflects the possibility that the option becomes more valuable before expiry, and it decays to zero as T &rarr; 0 (theta decay). Time value is maximized for at-the-money options and shrinks deep in- or out-of-the-money.</p>
+        </div>
+      </details>
+
+      <details class="formula-card">
+        <summary>Delta &amp; Gamma</summary>
+        <div class="formula-body">
+          <div class="eq">&Delta;_call = e^(-qT)&middot;N(d1)
+&Delta;_put  = e^(-qT)&middot;(N(d1) - 1)
+
+&Gamma; = e^(-qT)&middot;n(d1) / (S&middot;&sigma;&middot;&radic;T)   (same for call and put)</div>
+          <p><b style="color:var(--text-hi)">Delta</b> is the option's sensitivity to a $1 move in the underlying, and approximates the hedge ratio (shares to hold per option) and the option's directional probability of finishing ITM. <b style="color:var(--text-hi)">Gamma</b> is the rate of change of delta &mdash; it measures how quickly the hedge ratio shifts as the spot price moves, and is largest for at-the-money, near-expiry options.</p>
+        </div>
+      </details>
+
+      <details class="formula-card">
+        <summary>Vega, Theta &amp; Rho</summary>
+        <div class="formula-body">
+          <div class="eq">Vega  = S&middot;e^(-qT)&middot;n(d1)&middot;&radic;T           (per 1.00 change in &sigma;)
+
+&Theta;_call = -[S&middot;e^(-qT)&middot;n(d1)&middot;&sigma;/(2&radic;T)]
+         - rK&middot;e^(-rT)N(d2) + qS&middot;e^(-qT)N(d1)
+
+&Theta;_put  = -[S&middot;e^(-qT)&middot;n(d1)&middot;&sigma;/(2&radic;T)]
+         + rK&middot;e^(-rT)N(-d2) - qS&middot;e^(-qT)N(-d1)
+
+Rho_call = K&middot;T&middot;e^(-rT)&middot;N(d2)
+Rho_put  = -K&middot;T&middot;e^(-rT)&middot;N(-d2)</div>
+          <p><b style="color:var(--text-hi)">Vega</b> measures sensitivity to implied volatility. <b style="color:var(--text-hi)">Theta</b> measures the daily erosion of time value as expiry approaches (usually negative for long option holders). <b style="color:var(--text-hi)">Rho</b> measures sensitivity to the risk-free rate.</p>
+        </div>
+      </details>
+
+    </div>
+
+    <div class="section-label">How Each Input Moves the Price</div>
+    <div class="chart-card full">
+      <table class="greeks-table">
+        <thead><tr><th>Input</th><th>Increase &rarr; Call</th><th>Increase &rarr; Put</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td class="gname">Spot S</td><td class="gval" style="color:var(--green)">&uarr; higher</td><td class="gval" style="color:var(--red)">&darr; lower</td><td class="gdesc">A higher spot raises the payoff of a call and lowers the payoff of a put at expiry.</td></tr>
+          <tr><td class="gname">Strike K</td><td class="gval" style="color:var(--red)">&darr; lower</td><td class="gval" style="color:var(--green)">&uarr; higher</td><td class="gdesc">A higher strike makes calls harder to finish ITM and puts easier.</td></tr>
+          <tr><td class="gname">Volatility &sigma;</td><td class="gval" style="color:var(--green)">&uarr; higher</td><td class="gval" style="color:var(--green)">&uarr; higher</td><td class="gdesc">More uncertainty raises the value of optionality in both directions (limited downside, unlimited upside).</td></tr>
+          <tr><td class="gname">Time to Expiry T</td><td class="gval" style="color:var(--green)">&uarr; higher</td><td class="gval" style="color:var(--green)">&uarr; higher (usually)</td><td class="gdesc">More time means more chance for a favorable move; time value is generally larger, though deep ITM puts with high rates can be an exception.</td></tr>
+          <tr><td class="gname">Risk-free Rate r</td><td class="gval" style="color:var(--green)">&uarr; higher</td><td class="gval" style="color:var(--red)">&darr; lower</td><td class="gdesc">A higher rate lowers the present value of the strike paid (helps calls) and lowers the PV of the strike received (hurts puts).</td></tr>
+          <tr><td class="gname">Dividend Yield q</td><td class="gval" style="color:var(--red)">&darr; lower</td><td class="gval" style="color:var(--green)">&uarr; higher</td><td class="gdesc">Dividends reduce the expected forward price of the underlying, hurting calls and helping puts.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<footer>
+  <span>BSM Terminal &middot; Educational tool for European option pricing under Black-Scholes-Merton assumptions.</span>
+  <span>Not investment advice. All computations run client-side.</span>
+</footer>
+
+<script>
+(function(){
+
+  /* ---------- Math helpers ---------- */
+  function erf(x){
+    // Abramowitz-Stegun approximation 7.1.26
+    var sign = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    var a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429, p=0.3275911;
+    var t = 1/(1+p*x);
+    var y = 1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+    return sign*y;
+  }
+  function normCDF(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
+  function normPDF(x){ return Math.exp(-0.5*x*x)/Math.sqrt(2*Math.PI); }
+
+  var EPS_T = 1e-6;
+  var EPS_SIG = 1e-4;
+
+  function d1d2(S,K,sigma,r,q,T){
+    var sT = Math.max(sigma,EPS_SIG) * Math.sqrt(Math.max(T,EPS_T));
+    var d1 = (Math.log(S/K) + (r - q + 0.5*sigma*sigma)*T) / sT;
+    var d2 = d1 - sT;
+    return [d1,d2];
+  }
+
+  function price(S,K,sigma,r,q,T,type){
+    if(T<=EPS_T){
+      return type==='call' ? Math.max(S-K,0) : Math.max(K-S,0);
+    }
+    var dd = d1d2(S,K,sigma,r,q,T), d1=dd[0], d2=dd[1];
+    if(type==='call'){
+      return S*Math.exp(-q*T)*normCDF(d1) - K*Math.exp(-r*T)*normCDF(d2);
+    } else {
+      return K*Math.exp(-r*T)*normCDF(-d2) - S*Math.exp(-q*T)*normCDF(-d1);
+    }
+  }
+
+  function greeks(S,K,sigma,r,q,T,type){
+    if(T<=EPS_T){
+      var intrinsic = type==='call'?Math.max(S-K,0):Math.max(K-S,0);
+      var delta;
+      if(type==='call'){ delta = S>K?1:0; } else { delta = S<K?-1:0; }
+      return {delta:delta, gamma:0, vega:0, theta:0, rho:0, d1:NaN, d2:NaN, price:intrinsic};
+    }
+    var dd=d1d2(S,K,sigma,r,q,T), d1=dd[0], d2=dd[1];
+    var nD1 = normPDF(d1);
+    var eqT = Math.exp(-q*T), erT = Math.exp(-r*T);
+    var sig = Math.max(sigma,EPS_SIG);
+    var sqrtT = Math.sqrt(T);
+
+    var delta = type==='call' ? eqT*normCDF(d1) : eqT*(normCDF(d1)-1);
+    var gamma = eqT*nD1/(S*sig*sqrtT);
+    var vega  = S*eqT*nD1*sqrtT / 100; // per 1% vol move
+    var thetaAnnual, rho;
+    if(type==='call'){
+      thetaAnnual = -(S*eqT*nD1*sig)/(2*sqrtT) - r*K*erT*normCDF(d2) + q*S*eqT*normCDF(d1);
+      rho = K*T*erT*normCDF(d2) / 100; // per 1% rate move
+    } else {
+      thetaAnnual = -(S*eqT*nD1*sig)/(2*sqrtT) + r*K*erT*normCDF(-d2) - q*S*eqT*normCDF(-d1);
+      rho = -K*T*erT*normCDF(-d2) / 100;
+    }
+    var thetaDaily = thetaAnnual/365;
+
+    return {delta:delta, gamma:gamma, vega:vega, theta:thetaDaily, rho:rho, d1:d1, d2:d2,
+            price: type==='call' ? S*eqT*normCDF(d1)-K*erT*normCDF(d2) : K*erT*normCDF(-d2)-S*eqT*normCDF(-d1)};
+  }
+
+  function fmt(n, dp){
+    if(n===undefined || n===null || isNaN(n)) return '&mdash;';
+    dp = dp===undefined?4:dp;
+    return n.toFixed(dp).replace(/\\B(?=(\\d{3})+(?!\\d)\\.)/g, ',');
+  }
+  function fmtMoney(n){
+    if(isNaN(n)) return '&mdash;';
+    var sign = n<0?'-':'';
+    return sign+'$'+Math.abs(n).toFixed(2).replace(/\\B(?=(\\d{3})+(?!\\d))/g,',');
+  }
+
+  /* ---------- Elements ---------- */
+  var el = {
+    rangeS: document.getElementById('rangeS'), numS: document.getElementById('numS'), valS: document.getElementById('valS'),
+    rangeK: document.getElementById('rangeK'), numK: document.getElementById('numK'), valK: document.getElementById('valK'),
+    rangeSigma: document.getElementById('rangeSigma'), numSigma: document.getElementById('numSigma'), valSigma: document.getElementById('valSigma'),
+    rangeR: document.getElementById('rangeR'), numR: document.getElementById('numR'), valR: document.getElementById('valR'),
+    rangeQ: document.getElementById('rangeQ'), numQ: document.getElementById('numQ'), valQ: document.getElementById('valQ'),
+    rangeT: document.getElementById('rangeT'), numT: document.getElementById('numT'), valT: document.getElementById('valT'),
+    btnCall: document.getElementById('btnCall'), btnPut: document.getElementById('btnPut'),
+  };
+
+  var state = { S:100, K:100, sigma:0.20, r:0.05, q:0.00, T:1.0, type:'call' };
+
+  function syncControlsFromState(){
+    el.rangeS.value = state.S; el.numS.value = round(state.S,2); el.valS.textContent = round(state.S,2).toFixed(2);
+    el.rangeK.value = state.K; el.numK.value = round(state.K,2); el.valK.textContent = round(state.K,2).toFixed(2);
+    el.rangeSigma.value = state.sigma*100; el.numSigma.value = round(state.sigma*100,2); el.valSigma.textContent = (state.sigma*100).toFixed(2)+'%';
+    el.rangeR.value = state.r*100; el.numR.value = round(state.r*100,2); el.valR.textContent = (state.r*100).toFixed(2)+'%';
+    el.rangeQ.value = state.q*100; el.numQ.value = round(state.q*100,2); el.valQ.textContent = (state.q*100).toFixed(2)+'%';
+    el.rangeT.value = state.T; el.numT.value = round(state.T,3); el.valT.textContent = state.T.toFixed(3);
+    el.btnCall.classList.toggle('active', state.type==='call');
+    el.btnPut.classList.toggle('active', state.type==='put');
+  }
+  function round(n,dp){ var f=Math.pow(10,dp); return Math.round(n*f)/f; }
+
+  function bindPair(rangeEl, numEl, stateKey, scale, valLabelEl, suffix, dp){
+    scale = scale===undefined?1:scale;
+    function apply(v){
+      v = parseFloat(v);
+      if(isNaN(v)) return;
+      state[stateKey] = v/scale;
+      rangeEl.value = v; numEl.value = v;
+      if(valLabelEl) valLabelEl.textContent = v.toFixed(dp===undefined?2:dp) + (suffix||'');
+      recompute();
+    }
+    rangeEl.addEventListener('input', function(){ apply(this.value); });
+    numEl.addEventListener('input', function(){ apply(this.value); });
+  }
+
+  bindPair(el.rangeS, el.numS, 'S', 1, el.valS, '', 2);
+  bindPair(el.rangeK, el.numK, 'K', 1, el.valK, '', 2);
+  bindPair(el.rangeSigma, el.numSigma, 'sigma', 100, el.valSigma, '%', 2);
+  bindPair(el.rangeR, el.numR, 'r', 100, el.valR, '%', 2);
+  bindPair(el.rangeQ, el.numQ, 'q', 100, el.valQ, '%', 2);
+  bindPair(el.rangeT, el.numT, 'T', 1, el.valT, '', 3);
+
+  el.btnCall.addEventListener('click', function(){ state.type='call'; syncControlsFromState(); recompute(); });
+  el.btnPut.addEventListener('click', function(){ state.type='put'; syncControlsFromState(); recompute(); });
+
+  var presets = {
+    atm:     { S:100, K:100, sigma:0.20, r:0.05, q:0.00, T:1.0 },
+    dITM:    { S:150, K:100, sigma:0.18, r:0.05, q:0.00, T:0.75 },
+    dOTM:    { S:65,  K:100, sigma:0.22, r:0.05, q:0.00, T:0.75 },
+    hivol:   { S:100, K:100, sigma:0.75, r:0.04, q:0.01, T:0.5 },
+    nearexp: { S:102, K:100, sigma:0.25, r:0.05, q:0.00, T:0.04 },
+    reset:   { S:100, K:100, sigma:0.20, r:0.05, q:0.00, T:1.0 }
+  };
+  document.querySelectorAll('.presets button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var p = presets[btn.getAttribute('data-preset')];
+      Object.assign(state, p);
+      syncControlsFromState();
+      recompute();
+    });
+  });
+
+  /* ---------- Plot layout theme ---------- */
+  var plotFont = { family:'IBM Plex Mono, monospace', size:11, color:'#9fb0c0' };
+  function baseLayout(extra){
+    var l = {
+      paper_bgcolor:'rgba(0,0,0,0)',
+      plot_bgcolor:'rgba(0,0,0,0)',
+      font: plotFont,
+      margin:{l:50,r:20,t:10,b:40},
+      xaxis:{gridcolor:'#1c2430', zerolinecolor:'#1c2430', linecolor:'#1f2b3a'},
+      yaxis:{gridcolor:'#1c2430', zerolinecolor:'#1c2430', linecolor:'#1f2b3a'},
+      legend:{orientation:'h', y:1.15, font:{color:'#9fb0c0', size:10}},
+      hoverlabel:{bgcolor:'#121a24', bordercolor:'#1f2b3a', font:{family:'IBM Plex Mono, monospace', color:'#e8eef4', size:11}}
+    };
+    return Object.assign(l, extra||{});
+  }
+  var plotConfig = {displayModeBar:false, responsive:true};
+
+  var COLOR_AMBER='#ffb020', COLOR_CYAN='#4fd1c5', COLOR_GREEN='#3ecf7e', COLOR_RED='#f0555a';
+
+  /* ---------- Charts (created once, updated in place) ---------- */
+  var plotted = false;
+
+  function linspace(a,b,n){
+    var arr=[]; var step=(b-a)/(n-1);
+    for(var i=0;i<n;i++) arr.push(a+step*i);
+    return arr;
+  }
+
+  function recompute(){
+    var S=state.S, K=state.K, sigma=state.sigma, r=state.r, q=state.q, T=state.T, type=state.type;
+
+    var g = greeks(S,K,sigma,r,q,T,type);
+    var px = g.price;
+    var intrinsic = type==='call'?Math.max(S-K,0):Math.max(K-S,0);
+    var timeValue = Math.max(px - intrinsic, -1e-9);
+    var breakeven = type==='call' ? K+px : K-px;
+
+    document.getElementById('kpiPrice').textContent = fmtMoney(px);
+    document.getElementById('kpiPriceSub').textContent = (type==='call'?'Call':'Put') + ' &middot; T=' + T.toFixed(3)+'y';
+    document.getElementById('kpiIntrinsic').textContent = fmtMoney(intrinsic);
+    document.getElementById('kpiTimeValue').textContent = fmtMoney(timeValue<0?0:timeValue);
+    document.getElementById('kpiBreakeven').textContent = fmtMoney(breakeven);
+    document.getElementById('kpiBreakevenSub').innerHTML = type==='call' ? 'S &gt; K + premium to profit' : 'S &lt; K &minus; premium to profit';
+
+    // Moneyness
+    var ratio = S/K;
+    document.getElementById('moneynessRatio').textContent = ratio.toFixed(3);
+    var tag = document.getElementById('moneynessTag');
+    var isCall = type==='call';
+    var atmBand = 0.025;
+    var moneyness;
+    if(Math.abs(ratio-1) <= atmBand){ moneyness='atm'; }
+    else if(isCall ? ratio>1 : ratio<1){ moneyness='itm'; }
+    else { moneyness='otm'; }
+    tag.className='m-tag '+moneyness;
+    tag.textContent = moneyness.toUpperCase();
+
+    // Bar track: map ratio range [0.4x,1.6x] of K to [0%,100%]
+    var lo=0.4, hi=1.6;
+    var pct = Math.min(1,Math.max(0,(ratio-lo)/(hi-lo)))*100;
+    var atmLoPct = Math.min(1,Math.max(0,((1-atmBand)-lo)/(hi-lo)))*100;
+    var atmHiPct = Math.min(1,Math.max(0,((1+atmBand)-lo)/(hi-lo)))*100;
+    document.getElementById('zoneAtm').style.left = atmLoPct+'%';
+    document.getElementById('zoneAtm').style.width = (atmHiPct-atmLoPct)+'%';
+    document.getElementById('zoneOtm').style.width = (isCall?atmLoPct:0)+'%';
+    document.getElementById('zoneOtm').style.left = isCall?0:atmHiPct+'%';
+    document.getElementById('zoneOtm').style.right = isCall?'':'0';
+    if(!isCall){ document.getElementById('zoneOtm').style.width=(100-atmHiPct)+'%'; document.getElementById('zoneOtm').style.left=atmHiPct+'%'; }
+    else { document.getElementById('zoneOtm').style.width=atmLoPct+'%'; document.getElementById('zoneOtm').style.left='0%'; }
+    document.getElementById('zoneItm').style.left = isCall? atmHiPct+'%' : '0%';
+    document.getElementById('zoneItm').style.width = isCall? (100-atmHiPct)+'%' : atmLoPct+'%';
+    var marker = document.getElementById('spotMarker');
+    marker.style.left = 'calc('+pct+'% - 1px)';
+    document.getElementById('spotMarkerLbl').textContent = 'S='+S.toFixed(2);
+
+    // Greeks table
+    var rows = [
+      ['Delta (&Delta;)', g.delta.toFixed(4), 'Estimated $ change in option value per $1 move in the underlying. Also approximates hedge ratio and probability of finishing ITM.'],
+      ['Gamma (&Gamma;)', g.gamma.toFixed(4), 'Rate of change of Delta per $1 move in spot. Highest near-the-money, close to expiry.'],
+      ['Vega', fmtMoney(g.vega), 'Change in option value per 1 percentage-point rise in implied volatility.'],
+      ['Theta (&Theta;)', fmtMoney(g.theta) + ' /day', 'Change in option value from one calendar day passing, holding everything else fixed (time decay).'],
+      ['Rho (&rho;)', fmtMoney(g.rho), 'Change in option value per 1 percentage-point rise in the risk-free rate.']
+    ];
+    var body = document.getElementById('greeksBody');
+    body.innerHTML = rows.map(function(r){
+      return '<tr><td class="gname">'+r[0]+'</td><td class="gval">'+r[1]+'</td><td class="gdesc">'+r[2]+'</td></tr>';
+    }).join('');
+
+    updateCharts(S,K,sigma,r,q,T,type);
+  }
+
+  function updateCharts(S,K,sigma,r,q,T,type){
+    if(typeof Plotly === 'undefined'){
+      ['plotSpot','plotVol','plotTime','plotCompare','plotSurface'].forEach(function(id){
+        var node = document.getElementById(id);
+        if(node && !node.dataset.warned){
+          node.dataset.warned = '1';
+          node.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-lo);font-family:var(--ui);font-size:12px;text-align:center;padding:0 12px;">Chart library failed to load from CDN. KPI values and Greeks above are still live and accurate.</div>';
+        }
+      });
+      return;
+    }
+    var accent = type==='call' ? COLOR_GREEN : COLOR_RED;
+
+    // 1) Price vs Spot
+    var spotRange = linspace(Math.max(0.01,S*0.2), S*2.0, 80);
+    var pricesVsSpot = spotRange.map(function(s){ return price(s,K,sigma,r,q,T,type); });
+    var payoffVsSpot = spotRange.map(function(s){ return type==='call'?Math.max(s-K,0):Math.max(K-s,0); });
+
+    var traceSpot = { x:spotRange, y:pricesVsSpot, type:'scatter', mode:'lines', name:'Theoretical Price', line:{color:accent,width:2.5} };
+    var tracePayoff = { x:spotRange, y:payoffVsSpot, type:'scatter', mode:'lines', name:'Intrinsic (Expiry)', line:{color:'#5d6d7e', width:1.5, dash:'dot'} };
+    var traceCur = { x:[S], y:[price(S,K,sigma,r,q,T,type)], type:'scatter', mode:'markers', name:'Current', marker:{color:COLOR_AMBER, size:9, line:{color:'#000',width:1}} };
+    Plotly.react('plotSpot', [traceSpot, tracePayoff, traceCur], baseLayout({
+      xaxis:Object.assign({title:'Spot Price (S)'}, baseLayout().xaxis),
+      yaxis:Object.assign({title:'Option Price'}, baseLayout().yaxis)
+    }), plotConfig);
+
+    // 2) Price vs Vol
+    var volRange = linspace(0.01, 1.5, 70);
+    var pricesVsVol = volRange.map(function(v){ return price(S,K,v,r,q,T,type); });
+    Plotly.react('plotVol', [
+      { x:volRange.map(function(v){return v*100;}), y:pricesVsVol, type:'scatter', mode:'lines', name:'Price', line:{color:COLOR_CYAN,width:2.5} },
+      { x:[sigma*100], y:[price(S,K,sigma,r,q,T,type)], type:'scatter', mode:'markers', name:'Current', marker:{color:COLOR_AMBER,size:9,line:{color:'#000',width:1}} }
+    ], baseLayout({
+      xaxis:Object.assign({title:'Volatility (%)'}, baseLayout().xaxis),
+      yaxis:Object.assign({title:'Option Price'}, baseLayout().yaxis)
+    }), plotConfig);
+
+    // 3) Price vs Time to expiry
+    var tRange = linspace(0.001, Math.max(T,1.0)*1.2 + 0.05, 70);
+    var pricesVsT = tRange.map(function(t){ return price(S,K,sigma,r,q,t,type); });
+    Plotly.react('plotTime', [
+      { x:tRange, y:pricesVsT, type:'scatter', mode:'lines', name:'Price', line:{color:'#9d8cff', width:2.5} },
+      { x:[T], y:[price(S,K,sigma,r,q,T,type)], type:'scatter', mode:'markers', name:'Current', marker:{color:COLOR_AMBER,size:9,line:{color:'#000',width:1}} }
+    ], baseLayout({
+      xaxis:Object.assign({title:'Time to Expiry (years)', autorange:'reversed'}, baseLayout().xaxis),
+      yaxis:Object.assign({title:'Option Price'}, baseLayout().yaxis)
+    }), plotConfig);
+
+    // 4) Call vs Put comparison
+    var callVsSpot = spotRange.map(function(s){ return price(s,K,sigma,r,q,T,'call'); });
+    var putVsSpot = spotRange.map(function(s){ return price(s,K,sigma,r,q,T,'put'); });
+    Plotly.react('plotCompare', [
+      { x:spotRange, y:callVsSpot, type:'scatter', mode:'lines', name:'Call', line:{color:COLOR_GREEN,width:2.5} },
+      { x:spotRange, y:putVsSpot, type:'scatter', mode:'lines', name:'Put', line:{color:COLOR_RED,width:2.5} },
+      { x:[K], y:[0], type:'scatter', mode:'markers', name:'Strike', marker:{color:COLOR_AMBER, size:7, symbol:'diamond'} }
+    ], baseLayout({
+      xaxis:Object.assign({title:'Spot Price (S)'}, baseLayout().xaxis),
+      yaxis:Object.assign({title:'Option Price'}, baseLayout().yaxis)
+    }), plotConfig);
+
+    // 5) 3D Surface: Spot x Vol
+    var sAxis = linspace(Math.max(0.01,S*0.4), S*1.8, 35);
+    var vAxis = linspace(0.02, 1.2, 35);
+    var zSurf = vAxis.map(function(v){
+      return sAxis.map(function(s){ return price(s,K,v,r,q,T,type); });
+    });
+    Plotly.react('plotSurface', [{
+      x:sAxis, y:vAxis.map(function(v){return v*100;}), z:zSurf, type:'surface',
+      colorscale:[[0,'#122032'],[0.35,'#1f6b64'],[0.65,'#4fd1c5'],[1,'#ffb020']],
+      showscale:true,
+      colorbar:{tickfont:{color:'#9fb0c0', family:'IBM Plex Mono'}, len:0.7}
+    }], baseLayout({
+      scene:{
+        xaxis:{title:'Spot (S)', gridcolor:'#1c2430', color:'#9fb0c0', backgroundcolor:'rgba(0,0,0,0)'},
+        yaxis:{title:'Volatility (%)', gridcolor:'#1c2430', color:'#9fb0c0', backgroundcolor:'rgba(0,0,0,0)'},
+        zaxis:{title:'Price', gridcolor:'#1c2430', color:'#9fb0c0', backgroundcolor:'rgba(0,0,0,0)'},
+        camera:{eye:{x:1.6,y:-1.6,z:0.9}}
+      },
+      margin:{l:0,r:0,t:10,b:0}
+    }), plotConfig);
+
+    plotted = true;
+  }
+
+  /* ---------- Clock ---------- */
+  function tickClock(){
+    var d = new Date();
+    var hh=String(d.getHours()).padStart(2,'0'), mm=String(d.getMinutes()).padStart(2,'0'), ss=String(d.getSeconds()).padStart(2,'0');
+    document.getElementById('clockPill').textContent = hh+':'+mm+':'+ss+' LOCAL';
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ---------- Init ---------- */
+  syncControlsFromState();
+  recompute();
+
+  window.addEventListener('resize', function(){
+    ['plotSpot','plotVol','plotTime','plotCompare','plotSurface'].forEach(function(id){
+      Plotly.Plots.resize(document.getElementById(id));
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
