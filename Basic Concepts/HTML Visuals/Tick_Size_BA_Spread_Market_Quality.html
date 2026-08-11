@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tick Size, Bid-Ask Spread & Market Quality Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C; --bg-2:#0C0E12; --panel:#111318; --panel-2:#15171D;
+  --border:#242730; --border-soft:#1A1C22;
+  --text:#E8E9EE; --text-dim:#8C90A0; --text-faint:#5A5E6B;
+  --accent:#4F8EFF; --accent-dim:#3A6BC4; --oos:#FFC145;
+  --profit:#2ED573; --loss:#FF4757; --warn:#F5A623; --choppy:#8C7CFF;
+  --bid:#2ED573; --ask:#FF4757;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px; --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(255,193,69,0.04), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+.app{display:grid; grid-template-columns:360px 1fr; min-height:100vh;}
+@media (max-width:1200px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--bid), var(--accent), var(--ask)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:10px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:15px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+select, input[type=number]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+.preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.preset-btn{padding:7px 8px; font-size:11.5px; text-align:center;}
+.preset-btn.active{border-color:var(--accent); color:var(--accent); background:rgba(79,142,255,0.08);}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:22px 28px 60px; max-width:1560px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:26px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:920px; font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px; max-width:920px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+.grid-main{grid-template-columns:1.1fr 1fr 0.95fr; gap:14px;}
+@media (max-width:1300px){.grid-main{grid-template-columns:1fr;} .grid-4{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px 14px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.bid:before{background:var(--bid);}
+.kpi.ask:before{background:var(--ask);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.warn:before{background:var(--warn);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:17px; font-weight:600; margin-top:5px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+
+.ladder{font-family:var(--mono); font-size:12px;}
+.ladder-h{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:4px; padding:5px 8px; color:var(--text-faint); font-size:10px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+.ladder-row{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:4px; padding:3px 8px; position:relative;}
+.ladder-row .bar{position:absolute; top:1px; bottom:1px; opacity:0.16; border-radius:2px; pointer-events:none;}
+.ladder-row.ask .bar{background:var(--ask); right:0;}
+.ladder-row.bid .bar{background:var(--bid); left:0;}
+.ladder-row.ask .px{color:var(--ask); font-weight:600;}
+.ladder-row.bid .px{color:var(--bid); font-weight:600;}
+.ladder-row .sz,.ladder-row .ticks,.ladder-row .cum{text-align:right; color:var(--text-dim);}
+.spread-row{text-align:center; padding:8px; color:var(--oos); font-weight:600; font-family:var(--mono); font-size:12px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:rgba(255,255,255,0.02);}
+
+.event-log{font-family:var(--mono); font-size:11px; max-height:300px; overflow-y:auto;}
+.event-row{display:grid; grid-template-columns:48px 70px 1fr; gap:6px; padding:4px 6px; border-bottom:1px solid var(--border-soft);}
+.event-row .t{color:var(--text-faint);}
+.event-row.buy{color:var(--bid);}
+.event-row.sell{color:var(--ask);}
+.event-row.quote{color:var(--accent);}
+.event-row.trade{color:var(--oos);}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+table.data-table th, table.data-table td{padding:7px 8px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left;}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10.5px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.legend-row{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); margin-bottom:8px;}
+.footer-note{margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; border:1px solid rgba(79,142,255,0.4); color:var(--accent); margin-left:8px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">TK</div><div class="brand-name">Tick & Spread Lab</div></div>
+    <div class="brand-sub">Market Quality · Quote Competition</div>
+
+    <div class="ctrl-group">
+      <h4>Scenarios</h4>
+      <div class="preset-grid" id="scenarioGrid">
+        <button class="btn preset-btn active" data-s="standard">Standard $0.01</button>
+        <button class="btn preset-btn" data-s="smalltick">Small Tick</button>
+        <button class="btn preset-btn" data-s="largetick">Large Tick</button>
+        <button class="btn preset-btn" data-s="illiquid">Illiquid</button>
+        <button class="btn preset-btn" data-s="hft">High Quote Activity</button>
+        <button class="btn preset-btn" data-s="volatile">Volatile</button>
+      </div>
+      <div class="hint">Scenarios reset the book and retune tick size, liquidity and flow intensities.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Tick & Price Grid</h4>
+      <div class="field">
+        <div class="field-label"><span>Tick Size</span><span class="val" id="v_tick">0.01</span></div>
+        <input type="range" id="tickSize" min="0.0001" max="0.25" step="0.0001" value="0.01">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Mid (anchor)</span></div>
+          <input type="number" id="mid0" value="50.00" step="0.01" min="1">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Depth Levels</span><span class="val" id="v_levels">8</span></div>
+          <input type="range" id="levels" min="3" max="15" step="1" value="8">
+        </div>
+      </div>
+      <div class="hint">All quotes snap to the tick grid. Changing tick size rebuilds legal price levels around the anchor mid.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Liquidity & Flow</h4>
+      <div class="field">
+        <div class="field-label"><span>Base Liquidity</span><span class="val" id="v_liq">1.0</span></div>
+        <input type="range" id="liquidity" min="0.2" max="3" step="0.1" value="1.0">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Arrival Rate</span><span class="val" id="v_arr">0.45</span></div>
+        <input type="range" id="arrival" min="0.05" max="0.9" step="0.05" value="0.45">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Cancel Rate</span><span class="val" id="v_cxl">0.30</span></div>
+        <input type="range" id="cancel" min="0.05" max="0.8" step="0.05" value="0.30">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Trade Intensity</span><span class="val" id="v_trd">0.20</span></div>
+        <input type="range" id="tradeRate" min="0.02" max="0.5" step="0.02" value="0.20">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Volatility</span><span class="val" id="v_vol">0.30</span></div>
+        <input type="range" id="vol" min="0.05" max="1" step="0.05" value="0.30">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Simulation</h4>
+      <div class="field">
+        <div class="field-label"><span>Speed (ms)</span><span class="val" id="v_spd">180</span></div>
+        <input type="range" id="speed" min="50" max="600" step="20" value="180">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnPause">Pause</button>
+        <button class="btn" id="btnStep">Step</button>
+      </div>
+      <button class="btn" id="btnReset" style="margin-top:6px;">Reset Book</button>
+    </div>
+
+    <div class="status-line" id="statusLine">Running · synthetic book</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Market Microstructure · Market Quality</div>
+      <h1 class="page-title">Tick Size, Bid-Ask Spread &amp; Market Quality</h1>
+      <p class="page-desc">Explore how the minimum price increment shapes the bid–ask spread, queue competition and displayed depth in a live synthetic limit order book. Compare small-tick and large-tick regimes, track quote vs trade activity, and see why the “right” tick size is a trade-off — not a universal constant.</p>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-title">Market Quality Snapshot</span>
+        <span class="badge" id="tickBadge">tick 0.01</span>
+      </div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Order Book · Spread · Event Stream</span></div>
+      <div class="grid grid-main">
+        <div class="card">
+          <div class="legend-row">
+            <span style="color:var(--ask)">Asks</span>
+            <span style="color:var(--bid)">Bids</span>
+            <span style="color:var(--oos)">Spread zone</span>
+          </div>
+          <div class="ladder" id="ladder"></div>
+        </div>
+        <div class="card">
+          <div style="font-family:var(--display);font-weight:600;font-size:13px;margin-bottom:10px;">Spread &amp; Tick Metrics</div>
+          <table class="data-table"><tbody id="spreadBody"></tbody></table>
+          <div style="margin-top:16px;font-family:var(--display);font-weight:600;font-size:13px;margin-bottom:8px;">Tick Grid (near touch)</div>
+          <div id="tickGrid" style="font-family:var(--mono);font-size:11.5px;line-height:1.7;color:var(--text-dim);"></div>
+        </div>
+        <div class="card">
+          <div style="font-family:var(--display);font-weight:600;font-size:13px;margin-bottom:8px;">Quote &amp; Trade Events</div>
+          <div class="event-log" id="eventLog"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Depth Profile &amp; Queue at Touch</span></div>
+      <div class="grid grid-2">
+        <div class="card"><div id="depthChart" style="width:100%;height:300px;"></div></div>
+        <div class="card"><div id="queueChart" style="width:100%;height:300px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Spread Path · Quote Activity · Trades</span></div>
+      <div class="card" style="margin-bottom:14px;"><div id="spreadChart" style="width:100%;height:280px;"></div></div>
+      <div class="grid grid-2">
+        <div class="card"><div id="activityChart" style="width:100%;height:280px;"></div></div>
+        <div class="card"><div id="costChart" style="width:100%;height:280px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Session Statistics</span></div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr><th>Statistic</th><th>Value</th><th>Notes</th></tr></thead>
+          <tbody id="statsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Formulas</span></div>
+      <div class="formula-block">
+        <div class="f-title">Spread Measures</div>
+        <div class="f-math">Spread = BestAsk − BestBid</div>
+        <div class="f-math">Spread (ticks) = Spread / TickSize · Spread (bps) = Spread / Mid × 10 000</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Activity Ratios</div>
+        <div class="f-math">Quote-to-Trade ≈ (quote updates) / (trades)</div>
+        <div class="f-math">Tick-to-Trade ≈ (price-level changes at BBO) / (trades)</div>
+        <div class="f-note">High ratios often indicate intensive quote competition or fleeting liquidity relative to actual transactions.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Round-Trip Execution Cost (touch)</div>
+        <div class="f-math">Est. cost ≈ Spread / 2 &nbsp;(one-way, aggressive) · Round-trip ≈ Spread</div>
+        <div class="f-note">Ignores depth beyond top of book and adverse selection; a lower bound on immediate liquidity cost.</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Tick Size &amp; Market Quality</span></div>
+
+      <details class="disclosure" open>
+        <summary>What tick size is</summary>
+        <div class="disclosure-body">
+          <p>The <b>tick size</b> is the minimum price increment on which quotes and trades may be expressed. It defines the discrete grid of legal prices. A $0.01 tick on a $50 stock is 2 bps per tick; the same tick on a $5 stock is 20 bps — so economic tick size depends on price level as well as the absolute increment.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Small-tick vs large-tick regimes</summary>
+        <div class="disclosure-body">
+          <p><b>Large ticks</b> force a wider minimum spread (at least one tick). That can increase displayed depth at each level — because improving the price costs a full tick — and may simplify queue priority. But it can also keep the spread artificially wide relative to volatility, raising costs for liquidity takers.</p>
+          <p><b>Small ticks</b> allow finer quote competition and potentially tighter spreads. They can also fragment depth across more price levels, intensify cancel/replace activity, and make time priority at a given price less “valuable” because stepping ahead by one tick is cheap. Neither regime is universally optimal; effects depend on liquidity, volatility and trader mix.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Queue priority &amp; quote competition</summary>
+        <div class="disclosure-body">
+          <p>With price-time priority, the first order at the best price is first in line. When the tick is large, joining the queue at the touch is often the main way to compete. When the tick is small, liquidity providers may <b>improve</b> by one tick instead of waiting in a long queue — tightening the spread but thinning size at each level.</p>
+        </div>
+      </details>
+
+      <details class="disclosure">
+        <summary>Sub-penny quoting &amp; nuance</summary>
+        <div class="disclosure-body">
+          <p>In some venues and contexts, sub-penny pricing exists for certain order types or dark venues even when the lit tick is one cent. That can create complex interactions between displayed and non-displayed liquidity. This simulator uses a single discrete tick grid for clarity and does not model sub-penny exceptions — a deliberate simplification.</p>
+          <p>Empirical market-quality studies often find mixed results when regulators change tick size: spreads, depth, and trading costs need not all improve together. Treat the relationships you observe here as mechanistic illustrations inside a stylised model, not as policy conclusions.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational market-microstructure visualizer. Synthetic order flow on a discrete tick grid. Ratios and costs are model-implied, not estimates from real venues. Not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   TICK SIZE, BID-ASK SPREAD & MARKET QUALITY VISUALIZER
+   ===================================================================== */
+
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+const params = {
+  tick: 0.01,
+  mid0: 50,
+  levels: 8,
+  liquidity: 1.0,
+  arrival: 0.45,
+  cancel: 0.30,
+  tradeRate: 0.20,
+  vol: 0.30,
+  speed: 180,
+};
+
+let rng = mulberry32(99);
+let state = {
+  tickNum: 0,
+  mid: 50,
+  bids: new Map(), // priceKey -> size
+  asks: new Map(),
+  running: true,
+  // counters
+  quotes: 0,
+  trades: 0,
+  bboChanges: 0,
+  lastBB: null,
+  lastBA: null,
+};
+
+let history = []; // {t, spread, spreadTicks, spreadBps, bb, ba, mid, bidDepth, askDepth, quotes, trades}
+let events = [];
+let queueHist = []; // touch queue sizes over time
+const MAX_H = 400;
+const MAX_E = 100;
+
+function pk(p) {
+  const t = params.tick;
+  return (Math.round(p / t) * t).toFixed(6);
+}
+function pp(k) { return parseFloat(k); }
+function snap(p) {
+  const t = params.tick;
+  return Math.round(p / t) * t;
+}
+
+function bestBid() {
+  let b = null;
+  for (const k of state.bids.keys()) {
+    if (state.bids.get(k) > 0) {
+      const p = pp(k);
+      if (b === null || p > b) b = p;
+    }
+  }
+  return b;
+}
+function bestAsk() {
+  let a = null;
+  for (const k of state.asks.keys()) {
+    if (state.asks.get(k) > 0) {
+      const p = pp(k);
+      if (a === null || p < a) a = p;
+    }
+  }
+  return a;
+}
+function sizeAt(side, price) {
+  const m = side === 'buy' ? state.bids : state.asks;
+  return m.get(pk(price)) || 0;
+}
+function setSize(side, price, sz) {
+  const m = side === 'buy' ? state.bids : state.asks;
+  const k = pk(price);
+  if (sz <= 0) m.delete(k);
+  else m.set(k, Math.round(sz));
+}
+function addSize(side, price, d) {
+  setSize(side, price, sizeAt(side, price) + d);
+}
+
+function topPrices(side, n) {
+  if (side === 'buy') {
+    return [...state.bids.keys()].map(pp).filter(p => sizeAt('buy', p) > 0).sort((a,b) => b - a).slice(0, n);
+  }
+  return [...state.asks.keys()].map(pp).filter(p => sizeAt('sell', p) > 0).sort((a,b) => a - b).slice(0, n);
+}
+
+function logEvent(kind, side, msg) {
+  events.unshift({ t: state.tickNum, kind, side, msg });
+  if (events.length > MAX_E) events.pop();
+}
+
+function seedBook() {
+  state.bids.clear();
+  state.asks.clear();
+  state.mid = snap(params.mid0);
+  const t = params.tick;
+  // Natural spread tends to be max(1 tick, function of vol) — large ticks bind more often
+  const volTicks = params.vol * 2;
+  const minSpreadTicks = 1;
+  const natural = Math.max(minSpreadTicks, Math.round(0.5 + volTicks * 0.8));
+  const half = Math.max(1, Math.floor(natural / 2));
+  const bb = snap(state.mid - half * t);
+  const ba = snap(state.mid + Math.max(1, natural - half) * t);
+
+  for (let i = 0; i < params.levels; i++) {
+    const base = (25 + rng() * 50) * params.liquidity;
+    const decay = Math.pow(1 / (1 + i), 1.1);
+    setSize('buy', snap(bb - i * t), base * decay * (0.7 + rng() * 0.6));
+    setSize('sell', snap(ba + i * t), base * decay * (0.7 + rng() * 0.6));
+  }
+  state.lastBB = bestBid();
+  state.lastBA = bestAsk();
+  logEvent('quote', '', `Book seeded · tick ${t} · BBO ${state.lastBB?.toFixed(4)} / ${state.lastBA?.toFixed(4)}`);
+}
+
+function trackBBO() {
+  const bb = bestBid(), ba = bestAsk();
+  if (bb !== state.lastBB || ba !== state.lastBA) {
+    state.bboChanges++;
+    state.quotes++;
+    logEvent('quote', '', `BBO ${bb?.toFixed(4) ?? '—'} / ${ba?.toFixed(4) ?? '—'}`);
+    state.lastBB = bb;
+    state.lastBA = ba;
+  }
+}
+
+function simStep() {
+  state.tickNum++;
+  const t = params.tick;
+  let bb = bestBid(), ba = bestAsk();
+  if (bb == null || ba == null || bb >= ba) { seedBook(); bb = bestBid(); ba = bestAsk(); }
+
+  // Mid noise (snapped only for display; latent mid can be finer conceptually)
+  state.mid += (rng() - 0.5) * params.vol * t * 3;
+
+  // --- Cancellations ---
+  if (rng() < params.cancel) {
+    const side = rng() < 0.5 ? 'buy' : 'sell';
+    const prices = topPrices(side, params.levels);
+    if (prices.length) {
+      const idx = Math.floor(Math.pow(rng(), 0.6) * prices.length);
+      const p = prices[idx];
+      const sz = sizeAt(side, p);
+      const cut = Math.max(1, Math.floor(sz * (0.2 + rng() * 0.7)));
+      setSize(side, p, sz - cut);
+      state.quotes++;
+      logEvent('quote', side, `CXL ${side} ${cut} @ ${p.toFixed(4)}`);
+    }
+  }
+
+  // --- Limit arrivals / quote improvements ---
+  if (rng() < params.arrival) {
+    const side = rng() < 0.5 ? 'buy' : 'sell';
+    bb = bestBid(); ba = bestAsk();
+    const sz = Math.floor((5 + rng() * 40) * params.liquidity);
+
+    // Probability of improving by 1 tick vs joining
+    // Smaller ticks → more frequent one-tick improves (cheaper to jump queue)
+    const tickBps = (t / Math.max(state.mid, 1)) * 10000;
+    const improveProb = Math.max(0.05, Math.min(0.55, 0.5 - tickBps * 0.02 + params.arrival * 0.1));
+
+    let price;
+    if (side === 'buy') {
+      if (rng() < improveProb && ba != null && bb != null && ba - bb > t + 1e-12) {
+        price = snap(bb + t); // improve
+      } else {
+        const depth = Math.floor(rng() * Math.min(4, params.levels));
+        price = snap((bb ?? state.mid - t) - depth * t);
+      }
+      if (ba != null && price >= ba) price = snap(ba - t);
+    } else {
+      if (rng() < improveProb && ba != null && bb != null && ba - bb > t + 1e-12) {
+        price = snap(ba - t);
+      } else {
+        const depth = Math.floor(rng() * Math.min(4, params.levels));
+        price = snap((ba ?? state.mid + t) + depth * t);
+      }
+      if (bb != null && price <= bb) price = snap(bb + t);
+    }
+    addSize(side, price, sz);
+    state.quotes++;
+    logEvent('quote', side, `LMT ${side} ${sz} @ ${price.toFixed(4)}`);
+  }
+
+  // --- Trades (market orders hitting touch) ---
+  if (rng() < params.tradeRate) {
+    const side = rng() < 0.5 ? 'buy' : 'sell'; // aggressor
+    bb = bestBid(); ba = bestAsk();
+    const qty = Math.floor((3 + rng() * 25) * params.liquidity);
+    let left = qty;
+    if (side === 'buy' && ba != null) {
+      while (left > 0) {
+        const a = bestAsk();
+        if (a == null) break;
+        const avail = sizeAt('sell', a);
+        const take = Math.min(left, avail);
+        setSize('sell', a, avail - take);
+        left -= take;
+        state.mid += params.vol * t * 0.3;
+      }
+      logEvent('trade', 'buy', `TRADE buy ${qty - left} @ ask`);
+    } else if (side === 'sell' && bb != null) {
+      while (left > 0) {
+        const b = bestBid();
+        if (b == null) break;
+        const avail = sizeAt('buy', b);
+        const take = Math.min(left, avail);
+        setSize('buy', b, avail - take);
+        left -= take;
+        state.mid -= params.vol * t * 0.3;
+      }
+      logEvent('trade', 'sell', `TRADE sell ${qty - left} @ bid`);
+    }
+    state.trades++;
+  }
+
+  // Refill empty book sides lightly
+  bb = bestBid(); ba = bestAsk();
+  if (bb == null || ba == null) seedBook();
+  else if (ba - bb < t - 1e-12) {
+    // crossed — fix
+    seedBook();
+  }
+
+  trackBBO();
+
+  // Record history
+  bb = bestBid(); ba = bestAsk();
+  const spread = (bb != null && ba != null) ? ba - bb : null;
+  const mid = (bb != null && ba != null) ? (bb + ba) / 2 : state.mid;
+  const spreadTicks = spread != null ? spread / params.tick : null;
+  const spreadBps = spread != null && mid ? (spread / mid) * 10000 : null;
+  const bidDepth = topPrices('buy', 3).reduce((s, p) => s + sizeAt('buy', p), 0);
+  const askDepth = topPrices('sell', 3).reduce((s, p) => s + sizeAt('sell', p), 0);
+
+  history.push({
+    t: state.tickNum, spread, spreadTicks, spreadBps, bb, ba, mid,
+    bidDepth, askDepth,
+    quotes: state.quotes, trades: state.trades, bboChanges: state.bboChanges,
+  });
+  if (history.length > MAX_H) history.shift();
+
+  queueHist.push({
+    t: state.tickNum,
+    bidQ: bb != null ? sizeAt('buy', bb) : 0,
+    askQ: ba != null ? sizeAt('sell', ba) : 0,
+  });
+  if (queueHist.length > MAX_H) queueHist.shift();
+}
+
+/* ---- Scenarios ---- */
+const SCENARIOS = {
+  standard:  { tick: 0.01, liquidity: 1.0, arrival: 0.45, cancel: 0.30, tradeRate: 0.20, vol: 0.30, levels: 8, mid0: 50 },
+  smalltick: { tick: 0.0001, liquidity: 1.0, arrival: 0.55, cancel: 0.40, tradeRate: 0.18, vol: 0.30, levels: 10, mid0: 50 },
+  largetick: { tick: 0.10, liquidity: 1.3, arrival: 0.35, cancel: 0.20, tradeRate: 0.22, vol: 0.30, levels: 6, mid0: 50 },
+  illiquid:  { tick: 0.05, liquidity: 0.35, arrival: 0.20, cancel: 0.25, tradeRate: 0.12, vol: 0.40, levels: 5, mid0: 25 },
+  hft:       { tick: 0.01, liquidity: 1.2, arrival: 0.75, cancel: 0.65, tradeRate: 0.15, vol: 0.25, levels: 8, mid0: 50 },
+  volatile:  { tick: 0.01, liquidity: 0.9, arrival: 0.50, cancel: 0.35, tradeRate: 0.30, vol: 0.80, levels: 8, mid0: 50 },
+};
+
+function applyScenario(name) {
+  const s = SCENARIOS[name];
+  if (!s) return;
+  Object.assign(params, s);
+  document.getElementById('tickSize').value = params.tick;
+  document.getElementById('liquidity').value = params.liquidity;
+  document.getElementById('arrival').value = params.arrival;
+  document.getElementById('cancel').value = params.cancel;
+  document.getElementById('tradeRate').value = params.tradeRate;
+  document.getElementById('vol').value = params.vol;
+  document.getElementById('levels').value = params.levels;
+  document.getElementById('mid0').value = params.mid0;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.s === name));
+  syncLabels();
+  hardReset();
+}
+
+function hardReset() {
+  rng = mulberry32(Math.floor(Math.random() * 1e9));
+  state.tickNum = 0;
+  state.quotes = 0;
+  state.trades = 0;
+  state.bboChanges = 0;
+  history = [];
+  events = [];
+  queueHist = [];
+  seedBook();
+  for (let i = 0; i < 8; i++) simStep();
+  renderAll();
+}
+
+/* ---- UI sync ---- */
+function syncLabels() {
+  params.tick = parseFloat(document.getElementById('tickSize').value) || 0.01;
+  params.liquidity = parseFloat(document.getElementById('liquidity').value);
+  params.arrival = parseFloat(document.getElementById('arrival').value);
+  params.cancel = parseFloat(document.getElementById('cancel').value);
+  params.tradeRate = parseFloat(document.getElementById('tradeRate').value);
+  params.vol = parseFloat(document.getElementById('vol').value);
+  params.levels = parseInt(document.getElementById('levels').value, 10);
+  params.speed = parseInt(document.getElementById('speed').value, 10);
+  params.mid0 = parseFloat(document.getElementById('mid0').value) || 50;
+
+  document.getElementById('v_tick').textContent = params.tick < 0.01 ? params.tick.toFixed(4) : params.tick.toFixed(2);
+  document.getElementById('v_liq').textContent = params.liquidity.toFixed(1);
+  document.getElementById('v_arr').textContent = params.arrival.toFixed(2);
+  document.getElementById('v_cxl').textContent = params.cancel.toFixed(2);
+  document.getElementById('v_trd').textContent = params.tradeRate.toFixed(2);
+  document.getElementById('v_vol').textContent = params.vol.toFixed(2);
+  document.getElementById('v_levels').textContent = params.levels;
+  document.getElementById('v_spd').textContent = params.speed;
+  document.getElementById('tickBadge').textContent = 'tick ' + (params.tick < 0.01 ? params.tick.toFixed(4) : params.tick.toFixed(2));
+}
+
+['tickSize','liquidity','arrival','cancel','tradeRate','vol','levels','speed','mid0'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    const prevTick = params.tick;
+    syncLabels();
+    if (id === 'tickSize' || id === 'mid0' || id === 'levels') hardReset();
+    if (id === 'speed') restartLoop();
+  });
+});
+
+document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', () => applyScenario(b.dataset.s)));
+document.getElementById('btnPause').onclick = () => {
+  state.running = !state.running;
+  document.getElementById('btnPause').textContent = state.running ? 'Pause' : 'Resume';
+};
+document.getElementById('btnStep').onclick = () => { simStep(); renderAll(); };
+document.getElementById('btnReset').onclick = () => hardReset();
+
+/* ---- Render ---- */
+function fmt(x, d=2) { return isFinite(x) ? Number(x).toFixed(d) : '—'; }
+function plotlyBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 50, r: 16, t: 22, b: 42 },
+    xaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.14, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE' } },
+  }, extra || {});
+}
+const PCFG = { displayModeBar: false, responsive: true };
+
+function renderAll() {
+  const bb = bestBid(), ba = bestAsk();
+  const spread = (bb != null && ba != null) ? ba - bb : null;
+  const mid = (bb != null && ba != null) ? (bb + ba) / 2 : state.mid;
+  const spreadTicks = spread != null ? spread / params.tick : null;
+  const spreadBps = spread != null && mid ? (spread / mid) * 10000 : null;
+  const bidQ = bb != null ? sizeAt('buy', bb) : 0;
+  const askQ = ba != null ? sizeAt('sell', ba) : 0;
+  const depth3 = topPrices('buy', 3).reduce((s, p) => s + sizeAt('buy', p), 0)
+               + topPrices('sell', 3).reduce((s, p) => s + sizeAt('sell', p), 0);
+  const q2t = state.trades > 0 ? state.quotes / state.trades : null;
+  const t2t = state.trades > 0 ? state.bboChanges / state.trades : null;
+  const oneWayCostBps = spreadBps != null ? spreadBps / 2 : null;
+
+  // KPIs
+  const kpis = [
+    { l: 'Spread', v: spread != null ? fmt(spread, 4) : '—', s: spreadTicks != null ? fmt(spreadTicks, 1) + ' ticks' : '', c: 'oos' },
+    { l: 'Spread (bps)', v: spreadBps != null ? fmt(spreadBps, 2) : '—', s: 'vs mid', c: spreadBps > 20 ? 'warn' : '' },
+    { l: 'BBO', v: `${fmt(bb,4)} / ${fmt(ba,4)}`, s: `mid ${fmt(mid,3)}`, c: '' },
+    { l: 'Touch Depth', v: `${bidQ} × ${askQ}`, s: 'bid × ask size', c: '' },
+    { l: 'Depth (top-3)', v: String(Math.round(depth3)), s: 'both sides', c: '' },
+    { l: 'Quote / Trade', v: q2t != null ? fmt(q2t, 1) : '—', s: 'session ratio', c: q2t > 20 ? 'warn' : '' },
+    { l: 'BBO Δ / Trade', v: t2t != null ? fmt(t2t, 1) : '—', s: 'tick-to-trade proxy', c: '' },
+    { l: 'Est. 1-way Cost', v: oneWayCostBps != null ? fmt(oneWayCostBps, 2) + ' bps' : '—', s: '≈ half-spread', c: 'oos' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
+  ).join('');
+
+  // Ladder
+  const n = params.levels;
+  const asks = topPrices('sell', n);
+  const bids = topPrices('buy', n);
+  const maxSz = Math.max(1, ...asks.map(p => sizeAt('sell', p)), ...bids.map(p => sizeAt('buy', p)));
+  let html = `<div class="ladder-h"><span>Price</span><span style="text-align:right">Size</span><span style="text-align:right">Ticks from mid</span><span style="text-align:right">Cum</span></div>`;
+  const asksDisp = [...asks].reverse();
+  let cum = 0;
+  const askCum = new Map();
+  for (const p of asks) { cum += sizeAt('sell', p); askCum.set(p, cum); }
+  for (const p of asksDisp) {
+    const sz = sizeAt('sell', p);
+    const ticksFrom = mid ? Math.round((p - mid) / params.tick) : '—';
+    html += `<div class="ladder-row ask"><div class="bar" style="width:${(sz/maxSz)*100}%"></div>
+      <span class="px">${p.toFixed(4)}</span><span class="sz">${sz}</span><span class="ticks">${ticksFrom}</span><span class="cum">${askCum.get(p)}</span></div>`;
+  }
+  html += `<div class="spread-row">SPREAD ${spread != null ? spread.toFixed(4) : '—'} (${spreadTicks != null ? fmt(spreadTicks,1) : '—'} ticks · ${spreadBps != null ? fmt(spreadBps,1) : '—'} bps)</div>`;
+  cum = 0;
+  for (const p of bids) {
+    const sz = sizeAt('buy', p);
+    cum += sz;
+    const ticksFrom = mid ? Math.round((mid - p) / params.tick) : '—';
+    html += `<div class="ladder-row bid"><div class="bar" style="width:${(sz/maxSz)*100}%"></div>
+      <span class="px">${p.toFixed(4)}</span><span class="sz">${sz}</span><span class="ticks">${ticksFrom}</span><span class="cum">${cum}</span></div>`;
+  }
+  document.getElementById('ladder').innerHTML = html;
+
+  // Spread detail table
+  document.getElementById('spreadBody').innerHTML = [
+    ['Tick size', params.tick < 0.01 ? params.tick.toFixed(4) : params.tick.toFixed(2)],
+    ['Tick (bps of mid)', mid ? fmt((params.tick / mid) * 10000, 2) : '—'],
+    ['Spread (price)', spread != null ? spread.toFixed(4) : '—'],
+    ['Spread (ticks)', spreadTicks != null ? fmt(spreadTicks, 2) : '—'],
+    ['Spread (bps)', spreadBps != null ? fmt(spreadBps, 2) : '—'],
+    ['Min legal spread', params.tick.toFixed(4) + ' (1 tick)'],
+    ['Spread constrained?', spreadTicks != null && spreadTicks <= 1.01 ? 'Yes — at 1 tick' : 'No — wider than 1 tick'],
+    ['Half-spread cost (bps)', oneWayCostBps != null ? fmt(oneWayCostBps, 2) : '—'],
+  ].map(([a,b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('');
+
+  // Tick grid display
+  if (bb != null && ba != null) {
+    const levels = [];
+    for (let p = snap(bb - 3 * params.tick); p <= snap(ba + 3 * params.tick) + params.tick / 2; p = snap(p + params.tick)) {
+      let tag = '';
+      if (Math.abs(p - bb) < params.tick / 2) tag = ' ← best bid';
+      if (Math.abs(p - ba) < params.tick / 2) tag = ' ← best ask';
+      if (p > bb && p < ba) tag = ' · inside spread';
+      levels.push(`${p.toFixed(4)}${tag}`);
+    }
+    document.getElementById('tickGrid').innerHTML = levels.join('<br>');
+  }
+
+  // Events
+  document.getElementById('eventLog').innerHTML = events.slice(0, 40).map(e =>
+    `<div class="event-row ${e.kind}"><span class="t">t${e.t}</span><span>${e.kind}</span><span>${e.msg}</span></div>`
+  ).join('') || '<div style="padding:8px;color:var(--text-faint)">No events</div>';
+
+  // Depth chart
+  Plotly.newPlot('depthChart', [
+    { x: bids.map(p => p), y: bids.map(p => sizeAt('buy', p)), type: 'bar', name: 'Bid', marker: { color: 'rgba(46,213,115,0.75)' } },
+    { x: asks.map(p => p), y: asks.map(p => sizeAt('sell', p)), type: 'bar', name: 'Ask', marker: { color: 'rgba(255,71,87,0.75)' } },
+  ], plotlyBase({ barmode: 'group', xaxis: { title: 'Price' }, yaxis: { title: 'Size' } }), PCFG);
+
+  // Queue at touch over time
+  Plotly.newPlot('queueChart', [
+    { x: queueHist.map(q => q.t), y: queueHist.map(q => q.bidQ), mode: 'lines', line: { color: '#2ED573', width: 1.5 }, name: 'Bid touch size' },
+    { x: queueHist.map(q => q.t), y: queueHist.map(q => q.askQ), mode: 'lines', line: { color: '#FF4757', width: 1.5 }, name: 'Ask touch size' },
+  ], plotlyBase({ xaxis: { title: 'Tick' }, yaxis: { title: 'Queue size' } }), PCFG);
+
+  // Spread path
+  Plotly.newPlot('spreadChart', [
+    { x: history.map(h => h.t), y: history.map(h => h.spreadTicks), mode: 'lines', line: { color: '#FFC145', width: 1.8 }, name: 'Spread (ticks)' },
+    { x: history.map(h => h.t), y: history.map(() => 1), mode: 'lines', line: { color: '#5A5E6B', width: 1, dash: 'dot' }, name: '1 tick floor' },
+    { x: history.map(h => h.t), y: history.map(h => h.spreadBps), mode: 'lines', line: { color: '#4F8EFF', width: 1.2, dash: 'dash' }, name: 'Spread (bps)', yaxis: 'y2' },
+  ], plotlyBase({
+    xaxis: { title: 'Tick' },
+    yaxis: { title: 'Ticks', side: 'left' },
+    yaxis2: { title: 'bps', overlaying: 'y', side: 'right', showgrid: false },
+  }), PCFG);
+
+  // Activity cumulative
+  Plotly.newPlot('activityChart', [
+    { x: history.map(h => h.t), y: history.map(h => h.quotes), mode: 'lines', line: { color: '#4F8EFF', width: 2 }, name: 'Cum quotes' },
+    { x: history.map(h => h.t), y: history.map(h => h.trades), mode: 'lines', line: { color: '#FFC145', width: 2 }, name: 'Cum trades' },
+    { x: history.map(h => h.t), y: history.map(h => h.bboChanges), mode: 'lines', line: { color: '#8C7CFF', width: 1.5, dash: 'dot' }, name: 'BBO changes' },
+  ], plotlyBase({ xaxis: { title: 'Tick' }, yaxis: { title: 'Count' } }), PCFG);
+
+  // Execution cost proxy over time
+  Plotly.newPlot('costChart', [
+    { x: history.map(h => h.t), y: history.map(h => h.spreadBps != null ? h.spreadBps / 2 : null), mode: 'lines',
+      line: { color: '#FF4757', width: 2 }, name: 'Half-spread (bps)', fill: 'tozeroy', fillcolor: 'rgba(255,71,87,0.08)' },
+  ], plotlyBase({ xaxis: { title: 'Tick' }, yaxis: { title: 'Est. one-way cost (bps)' } }), PCFG);
+
+  // Session stats table
+  const avgSpreadTicks = history.length ? history.reduce((s, h) => s + (h.spreadTicks || 0), 0) / history.length : null;
+  const avgSpreadBps = history.length ? history.reduce((s, h) => s + (h.spreadBps || 0), 0) / history.length : null;
+  const pctAtOneTick = history.length ? history.filter(h => h.spreadTicks != null && h.spreadTicks <= 1.01).length / history.length : null;
+
+  document.getElementById('statsBody').innerHTML = [
+    ['Tick size', params.tick < 0.01 ? params.tick.toFixed(4) : params.tick.toFixed(2), 'Minimum price increment'],
+    ['Avg spread (ticks)', fmt(avgSpreadTicks, 2), 'Time-average'],
+    ['Avg spread (bps)', fmt(avgSpreadBps, 2), 'Time-average'],
+    ['% time at 1-tick spread', pctAtOneTick != null ? fmt(pctAtOneTick * 100, 1) + '%' : '—', 'Binding tick constraint'],
+    ['Quotes', state.quotes, 'Limit adds / cancels / improves'],
+    ['Trades', state.trades, 'Aggressive marketable events'],
+    ['BBO changes', state.bboChanges, 'Best bid or ask price changes'],
+    ['Quote-to-trade', q2t != null ? fmt(q2t, 2) : '—', 'Higher → more quote chatter'],
+    ['Tick-to-trade (BBO)', t2t != null ? fmt(t2t, 2) : '—', 'BBO changes per trade'],
+    ['Bid touch queue', bidQ, 'Size at best bid'],
+    ['Ask touch queue', askQ, 'Size at best ask'],
+  ].map(([a,b,c]) => `<tr><td>${a}</td><td>${b}</td><td style="color:var(--text-faint);font-size:11px;text-align:left">${c}</td></tr>`).join('');
+
+  document.getElementById('statusLine').innerHTML =
+    `${state.running ? 'Running' : 'Paused'} · t<b>${state.tickNum}</b> · spread <b>${spreadTicks != null ? fmt(spreadTicks,1) : '—'} ticks</b> (${spreadBps != null ? fmt(spreadBps,1) : '—'} bps) · Q/T <b>${q2t != null ? fmt(q2t,1) : '—'}</b>`;
+}
+
+/* ---- Loop ---- */
+let loopTimer = null;
+function restartLoop() {
+  if (loopTimer) clearInterval(loopTimer);
+  loopTimer = setInterval(() => {
+    if (!state.running) return;
+    simStep();
+    renderAll();
+  }, params.speed);
+}
+
+syncLabels();
+hardReset();
+restartLoop();
+</script>
+</body>
+</html>

@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order Book Imbalance & Microstructure Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C; --bg-2:#0C0E12; --panel:#111318; --panel-2:#15171D;
+  --border:#242730; --border-soft:#1A1C22;
+  --text:#E8E9EE; --text-dim:#8C90A0; --text-faint:#5A5E6B;
+  --accent:#4F8EFF; --accent-dim:#3A6BC4; --oos:#FFC145;
+  --profit:#2ED573; --loss:#FF4757; --warn:#F5A623; --choppy:#8C7CFF;
+  --bid:#2ED573; --ask:#FF4757;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px; --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 8% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(46,213,115,0.04), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+
+.app{display:grid; grid-template-columns:360px 1fr; min-height:100vh;}
+@media (max-width:1200px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 180deg, var(--bid), var(--accent), var(--ask)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:11px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:16px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+select, input[type=number]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-bid{background:rgba(46,213,115,0.12); border-color:rgba(46,213,115,0.35); color:var(--bid);}
+.btn-ask{background:rgba(255,71,87,0.12); border-color:rgba(255,71,87,0.35); color:var(--ask);}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+.preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.preset-btn{padding:7px 8px; font-size:11.5px; text-align:center;}
+.preset-btn.active{border-color:var(--accent); color:var(--accent); background:rgba(79,142,255,0.08);}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+.paused-badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; border:1px solid var(--warn); color:var(--warn); margin-left:6px;}
+
+.main{padding:22px 28px 60px; max-width:1600px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:26px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:920px; font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px; max-width:920px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+.grid-main{grid-template-columns:1fr 1.2fr 0.9fr; gap:14px;}
+@media (max-width:1300px){.grid-main{grid-template-columns:1fr;} .grid-4{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px 14px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.bid:before{background:var(--bid);}
+.kpi.ask:before{background:var(--ask);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.warn:before{background:var(--warn);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:18px; font-weight:600; margin-top:5px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+
+/* Ladder */
+.ladder{font-family:var(--mono); font-size:12px;}
+.ladder-h{display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; padding:5px 8px; color:var(--text-faint); font-size:10px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+.ladder-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; padding:3px 8px; position:relative;}
+.ladder-row .bar{position:absolute; top:1px; bottom:1px; opacity:0.18; border-radius:2px; pointer-events:none;}
+.ladder-row.ask .bar{background:var(--ask); right:0;}
+.ladder-row.bid .bar{background:var(--bid); left:0;}
+.ladder-row.ask .px{color:var(--ask); font-weight:600;}
+.ladder-row.bid .px{color:var(--bid); font-weight:600;}
+.ladder-row .sz,.ladder-row .cum{text-align:right; color:var(--text-dim);}
+.spread-row{text-align:center; padding:8px; color:var(--oos); font-weight:600; font-family:var(--mono); font-size:12px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:rgba(255,255,255,0.02);}
+
+/* OBI Gauge */
+.gauge-wrap{display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px 0;}
+.gauge-svg{width:100%; max-width:280px;}
+.gauge-value{font-family:var(--mono); font-size:28px; font-weight:700; margin-top:4px;}
+.gauge-label{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px;}
+
+/* Event log */
+.event-log{font-family:var(--mono); font-size:11px; max-height:280px; overflow-y:auto;}
+.event-row{display:grid; grid-template-columns:52px 64px 1fr; gap:6px; padding:4px 6px; border-bottom:1px solid var(--border-soft);}
+.event-row .t{color:var(--text-faint);}
+.event-row.buy{color:var(--bid);}
+.event-row.sell{color:var(--ask);}
+.event-row.cancel{color:var(--text-dim);}
+.event-row.system{color:var(--accent);}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+table.data-table th, table.data-table td{padding:7px 8px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left;}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10.5px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+table.data-table .pos{color:var(--bid);}
+table.data-table .neg{color:var(--ask);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.legend-row{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); margin-bottom:8px;}
+.legend-line{display:inline-block; width:14px; height:2px; margin-right:5px; vertical-align:middle;}
+.footer-note{margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">OBI</div><div class="brand-name">Imbalance Lab</div></div>
+    <div class="brand-sub">Order Book · Microstructure Signal</div>
+
+    <div class="ctrl-group">
+      <h4>Scenarios</h4>
+      <div class="preset-grid" id="scenarioGrid">
+        <button class="btn preset-btn active" data-s="balanced">Balanced</button>
+        <button class="btn preset-btn" data-s="bidheavy">Bid-Heavy</button>
+        <button class="btn preset-btn" data-s="askheavy">Ask-Heavy</button>
+        <button class="btn preset-btn" data-s="highcancel">High Cancel</button>
+        <button class="btn preset-btn" data-s="highvol">High Volatility</button>
+        <button class="btn preset-btn" data-s="thindense">Thin Book</button>
+      </div>
+      <div class="hint">Scenarios reconfigure depth, arrival bias, cancellation intensity and volatility, then reseeds the book.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Book Structure</h4>
+      <div class="field">
+        <div class="field-label"><span>Depth (levels / side)</span><span class="val" id="v_levels">10</span></div>
+        <input type="range" id="levels" min="3" max="20" step="1" value="10">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Base Spread (ticks)</span><span class="val" id="v_spread">2</span></div>
+        <input type="range" id="spreadTicks" min="1" max="10" step="1" value="2">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Depth Shape</span><span class="val" id="v_shape">1.2</span></div>
+        <input type="range" id="depthShape" min="0.4" max="2.5" step="0.1" value="1.2">
+      </div>
+      <div class="hint">Higher shape concentrates size near the touch; lower shape flattens depth across levels.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Order Flow</h4>
+      <div class="field">
+        <div class="field-label"><span>Market Order Rate</span><span class="val" id="v_mkt">0.25</span></div>
+        <input type="range" id="mktRate" min="0" max="0.7" step="0.05" value="0.25">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Cancel Rate</span><span class="val" id="v_cancel">0.20</span></div>
+        <input type="range" id="cancelRate" min="0" max="0.6" step="0.05" value="0.20">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Bid Arrival Bias</span><span class="val" id="v_bias">0.50</span></div>
+        <input type="range" id="bidBias" min="0.15" max="0.85" step="0.05" value="0.50">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Volatility</span><span class="val" id="v_vol">0.30</span></div>
+        <input type="range" id="vol" min="0.05" max="1" step="0.05" value="0.30">
+      </div>
+      <div class="hint">Bias &gt; 0.5 → more bid-side limit arrivals (bid-heavy pressure). Volatility scales mid innovations after aggressive trades.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>OBI Window</h4>
+      <div class="field">
+        <div class="field-label"><span>Levels in OBI</span><span class="val" id="v_obiL">3</span></div>
+        <input type="range" id="obiLevels" min="1" max="10" step="1" value="3">
+      </div>
+      <div class="hint">OBI = (BidVol − AskVol) / (BidVol + AskVol) using the top L levels on each side.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Simulation</h4>
+      <div class="field">
+        <div class="field-label"><span>Speed (ms / tick)</span><span class="val" id="v_speed">200</span></div>
+        <input type="range" id="speed" min="50" max="800" step="25" value="200">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnPause">Pause</button>
+        <button class="btn" id="btnStep">Step</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btnReset">Reset</button>
+        <button class="btn" id="btnReplay">Replay Buffer</button>
+      </div>
+      <div class="hint">Replay rewinds through the last ~400 recorded states so you can re-watch OBI and mid dynamics.</div>
+    </div>
+
+    <div class="status-line" id="statusLine">Running · tick 0</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Market Microstructure · Descriptive Signal</div>
+      <h1 class="page-title">Order Book Imbalance &amp; Microstructure Lab</h1>
+      <p class="page-desc">Watch a live synthetic limit order book evolve under controllable arrival, cancellation and volatility regimes. Measure order-book imbalance (OBI), track its time series, and observe how short-horizon mid-price moves relate to imbalance — while remembering that OBI is a <b>descriptive</b> microstructure statistic, not a guaranteed directional predictor.</p>
+    </div>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Live Statistics</span></div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Order Book · OBI Gauge · Event Log</span></div>
+      <div class="grid grid-main">
+        <div class="card">
+          <div class="legend-row"><span style="color:var(--ask)">Asks</span><span style="color:var(--bid)">Bids</span><span style="color:var(--oos)">Spread / Mid</span></div>
+          <div class="ladder" id="ladder"></div>
+        </div>
+        <div class="card">
+          <div class="gauge-wrap">
+            <div class="gauge-label">Order Book Imbalance</div>
+            <svg class="gauge-svg" viewBox="0 0 200 120" id="gaugeSvg">
+              <defs>
+                <linearGradient id="gGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#FF4757"/>
+                  <stop offset="50%" stop-color="#FFC145"/>
+                  <stop offset="100%" stop-color="#2ED573"/>
+                </linearGradient>
+              </defs>
+              <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#1A1C22" stroke-width="14" stroke-linecap="round"/>
+              <path id="gaugeArc" d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="url(#gGrad)" stroke-width="14" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="0"/>
+              <line id="gaugeNeedle" x1="100" y1="100" x2="100" y2="30" stroke="#E8E9EE" stroke-width="2.5" stroke-linecap="round"/>
+              <circle cx="100" cy="100" r="5" fill="#E8E9EE"/>
+              <text x="22" y="118" fill="#FF4757" font-size="10" font-family="JetBrains Mono">-1</text>
+              <text x="92" y="118" fill="#8C90A0" font-size="10" font-family="JetBrains Mono">0</text>
+              <text x="172" y="118" fill="#2ED573" font-size="10" font-family="JetBrains Mono">+1</text>
+            </svg>
+            <div class="gauge-value" id="gaugeValue">0.000</div>
+            <div class="gauge-label" id="gaugeLabel">balanced</div>
+          </div>
+          <div style="margin-top:8px;">
+            <table class="data-table">
+              <tbody id="obiDetailBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div style="font-family:var(--display);font-weight:600;font-size:13px;margin-bottom:8px;">Event Log</div>
+          <div class="event-log" id="eventLog"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Depth Profile &amp; Cumulative Liquidity</span></div>
+      <div class="grid grid-2">
+        <div class="card">
+          <div id="depthChart" style="width:100%;height:300px;"></div>
+        </div>
+        <div class="card">
+          <div id="cumChart" style="width:100%;height:300px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">OBI Time Series &amp; Mid-Price Response</span></div>
+      <p class="section-desc">Top: OBI over time with ± thresholds. Bottom: mid-price path. Vertical markers indicate aggressive market orders. Short-horizon mid moves often correlate with OBI in this synthetic model — but correlation is regime-dependent and not a trading guarantee.</p>
+      <div class="card" style="margin-bottom:14px;">
+        <div id="obiChart" style="width:100%;height:280px;"></div>
+      </div>
+      <div class="card">
+        <div id="midChart" style="width:100%;height:280px;"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Response Diagnostics</span></div>
+      <p class="section-desc">Conditional average mid-return after OBI crosses a threshold, and hit-rate of the sign of subsequent mid moves. Purely descriptive of <i>this</i> simulation — not out-of-sample evidence.</p>
+      <div class="grid grid-2">
+        <div class="card">
+          <div id="responseChart" style="width:100%;height:300px;"></div>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>Diagnostic</th><th>Value</th></tr></thead>
+            <tbody id="diagBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Formulas</span></div>
+      <div class="formula-block">
+        <div class="f-title">Order Book Imbalance (OBI)</div>
+        <div class="f-math">OBI = (V_bid − V_ask) / (V_bid + V_ask)</div>
+        <div class="f-note">V_bid and V_ask are aggregate displayed sizes over the top L levels. OBI ∈ [−1, +1]. +1 = only bids in the window; −1 = only asks.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Mid, Spread, Microprice</div>
+        <div class="f-math">Mid = (BestBid + BestAsk) / 2 · Spread = BestAsk − BestBid</div>
+        <div class="f-math">Microprice ≈ (BestAsk · Q_bid + BestBid · Q_ask) / (Q_bid + Q_ask)</div>
+        <div class="f-note">Microprice weights the touch by opposite-side size and often sits closer to the side with less size (the side more likely to be hit next).</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Short-Horizon Mid Return</div>
+        <div class="f-math">r_{t→t+h} = Mid_{t+h} − Mid_t</div>
+        <div class="f-note">Used in the response diagnostic: average subsequent mid change conditional on OBI exceeding a threshold at time t.</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">How to Read Imbalance</span></div>
+
+      <details class="disclosure" open>
+        <summary>OBI is descriptive, not a guaranteed predictor</summary>
+        <div class="disclosure-body">
+          <p>Order-book imbalance summarises the current shape of displayed liquidity. In many markets and models, elevated OBI has historically shown a <i>statistical</i> association with short-horizon mid moves — because market orders that arrive next are more likely to consume the thinner side, or because informed traders lean the book before price adjusts.</p>
+          <p>That association is <b>not</b> a guarantee. It can flip sign under inventory-management regimes, spoofing, hidden liquidity, or when the apparent imbalance is itself the residual of fleeting cancel/replace activity. Treat OBI as a feature, not a signal to trade blindly.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>How market orders consume depth</summary>
+        <div class="disclosure-body">
+          <p>An aggressive buy market order matches the best ask, then walks further ask levels if size remains. That reduces V_ask, pushes OBI upward (more bid-heavy), and — if the best ask is depleted — shifts mid higher. The same logic applies symmetrically for sell aggression. This mechanical channel is one reason OBI and short-horizon returns co-move in the simulation.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Cancellations &amp; fleeting liquidity</summary>
+        <div class="disclosure-body">
+          <p>High cancellation rates make depth unreliable: size you see may vanish before you can take it. OBI computed on displayed size then becomes noisier, and “bid-heavy” readings can evaporate within ticks. The High Cancel scenario demonstrates how the OBI series becomes more volatile and less persistent.</p>
+        </div>
+      </details>
+
+      <details class="disclosure">
+        <summary>Choosing the OBI depth window</summary>
+        <div class="disclosure-body">
+          <p>L = 1 uses only the touch — reactive to queue dynamics and flicker. Larger L smooths over deeper levels and captures structural lean, but reacts more slowly to near-touch depletion. Explore the “Levels in OBI” slider to see how the same book produces different OBI paths under different windows.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational microstructure simulator. Synthetic order flow and a simplified mid-impact model. OBI diagnostics describe this simulation only. Not investment advice; not a prediction engine.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   ORDER BOOK IMBALANCE & MICROSTRUCTURE LAB
+   ===================================================================== */
+
+const TICK = 0.01;
+const MAX_HIST = 400;
+const MAX_EVENTS = 120;
+
+let params = {
+  levels: 10,
+  spreadTicks: 2,
+  depthShape: 1.2,
+  mktRate: 0.25,
+  cancelRate: 0.20,
+  bidBias: 0.50,
+  vol: 0.30,
+  obiLevels: 3,
+  speed: 200,
+};
+
+let state = {
+  tick: 0,
+  mid: 100,
+  // book: { bids: Map priceKey -> size, asks: Map }
+  bids: new Map(),
+  asks: new Map(),
+  running: true,
+  replaying: false,
+  replayIdx: 0,
+};
+
+let history = []; // {tick, mid, obi, bb, ba, spread, bidVol, askVol, micro}
+let events = [];
+let snapshots = []; // for replay
+let mktMarkers = []; // tick indices of market orders
+
+function pk(p) { return (Math.round(p / TICK) * TICK).toFixed(4); }
+function pp(k) { return parseFloat(k); }
+
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+let rand = mulberry32(12345);
+
+function logEvent(type, side, msg) {
+  events.unshift({ t: state.tick, type, side, msg, ts: Date.now() });
+  if (events.length > MAX_EVENTS) events.pop();
+}
+
+/* ---- Book helpers ---- */
+function bestBid() {
+  let best = null;
+  for (const k of state.bids.keys()) {
+    const p = pp(k);
+    if (state.bids.get(k) > 0 && (best === null || p > best)) best = p;
+  }
+  return best;
+}
+function bestAsk() {
+  let best = null;
+  for (const k of state.asks.keys()) {
+    const p = pp(k);
+    if (state.asks.get(k) > 0 && (best === null || p < best)) best = p;
+  }
+  return best;
+}
+function levelSize(side, price) {
+  const m = side === 'buy' ? state.bids : state.asks;
+  return m.get(pk(price)) || 0;
+}
+function setLevel(side, price, sz) {
+  const m = side === 'buy' ? state.bids : state.asks;
+  const k = pk(price);
+  if (sz <= 0) m.delete(k);
+  else m.set(k, Math.round(sz));
+}
+function addLevel(side, price, delta) {
+  setLevel(side, price, levelSize(side, price) + delta);
+}
+
+function topPrices(side, n) {
+  if (side === 'buy') {
+    return [...state.bids.keys()].map(pp).filter(p => levelSize('buy', p) > 0).sort((a,b)=>b-a).slice(0, n);
+  }
+  return [...state.asks.keys()].map(pp).filter(p => levelSize('sell', p) > 0).sort((a,b)=>a-b).slice(0, n);
+}
+
+function volumeTop(side, L) {
+  return topPrices(side, L).reduce((s, p) => s + levelSize(side, p), 0);
+}
+
+function computeOBI(L) {
+  const vb = volumeTop('buy', L);
+  const va = volumeTop('sell', L);
+  if (vb + va === 0) return 0;
+  return (vb - va) / (vb + va);
+}
+
+function microprice() {
+  const bb = bestBid(), ba = bestAsk();
+  if (bb == null || ba == null) return state.mid;
+  const qb = levelSize('buy', bb), qa = levelSize('sell', ba);
+  if (qb + qa === 0) return (bb + ba) / 2;
+  return (ba * qb + bb * qa) / (qb + qa);
+}
+
+/* ---- Seed book ---- */
+function seedBook() {
+  state.bids.clear();
+  state.asks.clear();
+  const mid = state.mid;
+  const half = params.spreadTicks * TICK / 2;
+  const bb0 = mid - half;
+  const ba0 = mid + half;
+  for (let i = 0; i < params.levels; i++) {
+    // size decays with level index; shape controls concentration
+    const base = 40 + rand() * 40;
+    const bidSz = base * Math.pow(1 / (1 + i), params.depthShape) * (0.7 + 0.6 * rand());
+    const askSz = base * Math.pow(1 / (1 + i), params.depthShape) * (0.7 + 0.6 * rand());
+    // apply bias as structural lean
+    const lean = (params.bidBias - 0.5) * 0.8;
+    setLevel('buy', bb0 - i * TICK, bidSz * (1 + lean));
+    setLevel('sell', ba0 + i * TICK, askSz * (1 - lean));
+  }
+  logEvent('system', '', `Book seeded · mid ${mid.toFixed(2)} · ${params.levels} levels`);
+}
+
+/* ---- Simulation step ---- */
+function ensureTouch() {
+  // If a side is empty, rebuild minimal depth so book never dies
+  if (bestBid() == null || bestAsk() == null) {
+    seedBook();
+  }
+  // Enforce ordering
+  let bb = bestBid(), ba = bestAsk();
+  if (bb != null && ba != null && bb >= ba) {
+    // compress spread
+    const mid = (bb + ba) / 2;
+    state.mid = mid;
+    seedBook();
+  }
+}
+
+function aggressiveOrder(side, qty) {
+  // Market order walks the book
+  let remaining = qty;
+  let notional = 0, filled = 0;
+  if (side === 'buy') {
+    while (remaining > 0) {
+      const ba = bestAsk();
+      if (ba == null) break;
+      const avail = levelSize('sell', ba);
+      const take = Math.min(remaining, avail);
+      setLevel('sell', ba, avail - take);
+      remaining -= take; filled += take; notional += take * ba;
+      // impact: push mid up proportional to depletion
+      state.mid += params.vol * TICK * (take / Math.max(10, qty)) * (1 + rand());
+    }
+  } else {
+    while (remaining > 0) {
+      const bb = bestBid();
+      if (bb == null) break;
+      const avail = levelSize('buy', bb);
+      const take = Math.min(remaining, avail);
+      setLevel('buy', bb, avail - take);
+      remaining -= take; filled += take; notional += take * bb;
+      state.mid -= params.vol * TICK * (take / Math.max(10, qty)) * (1 + rand());
+    }
+  }
+  mktMarkers.push(state.tick);
+  if (mktMarkers.length > 80) mktMarkers.shift();
+  logEvent(side === 'buy' ? 'buy' : 'sell', side, `MKT ${side} ${filled} @ ~${filled ? (notional/filled).toFixed(2) : '—'}`);
+  return filled;
+}
+
+function limitArrival(side) {
+  const bb = bestBid(), ba = bestAsk();
+  const mid = state.mid;
+  let price;
+  const depthIdx = Math.floor(rand() * Math.min(params.levels, 6));
+  if (side === 'buy') {
+    const ref = bb != null ? bb : mid - TICK;
+    // mostly join or improve slightly
+    if (rand() < 0.25 && ba != null) price = Math.min(ref + TICK, ba - TICK); // improve
+    else price = ref - depthIdx * TICK;
+  } else {
+    const ref = ba != null ? ba : mid + TICK;
+    if (rand() < 0.25 && bb != null) price = Math.max(ref - TICK, bb + TICK);
+    else price = ref + depthIdx * TICK;
+  }
+  const sz = Math.floor(5 + rand() * 35);
+  addLevel(side, price, sz);
+  logEvent(side === 'buy' ? 'buy' : 'sell', side, `LMT ${side} ${sz} @ ${price.toFixed(2)}`);
+}
+
+function cancelRandom() {
+  const side = rand() < params.bidBias ? 'buy' : 'sell';
+  const prices = topPrices(side, params.levels);
+  if (!prices.length) return;
+  // prefer cancelling deeper levels slightly
+  const idx = Math.min(prices.length - 1, Math.floor(Math.pow(rand(), 0.7) * prices.length));
+  const p = prices[idx];
+  const sz = levelSize(side, p);
+  const cut = Math.floor(sz * (0.3 + rand() * 0.7));
+  setLevel(side, p, sz - cut);
+  logEvent('cancel', side, `CXL ${side} ${cut} @ ${p.toFixed(2)}`);
+}
+
+function simStep() {
+  state.tick++;
+  ensureTouch();
+
+  // 1) Possibly aggressive market order
+  if (rand() < params.mktRate) {
+    const side = rand() < params.bidBias ? 'buy' : 'sell';
+    // bias also affects aggression direction slightly opposite when extreme? keep simple
+    const qty = Math.floor(5 + rand() * 40 * (0.5 + params.vol));
+    aggressiveOrder(side, qty);
+  }
+
+  // 2) Limit arrivals (1–3)
+  const nLim = 1 + Math.floor(rand() * 3);
+  for (let i = 0; i < nLim; i++) {
+    const side = rand() < params.bidBias ? 'buy' : 'sell';
+    limitArrival(side);
+  }
+
+  // 3) Cancellations
+  if (rand() < params.cancelRate) {
+    const nCx = 1 + Math.floor(rand() * 2);
+    for (let i = 0; i < nCx; i++) cancelRandom();
+  }
+
+  // 4) Mild mean-reverting noise on mid
+  state.mid += (rand() - 0.5) * params.vol * TICK * 2;
+
+  ensureTouch();
+
+  // Record
+  const L = params.obiLevels;
+  const obi = computeOBI(L);
+  const bb = bestBid(), ba = bestAsk();
+  const sp = (bb != null && ba != null) ? ba - bb : null;
+  const rec = {
+    tick: state.tick,
+    mid: state.mid,
+    obi,
+    bb, ba,
+    spread: sp,
+    bidVol: volumeTop('buy', L),
+    askVol: volumeTop('sell', L),
+    micro: microprice(),
+  };
+  history.push(rec);
+  if (history.length > MAX_HIST) history.shift();
+
+  // Snapshot for replay (lightweight)
+  snapshots.push({
+    tick: state.tick,
+    mid: state.mid,
+    bids: [...state.bids.entries()],
+    asks: [...state.asks.entries()],
+    obi, bb, ba,
+  });
+  if (snapshots.length > MAX_HIST) snapshots.shift();
+}
+
+/* ---- Scenarios ---- */
+const SCENARIOS = {
+  balanced:  { bidBias: 0.50, mktRate: 0.25, cancelRate: 0.20, vol: 0.30, depthShape: 1.2, spreadTicks: 2, levels: 10 },
+  bidheavy:  { bidBias: 0.72, mktRate: 0.22, cancelRate: 0.18, vol: 0.28, depthShape: 1.3, spreadTicks: 2, levels: 10 },
+  askheavy:  { bidBias: 0.28, mktRate: 0.22, cancelRate: 0.18, vol: 0.28, depthShape: 1.3, spreadTicks: 2, levels: 10 },
+  highcancel:{ bidBias: 0.50, mktRate: 0.20, cancelRate: 0.55, vol: 0.35, depthShape: 1.0, spreadTicks: 2, levels: 10 },
+  highvol:   { bidBias: 0.50, mktRate: 0.40, cancelRate: 0.25, vol: 0.85, depthShape: 1.1, spreadTicks: 3, levels: 10 },
+  thindense: { bidBias: 0.50, mktRate: 0.30, cancelRate: 0.22, vol: 0.40, depthShape: 2.0, spreadTicks: 1, levels: 5 },
+};
+
+function applyScenario(name) {
+  const s = SCENARIOS[name];
+  if (!s) return;
+  Object.assign(params, s);
+  // sync UI
+  ['levels','spreadTicks','depthShape','mktRate','cancelRate','bidBias','vol'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && params[id] != null) el.value = params[id];
+  });
+  syncLabels();
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.s === name));
+  hardReset();
+}
+
+/* ---- Render ---- */
+function fmt(x, d=3) { return isFinite(x) ? Number(x).toFixed(d) : '—'; }
+
+function plotlyBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 48, r: 16, t: 20, b: 40 },
+    xaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.14, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE' } },
+  }, extra || {});
+}
+const CFG = { displayModeBar: false, responsive: true };
+
+function renderGauge(obi) {
+  // semicircle length ≈ π * 80 ≈ 251.3
+  const arcLen = 251.3;
+  // needle angle: -1 → 180°, +1 → 0° in standard position from left
+  const angle = Math.PI * (1 - (obi + 1) / 2); // π at -1, 0 at +1
+  const cx = 100, cy = 100, r = 70;
+  const x2 = cx + r * Math.cos(angle);
+  const y2 = cy - r * Math.sin(angle);
+  document.getElementById('gaugeNeedle').setAttribute('x2', x2);
+  document.getElementById('gaugeNeedle').setAttribute('y2', y2);
+  const el = document.getElementById('gaugeValue');
+  el.textContent = (obi >= 0 ? '+' : '') + fmt(obi, 3);
+  el.style.color = obi > 0.15 ? 'var(--bid)' : obi < -0.15 ? 'var(--ask)' : 'var(--oos)';
+  document.getElementById('gaugeLabel').textContent =
+    obi > 0.35 ? 'strongly bid-heavy' : obi > 0.15 ? 'bid-heavy' :
+    obi < -0.35 ? 'strongly ask-heavy' : obi < -0.15 ? 'ask-heavy' : 'balanced';
+}
+
+function renderKPIs(rec) {
+  const imbCls = rec.obi > 0.15 ? 'bid' : rec.obi < -0.15 ? 'ask' : 'oos';
+  const kpis = [
+    { l: 'OBI', v: (rec.obi>=0?'+':'') + fmt(rec.obi,3), s: `L=${params.obiLevels}`, c: imbCls },
+    { l: 'Mid', v: fmt(rec.mid, 2), s: `micro ${fmt(rec.micro,2)}`, c: 'oos' },
+    { l: 'Spread', v: rec.spread != null ? fmt(rec.spread, 4) : '—', s: rec.spread != null ? `${fmt(rec.spread/TICK,0)} ticks` : '', c: '' },
+    { l: 'BBO', v: `${fmt(rec.bb,2)} / ${fmt(rec.ba,2)}`, s: 'bid / ask', c: '' },
+    { l: 'Bid Vol (L)', v: String(rec.bidVol), s: 'top levels', c: 'bid' },
+    { l: 'Ask Vol (L)', v: String(rec.askVol), s: 'top levels', c: 'ask' },
+    { l: 'Tick', v: String(state.tick), s: state.running ? 'running' : 'paused', c: state.running ? '' : 'warn' },
+    { l: 'Events', v: String(events.length), s: 'log buffer', c: '' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
+  ).join('');
+
+  document.getElementById('obiDetailBody').innerHTML = [
+    ['Bid volume (L)', rec.bidVol],
+    ['Ask volume (L)', rec.askVol],
+    ['OBI', (rec.obi>=0?'+':'') + fmt(rec.obi,4)],
+    ['Microprice', fmt(rec.micro,4)],
+    ['Micro − Mid', fmt(rec.micro - rec.mid, 4)],
+  ].map(([a,b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('');
+}
+
+function renderLadder() {
+  const n = Math.min(params.levels, 12);
+  const asks = topPrices('sell', n);
+  const bids = topPrices('buy', n);
+  const maxSz = Math.max(1, ...asks.map(p => levelSize('sell', p)), ...bids.map(p => levelSize('buy', p)));
+  let cum = 0;
+  const asksDisp = [...asks].reverse();
+  let html = `<div class="ladder-h"><span>Price</span><span style="text-align:right">Size</span><span style="text-align:right">Cum</span></div>`;
+  // cum from touch for asks: compute ascending first
+  const askCumMap = new Map();
+  cum = 0;
+  for (const p of asks) { cum += levelSize('sell', p); askCumMap.set(p, cum); }
+  for (const p of asksDisp) {
+    const sz = levelSize('sell', p);
+    const pct = (sz / maxSz) * 100;
+    html += `<div class="ladder-row ask"><div class="bar" style="width:${pct}%"></div><span class="px">${p.toFixed(2)}</span><span class="sz">${sz}</span><span class="cum">${askCumMap.get(p)}</span></div>`;
+  }
+  const bb = bestBid(), ba = bestAsk();
+  const sp = bb != null && ba != null ? ba - bb : null;
+  html += `<div class="spread-row">MID ${state.mid.toFixed(2)} · SPREAD ${sp != null ? sp.toFixed(4) : '—'} · OBI ${fmt(computeOBI(params.obiLevels),3)}</div>`;
+  cum = 0;
+  for (const p of bids) {
+    const sz = levelSize('buy', p);
+    cum += sz;
+    const pct = (sz / maxSz) * 100;
+    html += `<div class="ladder-row bid"><div class="bar" style="width:${pct}%"></div><span class="px">${p.toFixed(2)}</span><span class="sz">${sz}</span><span class="cum">${cum}</span></div>`;
+  }
+  document.getElementById('ladder').innerHTML = html;
+}
+
+function renderEvents() {
+  document.getElementById('eventLog').innerHTML = events.slice(0, 50).map(e =>
+    `<div class="event-row ${e.side || e.type}"><span class="t">t${e.t}</span><span>${e.type}</span><span>${e.msg}</span></div>`
+  ).join('') || '<div style="padding:10px;color:var(--text-faint)">No events</div>';
+}
+
+function renderDepth() {
+  const n = params.levels;
+  const asks = topPrices('sell', n);
+  const bids = topPrices('buy', n);
+  Plotly.newPlot('depthChart', [
+    { x: bids.map(p => p), y: bids.map(p => levelSize('buy', p)), type: 'bar', name: 'Bid', marker: { color: 'rgba(46,213,115,0.75)' } },
+    { x: asks.map(p => p), y: asks.map(p => levelSize('sell', p)), type: 'bar', name: 'Ask', marker: { color: 'rgba(255,71,87,0.75)' } },
+  ], plotlyBase({
+    barmode: 'group',
+    xaxis: { title: 'Price' }, yaxis: { title: 'Size' },
+  }), CFG);
+
+  let c = 0;
+  const bidC = bids.map(p => { c += levelSize('buy', p); return { p, c }; });
+  c = 0;
+  const askC = asks.map(p => { c += levelSize('sell', p); return { p, c }; });
+  Plotly.newPlot('cumChart', [
+    { x: bidC.map(d => d.p), y: bidC.map(d => d.c), mode: 'lines', name: 'Cum Bid', line: { color: '#2ED573', width: 2.5 }, fill: 'tozeroy', fillcolor: 'rgba(46,213,115,0.08)' },
+    { x: askC.map(d => d.p), y: askC.map(d => d.c), mode: 'lines', name: 'Cum Ask', line: { color: '#FF4757', width: 2.5 }, fill: 'tozeroy', fillcolor: 'rgba(255,71,87,0.08)' },
+  ], plotlyBase({ xaxis: { title: 'Price' }, yaxis: { title: 'Cumulative size' } }), CFG);
+}
+
+function renderTimeSeries() {
+  const xs = history.map(h => h.tick);
+  const obis = history.map(h => h.obi);
+  const mids = history.map(h => h.mid);
+
+  Plotly.newPlot('obiChart', [
+    { x: xs, y: obis, mode: 'lines', line: { color: '#4F8EFF', width: 1.8 }, name: 'OBI' },
+    { x: xs, y: xs.map(() => 0.25), mode: 'lines', line: { color: '#2ED573', width: 1, dash: 'dot' }, name: '+0.25', showlegend: true },
+    { x: xs, y: xs.map(() => -0.25), mode: 'lines', line: { color: '#FF4757', width: 1, dash: 'dot' }, name: '−0.25' },
+    { x: xs, y: xs.map(() => 0), mode: 'lines', line: { color: '#5A5E6B', width: 1 }, showlegend: false },
+  ], plotlyBase({
+    xaxis: { title: 'Tick' }, yaxis: { title: 'OBI', range: [-1.05, 1.05] },
+  }), CFG);
+
+  // Market order markers
+  const markerTicks = mktMarkers.filter(t => t >= (history[0]?.tick || 0));
+  const markerMids = markerTicks.map(t => {
+    const h = history.find(x => x.tick === t);
+    return h ? h.mid : null;
+  });
+
+  Plotly.newPlot('midChart', [
+    { x: xs, y: mids, mode: 'lines', line: { color: '#FFC145', width: 2 }, name: 'Mid' },
+    { x: xs, y: history.map(h => h.micro), mode: 'lines', line: { color: '#8C7CFF', width: 1.2, dash: 'dot' }, name: 'Microprice' },
+    { x: markerTicks, y: markerMids, mode: 'markers', marker: { size: 6, color: '#FF4757', symbol: 'x' }, name: 'MKT trade' },
+  ], plotlyBase({
+    xaxis: { title: 'Tick' }, yaxis: { title: 'Price' },
+  }), CFG);
+}
+
+function renderDiagnostics() {
+  // Average mid change over next H ticks when |OBI| > threshold
+  const H = 8;
+  const thr = 0.25;
+  let upSum = 0, upN = 0, dnSum = 0, dnN = 0;
+  let correct = 0, total = 0;
+  const lagBins = Array.from({ length: H }, () => ({ sum: 0, n: 0 }));
+
+  for (let i = 0; i < history.length - H; i++) {
+    const o = history[i].obi;
+    const r = history[i + H].mid - history[i].mid;
+    if (o > thr) { upSum += r; upN++; total++; if (r > 0) correct++; }
+    if (o < -thr) { dnSum += r; dnN++; total++; if (r < 0) correct++; }
+    if (Math.abs(o) > thr) {
+      for (let h = 1; h <= H; h++) {
+        const rh = history[i + h].mid - history[i].mid;
+        // sign-adjusted: positive when move agrees with OBI sign
+        lagBins[h - 1].sum += rh * Math.sign(o);
+        lagBins[h - 1].n++;
+      }
+    }
+  }
+
+  const lagX = lagBins.map((_, i) => i + 1);
+  const lagY = lagBins.map(b => b.n ? b.sum / b.n : 0);
+
+  Plotly.newPlot('responseChart', [{
+    x: lagX, y: lagY, mode: 'lines+markers',
+    line: { color: '#4F8EFF', width: 2.5 },
+    marker: { size: 7, color: '#4F8EFF' },
+    name: 'Signed mid response',
+  }], plotlyBase({
+    xaxis: { title: 'Horizon h (ticks)' },
+    yaxis: { title: 'Avg signed Δmid | |OBI|>0.25' },
+    title: { text: 'Mean reversion vs continuation of OBI-aligned moves', font: { size: 11, color: '#8C90A0' } },
+  }), CFG);
+
+  const hit = total ? (correct / total) * 100 : null;
+  const rows = [
+    ['Threshold |OBI|', thr.toFixed(2)],
+    ['Horizon H', H + ' ticks'],
+    ['E[Δmid | OBI>+thr]', upN ? fmt(upSum / upN, 4) : '—'],
+    ['E[Δmid | OBI<−thr]', dnN ? fmt(dnSum / dnN, 4) : '—'],
+    ['Samples (up / dn)', `${upN} / ${dnN}`],
+    ['Sign hit-rate', hit != null ? fmt(hit, 1) + '%' : '—'],
+    ['OBI mean (session)', history.length ? fmt(history.reduce((s,h)=>s+h.obi,0)/history.length, 3) : '—'],
+    ['OBI std (session)', history.length > 2 ? fmt(Math.sqrt(history.reduce((s,h)=>{const m=history.reduce((a,b)=>a+b.obi,0)/history.length; return s+(h.obi-m)**2;},0)/(history.length-1)), 3) : '—'],
+    ['MKT events', mktMarkers.length],
+  ];
+  document.getElementById('diagBody').innerHTML = rows.map(([a,b]) =>
+    `<tr><td>${a}</td><td>${b}</td></tr>`
+  ).join('');
+}
+
+function renderAll() {
+  const L = params.obiLevels;
+  const rec = history.length ? history[history.length - 1] : {
+    tick: state.tick, mid: state.mid, obi: computeOBI(L),
+    bb: bestBid(), ba: bestAsk(),
+    spread: (bestBid()!=null && bestAsk()!=null) ? bestAsk()-bestBid() : null,
+    bidVol: volumeTop('buy', L), askVol: volumeTop('sell', L),
+    micro: microprice(),
+  };
+  renderKPIs(rec);
+  renderGauge(rec.obi);
+  renderLadder();
+  renderEvents();
+  renderDepth();
+  renderTimeSeries();
+  renderDiagnostics();
+
+  const badge = state.running ? '' : ' <span class="paused-badge">PAUSED</span>';
+  document.getElementById('statusLine').innerHTML =
+    `${state.replaying ? 'Replay' : (state.running ? 'Running' : 'Paused')} · tick <b>${state.tick}</b> · OBI <b>${fmt(rec.obi,3)}</b>${badge}`;
+}
+
+/* ---- Controls ---- */
+function syncLabels() {
+  const map = {
+    levels: 'v_levels', spreadTicks: 'v_spread', depthShape: 'v_shape',
+    mktRate: 'v_mkt', cancelRate: 'v_cancel', bidBias: 'v_bias',
+    vol: 'v_vol', obiLevels: 'v_obiL', speed: 'v_speed',
+  };
+  for (const [id, vid] of Object.entries(map)) {
+    const el = document.getElementById(id);
+    const v = document.getElementById(vid);
+    if (el && v) v.textContent = el.value;
+    if (el) params[id] = parseFloat(el.value);
+  }
+  params.levels = parseInt(document.getElementById('levels').value, 10);
+  params.spreadTicks = parseInt(document.getElementById('spreadTicks').value, 10);
+  params.obiLevels = parseInt(document.getElementById('obiLevels').value, 10);
+  params.speed = parseInt(document.getElementById('speed').value, 10);
+}
+
+['levels','spreadTicks','depthShape','mktRate','cancelRate','bidBias','vol','obiLevels','speed'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    syncLabels();
+    if (id === 'speed') restartLoop();
+  });
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => applyScenario(btn.dataset.s));
+});
+
+function hardReset() {
+  state.tick = 0;
+  state.mid = 100;
+  history = [];
+  events = [];
+  snapshots = [];
+  mktMarkers = [];
+  rand = mulberry32(Math.floor(Math.random() * 1e9));
+  seedBook();
+  // prime a few quiet steps
+  for (let i = 0; i < 5; i++) simStep();
+  renderAll();
+}
+
+document.getElementById('btnReset').onclick = () => {
+  state.replaying = false;
+  hardReset();
+  document.getElementById('statusLine').innerHTML = 'Reset complete · <b>tick 0</b>';
+};
+
+document.getElementById('btnPause').onclick = () => {
+  if (state.replaying) { state.replaying = false; }
+  state.running = !state.running;
+  document.getElementById('btnPause').textContent = state.running ? 'Pause' : 'Resume';
+  renderAll();
+};
+
+document.getElementById('btnStep').onclick = () => {
+  if (state.replaying) return;
+  simStep();
+  renderAll();
+};
+
+document.getElementById('btnReplay').onclick = () => {
+  if (snapshots.length < 10) return;
+  state.running = false;
+  state.replaying = true;
+  state.replayIdx = 0;
+  document.getElementById('btnPause').textContent = 'Resume';
+  logEvent('system', '', 'Replay started');
+};
+
+function replayTick() {
+  if (!state.replaying || state.replayIdx >= snapshots.length) {
+    state.replaying = false;
+    return;
+  }
+  const sn = snapshots[state.replayIdx++];
+  state.tick = sn.tick;
+  state.mid = sn.mid;
+  state.bids = new Map(sn.bids);
+  state.asks = new Map(sn.asks);
+  // rebuild trailing history view up to this idx
+  // (history already has data; just render from current book)
+  renderAll();
+}
+
+/* ---- Main loop ---- */
+let loopTimer = null;
+function restartLoop() {
+  if (loopTimer) clearInterval(loopTimer);
+  loopTimer = setInterval(() => {
+    if (state.replaying) {
+      replayTick();
+      return;
+    }
+    if (!state.running) return;
+    simStep();
+    renderAll();
+  }, params.speed);
+}
+
+// Init
+syncLabels();
+hardReset();
+restartLoop();
+</script>
+</body>
+</html>

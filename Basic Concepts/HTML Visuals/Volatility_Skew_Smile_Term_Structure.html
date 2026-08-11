@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Volatility Smile, Skew & Term Structure Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C; --bg-2:#0C0E12; --panel:#111318; --panel-2:#15171D;
+  --border:#242730; --border-soft:#1A1C22;
+  --text:#E8E9EE; --text-dim:#8C90A0; --text-faint:#5A5E6B;
+  --accent:#4F8EFF; --accent-dim:#3A6BC4; --oos:#FFC145;
+  --profit:#2ED573; --loss:#FF4757; --warn:#F5A623; --choppy:#8C7CFF;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px; --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(140,124,255,0.05), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+.app{display:grid; grid-template-columns:350px 1fr; min-height:100vh;}
+@media (max-width:1100px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 220deg, var(--choppy), var(--accent), var(--oos)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:11px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:15px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+select, input[type=number]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.preset-btn{padding:7px 8px; font-size:11.5px; text-align:center;}
+.preset-btn.active{border-color:var(--accent); color:var(--accent); background:rgba(79,142,255,0.08);}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:22px 28px 60px; max-width:1520px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:26px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:900px; font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px; max-width:900px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px 14px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.profit:before{background:var(--profit);}
+.kpi.loss:before{background:var(--loss);}
+.kpi.warn:before{background:var(--warn);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:17px; font-weight:600; margin-top:5px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+table.data-table th, table.data-table td{padding:7px 8px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left;}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10.5px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.legend-row{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); margin-bottom:8px;}
+.footer-note{margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; border:1px solid rgba(255,193,69,0.4); color:var(--oos); margin-left:8px;}
+.warn-banner{background:rgba(255,193,69,0.07); border:1px solid rgba(255,193,69,0.28); border-radius:8px; padding:11px 14px; font-size:12.5px; color:var(--oos); margin-bottom:14px; line-height:1.55;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">σ</div><div class="brand-name">Vol Smile Lab</div></div>
+    <div class="brand-sub">IV Surface · Skew · Term Structure</div>
+
+    <div class="ctrl-group">
+      <h4>Presets</h4>
+      <div class="preset-grid">
+        <button class="btn preset-btn active" data-p="equity">Equity Skew</button>
+        <button class="btn preset-btn" data-p="flat">Flat Smile</button>
+        <button class="btn preset-btn" data-p="strong">Strong Skew</button>
+        <button class="btn preset-btn" data-p="smile">Symmetric Smile</button>
+        <button class="btn preset-btn" data-p="inverted">Inverted Skew</button>
+        <button class="btn preset-btn" data-p="steep">Steep Term</button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Underlying</h4>
+      <div class="field">
+        <div class="field-label"><span>Spot S</span></div>
+        <input type="number" id="spot" value="100" step="1" min="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Rate r (cont.)</span><span class="val" id="v_r">0.02</span></div>
+        <input type="range" id="rate" min="0" max="0.10" step="0.005" value="0.02">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Div q (cont.)</span><span class="val" id="v_q">0.01</span></div>
+        <input type="range" id="div" min="0" max="0.08" step="0.005" value="0.01">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Surface Parameters</h4>
+      <div class="field">
+        <div class="field-label"><span>ATM IV @ 1M (%)</span><span class="val" id="v_atm">18.0</span></div>
+        <input type="range" id="atmIv" min="5" max="80" step="0.5" value="18">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Skew (per unit m)</span><span class="val" id="v_skew">−0.12</span></div>
+        <input type="range" id="skew" min="-0.40" max="0.40" step="0.01" value="-0.12">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Curvature</span><span class="val" id="v_curv">0.08</span></div>
+        <input type="range" id="curv" min="0" max="0.50" step="0.01" value="0.08">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Term slope</span><span class="val" id="v_term">0.04</span></div>
+        <input type="range" id="termSlope" min="-0.20" max="0.30" step="0.01" value="0.04">
+      </div>
+      <div class="hint">IV(K,T) = ATM(T) + skew·m + curv·m² with m = ln(K/S). ATM(T) = ATM₁ₘ · (1 + termSlope·ln(T/T₁ₘ)). Synthetic only.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>View</h4>
+      <div class="field">
+        <div class="field-label"><span>Focus expiry</span></div>
+        <select id="focusT">
+          <option value="0.0833">1M</option>
+          <option value="0.25" selected>3M</option>
+          <option value="0.5">6M</option>
+          <option value="1">1Y</option>
+          <option value="2">2Y</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Strike range (±% from spot)</span><span class="val" id="v_range">40</span></div>
+        <input type="range" id="kRange" min="15" max="70" step="5" value="40">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Show 3D surface</span></div>
+        <select id="show3d">
+          <option value="1" selected>Yes</option>
+          <option value="0">No</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="updateBtn">Update Surface</button>
+    <div class="status-line" id="statusLine">Synthetic IV surface · illustrative</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Options · Implied Volatility</div>
+      <h1 class="page-title">Volatility Smile, Skew &amp; Term Structure Lab</h1>
+      <p class="page-desc">Shape a parametric implied-volatility surface and inspect smiles across expiry, ATM term structure, 25-delta risk reversals and butterflies. All levels are synthetic — built from ATM, skew, curvature and term slope — so you can learn the geometry of the surface without mistaking it for live market data.</p>
+    </div>
+
+    <div class="warn-banner">
+      <b>Synthetic / illustrative data only.</b> The surface is a teaching model: IV(K,T) = ATM(T) + skew·m + curvature·m². It is not calibrated to any exchange or underlier. High IV is not automatically “expensive.”
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-title">Focus Expiry Snapshot</span>
+        <span class="badge">SYNTHETIC</span>
+      </div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">IV Smile — Focus Expiry</span></div>
+      <p class="section-desc">Implied vol vs strike and vs log-moneyness. Markers approximate 25Δ put, ATM and 25Δ call (Black–Scholes delta under the local IV).</p>
+      <div class="grid grid-2">
+        <div class="card"><div id="smileKChart" style="width:100%;height:340px;"></div></div>
+        <div class="card"><div id="smileMChart" style="width:100%;height:340px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Multi-Expiry Smiles &amp; ATM Term Structure</span></div>
+      <div class="grid grid-2">
+        <div class="card"><div id="multiSmileChart" style="width:100%;height:340px;"></div></div>
+        <div class="card"><div id="termChart" style="width:100%;height:340px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">25Δ Risk Reversal &amp; Butterfly by Expiry</span></div>
+      <p class="section-desc">RR25 = IV₂₅Δc − IV₂₅Δp (sign convention: positive when calls are richer than puts at 25Δ). BF25 = (IV₂₅Δc + IV₂₅Δp)/2 − IV_ATM measures smile wings vs ATM.</p>
+      <div class="grid grid-2">
+        <div class="card"><div id="rrChart" style="width:100%;height:300px;"></div></div>
+        <div class="card"><div id="bfChart" style="width:100%;height:300px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">IV Heatmap &amp; 3D Surface</span></div>
+      <div class="card" style="margin-bottom:14px;"><div id="heatChart" style="width:100%;height:380px;"></div></div>
+      <div class="card" id="surfaceCard"><div id="surfaceChart" style="width:100%;height:420px;"></div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Strike Table — Focus Expiry</span></div>
+      <div class="card" style="overflow-x:auto; max-height:340px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Strike</th>
+              <th>Moneyness</th>
+              <th>m = ln(K/S)</th>
+              <th>IV (%)</th>
+              <th>Approx Δ call</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Formulas</span></div>
+      <div class="formula-block">
+        <div class="f-title">Parametric Smile (synthetic)</div>
+        <div class="f-math">m = ln(K / S)</div>
+        <div class="f-math">ATM(T) = ATM₁ₘ · (1 + termSlope · ln(T / T₁ₘ))</div>
+        <div class="f-math">IV(K,T) = max(σ_floor, ATM(T) + skew · m + curvature · m²)</div>
+        <div class="f-note">T in years. Floor keeps IV positive. This is a pedagogical surface, not a no-arbitrage parametric model (e.g. SVI).</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">25Δ Risk Reversal &amp; Butterfly</div>
+        <div class="f-math">RR25 = IV(K₂₅Δc) − IV(K₂₅Δp)</div>
+        <div class="f-math">BF25 = ½ [IV(K₂₅Δc) + IV(K₂₅Δp)] − IV_ATM</div>
+        <div class="f-note">Strikes solved so that Black–Scholes call delta ≈ 0.25 and put delta ≈ −0.25 under that strike’s own IV (fixed-point iteration).</div>
+      </
+      <div class="formula-block">
+        <div class="f-title">Black–Scholes Call Delta (for mapping)</div>
+        <div class="f-math">Δ_call = e^{−qT} · N(d₁) &nbsp;&nbsp; d₁ = [ln(S/K) + (r − q + ½σ²)T] / (σ√T)</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Concepts</span></div>
+
+      <details class="disclosure" open>
+        <summary>Smile vs skew</summary>
+        <div class="disclosure-body">
+          <p>A <b>smile</b> is the pattern of IV against strike (or moneyness) at fixed expiry — often U-shaped in FX and some equities. <b>Skew</b> refers to the asymmetric slope: in equity index markets, low strikes (puts) typically carry higher IV than high strikes (calls), producing a downward-sloping smile in strike space. Skew is often quoted via risk reversals.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Term structure</summary>
+        <div class="disclosure-body">
+          <p>ATM IV across expiries forms the <b>term structure</b>. Upward-sloping term structures are common when the market prices more uncertainty at longer horizons or mean-reverting short-dated vol; inverted term structures often appear when near-term event risk dominates. This lab uses a simple log-linear tilt of ATM vol — illustrative only.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Risk reversal &amp; butterfly</summary>
+        <div class="disclosure-body">
+          <p><b>RR25</b> isolates the skew component between 25Δ call and put vols. <b>BF25</b> isolates the average wing richness versus ATM (curvature / smile convexity). Traders watch both as compact summaries of the surface slice.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>High IV is not automatically expensive</summary>
+        <div class="disclosure-body">
+          <p>Implied vol is the market’s pricing kernel for optionality — it embeds expected future realised vol, risk premia, supply/demand for hedges, and distributional assumptions (tail risk). An elevated IV may be “fair” or even cheap if realised volatility and jumps are likely to be higher still. Valuation requires a view on realised dynamics and relative value across strikes/expiries, not IV level alone.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational options-volatility lab. Entire surface is synthetic and parametric. Delta mappings use Black–Scholes under local IV. Not market data; not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   INTERACTIVE VOLATILITY SMILE, SKEW & TERM STRUCTURE LAB
+   Synthetic surface only
+   ===================================================================== */
+
+const EXPIRIES = [
+  { label: '1W', T: 7/365 },
+  { label: '1M', T: 1/12 },
+  { label: '2M', T: 2/12 },
+  { label: '3M', T: 0.25 },
+  { label: '6M', T: 0.5 },
+  { label: '9M', T: 0.75 },
+  { label: '1Y', T: 1 },
+  { label: '18M', T: 1.5 },
+  { label: '2Y', T: 2 },
+];
+const T_1M = 1/12;
+
+function normCdf(x) {
+  // Abramowitz–Stegun approximation
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989422804014327 * Math.exp(-0.5 * x * x);
+  const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+  return x > 0 ? 1 - p : p;
+}
+
+function inputs() {
+  return {
+    S: Math.max(1, parseFloat(document.getElementById('spot').value) || 100),
+    r: parseFloat(document.getElementById('rate').value) || 0,
+    q: parseFloat(document.getElementById('div').value) || 0,
+    atm1m: (parseFloat(document.getElementById('atmIv').value) || 18) / 100,
+    skew: parseFloat(document.getElementById('skew').value) || 0,
+    curv: parseFloat(document.getElementById('curv').value) || 0,
+    termSlope: parseFloat(document.getElementById('termSlope').value) || 0,
+    focusT: parseFloat(document.getElementById('focusT').value) || 0.25,
+    kRange: (parseFloat(document.getElementById('kRange').value) || 40) / 100,
+    show3d: document.getElementById('show3d').value === '1',
+  };
+}
+
+function syncLabels() {
+  const skew = parseFloat(document.getElementById('skew').value);
+  document.getElementById('v_r').textContent = parseFloat(document.getElementById('rate').value).toFixed(3);
+  document.getElementById('v_q').textContent = parseFloat(document.getElementById('div').value).toFixed(3);
+  document.getElementById('v_atm').textContent = parseFloat(document.getElementById('atmIv').value).toFixed(1);
+  document.getElementById('v_skew').textContent = (skew >= 0 ? '+' : '') + skew.toFixed(2);
+  document.getElementById('v_curv').textContent = parseFloat(document.getElementById('curv').value).toFixed(2);
+  document.getElementById('v_term').textContent = parseFloat(document.getElementById('termSlope').value).toFixed(2);
+  document.getElementById('v_range').textContent = document.getElementById('kRange').value;
+}
+['rate','div','atmIv','skew','curv','termSlope','kRange'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => { syncLabels(); render(); });
+});
+['spot','focusT','show3d'].forEach(id => {
+  document.getElementById(id).addEventListener('change', render);
+  document.getElementById(id).addEventListener('input', render);
+});
+syncLabels();
+
+/* ---- Surface ---- */
+function atmT(T, cfg) {
+  const base = cfg.atm1m * (1 + cfg.termSlope * Math.log(Math.max(T, 1/365) / T_1M));
+  return Math.max(0.03, base);
+}
+
+function iv(K, T, cfg) {
+  const m = Math.log(K / cfg.S);
+  const a = atmT(T, cfg);
+  return Math.max(0.03, a + cfg.skew * m + cfg.curv * m * m);
+}
+
+function bsD1(S, K, T, r, q, sig) {
+  if (T <= 0 || sig <= 0) return 0;
+  return (Math.log(S / K) + (r - q + 0.5 * sig * sig) * T) / (sig * Math.sqrt(T));
+}
+
+function callDelta(S, K, T, r, q, sig) {
+  return Math.exp(-q * T) * normCdf(bsD1(S, K, T, r, q, sig));
+}
+
+/** Find strike with call delta ≈ targetDelta (e.g. 0.25 or 0.75 for 25Δ put ≈ 1−0.25 on forward-adjusted basis). */
+function strikeForCallDelta(targetDelta, T, cfg) {
+  // Binary search on K
+  let lo = cfg.S * 0.3, hi = cfg.S * 2.5;
+  for (let i = 0; i < 40; i++) {
+    const mid = 0.5 * (lo + hi);
+    const sig = iv(mid, T, cfg);
+    const d = callDelta(cfg.S, mid, T, cfg.r, cfg.q, sig);
+    // higher K → lower call delta
+    if (d > targetDelta) lo = mid;
+    else hi = mid;
+  }
+  return 0.5 * (lo + hi);
+}
+
+function sliceMetrics(T, cfg) {
+  const atm = atmT(T, cfg);
+  // 25Δ call: call delta = 0.25
+  const k25c = strikeForCallDelta(0.25, T, cfg);
+  // 25Δ put: put delta ≈ -0.25 ⇒ call delta ≈ e^{-qT} + putDelta ≈ 0.75 (roughly); use call Δ = 0.75
+  const k25p = strikeForCallDelta(0.75, T, cfg);
+  const iv25c = iv(k25c, T, cfg);
+  const iv25p = iv(k25p, T, cfg);
+  const ivAtm = iv(cfg.S, T, cfg); // approx ATM spot
+  const rr = iv25c - iv25p;
+  const bf = 0.5 * (iv25c + iv25p) - ivAtm;
+  return { T, atm, k25c, k25p, iv25c, iv25p, ivAtm, rr, bf };
+}
+
+/* ---- Presets ---- */
+const PRESETS = {
+  equity:   { atmIv: 18, skew: -0.12, curv: 0.08, termSlope: 0.04 },
+  flat:     { atmIv: 20, skew: 0,     curv: 0.00, termSlope: 0.02 },
+  strong:   { atmIv: 22, skew: -0.28, curv: 0.12, termSlope: 0.05 },
+  smile:    { atmIv: 16, skew: 0,     curv: 0.22, termSlope: 0.03 },
+  inverted: { atmIv: 19, skew: 0.14,  curv: 0.06, termSlope: 0.02 },
+  steep:    { atmIv: 14, skew: -0.10, curv: 0.07, termSlope: 0.18 },
+};
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = PRESETS[btn.dataset.p];
+    if (!p) return;
+    document.getElementById('atmIv').value = p.atmIv;
+    document.getElementById('skew').value = p.skew;
+    document.getElementById('curv').value = p.curv;
+    document.getElementById('termSlope').value = p.termSlope;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+    syncLabels();
+    render();
+  });
+});
+
+document.getElementById('updateBtn').onclick = () => render();
+
+/* ---- Render ---- */
+function fmt(x, d=2) { return isFinite(x) ? Number(x).toFixed(d) : '—'; }
+function pct(x, d=2) { return isFinite(x) ? (x * 100).toFixed(d) + '%' : '—'; }
+
+function plotlyBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 55, r: 24, t: 28, b: 48 },
+    xaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.14, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE' } },
+  }, extra || {});
+}
+const PCFG = { displayModeBar: false, responsive: true };
+
+const SMILE_COLORS = ['#4F8EFF','#2ED573','#FFC145','#8C7CFF','#FF4757','#F5A623','#5DADE2','#E8E9EE','#AF7AC5'];
+
+function render() {
+  const cfg = inputs();
+  const focus = sliceMetrics(cfg.focusT, cfg);
+  const focusLabel = EXPIRIES.find(e => Math.abs(e.T - cfg.focusT) < 0.01)?.label || (cfg.focusT.toFixed(2) + 'Y');
+
+  // KPIs
+  const kpis = [
+    { l: 'ATM IV', v: pct(focus.ivAtm), s: focusLabel, c: 'oos' },
+    { l: '25Δ Put IV', v: pct(focus.iv25p), s: `K≈${fmt(focus.k25p,1)}`, c: 'loss' },
+    { l: '25Δ Call IV', v: pct(focus.iv25c), s: `K≈${fmt(focus.k25c,1)}`, c: 'profit' },
+    { l: 'RR25', v: pct(focus.rr), s: 'IV_c − IV_p', c: focus.rr < 0 ? 'loss' : 'profit' },
+    { l: 'BF25', v: pct(focus.bf), s: 'wings − ATM', c: '' },
+    { l: 'Skew param', v: cfg.skew.toFixed(2), s: 'per unit m', c: '' },
+    { l: 'Curvature', v: cfg.curv.toFixed(2), s: 'm² coeff', c: '' },
+    { l: 'ATM 1M / slope', v: pct(cfg.atm1m,1) + ' / ' + cfg.termSlope.toFixed(2), s: 'term structure', c: '' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
+  ).join('');
+
+  // Strike grid for focus smile
+  const nK = 61;
+  const kMin = cfg.S * (1 - cfg.kRange);
+  const kMax = cfg.S * (1 + cfg.kRange);
+  const strikes = [];
+  const ivs = [];
+  const ms = [];
+  const deltas = [];
+  for (let i = 0; i < nK; i++) {
+    const K = kMin + (kMax - kMin) * (i / (nK - 1));
+    const sig = iv(K, cfg.focusT, cfg);
+    strikes.push(K);
+    ivs.push(sig * 100);
+    ms.push(Math.log(K / cfg.S));
+    deltas.push(callDelta(cfg.S, K, cfg.focusT, cfg.r, cfg.q, sig));
+  }
+
+  // Smile vs K
+  Plotly.newPlot('smileKChart', [
+    { x: strikes, y: ivs, mode: 'lines', line: { color: '#4F8EFF', width: 2.5 }, name: 'IV' },
+    { x: [focus.k25p], y: [focus.iv25p * 100], mode: 'markers', marker: { size: 11, color: '#FF4757', symbol: 'diamond' }, name: '25Δ put' },
+    { x: [cfg.S], y: [focus.ivAtm * 100], mode: 'markers', marker: { size: 11, color: '#FFC145' }, name: 'ATM' },
+    { x: [focus.k25c], y: [focus.iv25c * 100], mode: 'markers', marker: { size: 11, color: '#2ED573', symbol: 'diamond' }, name: '25Δ call' },
+  ], plotlyBase({
+    title: { text: `IV vs strike · ${focusLabel} · SYNTHETIC`, font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Strike' }, yaxis: { title: 'IV (%)' },
+  }), PCFG);
+
+  // Smile vs m
+  Plotly.newPlot('smileMChart', [
+    { x: ms, y: ivs, mode: 'lines', line: { color: '#8C7CFF', width: 2.5 }, name: 'IV' },
+    { x: [Math.log(focus.k25p / cfg.S)], y: [focus.iv25p * 100], mode: 'markers', marker: { size: 10, color: '#FF4757' }, name: '25Δp' },
+    { x: [0], y: [focus.ivAtm * 100], mode: 'markers', marker: { size: 10, color: '#FFC145' }, name: 'ATM' },
+    { x: [Math.log(focus.k25c / cfg.S)], y: [focus.iv25c * 100], mode: 'markers', marker: { size: 10, color: '#2ED573' }, name: '25Δc' },
+  ], plotlyBase({
+    title: { text: 'IV vs log-moneyness m = ln(K/S)', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'm' }, yaxis: { title: 'IV (%)' },
+  }), PCFG);
+
+  // Multi-expiry smiles
+  const multiTraces = EXPIRIES.map((e, idx) => {
+    const xs = [], ys = [];
+    for (let i = 0; i < nK; i++) {
+      const K = kMin + (kMax - kMin) * (i / (nK - 1));
+      xs.push(K);
+      ys.push(iv(K, e.T, cfg) * 100);
+    }
+    return {
+      x: xs, y: ys, mode: 'lines',
+      line: { color: SMILE_COLORS[idx % SMILE_COLORS.length], width: e.T === cfg.focusT ? 3 : 1.5 },
+      opacity: Math.abs(e.T - cfg.focusT) < 0.01 ? 1 : 0.75,
+      name: e.label,
+    };
+  });
+  Plotly.newPlot('multiSmileChart', multiTraces, plotlyBase({
+    title: { text: 'Smiles by expiry (synthetic)', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Strike' }, yaxis: { title: 'IV (%)' },
+  }), PCFG);
+
+  // ATM term structure
+  const termT = EXPIRIES.map(e => e.T);
+  const termAtm = EXPIRIES.map(e => atmT(e.T, cfg) * 100);
+  const termLabels = EXPIRIES.map(e => e.label);
+  Plotly.newPlot('termChart', [
+    { x: termT, y: termAtm, mode: 'lines+markers', line: { color: '#FFC145', width: 2.5 }, marker: { size: 8 }, name: 'ATM IV',
+      text: termLabels, hovertemplate: '%{text}<br>%{y:.2f}%<extra></extra>' },
+  ], plotlyBase({
+    title: { text: 'ATM term structure (synthetic)', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Expiry (years)' }, yaxis: { title: 'ATM IV (%)' },
+  }), PCFG);
+
+  // RR & BF across expiries
+  const metricsAll = EXPIRIES.map(e => sliceMetrics(e.T, cfg));
+  Plotly.newPlot('rrChart', [{
+    x: EXPIRIES.map(e => e.label),
+    y: metricsAll.map(m => m.rr * 100),
+    type: 'bar',
+    marker: { color: metricsAll.map(m => m.rr < 0 ? '#FF4757' : '#2ED573') },
+    name: 'RR25 (pts)',
+  }], plotlyBase({
+    title: { text: '25Δ Risk Reversal by expiry', font: { size: 12, color: '#8C90A0' } },
+    yaxis: { title: 'IV pts (call − put)' },
+  }), PCFG);
+
+  Plotly.newPlot('bfChart', [{
+    x: EXPIRIES.map(e => e.label),
+    y: metricsAll.map(m => m.bf * 100),
+    type: 'bar',
+    marker: { color: '#8C7CFF' },
+    name: 'BF25 (pts)',
+  }], plotlyBase({
+    title: { text: '25Δ Butterfly by expiry', font: { size: 12, color: '#8C90A0' } },
+    yaxis: { title: 'IV pts' },
+  }), PCFG);
+
+  // Heatmap
+  const heatK = [];
+  const nH = 40;
+  for (let i = 0; i < nH; i++) heatK.push(kMin + (kMax - kMin) * (i / (nH - 1)));
+  const heatZ = EXPIRIES.map(e => heatK.map(K => iv(K, e.T, cfg) * 100));
+  Plotly.newPlot('heatChart', [{
+    z: heatZ,
+    x: heatK.map(k => k.toFixed(1)),
+    y: EXPIRIES.map(e => e.label),
+    type: 'heatmap',
+    colorscale: [
+      [0, '#0C0E12'], [0.25, '#1a2744'], [0.5, '#3A6BC4'],
+      [0.75, '#F5A623'], [1, '#FF4757'],
+    ],
+    colorbar: { title: 'IV%', thickness: 12, tickfont: { color: '#8C90A0', size: 10 } },
+    hovertemplate: 'K=%{x}<br>T=%{y}<br>IV=%{z:.2f}%<extra></extra>',
+  }], plotlyBase({
+    title: { text: 'IV heatmap — strike × expiry (SYNTHETIC)', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Strike' }, yaxis: { title: 'Expiry' },
+    margin: { l: 60, r: 20, t: 36, b: 48 },
+  }), PCFG);
+
+  // 3D surface
+  const surfaceCard = document.getElementById('surfaceCard');
+  if (cfg.show3d) {
+    surfaceCard.style.display = 'block';
+    const n3 = 35;
+    const k3 = [], t3 = [];
+    for (let i = 0; i < n3; i++) k3.push(kMin + (kMax - kMin) * (i / (n3 - 1)));
+    for (let j = 0; j < n3; j++) t3.push(1/52 + (2 - 1/52) * (j / (n3 - 1)));
+    const z3 = t3.map(T => k3.map(K => iv(K, T, cfg) * 100));
+    Plotly.newPlot('surfaceChart', [{
+      type: 'surface',
+      x: k3,
+      y: t3,
+      z: z3,
+      colorscale: [
+        [0, '#0C0E12'], [0.3, '#1a2744'], [0.55, '#4F8EFF'],
+        [0.8, '#FFC145'], [1, '#FF4757'],
+      ],
+      colorbar: { title: 'IV%', thickness: 12, tickfont: { color: '#8C90A0', size: 10 } },
+      hovertemplate: 'K=%{x:.1f}<br>T=%{y:.2f}y<br>IV=%{z:.2f}%<extra></extra>',
+    }], {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+      margin: { l: 10, r: 10, t: 30, b: 10 },
+      title: { text: 'Synthetic IV surface σ(K,T)', font: { size: 12, color: '#8C90A0' } },
+      scene: {
+        xaxis: { title: 'Strike', gridcolor: '#242730', backgroundcolor: '#0C0E12' },
+        yaxis: { title: 'T (years)', gridcolor: '#242730', backgroundcolor: '#0C0E12' },
+        zaxis: { title: 'IV (%)', gridcolor: '#242730', backgroundcolor: '#0C0E12' },
+        bgcolor: '#08090C',
+      },
+    }, PCFG);
+  } else {
+    surfaceCard.style.display = 'none';
+  }
+
+  // Table
+  let th = '';
+  const step = Math.max(1, Math.floor(nK / 24));
+  for (let i = 0; i < nK; i += step) {
+    const K = strikes[i];
+    const sig = ivs[i];
+    const m = ms[i];
+    const d = deltas[i];
+    let note = '';
+    if (Math.abs(K - focus.k25p) / cfg.S < 0.02) note = '≈25Δ put';
+    if (Math.abs(K - cfg.S) / cfg.S < 0.015) note = 'ATM';
+    if (Math.abs(K - focus.k25c) / cfg.S < 0.02) note = '≈25Δ call';
+    th += `<tr>
+      <td>${fmt(K,2)}</td>
+      <td>${fmt(K/cfg.S,3)}</td>
+      <td>${fmt(m,3)}</td>
+      <td>${fmt(sig,2)}</td>
+      <td>${fmt(d,3)}</td>
+      <td style="color:var(--oos)">${note}</td>
+    </tr>`;
+  }
+  document.getElementById('tableBody').innerHTML = th;
+
+  document.getElementById('statusLine').innerHTML =
+    `Synthetic surface · focus <b>${focusLabel}</b> · ATM <b>${pct(focus.ivAtm)}</b> · RR25 <b>${pct(focus.rr)}</b> · BF25 <b>${pct(focus.bf)}</b>`;
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IV Relative-Value & Surface Scenario Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C; --bg-2:#0C0E12; --panel:#111318; --panel-2:#15171D;
+  --border:#242730; --border-soft:#1A1C22;
+  --text:#E8E9EE; --text-dim:#8C90A0; --text-faint:#5A5E6B;
+  --accent:#4F8EFF; --accent-dim:#3A6BC4; --oos:#FFC145;
+  --profit:#2ED573; --loss:#FF4757; --warn:#F5A623; --choppy:#8C7CFF;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px; --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(140,124,255,0.05), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+.app{display:grid; grid-template-columns:360px 1fr; min-height:100vh;}
+@media (max-width:1200px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 210deg, var(--choppy), var(--accent), var(--oos)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:11px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:15px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+select, input[type=number]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px;}
+.btn-sm{padding:7px 8px; font-size:11px;}
+.scenario-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:22px 28px 60px; max-width:1540px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:26px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:920px; font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px; max-width:920px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px 14px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.profit:before{background:var(--profit);}
+.kpi.loss:before{background:var(--loss);}
+.kpi.warn:before{background:var(--warn);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:17px; font-weight:600; margin-top:5px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:11.5px;}
+table.data-table th, table.data-table td{padding:6px 7px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left;}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+table.data-table tr.sel td{background:rgba(79,142,255,0.12);}
+table.data-table tr{cursor:pointer;}
+table.data-table tr:hover td{background:rgba(255,255,255,0.03);}
+table.data-table .pos{color:var(--profit);}
+table.data-table .neg{color:var(--loss);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.footer-note{margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; border:1px solid rgba(255,193,69,0.4); color:var(--oos); margin-left:8px;}
+.warn-banner{background:rgba(255,193,69,0.07); border:1px solid rgba(255,193,69,0.28); border-radius:8px; padding:11px 14px; font-size:12.5px; color:var(--oos); margin-bottom:14px; line-height:1.55;}
+.scenario-tag{display:inline-block; font-family:var(--mono); font-size:11px; padding:3px 10px; border-radius:20px; background:rgba(140,124,255,0.15); border:1px solid rgba(140,124,255,0.35); color:var(--choppy); margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">RV</div><div class="brand-name">IV Rel-Val Lab</div></div>
+    <div class="brand-sub">Surface · Scenarios · Greeks</div>
+
+    <div class="ctrl-group">
+      <h4>Underlying</h4>
+      <div class="field">
+        <div class="field-label"><span>Spot S</span></div>
+        <input type="number" id="spot" value="100" step="0.5" min="1">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Rate r</span><span class="val" id="v_r">0.03</span></div>
+          <input type="range" id="rate" min="0" max="0.10" step="0.005" value="0.03">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Div q</span><span class="val" id="v_q">0.01</span></div>
+          <input type="range" id="div" min="0" max="0.06" step="0.005" value="0.01">
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Current Surface</h4>
+      <div class="field">
+        <div class="field-label"><span>ATM IV (1M)</span><span class="val" id="v_atm">20%</span></div>
+        <input type="range" id="atmIv" min="8" max="60" step="0.5" value="20">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Skew</span><span class="val" id="v_skew">−0.12</span></div>
+        <input type="range" id="skew" min="-0.40" max="0.30" step="0.01" value="-0.12">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Curvature</span><span class="val" id="v_curv">0.10</span></div>
+        <input type="range" id="curv" min="0" max="0.40" step="0.01" value="0.10">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Term slope</span><span class="val" id="v_term">0.05</span></div>
+        <input type="range" id="termSlope" min="-0.15" max="0.25" step="0.01" value="0.05">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Reference &amp; Realized</h4>
+      <div class="field">
+        <div class="field-label"><span>Reference ATM IV</span><span class="val" id="v_ref">18%</span></div>
+        <input type="range" id="refAtm" min="8" max="55" step="0.5" value="18">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Realized vol (ann.)</span><span class="val" id="v_rv">16%</span></div>
+        <input type="range" id="rv" min="5" max="55" step="0.5" value="16">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>IV percentile (synthetic)</span><span class="val" id="v_pct">62</span></div>
+        <input type="range" id="ivPct" min="1" max="99" step="1" value="62">
+      </div>
+      <div class="hint">Percentile is a user-controlled synthetic ranking vs history — not computed from real data.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Scenario Shocks</h4>
+      <div class="scenario-grid">
+        <button class="btn btn-sm" data-sc="none">Base</button>
+        <button class="btn btn-sm" data-sc="spotDown">Spot −5%</button>
+        <button class="btn btn-sm" data-sc="spotUp">Spot +5%</button>
+        <button class="btn btn-sm" data-sc="ivCrush">IV Crush</button>
+        <button class="btn btn-sm" data-sc="ivSpike">IV Spike</button>
+        <button class="btn btn-sm" data-sc="skewSteep">Skew Steepen</button>
+        <button class="btn btn-sm" data-sc="skewFlat">Skew Flatten</button>
+        <button class="btn btn-sm" data-sc="frontSpike">Front IV Spike</button>
+      </div>
+      <div class="hint" style="margin-top:8px">Scenarios shift the surface / spot for “scenario IV” vs current. Compare option values and Greeks below.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Selected Option</h4>
+      <div class="field">
+        <div class="field-label"><span>Expiry</span></div>
+        <select id="optT">
+          <option value="0.0833">1M</option>
+          <option value="0.25" selected>3M</option>
+          <option value="0.5">6M</option>
+          <option value="1">1Y</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Strike</span></div>
+        <input type="number" id="optK" value="100" step="1" min="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Type</span></div>
+        <select id="optType"><option value="call" selected>Call</option><option value="put">Put</option></select>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="updateBtn">Update Surface</button>
+    <div class="status-line" id="statusLine">Synthetic surface · educational</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Options · Volatility Relative Value</div>
+      <h1 class="page-title">IV Relative-Value &amp; Surface Scenario Lab</h1>
+      <p class="page-desc">Build a synthetic implied-vol surface, compare it to a reference surface and realized volatility, and apply scenario shocks. Inspect relative-value gauges, smile/term structure, an option chain, and how a selected contract’s theoretical value and Greeks respond — without treating any spread as a guaranteed trade.</p>
+    </div>
+
+    <div class="warn-banner">
+      <b>No guaranteed edge.</b> A positive IV − RV gap is <i>not</i> a trading signal by itself. Realized vol is backward-looking; IV embeds risk premia, demand for hedges, jump risk and market structure. Model risk, path dependence, transaction costs and surface dynamics can erase apparent “richness” or “cheapness.”
+    </div>
+
+    <div class="scenario-tag" id="scenarioTag">Scenario: Base</div>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-title">Relative-Value Snapshot</span>
+        <span class="badge">SYNTHETIC</span>
+      </div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Smile · Term Structure · Scenario Overlay</span></div>
+      <div class="grid grid-2">
+        <div class="card"><div id="smileChart" style="width:100%;height:340px;"></div></div>
+        <div class="card"><div id="termChart" style="width:100%;height:340px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">RV Measures · Calendar &amp; Skew Spreads</span></div>
+      <div class="grid grid-2">
+        <div class="card"><div id="rvChart" style="width:100%;height:300px;"></div></div>
+        <div class="card"><div id="spreadChart" style="width:100%;height:300px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Selected Option Analytics</span></div>
+      <p class="section-desc">Black–Scholes theoretical values under current and scenario surfaces. Delta bump for scenario spot is applied; vol is taken from each surface at the option’s strike and expiry.</p>
+      <div class="grid grid-4" id="optKpi"></div>
+      <div class="grid grid-2" style="margin-top:14px;">
+        <div class="card"><div id="greekChart" style="width:100%;height:280px;"></div></div>
+        <div class="card"><div id="valueChart" style="width:100%;height:280px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Option Chain (focus expiry)</span></div>
+      <div class="card" style="overflow-x:auto; max-height:380px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Strike</th>
+              <th>IV cur</th>
+              <th>IV scen</th>
+              <th>IV−RV</th>
+              <th>Call</th>
+              <th>Put</th>
+              <th>Δ call</th>
+              <th>Vega</th>
+              <th>RR note</th>
+            </tr>
+          </thead>
+          <tbody id="chainBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Formulas</span></div>
+      <div class="formula-block">
+        <div class="f-title">Synthetic Surface</div>
+        <div class="f-math">m = ln(K/S) &nbsp;·&nbsp; ATM(T) = ATM₁ₘ · (1 + termSlope · ln(T/T₁ₘ))</div>
+        <div class="f-math">IV(K,T) = max(σ_floor, ATM(T) + skew·m + curv·m²)</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Relative-Value Gauges</div>
+        <div class="f-math">IV − RV = ATM_IV − RealizedVol &nbsp;&nbsp;(pts)</div>
+        <div class="f-math">RR25 ≈ IV₂₅Δc − IV₂₅Δp &nbsp;&nbsp; BF25 ≈ ½(IV₂₅Δc+IV₂₅Δp) − IV_ATM</div>
+        <div class="f-math">Calendar ≈ ATM(T₂) − ATM(T₁) &nbsp;&nbsp; Term spread e.g. 1Y − 1M</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Black–Scholes (European)</div>
+        <div class="f-math">d₁ = [ln(S/K)+(r−q+½σ²)T]/(σ√T) &nbsp;·&nbsp; d₂ = d₁ − σ√T</div>
+        <div class="f-math">Call = S e^{−qT} N(d₁) − K e^{−rT} N(d₂)</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Why IV − RV Is Not a Trade Ticket</span></div>
+      <details class="disclosure" open>
+        <summary>Realized-vol uncertainty</summary>
+        <div class="disclosure-body">
+          <p>RV is a sample from a path that has already occurred (or a forecast model). Future realized volatility can differ sharply — especially around events. Selling “rich” IV when RV was low can still lose if vol spikes.</p>
+        </div>
+      </details>
+      <details class="disclosure" open>
+        <summary>Model risk &amp; surface dynamics</summary>
+        <div class="disclosure-body">
+          <p>BS Greeks assume a flat vol world; real P&amp;L depends on the full surface move (sticky strike vs sticky delta, skew dynamics). A scenario that only bumps ATM can misstate option P&amp;L when skew steepens simultaneously.</p>
+        </div>
+      </details>
+      <details class="disclosure" open>
+        <summary>Transaction costs &amp; carry</summary>
+        <div class="disclosure-body">
+          <p>Crossing bid–ask on wings, margin, and the path of delta-hedging costs all erode theoretical edges. Apparent calendar or butterfly richness may not cover these frictions.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational IV relative-value lab. Entire surface, RV, percentile and scenarios are synthetic. Not market data. Not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   IV RELATIVE-VALUE & SURFACE SCENARIO LAB
+   ===================================================================== */
+
+const EXPIRIES = [
+  {label:'1W', T:7/365}, {label:'1M', T:1/12}, {label:'2M', T:2/12},
+  {label:'3M', T:0.25}, {label:'6M', T:0.5}, {label:'9M', T:0.75},
+  {label:'1Y', T:1}, {label:'18M', T:1.5}, {label:'2Y', T:2},
+];
+const T1M = 1/12;
+
+function normCdf(x){
+  const t=1/(1+0.2316419*Math.abs(x));
+  const d=0.3989422804014327*Math.exp(-0.5*x*x);
+  const p=d*t*(0.319381530+t*(-0.356563782+t*(1.421413741+t*(-1.453152027+t*1.061405429))));
+  return x>0?1-p:p;
+}
+function normPdf(x){ return Math.exp(-0.5*x*x)/Math.sqrt(2*Math.PI); }
+
+function syncLabels(){
+  document.getElementById('v_r').textContent=parseFloat(document.getElementById('rate').value).toFixed(3);
+  document.getElementById('v_q').textContent=parseFloat(document.getElementById('div').value).toFixed(3);
+  document.getElementById('v_atm').textContent=document.getElementById('atmIv').value+'%';
+  const sk=parseFloat(document.getElementById('skew').value);
+  document.getElementById('v_skew').textContent=(sk>=0?'+':'')+sk.toFixed(2);
+  document.getElementById('v_curv').textContent=parseFloat(document.getElementById('curv').value).toFixed(2);
+  document.getElementById('v_term').textContent=parseFloat(document.getElementById('termSlope').value).toFixed(2);
+  document.getElementById('v_ref').textContent=document.getElementById('refAtm').value+'%';
+  document.getElementById('v_rv').textContent=document.getElementById('rv').value+'%';
+  document.getElementById('v_pct').textContent=document.getElementById('ivPct').value;
+}
+['rate','div','atmIv','skew','curv','termSlope','refAtm','rv','ivPct'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',()=>{syncLabels(); render();});
+});
+['spot','optT','optK','optType'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', render);
+  document.getElementById(id).addEventListener('input', render);
+});
+syncLabels();
+
+let SCENARIO = 'none';
+document.querySelectorAll('[data-sc]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    SCENARIO=btn.dataset.sc;
+    document.querySelectorAll('[data-sc]').forEach(b=>b.style.borderColor='');
+    btn.style.borderColor='var(--accent)';
+    render();
+  });
+});
+
+function baseParams(){
+  return {
+    S: Math.max(1, parseFloat(document.getElementById('spot').value)||100),
+    r: parseFloat(document.getElementById('rate').value)||0,
+    q: parseFloat(document.getElementById('div').value)||0,
+    atm1m: (parseFloat(document.getElementById('atmIv').value)||20)/100,
+    skew: parseFloat(document.getElementById('skew').value)||0,
+    curv: parseFloat(document.getElementById('curv').value)||0,
+    termSlope: parseFloat(document.getElementById('termSlope').value)||0,
+    refAtm: (parseFloat(document.getElementById('refAtm').value)||18)/100,
+    rv: (parseFloat(document.getElementById('rv').value)||16)/100,
+    ivPct: parseFloat(document.getElementById('ivPct').value)||50,
+    optT: parseFloat(document.getElementById('optT').value)||0.25,
+    optK: parseFloat(document.getElementById('optK').value)||100,
+    optType: document.getElementById('optType').value,
+  };
+}
+
+function applyScenario(p){
+  const s={S:p.S, atm1m:p.atm1m, skew:p.skew, curv:p.curv, termSlope:p.termSlope};
+  const names={
+    none:'Base',
+    spotDown:'Spot −5%',
+    spotUp:'Spot +5%',
+    ivCrush:'IV Crush (−25% ATM)',
+    ivSpike:'IV Spike (+30% ATM)',
+    skewSteep:'Skew Steepening',
+    skewFlat:'Skew Flattening',
+    frontSpike:'Front-End IV Spike',
+  };
+  switch(SCENARIO){
+    case 'spotDown': s.S=p.S*0.95; break;
+    case 'spotUp': s.S=p.S*1.05; break;
+    case 'ivCrush': s.atm1m=p.atm1m*0.75; break;
+    case 'ivSpike': s.atm1m=p.atm1m*1.30; break;
+    case 'skewSteep': s.skew=p.skew-0.10; s.curv=p.curv+0.03; break;
+    case 'skewFlat': s.skew=p.skew*0.4; s.curv=p.curv*0.7; break;
+    case 'frontSpike': s.atm1m=p.atm1m*1.35; s.termSlope=p.termSlope-0.12; break;
+  }
+  return { ...s, name: names[SCENARIO]||SCENARIO };
+}
+
+function atmT(T, atm1m, termSlope){
+  return Math.max(0.03, atm1m*(1+termSlope*Math.log(Math.max(T,1/365)/T1M)));
+}
+function iv(K, T, S, atm1m, skew, curv, termSlope){
+  const m=Math.log(K/S);
+  const a=atmT(T, atm1m, termSlope);
+  return Math.max(0.03, a + skew*m + curv*m*m);
+}
+
+function bsPrice(S,K,T,r,q,sig,type){
+  if(T<=0) return type==='call'?Math.max(0,S-K):Math.max(0,K-S);
+  const sq=Math.sqrt(T), d1=(Math.log(S/K)+(r-q+0.5*sig*sig)*T)/(sig*sq), d2=d1-sig*sq;
+  const df=Math.exp(-r*T), dq=Math.exp(-q*T);
+  if(type==='call') return S*dq*normCdf(d1)-K*df*normCdf(d2);
+  return K*df*normCdf(-d2)-S*dq*normCdf(-d1);
+}
+function bsGreeks(S,K,T,r,q,sig){
+  if(T<=0||sig<=0) return {deltaCall:0,deltaPut:0,gamma:0,vega:0,thetaCall:0};
+  const sq=Math.sqrt(T), d1=(Math.log(S/K)+(r-q+0.5*sig*sig)*T)/(sig*sq), d2=d1-sig*sq;
+  const pdf=normPdf(d1), df=Math.exp(-r*T), dq=Math.exp(-q*T);
+  const deltaCall=dq*normCdf(d1);
+  const deltaPut=deltaCall-dq;
+  const gamma=dq*pdf/(S*sig*sq);
+  const vega=S*dq*pdf*sq/100; // per vol point
+  const thetaCall=(-(S*dq*pdf*sig)/(2*sq) - r*K*df*normCdf(d2) + q*S*dq*normCdf(d1))/365;
+  return {deltaCall, deltaPut, gamma, vega, thetaCall};
+}
+
+function strikeForCallDelta(targetDelta, T, S, r, q, atm1m, skew, curv, termSlope){
+  let lo=S*0.3, hi=S*2.5;
+  for(let i=0;i<40;i++){
+    const mid=0.5*(lo+hi);
+    const sig=iv(mid,T,S,atm1m,skew,curv,termSlope);
+    const d=bsGreeks(S,mid,T,r,q,sig).deltaCall;
+    if(d>targetDelta) lo=mid; else hi=mid;
+  }
+  return 0.5*(lo+hi);
+}
+
+function sliceRV(T, S, r, q, atm1m, skew, curv, termSlope){
+  const k25c=strikeForCallDelta(0.25,T,S,r,q,atm1m,skew,curv,termSlope);
+  const k25p=strikeForCallDelta(0.75,T,S,r,q,atm1m,skew,curv,termSlope);
+  const iv25c=iv(k25c,T,S,atm1m,skew,curv,termSlope);
+  const iv25p=iv(k25p,T,S,atm1m,skew,curv,termSlope);
+  const ivAtm=iv(S,T,S,atm1m,skew,curv,termSlope);
+  return {
+    ivAtm, iv25c, iv25p,
+    rr: iv25c-iv25p,
+    bf: 0.5*(iv25c+iv25p)-ivAtm,
+    k25c, k25p,
+  };
+}
+
+function plotlyBase(extra){
+  return Object.assign({
+    paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)',
+    font:{family:'JetBrains Mono, monospace', color:'#8C90A0', size:11},
+    margin:{l:55,r:20,t:28,b:48},
+    xaxis:{gridcolor:'#1A1C22', linecolor:'#242730'},
+    yaxis:{gridcolor:'#1A1C22', linecolor:'#242730'},
+    legend:{orientation:'h', y:1.14, font:{color:'#8C90A0'}},
+    hoverlabel:{bgcolor:'#15171D', bordercolor:'#242730', font:{color:'#E8E9EE'}},
+  }, extra||{});
+}
+const PCFG={displayModeBar:false, responsive:true};
+function fmt(x,d=2){return isFinite(x)?Number(x).toFixed(d):'—';}
+function pct(x,d=1){return isFinite(x)?(x*100).toFixed(d)+'%':'—';}
+
+function render(){
+  const p=baseParams();
+  const sc=applyScenario(p);
+  document.getElementById('scenarioTag').textContent='Scenario: '+sc.name;
+
+  const focusT=p.optT;
+  const curSlice=sliceRV(focusT, p.S, p.r, p.q, p.atm1m, p.skew, p.curv, p.termSlope);
+  const scSlice=sliceRV(focusT, sc.S, p.r, p.q, sc.atm1m, sc.skew, sc.curv, sc.termSlope);
+  const refAtmT=atmT(focusT, p.refAtm, p.termSlope);
+
+  const ivRv=(curSlice.ivAtm - p.rv)*100;
+  const term1m=atmT(T1M, p.atm1m, p.termSlope);
+  const term1y=atmT(1, p.atm1m, p.termSlope);
+  const calSpread=(term1y-term1m)*100;
+
+  // KPIs
+  const kpis=[
+    {l:'ATM IV (focus)', v:pct(curSlice.ivAtm), s:focusT.toFixed(2)+'Y', c:'oos'},
+    {l:'IV − RV', v:(ivRv>=0?'+':'')+ivRv.toFixed(1)+' pts', s:'not a trade signal', c: ivRv>3?'warn':''},
+    {l:'IV percentile', v:p.ivPct.toFixed(0), s:'synthetic rank', c:''},
+    {l:'vs Reference ATM', v:((curSlice.ivAtm-refAtmT)*100).toFixed(1)+' pts', s:'current − ref', c:''},
+    {l:'RR25', v:(curSlice.rr*100).toFixed(2)+' pts', s:'25Δ c − p', c: curSlice.rr<0?'loss':'profit'},
+    {l:'BF25', v:(curSlice.bf*100).toFixed(2)+' pts', s:'wings − ATM', c:''},
+    {l:'1Y−1M calendar', v:(calSpread>=0?'+':'')+calSpread.toFixed(1)+' pts', s:'ATM term', c:''},
+    {l:'Scenario ATM', v:pct(scSlice.ivAtm), s:sc.name, c:'oos'},
+  ];
+  document.getElementById('kpiGrid').innerHTML=kpis.map(k=>
+    `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
+  ).join('');
+
+  // Smile chart
+  const kMin=p.S*0.7, kMax=p.S*1.3, nK=51;
+  const strikes=[], ivCur=[], ivSc=[], ivRef=[];
+  for(let i=0;i<nK;i++){
+    const K=kMin+(kMax-kMin)*i/(nK-1);
+    strikes.push(K);
+    ivCur.push(iv(K,focusT,p.S,p.atm1m,p.skew,p.curv,p.termSlope)*100);
+    ivSc.push(iv(K,focusT,sc.S,sc.atm1m,sc.skew,sc.curv,sc.termSlope)*100);
+    ivRef.push(iv(K,focusT,p.S,p.refAtm,p.skew*0.8,p.curv*0.9,p.termSlope)*100);
+  }
+  Plotly.newPlot('smileChart',[
+    {x:strikes, y:ivCur, mode:'lines', line:{color:'#4F8EFF',width:2.5}, name:'Current IV'},
+    {x:strikes, y:ivSc,  mode:'lines', line:{color:'#8C7CFF',width:2,dash:'dash'}, name:'Scenario IV'},
+    {x:strikes, y:ivRef, mode:'lines', line:{color:'#5A5E6B',width:1.5,dash:'dot'}, name:'Reference IV'},
+    {
+      x: [p.optK],
+      y: [iv(p.optK, focusT, p.S, p.atm1m, p.skew, p.curv, p.termSlope)*100],
+      mode: 'markers',
+      marker: {size:11, color:'#FFC145'},
+      name: 'Selected K'
+    }
+  ], plotlyBase({
+    title: {text:`Smile @ ${focusT.toFixed(2)}Y (synthetic)`, font:{size:12, color:'#8C90A0'}},
+    xaxis: {title:'Strike'},
+    yaxis: {title:'IV %'}
+  }), PCFG);
+  // Term structure ATM
+  Plotly.newPlot('termChart',[
+    {x:EXPIRIES.map(e=>e.T), y:EXPIRIES.map(e=>atmT(e.T,p.atm1m,p.termSlope)*100),
+      mode:'lines+markers', line:{color:'#4F8EFF',width:2.5}, marker:{size:7}, name:'Current ATM',
+      text:EXPIRIES.map(e=>e.label), hovertemplate:'%{text}: %{y:.2f}%<extra></extra>'},
+    {x:EXPIRIES.map(e=>e.T), y:EXPIRIES.map(e=>atmT(e.T,sc.atm1m,sc.termSlope)*100),
+      mode:'lines+markers', line:{color:'#8C7CFF',width:2,dash:'dash'}, name:'Scenario ATM'},
+    {x:EXPIRIES.map(e=>e.T), y:EXPIRIES.map(()=>p.rv*100),
+      mode:'lines', line:{color:'#FFC145',width:1.5,dash:'dot'}, name:'Realized vol'},
+  ],plotlyBase({
+    title:{text:'ATM term structure vs RV',font:{size:12,color:'#8C90A0'}},
+    xaxis:{title:'T (years)'},yaxis:{title:'Vol %'},
+  }),PCFG);
+
+  // IV-RV by expiry
+  Plotly.newPlot('rvChart',[{
+    x:EXPIRIES.map(e=>e.label),
+    y:EXPIRIES.map(e=>(atmT(e.T,p.atm1m,p.termSlope)-p.rv)*100),
+    type:'bar',
+    marker:{color:EXPIRIES.map(e=>(atmT(e.T,p.atm1m,p.termSlope)-p.rv)>0?'#F5A623':'#2ED573')},
+    name:'IV−RV pts',
+  }],plotlyBase({
+    title:{text:'ATM IV − RV by expiry (illustrative only)',font:{size:12,color:'#8C90A0'}},
+    yaxis:{title:'pts'},
+  }),PCFG);
+
+  // Spreads RR / BF / Calendar
+  const rrs=EXPIRIES.map(e=>sliceRV(e.T,p.S,p.r,p.q,p.atm1m,p.skew,p.curv,p.termSlope).rr*100);
+  const bfs=EXPIRIES.map(e=>sliceRV(e.T,p.S,p.r,p.q,p.atm1m,p.skew,p.curv,p.termSlope).bf*100);
+  Plotly.newPlot('spreadChart',[
+    {x:EXPIRIES.map(e=>e.label), y:rrs, type:'bar', name:'RR25', marker:{color:'#FF4757'}},
+    {x:EXPIRIES.map(e=>e.label), y:bfs, type:'bar', name:'BF25', marker:{color:'#8C7CFF'}},
+  ],plotlyBase({
+    barmode:'group',
+    title:{text:'Skew (RR) & butterfly (BF) by expiry',font:{size:12,color:'#8C90A0'}},
+    yaxis:{title:'pts'},
+  }),PCFG);
+
+  // Selected option
+  const sigCur=iv(p.optK,p.optT,p.S,p.atm1m,p.skew,p.curv,p.termSlope);
+  const sigSc=iv(p.optK,p.optT,sc.S,sc.atm1m,sc.skew,sc.curv,sc.termSlope);
+  const pxCur=bsPrice(p.S,p.optK,p.optT,p.r,p.q,sigCur,p.optType);
+  const pxSc=bsPrice(sc.S,p.optK,p.optT,p.r,p.q,sigSc,p.optType);
+  const gCur=bsGreeks(p.S,p.optK,p.optT,p.r,p.q,sigCur);
+  const gSc=bsGreeks(sc.S,p.optK,p.optT,p.r,p.q,sigSc);
+  const delta=p.optType==='call'?gCur.deltaCall:gCur.deltaPut;
+  const deltaSc=p.optType==='call'?gSc.deltaCall:gSc.deltaPut;
+
+  document.getElementById('optKpi').innerHTML=[
+    {l:'Theo (current)', v:fmt(pxCur,3), s:`σ=${pct(sigCur)}`, c:'oos'},
+    {l:'Theo (scenario)', v:fmt(pxSc,3), s:`σ=${pct(sigSc)}`, c:''},
+    {l:'Δ Value', v:fmt(pxSc-pxCur,3), s:sc.name, c: pxSc-pxCur>=0?'profit':'loss'},
+    {l:'Delta / Vega', v:fmt(delta,3)+' / '+fmt(gCur.vega,3), s:'current surface', c:''},
+  ].map(k=>`<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+
+  Plotly.newPlot('greekChart',[{
+    x:['Delta','Gamma×100','Vega','Theta'],
+    y:[delta, gCur.gamma*100, gCur.vega, gCur.thetaCall],
+    type:'bar', name:'Current', marker:{color:'#4F8EFF'},
+  },{
+    x:['Delta','Gamma×100','Vega','Theta'],
+    y:[deltaSc, gSc.gamma*100, gSc.vega, gSc.thetaCall],
+    type:'bar', name:'Scenario', marker:{color:'#8C7CFF'},
+  }],plotlyBase({barmode:'group', title:{text:'Greeks: current vs scenario',font:{size:12,color:'#8C90A0'}}}),PCFG);
+
+  // Value vs spot diagram
+  const spotGrid=[], valCur=[], valSc=[];
+  for(let i=0;i<=40;i++){
+    const s=p.S*0.8+p.S*0.4*i/40;
+    spotGrid.push(s);
+    valCur.push(bsPrice(s,p.optK,p.optT,p.r,p.q,sigCur,p.optType));
+    valSc.push(bsPrice(s,p.optK,p.optT,p.r,p.q,sigSc,p.optType));
+  }
+ 
+  Plotly.newPlot('valueChart',[
+    {x:spotGrid, y:valCur, mode:'lines', line:{color:'#4F8EFF', width:2}, name:'Value @ current σ'},
+    {x:spotGrid, y:valSc,  mode:'lines', line:{color:'#8C7CFF', width:2, dash:'dash'}, name:'Value @ scenario σ'},
+    {
+      x: [p.S],
+      y: [pxCur],
+      mode: 'markers',
+      marker: {size:10, color:'#FFC145'},
+      name: 'Now'
+    }
+  ], plotlyBase({
+    title: {text:`${p.optType} K=${p.optK} value vs spot`, font:{size:12, color:'#8C90A0'}},
+    xaxis: {title:'Spot'},
+    yaxis: {title:'Theo'}
+  }), PCFG);
+
+  // Chain
+  let rows='';
+  for(let i=0;i<=16;i++){
+    const K=Math.round(p.S*0.80 + p.S*0.40*i/16);
+    const sig=iv(K,focusT,p.S,p.atm1m,p.skew,p.curv,p.termSlope);
+    const sigS=iv(K,focusT,sc.S,sc.atm1m,sc.skew,sc.curv,sc.termSlope);
+    const call=bsPrice(p.S,K,focusT,p.r,p.q,sig,'call');
+    const put=bsPrice(p.S,K,focusT,p.r,p.q,sig,'put');
+    const g=bsGreeks(p.S,K,focusT,p.r,p.q,sig);
+    const ivrv=(sig-p.rv)*100;
+    const sel=Math.abs(K-p.optK)<0.6;
+    let note='';
+    if(Math.abs(K-curSlice.k25p)<p.S*0.02) note='~25Δ put';
+    if(Math.abs(K-p.S)<p.S*0.015) note='ATM';
+    if(Math.abs(K-curSlice.k25c)<p.S*0.02) note='~25Δ call';
+    rows+=`<tr class="${sel?'sel':''}" data-k="${K}">
+      <td>${K}</td>
+      <td>${(sig*100).toFixed(2)}</td>
+      <td>${(sigS*100).toFixed(2)}</td>
+      <td class="${ivrv>=0?'neg':'pos'}">${ivrv>=0?'+':''}${ivrv.toFixed(1)}</td>
+      <td>${fmt(call,2)}</td>
+      <td>${fmt(put,2)}</td>
+      <td>${fmt(g.deltaCall,3)}</td>
+      <td>${fmt(g.vega,3)}</td>
+      <td style="color:var(--oos)">${note}</td>
+    </tr>`;
+  }
+  document.getElementById('chainBody').innerHTML=rows;
+  document.querySelectorAll('#chainBody tr').forEach(tr=>{
+    tr.addEventListener('click',()=>{
+      document.getElementById('optK').value=tr.dataset.k;
+      render();
+    });
+  });
+
+  document.getElementById('statusLine').innerHTML=
+    `IV−RV <b>${ivRv>=0?'+':''}${ivRv.toFixed(1)} pts</b> · RR25 <b>${(curSlice.rr*100).toFixed(2)}</b> · scenario <b>${sc.name}</b> · synthetic`;
+}
+
+document.getElementById('updateBtn').onclick=render;
+render();
+</script>
+</body>
+</html>

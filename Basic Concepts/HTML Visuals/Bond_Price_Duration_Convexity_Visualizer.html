@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bond Price, Duration & Convexity Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C;
+  --bg-2:#0C0E12;
+  --panel:#111318;
+  --panel-2:#15171D;
+  --border:#242730;
+  --border-soft:#1A1C22;
+  --text:#E8E9EE;
+  --text-dim:#8C90A0;
+  --text-faint:#5A5E6B;
+  --accent:#4F8EFF;
+  --accent-dim:#3A6BC4;
+  --oos:#FFC145;
+  --train:#4F8EFF;
+  --profit:#2ED573;
+  --loss:#FF4757;
+  --warn:#F5A623;
+  --bull:#2ED573;
+  --bear:#FF4757;
+  --choppy:#8C7CFF;
+  --crisis:#B00020;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px;
+  --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(255,193,69,0.05), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+
+.app{display:grid; grid-template-columns:340px 1fr; min-height:100vh;}
+@media (max-width:1100px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--accent), var(--oos), var(--accent)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:12px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:16px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+input[type=range]::-moz-range-thumb{width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14;}
+select, input[type=number], input[type=text]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:26px 32px 60px; max-width:1460px;}
+.page-header{margin-bottom:22px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:28px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:860px; font-size:13.5px;}
+
+.section{margin-top:32px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:17px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-6px 0 14px; max-width:860px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:18px 18px 16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 16px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.warn:before{background:var(--warn);}
+.kpi.loss:before{background:var(--loss);}
+.kpi.profit:before{background:var(--profit);}
+.kpi-label{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:20px; font-weight:600; margin-top:6px; letter-spacing:-0.3px;}
+.kpi-sub{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12.5px;}
+table.data-table th, table.data-table td{padding:8px 10px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left; color:var(--text-dim); font-family:var(--body);}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+table.data-table td.oos-col{color:var(--oos);}
+table.data-table td.pos{color:var(--profit);}
+table.data-table td.neg{color:var(--loss);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13.5px; color:var(--text); margin-bottom:6px; overflow-x:auto;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body h5{color:var(--text); font-family:var(--display); font-size:13px; margin:14px 0 4px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.legend-row{display:flex; gap:16px; align-items:center; font-size:12px; color:var(--text-dim); margin-bottom:10px; flex-wrap:wrap;}
+.legend-line{display:inline-block; width:16px; height:2px; margin-right:6px; vertical-align:middle;}
+
+.footer-note{margin-top:44px; padding-top:18px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.convention-badge{display:inline-block; font-family:var(--mono); font-size:10.5px; padding:2px 8px; border-radius:20px; border:1px solid rgba(79,142,255,0.4); color:var(--accent); margin-left:8px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">ΔP</div><div class="brand-name">Duration Lab</div></div>
+    <div class="brand-sub">Price · Duration · Convexity · DV01</div>
+
+    <div class="ctrl-group">
+      <h4>Bond Terms</h4>
+      <div class="field">
+        <div class="field-label"><span>Face Value</span></div>
+        <input type="number" id="face" value="100" step="1" min="1">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>Coupon Rate (%)</span></div>
+          <input type="number" id="coupon" value="5.00" step="0.05" min="0" max="30">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Frequency</span></div>
+          <select id="freq">
+            <option value="1">Annual</option>
+            <option value="2" selected>Semi-annual</option>
+            <option value="4">Quarterly</option>
+            <option value="12">Monthly</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Maturity (years)</span><span class="val" id="v_mat">10.0</span></div>
+        <input type="range" id="maturity" min="0.5" max="40" step="0.5" value="10">
+      </div>
+      <div class="hint">Assumes regular coupon periods and settlement on a coupon date (no accrued interest). Clean price = full price under this simplification.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Yield</h4>
+      <div class="field">
+        <div class="field-label"><span>YTM (%)</span><span class="val" id="v_ytm">5.00</span></div>
+        <input type="range" id="ytm" min="0.10" max="15" step="0.05" value="5.00">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Yield Shock (bp)</span><span class="val" id="v_shock">0</span></div>
+        <input type="range" id="shock" min="-300" max="300" step="5" value="0">
+      </div>
+      <div class="hint">Shock is applied on top of the base YTM to illustrate price change, duration and convexity approximations for a parallel yield move.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Chart Range</h4>
+      <div class="field">
+        <div class="field-label"><span>Yield axis min / max (%)</span></div>
+        <div class="row2">
+          <input type="number" id="yMin" value="0.5" step="0.5">
+          <input type="number" id="yMax" value="12" step="0.5">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="resetBtn">Reset Defaults</button>
+    <div class="status-line" id="statusLine">Ready.</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Fixed Income · Risk Metrics</div>
+      <h1 class="page-title">Bond Price, Duration &amp; Convexity Visualizer</h1>
+      <p class="page-desc">See how a fixed-coupon bond’s price responds to yield changes. Compare the exact re-priced bond against the first-order (duration) and second-order (duration + convexity) Taylor approximations. All metrics update live as you move maturity, coupon, yield, or apply a yield shock.</p>
+    </div>
+
+    <!-- KPIs -->
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-title">Key Metrics</span>
+        <span class="convention-badge" id="convBadge">Semi-annual · Clean price</span>
+      </div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <!-- Price vs Yield -->
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Bond Price versus Yield</span></div>
+      <p class="section-desc">The classic inverse, convex price–yield relationship. The gold marker is the current (base) yield; the purple marker shows the shocked yield. The dashed tangent is the duration (linear) approximation; the dotted curve adds the convexity term.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-line" style="background:var(--accent);"></span>Exact price</span>
+          <span><span class="legend-line" style="background:var(--oos);"></span>Duration (tangent)</span>
+          <span><span class="legend-line" style="background:var(--choppy);"></span>Duration + Convexity</span>
+        </div>
+        <div id="priceYieldChart" style="width:100%; height:420px;"></div>
+      </div>
+    </section>
+
+    <!-- Approximation error -->
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Exact Price vs Approximations under Yield Shock</span></div>
+      <p class="section-desc">For the selected shock size, compare the true re-priced bond with the duration-only and duration+convexity estimates. Larger shocks make the linear approximation deteriorate; convexity closes most of the gap for moderate moves.</p>
+      <div class="grid grid-2">
+        <div class="card">
+          <div id="approxChart" style="width:100%; height:340px;"></div>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <thead>
+              <tr><th>Metric</th><th>Value</th></tr>
+            </thead>
+            <tbody id="shockTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Error vs shock size -->
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Approximation Error versus Shock Size</span></div>
+      <p class="section-desc">How the percentage pricing error of each approximation grows as the parallel yield shock increases. Duration error is roughly quadratic in Δy; adding convexity leaves a much smaller residual (higher-order terms).</p>
+      <div class="card">
+        <div id="errorChart" style="width:100%; height:360px;"></div>
+      </div>
+    </section>
+
+    <!-- Cashflow schedule -->
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Cash-Flow Schedule &amp; Duration Weights</span></div>
+      <p class="section-desc">Each bar is a coupon (plus principal at maturity). Opacity / secondary series shows the present-value weight of that cash flow — the building blocks of Macaulay duration.</p>
+      <div class="card">
+        <div id="cfChart" style="width:100%; height:340px;"></div>
+      </div>
+    </section>
+
+    <!-- Formula reference -->
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Bond Price (periodic)</div>
+        <div class="f-math">P = Σ<sub>k=1…N</sub> C / (1 + y/f)<sup>k</sup>  +  Face / (1 + y/f)<sup>N</sup></div>
+        <div class="f-note">C = (coupon rate × Face) / f · N = maturity × f · y = annual YTM · f = payments per year. Assumes settlement on a coupon date.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Macaulay Duration</div>
+        <div class="f-math">MacD = (1/P) · Σ<sub>k</sub> t<sub>k</sub> · PV(CF<sub>k</sub>)</div>
+        <div class="f-note">Weighted-average time to receipt of cash flows, weights = PV of each cash flow / price. Measured in years.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Modified Duration &amp; DV01</div>
+        <div class="f-math">D<sub>mod</sub> = MacD / (1 + y/f)</div>
+        <div class="f-math">DV01 ≈ D<sub>mod</sub> · P · 0.0001</div>
+        <div class="f-note">Modified duration scales Macaulay duration so that −D<sub>mod</sub> × Δy approximates the percentage price change. DV01 is the (approximate) dollar change for a 1 basis-point rise in yield.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Convexity (periodic)</div>
+        <div class="f-math">Conv = (1/P) · Σ<sub>k</sub> [ t<sub>k</sub>(t<sub>k</sub>+1/f) · PV(CF<sub>k</sub>) ] / (1 + y/f)²</div>
+        <div class="f-note">Second derivative of price w.r.t. yield, scaled for use in the percentage-change formula below.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Taylor Approximations</div>
+        <div class="f-math">ΔP/P ≈ − D<sub>mod</sub> · Δy</div>
+        <div class="f-math">ΔP/P ≈ − D<sub>mod</sub> · Δy  +  ½ · Convexity · (Δy)²</div>
+        <div class="f-note">Δy is the decimal yield change (e.g. 0.01 for +100 bp). Duration is the first-order (linear) term; convexity supplies the second-order correction that captures the curvature of the price–yield curve.</div>
+      </div>
+    </section>
+
+    <!-- Education -->
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Why Duration &amp; Convexity Matter</span></div>
+
+      <details class="disclosure" open>
+        <summary>Duration is a first-order approximation</summary>
+        <div class="disclosure-body">
+          <p>Modified duration tells you the <i>slope</i> of the price–yield curve at the current yield. For an infinitesimal yield change the linear (tangent) approximation is exact. For any finite move the curve’s convexity means the true price change differs from −D<sub>mod</sub>·Δy. Because the price–yield relationship is convex (curves upward), duration systematically <b>underestimates</b> the price rise when yields fall and <b>overestimates</b> the price decline when yields rise.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Convexity improves the estimate</summary>
+        <div class="disclosure-body">
+          <p>Adding the ½·Convexity·(Δy)² term captures the curvature. For moderate shocks (roughly ±50–150 bp for typical coupon bonds) the two-term expansion is already very accurate. Residual error comes from third- and higher-order derivatives of the price function. Longer-maturity, lower-coupon bonds have higher convexity and therefore benefit more from the second-order correction.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Coupon, maturity, duration &amp; convexity relationships</summary>
+        <div class="disclosure-body">
+          <p><b>Higher coupon</b> → more cash flow arrives earlier → lower Macaulay duration and lower convexity.</p>
+          <p><b>Longer maturity</b> → cash flows stretched further out → higher duration and higher convexity (all else equal).</p>
+          <p><b>Higher yield</b> → heavier discounting of distant cash flows → lower duration and convexity.</p>
+          <p>Zero-coupon bonds have Macaulay duration equal to maturity — the maximum possible for a given final payment date.</p>
+        </div>
+      </details>
+
+      <details class="disclosure">
+        <summary>DV01 in practice</summary>
+        <div class="disclosure-body">
+          <p>DV01 (dollar value of one basis point) is the risk-management workhorse: it converts duration into a cash sensitivity that can be summed across positions. A portfolio DV01 of $50 000 means an approximate $50 000 loss for a parallel +1 bp yield rise (and the opposite for a fall). Because it is still a linear approximation, large yield moves or pronounced curve reshaping require convexity or full revaluation.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational fixed-income tool. Assumes regular coupon schedule, settlement on a coupon date, and a flat yield used for discounting every cash flow (YTM). No day-count conventions, accrued interest, or credit considerations. Not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   BOND PRICE, DURATION & CONVEXITY VISUALIZER
+   ===================================================================== */
+
+const els = {
+  face: document.getElementById('face'),
+  coupon: document.getElementById('coupon'),
+  freq: document.getElementById('freq'),
+  maturity: document.getElementById('maturity'),
+  v_mat: document.getElementById('v_mat'),
+  ytm: document.getElementById('ytm'),
+  v_ytm: document.getElementById('v_ytm'),
+  shock: document.getElementById('shock'),
+  v_shock: document.getElementById('v_shock'),
+  yMin: document.getElementById('yMin'),
+  yMax: document.getElementById('yMax'),
+  statusLine: document.getElementById('statusLine'),
+  convBadge: document.getElementById('convBadge'),
+};
+
+function inputs() {
+  return {
+    face: Math.max(parseFloat(els.face.value) || 100, 1),
+    cpn: Math.max(parseFloat(els.coupon.value) || 0, 0) / 100,
+    f: parseInt(els.freq.value, 10) || 2,
+    T: Math.max(parseFloat(els.maturity.value) || 1, 0.25),
+    y: Math.max(parseFloat(els.ytm.value) || 0.01, 0.0001) / 100,
+    shockBp: parseFloat(els.shock.value) || 0,
+  };
+}
+
+/* ---------------------------------------------------------------------
+   CORE BOND MATH
+   --------------------------------------------------------------------- */
+function bondCashflows(face, cpn, f, T) {
+  const N = Math.max(1, Math.round(T * f));
+  const dt = 1 / f;
+  const couponPmt = (cpn * face) / f;
+  const times = [];
+  const cfs = [];
+  for (let k = 1; k <= N; k++) {
+    times.push(k * dt);
+    cfs.push(k === N ? couponPmt + face : couponPmt);
+  }
+  return { times, cfs, N, dt, couponPmt };
+}
+
+function bondPrice(face, cpn, f, T, y) {
+  const { times, cfs } = bondCashflows(face, cpn, f, T);
+  const r = y / f; // periodic yield
+  let P = 0;
+  for (let i = 0; i < cfs.length; i++) {
+    const k = (i + 1); // period index
+    P += cfs[i] / Math.pow(1 + r, k);
+  }
+  return P;
+}
+
+function bondMetrics(face, cpn, f, T, y) {
+  const { times, cfs, N } = bondCashflows(face, cpn, f, T);
+  const r = y / f;
+  let P = 0;
+  let sumW = 0;       // for MacD: Σ t * PV
+  let sumConv = 0;    // Σ t(t+dt)*PV
+  const pvs = [];
+  for (let i = 0; i < cfs.length; i++) {
+    const k = i + 1;
+    const pv = cfs[i] / Math.pow(1 + r, k);
+    pvs.push(pv);
+    P += pv;
+    const t = times[i];
+    sumW += t * pv;
+    sumConv += t * (t + 1 / f) * pv;
+  }
+  const macD = P > 0 ? sumW / P : 0;
+  const modD = macD / (1 + r);
+  const conv = P > 0 ? sumConv / (P * Math.pow(1 + r, 2)) : 0;
+  const dv01 = modD * P * 0.0001;
+  return { price: P, macD, modD, conv, dv01, pvs, times, cfs };
+}
+
+function approxPrice(P0, modD, conv, dy) {
+  // dy in decimal
+  const durApprox = P0 * (1 - modD * dy);
+  const convApprox = P0 * (1 - modD * dy + 0.5 * conv * dy * dy);
+  return { durApprox, convApprox };
+}
+
+/* ---------------------------------------------------------------------
+   RENDER HELPERS
+   --------------------------------------------------------------------- */
+function fmt(x, d = 2) {
+  if (!isFinite(x)) return '—';
+  return x.toFixed(d);
+}
+function fmtMoney(x, d = 4) {
+  if (!isFinite(x)) return '—';
+  return x.toFixed(d);
+}
+
+function plotlyLayoutBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 60, r: 24, t: 24, b: 48 },
+    xaxis: { gridcolor: '#1A1C22', zerolinecolor: '#242730', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', zerolinecolor: '#242730', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.12, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE', family: 'JetBrains Mono, monospace' } },
+  }, extra || {});
+}
+const CFG = { displayModeBar: false, responsive: true };
+
+/* ---------------------------------------------------------------------
+   FULL RENDER
+   --------------------------------------------------------------------- */
+function fullRender() {
+  const inp = inputs();
+  const baseY = inp.y;
+  const shockY = baseY + inp.shockBp / 10000;
+  const m0 = bondMetrics(inp.face, inp.cpn, inp.f, inp.T, baseY);
+  const m1 = bondMetrics(inp.face, inp.cpn, inp.f, inp.T, shockY);
+  const dy = shockY - baseY;
+  const approx = approxPrice(m0.price, m0.modD, m0.conv, dy);
+
+  // Labels
+  els.v_mat.textContent = inp.T.toFixed(1);
+  els.v_ytm.textContent = (baseY * 100).toFixed(2);
+  els.v_shock.textContent = (inp.shockBp >= 0 ? '+' : '') + inp.shockBp;
+  const freqLabel = {1:'Annual',2:'Semi-annual',4:'Quarterly',12:'Monthly'}[inp.f] || '';
+  els.convBadge.textContent = `${freqLabel} · Clean price`;
+
+  // KPIs
+  const kpis = [
+    { label: 'Bond Price', value: fmtMoney(m0.price, 4), sub: `Face ${inp.face}`, cls: '' },
+    { label: 'Macaulay Duration', value: fmt(m0.macD, 3) + ' y', sub: 'weighted avg life', cls: '' },
+    { label: 'Modified Duration', value: fmt(m0.modD, 3), sub: '−%ΔP per 1% Δy', cls: 'oos' },
+    { label: 'Convexity', value: fmt(m0.conv, 2), sub: 'second-order term', cls: '' },
+    { label: 'DV01', value: fmtMoney(m0.dv01, 5), sub: '≈ $ change for +1 bp', cls: 'profit' },
+    { label: 'Price @ Shock', value: fmtMoney(m1.price, 4), sub: `YTM ${(shockY*100).toFixed(2)}%`, cls: dy > 0 ? 'loss' : (dy < 0 ? 'profit' : '') },
+    { label: 'Exact ΔP', value: (m1.price - m0.price >= 0 ? '+' : '') + fmtMoney(m1.price - m0.price, 4), sub: `${((m1.price/m0.price - 1)*100).toFixed(3)}%`, cls: m1.price >= m0.price ? 'profit' : 'loss' },
+    { label: 'Conv. Approx ΔP', value: (approx.convApprox - m0.price >= 0 ? '+' : '') + fmtMoney(approx.convApprox - m0.price, 4), sub: 'duration + convexity', cls: 'oos' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`
+  ).join('');
+
+  // Price vs Yield chart
+  const yMin = Math.max(0.001, (parseFloat(els.yMin.value) || 0.5) / 100);
+  const yMax = Math.max(yMin + 0.01, (parseFloat(els.yMax.value) || 12) / 100);
+  const nPts = 80;
+  const ys = [], exactP = [], durP = [], convP = [];
+  for (let i = 0; i <= nPts; i++) {
+    const y = yMin + (yMax - yMin) * (i / nPts);
+    ys.push(y * 100);
+    const p = bondPrice(inp.face, inp.cpn, inp.f, inp.T, y);
+    exactP.push(p);
+    const dyy = y - baseY;
+    const a = approxPrice(m0.price, m0.modD, m0.conv, dyy);
+    durP.push(a.durApprox);
+    convP.push(a.convApprox);
+  }
+
+  Plotly.newPlot('priceYieldChart', [
+    { x: ys, y: exactP, mode: 'lines', line: { color: '#4F8EFF', width: 2.5 }, name: 'Exact price' },
+    { x: ys, y: durP, mode: 'lines', line: { color: '#FFC145', width: 2, dash: 'dash' }, name: 'Duration approx' },
+    { x: ys, y: convP, mode: 'lines', line: { color: '#8C7CFF', width: 2, dash: 'dot' }, name: 'Duration + Convexity' },
+    { x: [baseY * 100], y: [m0.price], mode: 'markers', marker: { size: 12, color: '#FFC145', line: { width: 2, color: '#050a14' } }, name: 'Base', hovertemplate: 'Base<br>%{x:.2f}% → %{y:.4f}<extra></extra>' },
+    { x: [shockY * 100], y: [m1.price], mode: 'markers', marker: { size: 11, color: '#8C7CFF', symbol: 'diamond', line: { width: 2, color: '#050a14' } }, name: 'Shocked', hovertemplate: 'Shocked<br>%{x:.2f}% → %{y:.4f}<extra></extra>' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Yield to Maturity (%)', gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Bond Price', gridcolor: '#1A1C22', linecolor: '#242730' },
+  }), CFG);
+
+  // Approx bar comparison
+  const labels = ['Exact', 'Duration only', 'Duration + Conv'];
+  const prices = [m1.price, approx.durApprox, approx.convApprox];
+  const colors = ['#4F8EFF', '#FFC145', '#8C7CFF'];
+  Plotly.newPlot('approxChart', [{
+    x: labels,
+    y: prices,
+    type: 'bar',
+    marker: { color: colors },
+    text: prices.map(p => fmtMoney(p, 4)),
+    textposition: 'outside',
+    hovertemplate: '%{x}<br>%{y:.4f}<extra></extra>',
+  }], plotlyLayoutBase({
+    yaxis: { title: 'Price after shock', gridcolor: '#1A1C22', linecolor: '#242730' },
+    xaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    margin: { l: 55, r: 20, t: 30, b: 40 },
+    title: { text: `Shock = ${inp.shockBp >= 0 ? '+' : ''}${inp.shockBp} bp`, font: { size: 12, color: '#8C90A0' } },
+  }), CFG);
+
+  // Shock table
+  const exactDP = m1.price - m0.price;
+  const durDP = approx.durApprox - m0.price;
+  const convDP = approx.convApprox - m0.price;
+  const rows = [
+    ['Base YTM', `${(baseY*100).toFixed(3)}%`],
+    ['Shocked YTM', `${(shockY*100).toFixed(3)}%`],
+    ['Δy', `${(dy*10000).toFixed(1)} bp`],
+    ['Base Price', fmtMoney(m0.price, 6)],
+    ['Exact Price @ Shock', fmtMoney(m1.price, 6)],
+    ['Exact ΔP', `${exactDP >= 0 ? '+' : ''}${fmtMoney(exactDP, 6)}`],
+    ['Exact ΔP / P', `${((m1.price/m0.price - 1)*100).toFixed(4)}%`],
+    ['Duration Approx ΔP', `${durDP >= 0 ? '+' : ''}${fmtMoney(durDP, 6)}`],
+    ['Duration Error', `${fmtMoney(durDP - exactDP, 6)} (${((durDP - exactDP)/m0.price*100).toFixed(4)}%)`],
+    ['Dur+Conv Approx ΔP', `${convDP >= 0 ? '+' : ''}${fmtMoney(convDP, 6)}`],
+    ['Dur+Conv Error', `${fmtMoney(convDP - exactDP, 6)} (${((convDP - exactDP)/m0.price*100).toFixed(4)}%)`],
+  ];
+  document.getElementById('shockTableBody').innerHTML = rows.map(([a,b]) =>
+    `<tr><td>${a}</td><td class="oos-col">${b}</td></tr>`
+  ).join('');
+
+  // Error vs shock size
+  const shockRange = [];
+  const errDur = [], errConv = [];
+  for (let bp = -300; bp <= 300; bp += 10) {
+    const dyI = bp / 10000;
+    const yI = baseY + dyI;
+    if (yI <= 0.0001) continue;
+    const pExact = bondPrice(inp.face, inp.cpn, inp.f, inp.T, yI);
+    const a = approxPrice(m0.price, m0.modD, m0.conv, dyI);
+    shockRange.push(bp);
+    errDur.push(((a.durApprox - pExact) / m0.price) * 100);
+    errConv.push(((a.convApprox - pExact) / m0.price) * 100);
+  }
+  Plotly.newPlot('errorChart', [
+    { x: shockRange, y: errDur, mode: 'lines', line: { color: '#FFC145', width: 2.5 }, name: 'Duration error (%)' },
+    { x: shockRange, y: errConv, mode: 'lines', line: { color: '#8C7CFF', width: 2.5 }, name: 'Dur+Conv error (%)' },
+    { x: [inp.shockBp], y: [((approx.durApprox - m1.price)/m0.price)*100], mode: 'markers', marker: { size: 10, color: '#FFC145' }, name: 'Current shock (dur)', showlegend: false },
+    { x: [inp.shockBp], y: [((approx.convApprox - m1.price)/m0.price)*100], mode: 'markers', marker: { size: 10, color: '#8C7CFF', symbol: 'diamond' }, name: 'Current shock (conv)', showlegend: false },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Yield shock (bp)', gridcolor: '#1A1C22', linecolor: '#242730', zeroline: true },
+    yaxis: { title: 'Pricing error (% of base price)', gridcolor: '#1A1C22', linecolor: '#242730', zeroline: true },
+  }), CFG);
+
+  // Cashflow chart
+  const cfTimes = m0.times;
+  const cfAmts = m0.cfs;
+  const cfPVs = m0.pvs;
+  Plotly.newPlot('cfChart', [
+    {
+      x: cfTimes, y: cfAmts, type: 'bar', name: 'Cash flow',
+      marker: { color: 'rgba(79,142,255,0.55)' },
+      hovertemplate: 't=%{x:.2f}y<br>CF=%{y:.4f}<extra></extra>',
+    },
+    {
+      x: cfTimes, y: cfPVs, type: 'bar', name: 'PV of cash flow',
+      marker: { color: 'rgba(255,193,69,0.7)' },
+      hovertemplate: 't=%{x:.2f}y<br>PV=%{y:.4f}<extra></extra>',
+    },
+  ], plotlyLayoutBase({
+    barmode: 'group',
+    xaxis: { title: 'Time (years)', gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Amount', gridcolor: '#1A1C22', linecolor: '#242730' },
+  }), CFG);
+
+  els.statusLine.innerHTML = `Price <b>${fmtMoney(m0.price,4)}</b> · MacD <b>${fmt(m0.macD,3)}y</b> · ModD <b>${fmt(m0.modD,3)}</b> · Conv <b>${fmt(m0.conv,2)}</b> · DV01 <b>${fmtMoney(m0.dv01,5)}</b>`;
+}
+
+/* ---------------------------------------------------------------------
+   WIRING
+   --------------------------------------------------------------------- */
+['face','coupon','freq','maturity','ytm','shock','yMin','yMax'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', fullRender);
+  el.addEventListener('change', fullRender);
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  els.face.value = 100;
+  els.coupon.value = 5.00;
+  els.freq.value = 2;
+  els.maturity.value = 10;
+  els.ytm.value = 5.00;
+  els.shock.value = 0;
+  els.yMin.value = 0.5;
+  els.yMax.value = 12;
+  fullRender();
+});
+
+fullRender();
+</script>
+</body>
+</html>

@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Yield Curve & Forward Rate Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C;
+  --bg-2:#0C0E12;
+  --panel:#111318;
+  --panel-2:#15171D;
+  --border:#242730;
+  --border-soft:#1A1C22;
+  --text:#E8E9EE;
+  --text-dim:#8C90A0;
+  --text-faint:#5A5E6B;
+  --accent:#4F8EFF;
+  --accent-dim:#3A6BC4;
+  --oos:#FFC145;
+  --train:#4F8EFF;
+  --profit:#2ED573;
+  --loss:#FF4757;
+  --warn:#F5A623;
+  --bull:#2ED573;
+  --bear:#FF4757;
+  --choppy:#8C7CFF;
+  --crisis:#B00020;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px;
+  --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(255,193,69,0.05), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+
+.app{display:grid; grid-template-columns:340px 1fr; min-height:100vh;}
+@media (max-width:1100px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--accent), var(--oos), var(--accent)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:13px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:16px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600; display:flex; justify-content:space-between; align-items:center;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .tip{cursor:help; border-bottom:1px dotted var(--text-faint);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+input[type=range]::-moz-range-thumb{width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14;}
+select, input[type=number], input[type=text]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;}
+.preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.preset-btn{padding:7px 8px; font-size:11.5px; text-align:center;}
+.preset-btn.active{border-color:var(--accent); color:var(--accent); background:rgba(79,142,255,0.08);}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:26px 32px 60px; max-width:1460px;}
+.page-header{margin-bottom:22px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:28px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:820px; font-size:13.5px;}
+
+.section{margin-top:32px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:17px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-6px 0 14px; max-width:820px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:18px 18px 16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 16px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.warn:before{background:var(--warn);}
+.kpi.loss:before{background:var(--loss);}
+.kpi-label{font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:20px; font-weight:600; margin-top:6px; letter-spacing:-0.3px;}
+.kpi-sub{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+table.data-table th, table.data-table td{padding:7px 9px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left; color:var(--text-dim); font-family:var(--body);}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+table.data-table td.oos-col{color:var(--oos);}
+table.data-table input.rate-edit{width:70px; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:3px 5px; font-family:var(--mono); font-size:12px; text-align:right;}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13.5px; color:var(--text); margin-bottom:6px; overflow-x:auto;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body h5{color:var(--text); font-family:var(--display); font-size:13px; margin:14px 0 4px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.legend-row{display:flex; gap:16px; align-items:center; font-size:12px; color:var(--text-dim); margin-bottom:10px; flex-wrap:wrap;}
+.legend-dot{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px;}
+.legend-line{display:inline-block; width:16px; height:2px; margin-right:6px; vertical-align:middle;}
+
+.footer-note{margin-top:44px; padding-top:18px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.two-col{display:grid; grid-template-columns:1.2fr 1fr; gap:16px;}
+@media (max-width:980px){.two-col{grid-template-columns:1fr;}}
+
+.convention-badge{display:inline-block; font-family:var(--mono); font-size:10.5px; padding:2px 8px; border-radius:20px; border:1px solid rgba(79,142,255,0.4); color:var(--accent); margin-left:8px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">YC</div><div class="brand-name">Yield Curve Lab</div></div>
+    <div class="brand-sub">Spot · Forward · Discount Factors</div>
+
+    <div class="ctrl-group">
+      <h4>Curve Presets</h4>
+      <div class="preset-grid" id="presetGrid">
+        <button class="btn preset-btn active" data-preset="normal">Normal</button>
+        <button class="btn preset-btn" data-preset="flat">Flat</button>
+        <button class="btn preset-btn" data-preset="inverted">Inverted</button>
+        <button class="btn preset-btn" data-preset="humped">Humped</button>
+        <button class="btn preset-btn" data-preset="steep">Steepening</button>
+        <button class="btn preset-btn" data-preset="flatn">Flattening</button>
+      </div>
+      <div class="hint">Click a preset to load a classic shape. You can still drag or edit individual points afterward.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Global Shifts</h4>
+      <div class="field">
+        <div class="field-label"><span>Parallel Shift (bp)</span><span class="val" id="v_parallel">0</span></div>
+        <input type="range" id="parallelShift" min="-200" max="200" step="5" value="0">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Twist (short − long, bp)</span><span class="val" id="v_twist">0</span></div>
+        <input type="range" id="twist" min="-150" max="150" step="5" value="0">
+      </div>
+      <div class="hint">Twist raises short rates and lowers long rates (or vice-versa) to simulate steepening/flattening scenarios.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Convention</h4>
+      <div class="field">
+        <div class="field-label"><span>Compounding</span></div>
+        <select id="compounding">
+          <option value="annual" selected>Annual (educational)</option>
+          <option value="continuous">Continuous</option>
+        </select>
+      </div>
+      <div class="hint">Educational default: DF(T) = 1 / (1 + y)^T. Continuous uses DF(T) = e^(−y·T). All formulas are labeled in the reference section.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Scenario Comparison</h4>
+      <div class="field">
+        <div class="field-label"><span>Show baseline snapshot</span></div>
+        <select id="showBaseline">
+          <option value="1" selected>Yes — compare to last snapshot</option>
+          <option value="0">No</option>
+        </select>
+      </div>
+      <button class="btn" id="snapshotBtn" style="margin-top:4px;">📸 Take Snapshot as Baseline</button>
+      <div class="hint">Snapshot the current curve, then edit rates or apply shifts to see the impact on forwards and discount factors.</div>
+    </div>
+
+    <button class="btn btn-primary" id="resetBtn">Reset to Normal</button>
+    <div class="status-line" id="statusLine">Ready · Annual compounding · Drag points on the yield curve</div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Fixed Income · Term Structure</div>
+      <h1 class="page-title">Interactive Yield Curve &amp; Forward Rate Lab</h1>
+      <p class="page-desc">Build and reshape a synthetic zero curve from 1-month to 30-year maturities. Instantly see how spot rates, discount factors, par yields and implied forward rates respond. Drag curve points, apply parallel shifts and twists, or load classic shapes — all under a transparent educational compounding convention.</p>
+    </div>
+
+    <!-- KPI strip -->
+    <section class="section" id="sec-kpi">
+      <div class="section-head"><span class="section-num">01</span><span class="section-title">Curve Snapshot</span><span class="convention-badge" id="conventionBadge">Annual compounding</span></div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <!-- Yield curve (interactive) -->
+    <section class="section" id="sec-yield">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Zero / Spot Yield Curve</span></div>
+      <p class="section-desc">Drag any marker vertically to change that maturity’s zero rate. The rest of the dashboard updates live. Gold dashed line (if present) is the baseline snapshot.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-line" style="background:var(--accent);"></span>Current zero curve</span>
+          <span><span class="legend-line" style="background:var(--oos); opacity:0.8;"></span>Baseline snapshot</span>
+        </div>
+        <div id="yieldChart" style="width:100%; height:400px;"></div>
+      </div>
+    </section>
+
+    <!-- Forward + Discount side by side -->
+    <section class="section" id="sec-fwd-df">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Forward Curve &amp; Discount Factors</span></div>
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="legend-row">
+            <span><span class="legend-line" style="background:var(--oos);"></span>1Y forward rates</span>
+            <span><span class="legend-line" style="background:var(--choppy);"></span>Instantaneous (approx.)</span>
+          </div>
+          <div id="forwardChart" style="width:100%; height:340px;"></div>
+        </div>
+        <div class="card">
+          <div class="legend-row">
+            <span><span class="legend-line" style="background:var(--profit);"></span>Discount factors</span>
+          </div>
+          <div id="dfChart" style="width:100%; height:340px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Spot / Par / Forward comparison -->
+    <section class="section" id="sec-compare">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Spot · Par · Forward Comparison</span></div>
+      <p class="section-desc">Par yields are the coupon rates that make a fixed-rate bond price at par given the current discount curve. Forward rates are the break-even future rates implied by today’s curve.</p>
+      <div class="card">
+        <div id="compareChart" style="width:100%; height:380px;"></div>
+      </div>
+    </section>
+
+    <!-- Scenario impact -->
+    <section class="section" id="sec-scenario">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Curve-Change Scenario</span></div>
+      <p class="section-desc">Difference between the current curve and the baseline snapshot (if taken). Useful for visualising the impact of a parallel shift, twist, or manual edit on forwards.</p>
+      <div class="card">
+        <div id="scenarioChart" style="width:100%; height:340px;"></div>
+      </div>
+    </section>
+
+    <!-- Data table -->
+    <section class="section" id="sec-table">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Term Structure Table</span></div>
+      <p class="section-desc">Edit any zero rate directly (in %). All dependent quantities recalculate immediately.</p>
+      <div class="card" style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Maturity</th>
+              <th>Years</th>
+              <th>Zero / Spot (%)</th>
+              <th>Discount Factor</th>
+              <th>Par Yield (%)</th>
+              <th>1Y Forward (%)</th>
+              <th>Inst. Fwd (approx %)</th>
+            </tr>
+          </thead>
+          <tbody id="termTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Formula reference -->
+    <section class="section" id="sec-formulas">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Discount Factor (Annual Compounding)</div>
+        <div class="f-math">DF(T) = 1 / (1 + y(T))^T</div>
+        <div class="f-note">y(T) is the annually compounded zero rate for maturity T (in years). This is the educational convention used by default.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Discount Factor (Continuous Compounding)</div>
+        <div class="f-math">DF(T) = e^(−y(T) · T)</div>
+        <div class="f-note">Available via the compounding selector. Continuous rates are common in theoretical work and some derivatives pricing.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Simply-Compounded Forward Rate</div>
+        <div class="f-math">(1 + y₂)^T₂ = (1 + y₁)^T₁ · (1 + f)^(T₂ − T₁)</div>
+        <div class="f-math">⇒  f = [ (1 + y₂)^T₂ / (1 + y₁)^T₁ ]^(1/(T₂−T₁)) − 1</div>
+        <div class="f-note">f is the forward rate from T₁ to T₂ implied by today’s zero curve (annual compounding).</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Approximate Instantaneous Forward</div>
+        <div class="f-math">f_inst(T) ≈ − d(ln DF) / dT   (finite-difference approximation)</div>
+        <div class="f-note">Computed between adjacent maturities as a practical discrete approximation to the instantaneous forward rate.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Par Yield (Annual Coupon)</div>
+        <div class="f-math">c = (1 − DF(T)) / Σ DF(tᵢ)</div>
+        <div class="f-note">Coupon rate that makes a bond with annual coupons and maturity T price at par given the discount curve.</div>
+      </div>
+    </section>
+
+    <!-- Educational -->
+    <section class="section" id="sec-edu">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Understanding the Term Structure</span></div>
+
+      <details class="disclosure" open>
+        <summary>Normal, Flat &amp; Inverted Curves</summary>
+        <div class="disclosure-body">
+          <p><b>Normal (upward-sloping)</b> curves are the historical average shape: longer-dated rates sit above shorter-dated rates, reflecting term premium and expectations of growth/inflation.</p>
+          <p><b>Flat</b> curves appear when the market expects little change in the policy rate path or when a transition between regimes is underway.</p>
+          <p><b>Inverted</b> curves (short rates above long rates) have often preceded recessions. They typically price expected future rate cuts. Inversion does not guarantee a recession, but it is one of the more reliable leading indicators in the historical record.</p>
+          <p><b>Humped</b> shapes can arise from a combination of near-term rate expectations and a longer-term term premium.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Spot vs Par vs Forward Rates</summary>
+        <div class="disclosure-body">
+          <p><b>Spot / zero rates</b> are the yields on zero-coupon instruments. They are the fundamental building blocks of the discount curve.</p>
+          <p><b>Par yields</b> are the coupon rates that make a fixed-rate bond price exactly at par. They are what you typically observe in the coupon bond market and are often quoted as “the yield curve” in practice. Par yields lie close to but are not identical to zero rates.</p>
+          <p><b>Forward rates</b> are the future rates implied by today’s curve that make investors indifferent between locking in a long-term zero and rolling shorter zeros. They are <i>break-even</i> rates, not forecasts that the market “expects” in a statistical sense, and they are certainly not guarantees of future realised rates.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Why Forward Rates Are Not Guarantees</summary>
+        <div class="disclosure-body">
+          <p>A 1-year forward rate starting in 5 years is simply the rate that equates the return of a 6-year zero with the return of a 5-year zero rolled into a 1-year investment. It embeds expectations, risk premia, and liquidity preferences. Realised future rates can (and usually do) differ substantially from today’s implied forwards. Treating the forward curve as a pure forecast is a common source of confusion.</p>
+        </div>
+      </details>
+
+      <details class="disclosure">
+        <summary>Discount Factors &amp; Pricing</summary>
+        <div class="disclosure-body">
+          <p>Once you have a complete set of discount factors, any fixed cash-flow instrument can be valued as the sum of those cash flows multiplied by the corresponding DFs. This is why the zero curve (or its equivalent discount curve) is the central object in fixed-income pricing. Changing a single zero rate changes the entire set of implied forwards and the value of every instrument that depends on that part of the curve.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational fixed-income tool. The curve is synthetic and illustrative. Compounding conventions are simplified for teaching clarity. Nothing here constitutes investment advice or a pricing model suitable for live trading or risk management.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   INTERACTIVE YIELD CURVE & FORWARD RATE LAB
+   ===================================================================== */
+
+const MATURITIES = [
+  { label: '1M',  T: 1/12 },
+  { label: '3M',  T: 0.25 },
+  { label: '6M',  T: 0.5 },
+  { label: '1Y',  T: 1 },
+  { label: '2Y',  T: 2 },
+  { label: '3Y',  T: 3 },
+  { label: '5Y',  T: 5 },
+  { label: '7Y',  T: 7 },
+  { label: '10Y', T: 10 },
+  { label: '15Y', T: 15 },
+  { label: '20Y', T: 20 },
+  { label: '30Y', T: 30 },
+];
+
+// Preset zero rates in percent
+const PRESETS = {
+  normal:  [4.85, 4.90, 4.95, 5.00, 4.70, 4.55, 4.40, 4.35, 4.30, 4.25, 4.20, 4.15],
+  flat:    [4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50],
+  inverted:[5.40, 5.35, 5.25, 5.10, 4.70, 4.40, 4.10, 3.95, 3.80, 3.70, 3.65, 3.60],
+  humped:  [4.20, 4.40, 4.70, 5.10, 5.25, 5.15, 4.90, 4.70, 4.50, 4.35, 4.25, 4.20],
+  steep:   [3.80, 3.90, 4.05, 4.25, 4.55, 4.80, 5.10, 5.25, 5.40, 5.50, 5.55, 5.60],
+  flatn:   [5.10, 5.05, 5.00, 4.90, 4.70, 4.55, 4.40, 4.30, 4.25, 4.20, 4.18, 4.15],
+};
+
+let zeros = PRESETS.normal.slice();          // current zero rates (%)
+let baseline = null;                         // snapshot zeros (%)
+let compounding = 'annual';
+
+const els = {
+  parallelShift: document.getElementById('parallelShift'),
+  v_parallel: document.getElementById('v_parallel'),
+  twist: document.getElementById('twist'),
+  v_twist: document.getElementById('v_twist'),
+  compounding: document.getElementById('compounding'),
+  showBaseline: document.getElementById('showBaseline'),
+  statusLine: document.getElementById('statusLine'),
+  conventionBadge: document.getElementById('conventionBadge'),
+};
+
+/* ---------------------------------------------------------------------
+   CORE MATH
+   --------------------------------------------------------------------- */
+function df(yPct, T, conv) {
+  const y = yPct / 100;
+  if (T <= 0) return 1;
+  if (conv === 'continuous') return Math.exp(-y * T);
+  return 1 / Math.pow(1 + y, T);
+}
+
+function forwardRate(y1, T1, y2, T2, conv) {
+  // Returns annually compounded forward rate in decimal
+  if (T2 <= T1) return NaN;
+  const df1 = df(y1, T1, conv);
+  const df2 = df(y2, T2, conv);
+  if (conv === 'continuous') {
+    // continuous forward ≈ (y2*T2 - y1*T1)/(T2-T1)
+    return (y2/100 * T2 - y1/100 * T1) / (T2 - T1);
+  }
+  // annual: (DF1/DF2)^(1/(T2-T1)) - 1
+  return Math.pow(df1 / df2, 1 / (T2 - T1)) - 1;
+}
+
+function instForwardApprox(zerosArr, idx, conv) {
+  // Finite difference on -ln DF
+  if (idx >= zerosArr.length - 1) return NaN;
+  const T1 = MATURITIES[idx].T;
+  const T2 = MATURITIES[idx + 1].T;
+  const df1 = df(zerosArr[idx], T1, conv);
+  const df2 = df(zerosArr[idx + 1], T2, conv);
+  return -(Math.log(df2) - Math.log(df1)) / (T2 - T1);
+}
+
+function parYield(zerosArr, maturityIdx, conv) {
+  // Annual coupon par yield for maturity T
+  const T = MATURITIES[maturityIdx].T;
+  if (T < 1) {
+    // For sub-annual, approximate with zero
+    return zerosArr[maturityIdx] / 100;
+  }
+  // Sum of DFs for annual payment dates up to T
+  let sumDF = 0;
+  const n = Math.round(T);
+  for (let t = 1; t <= n; t++) {
+    // interpolate zero at integer year t
+    const z = interpZero(zerosArr, t);
+    sumDF += df(z, t, conv);
+  }
+  const dfT = df(zerosArr[maturityIdx], T, conv);
+  if (sumDF <= 0) return NaN;
+  return (1 - dfT) / sumDF;
+}
+
+function interpZero(zerosArr, T) {
+  // Linear interpolation in maturity
+  if (T <= MATURITIES[0].T) return zerosArr[0];
+  if (T >= MATURITIES[MATURITIES.length - 1].T) return zerosArr[zerosArr.length - 1];
+  for (let i = 0; i < MATURITIES.length - 1; i++) {
+    if (T >= MATURITIES[i].T && T <= MATURITIES[i + 1].T) {
+      const w = (T - MATURITIES[i].T) / (MATURITIES[i + 1].T - MATURITIES[i].T);
+      return zerosArr[i] * (1 - w) + zerosArr[i + 1] * w;
+    }
+  }
+  return zerosArr[zerosArr.length - 1];
+}
+
+function computeAll() {
+  const n = zeros.length;
+  const dfs = zeros.map((z, i) => df(z, MATURITIES[i].T, compounding));
+  const pars = zeros.map((_, i) => parYield(zeros, i, compounding) * 100);
+  const fwds1Y = [];
+  const instFwds = [];
+  for (let i = 0; i < n; i++) {
+    // 1Y forward starting at this maturity (if possible)
+    const T1 = MATURITIES[i].T;
+    const T2 = T1 + 1;
+    if (T2 <= MATURITIES[n - 1].T + 0.01) {
+      const y1 = zeros[i];
+      const y2 = interpZero(zeros, T2);
+      fwds1Y.push(forwardRate(y1, T1, y2, T2, compounding) * 100);
+    } else {
+      fwds1Y.push(NaN);
+    }
+    instFwds.push(instForwardApprox(zeros, i, compounding) * 100);
+  }
+  return { dfs, pars, fwds1Y, instFwds };
+}
+
+/* ---------------------------------------------------------------------
+   RENDERING
+   --------------------------------------------------------------------- */
+function fmtPct(x, d = 2) {
+  if (!isFinite(x)) return '—';
+  return x.toFixed(d);
+}
+function fmtDF(x) {
+  if (!isFinite(x)) return '—';
+  return x.toFixed(5);
+}
+
+function renderKPIs(calc) {
+  const z2 = zeros[MATURITIES.findIndex(m => m.label === '2Y')];
+  const z10 = zeros[MATURITIES.findIndex(m => m.label === '10Y')];
+  const z30 = zeros[MATURITIES.findIndex(m => m.label === '30Y')];
+  const slope = z10 - z2;
+  const level = zeros.reduce((a, b) => a + b, 0) / zeros.length;
+  const maxFwd = Math.max(...calc.fwds1Y.filter(isFinite));
+  const minDF = Math.min(...calc.dfs);
+
+  const cards = [
+    { label: '2s10s Slope', value: (slope >= 0 ? '+' : '') + slope.toFixed(2) + ' bp'.replace('bp','%'), sub: '10Y − 2Y zero', cls: slope < 0 ? 'loss' : 'oos' },
+    { label: 'Curve Level (avg)', value: level.toFixed(2) + '%', sub: 'mean zero rate', cls: '' },
+    { label: 'Max 1Y Forward', value: isFinite(maxFwd) ? maxFwd.toFixed(2) + '%' : '—', sub: 'highest implied 1Y fwd', cls: 'oos' },
+    { label: '30Y Discount Factor', value: fmtDF(calc.dfs[calc.dfs.length - 1]), sub: 'PV of $1 in 30Y', cls: '' },
+  ];
+  // Fix slope unit display
+  cards[0].value = (slope >= 0 ? '+' : '') + slope.toFixed(2) + '%';
+
+  document.getElementById('kpiGrid').innerHTML = cards.map(c =>
+    `<div class="kpi ${c.cls}"><div class="kpi-label">${c.label}</div><div class="kpi-value">${c.value}</div><div class="kpi-sub">${c.sub}</div></div>`
+  ).join('');
+}
+
+function plotlyLayoutBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 55, r: 20, t: 20, b: 45 },
+    xaxis: { gridcolor: '#1A1C22', zerolinecolor: '#242730', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', zerolinecolor: '#242730', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.12, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE', family: 'JetBrains Mono, monospace' } },
+  }, extra || {});
+}
+const PLOTLY_CONFIG = { displayModeBar: false, responsive: true };
+
+function renderYieldChart() {
+  const xs = MATURITIES.map(m => m.T);
+  const labels = MATURITIES.map(m => m.label);
+  const traces = [{
+    x: xs, y: zeros,
+    mode: 'lines+markers',
+    line: { color: '#4F8EFF', width: 2.5 },
+    marker: { size: 10, color: '#4F8EFF', line: { width: 2, color: '#050a14' } },
+    name: 'Zero / Spot',
+    text: labels,
+    hovertemplate: '%{text}<br>%{y:.3f}%<extra></extra>',
+  }];
+
+  if (baseline && els.showBaseline.value === '1') {
+    traces.push({
+      x: xs, y: baseline,
+      mode: 'lines+markers',
+      line: { color: '#FFC145', width: 2, dash: 'dash' },
+      marker: { size: 6, color: '#FFC145' },
+      name: 'Baseline',
+      hovertemplate: 'Baseline<br>%{y:.3f}%<extra></extra>',
+    });
+  }
+
+  const layout = plotlyLayoutBase({
+    xaxis: { title: 'Maturity (years)', type: 'log', gridcolor: '#1A1C22', linecolor: '#242730',
+      tickvals: xs, ticktext: labels },
+    yaxis: { title: 'Zero rate (%)', gridcolor: '#1A1C22', linecolor: '#242730' },
+    dragmode: false,
+  });
+
+  Plotly.newPlot('yieldChart', traces, layout, PLOTLY_CONFIG).then(gd => {
+    // Enable point dragging
+    let dragging = false;
+    let dragIdx = -1;
+
+    gd.on('plotly_click', () => {}); // keep interactive
+
+    const plotDiv = document.getElementById('yieldChart');
+    plotDiv.onpointerdown = (e) => {
+      const rect = plotDiv.getBoundingClientRect();
+      // Rough hit-test via closest point in data space is complex; use Plotly's built-in
+    };
+
+    // Use Plotly's editable shapes / restyle approach via plotly_relayout is limited.
+    // Instead attach a simple drag handler using mouse events + nearest point.
+    enableCurveDrag(plotDiv, xs, zeros, (idx, newY) => {
+      zeros[idx] = Math.max(0.01, Math.min(15, newY));
+      fullRender(false);
+    });
+  });
+}
+
+function enableCurveDrag(plotDiv, xs, ys, onChange) {
+  // Remove previous listeners by cloning is heavy; just attach once with a flag
+  if (plotDiv._dragEnabled) return;
+  plotDiv._dragEnabled = true;
+
+  let active = false;
+  let idx = -1;
+
+  function dataYFromEvent(e) {
+    const yaxis = plotDiv._fullLayout.yaxis;
+    const bb = plotDiv.getBoundingClientRect();
+    // Approximate using plot area
+    const ya = yaxis;
+    const plotH = ya._height;
+    const plotTop = bb.top + ya._offset;
+    const frac = (e.clientY - plotTop) / plotH;
+    const yRange = ya.range;
+    // range is [min, max] or reversed
+    const yVal = yRange[0] + (1 - frac) * (yRange[1] - yRange[0]);
+    return yVal;
+  }
+
+  function nearestIdx(e) {
+    const xaxis = plotDiv._fullLayout.xaxis;
+    const bb = plotDiv.getBoundingClientRect();
+    const plotW = xaxis._length;
+    const plotLeft = bb.left + xaxis._offset;
+    const frac = (e.clientX - plotLeft) / plotW;
+    // log axis: more involved
+    const logMin = Math.log10(xaxis.range[0]);
+    const logMax = Math.log10(xaxis.range[1]);
+    const logX = logMin + frac * (logMax - logMin);
+    const xVal = Math.pow(10, logX);
+    let best = 0, bestDist = Infinity;
+    xs.forEach((x, i) => {
+      const d = Math.abs(Math.log(x) - Math.log(xVal));
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    return best;
+  }
+
+  plotDiv.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    idx = nearestIdx(e);
+    active = true;
+    plotDiv.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  plotDiv.addEventListener('pointermove', (e) => {
+    if (!active) return;
+    const y = dataYFromEvent(e);
+    if (isFinite(y)) onChange(idx, y);
+  });
+  plotDiv.addEventListener('pointerup', (e) => {
+    active = false;
+    try { plotDiv.releasePointerCapture(e.pointerId); } catch (_) {}
+  });
+}
+
+function renderForwardChart(calc) {
+  const xs = MATURITIES.map(m => m.T);
+  const labels = MATURITIES.map(m => m.label);
+  const traces = [
+    {
+      x: xs, y: calc.fwds1Y,
+      mode: 'lines+markers',
+      line: { color: '#FFC145', width: 2.5 },
+      marker: { size: 7, color: '#FFC145' },
+      name: '1Y Forward',
+      hovertemplate: '%{y:.3f}%<extra>1Y fwd</extra>',
+    },
+    {
+      x: xs, y: calc.instFwds,
+      mode: 'lines+markers',
+      line: { color: '#8C7CFF', width: 2, dash: 'dot' },
+      marker: { size: 5, color: '#8C7CFF' },
+      name: 'Inst. Forward (approx)',
+      hovertemplate: '%{y:.3f}%<extra>inst</extra>',
+    },
+  ];
+  Plotly.newPlot('forwardChart', traces, plotlyLayoutBase({
+    xaxis: { title: 'Start maturity (years)', type: 'log', tickvals: xs, ticktext: labels, gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Forward rate (%)', gridcolor: '#1A1C22', linecolor: '#242730' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderDFChart(calc) {
+  const xs = MATURITIES.map(m => m.T);
+  const labels = MATURITIES.map(m => m.label);
+  Plotly.newPlot('dfChart', [{
+    x: xs, y: calc.dfs,
+    mode: 'lines+markers',
+    line: { color: '#2ED573', width: 2.5 },
+    marker: { size: 7, color: '#2ED573' },
+    name: 'Discount Factor',
+    fill: 'tozeroy',
+    fillcolor: 'rgba(46,213,115,0.08)',
+    hovertemplate: 'DF = %{y:.5f}<extra></extra>',
+  }], plotlyLayoutBase({
+    xaxis: { title: 'Maturity (years)', type: 'log', tickvals: xs, ticktext: labels, gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Discount factor', gridcolor: '#1A1C22', linecolor: '#242730', range: [0, 1.05] },
+  }), PLOTLY_CONFIG);
+}
+
+function renderCompareChart(calc) {
+  const xs = MATURITIES.map(m => m.T);
+  const labels = MATURITIES.map(m => m.label);
+  Plotly.newPlot('compareChart', [
+    { x: xs, y: zeros, mode: 'lines+markers', line: { color: '#4F8EFF', width: 2.5 }, name: 'Zero / Spot', hovertemplate: '%{y:.3f}%<extra>Zero</extra>' },
+    { x: xs, y: calc.pars, mode: 'lines+markers', line: { color: '#2ED573', width: 2 }, name: 'Par Yield', hovertemplate: '%{y:.3f}%<extra>Par</extra>' },
+    { x: xs, y: calc.fwds1Y, mode: 'lines+markers', line: { color: '#FFC145', width: 2, dash: 'dash' }, name: '1Y Forward', hovertemplate: '%{y:.3f}%<extra>1Y Fwd</extra>' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Maturity (years)', type: 'log', tickvals: xs, ticktext: labels, gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Rate (%)', gridcolor: '#1A1C22', linecolor: '#242730' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderScenarioChart(calc) {
+  const xs = MATURITIES.map(m => m.T);
+  const labels = MATURITIES.map(m => m.label);
+  if (!baseline || els.showBaseline.value !== '1') {
+    Plotly.newPlot('scenarioChart', [{
+      x: xs, y: xs.map(() => 0),
+      mode: 'lines',
+      line: { color: '#5A5E6B', width: 1, dash: 'dot' },
+      name: 'No baseline',
+    }], plotlyLayoutBase({
+      xaxis: { title: 'Maturity (years)', type: 'log', tickvals: xs, ticktext: labels, gridcolor: '#1A1C22', linecolor: '#242730' },
+      yaxis: { title: 'Change (bp)', gridcolor: '#1A1C22', linecolor: '#242730' },
+      annotations: [{ text: 'Take a snapshot to enable scenario comparison', showarrow: false, x: 0.5, y: 0.5, xref: 'paper', yref: 'paper', font: { color: '#5A5E6B' } }],
+    }), PLOTLY_CONFIG);
+    return;
+  }
+  const dZero = zeros.map((z, i) => (z - baseline[i]) * 100); // bp
+  // Also show change in 1Y forwards
+  const baseCalc = (() => {
+    const saved = zeros.slice();
+    zeros = baseline.slice();
+    const c = computeAll();
+    zeros = saved;
+    return c;
+  })();
+  const dFwd = calc.fwds1Y.map((f, i) => isFinite(f) && isFinite(baseCalc.fwds1Y[i]) ? (f - baseCalc.fwds1Y[i]) * 100 : NaN);
+
+  Plotly.newPlot('scenarioChart', [
+    { x: xs, y: dZero, mode: 'lines+markers', line: { color: '#4F8EFF', width: 2.5 }, name: 'Δ Zero (bp)', hovertemplate: '%{y:.1f} bp<extra>Zero</extra>' },
+    { x: xs, y: dFwd, mode: 'lines+markers', line: { color: '#FFC145', width: 2, dash: 'dash' }, name: 'Δ 1Y Forward (bp)', hovertemplate: '%{y:.1f} bp<extra>Fwd</extra>' },
+  ], plotlyLayoutBase({
+    xaxis: { title: 'Maturity (years)', type: 'log', tickvals: xs, ticktext: labels, gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { title: 'Change (bp)', gridcolor: '#1A1C22', linecolor: '#242730', zeroline: true, zerolinecolor: '#5A5E6B' },
+  }), PLOTLY_CONFIG);
+}
+
+function renderTable(calc) {
+  const body = document.getElementById('termTableBody');
+  body.innerHTML = MATURITIES.map((m, i) => `
+    <tr>
+      <td>${m.label}</td>
+      <td>${m.T < 1 ? m.T.toFixed(3) : m.T}</td>
+      <td><input class="rate-edit" type="number" step="0.01" min="0.01" max="20" value="${zeros[i].toFixed(3)}" data-idx="${i}"></td>
+      <td>${fmtDF(calc.dfs[i])}</td>
+      <td class="oos-col">${fmtPct(calc.pars[i])}</td>
+      <td>${fmtPct(calc.fwds1Y[i])}</td>
+      <td>${fmtPct(calc.instFwds[i])}</td>
+    </tr>
+  `).join('');
+
+  body.querySelectorAll('.rate-edit').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const i = parseInt(inp.dataset.idx, 10);
+      let v = parseFloat(inp.value);
+      if (!isFinite(v)) v = zeros[i];
+      zeros[i] = Math.max(0.01, Math.min(20, v));
+      fullRender();
+    });
+  });
+}
+
+function fullRender(updateStatus = true) {
+  compounding = els.compounding.value;
+  els.conventionBadge.textContent = compounding === 'annual' ? 'Annual compounding' : 'Continuous compounding';
+  const calc = computeAll();
+  renderKPIs(calc);
+  renderYieldChart();
+  renderForwardChart(calc);
+  renderDFChart(calc);
+  renderCompareChart(calc);
+  renderScenarioChart(calc);
+  renderTable(calc);
+  if (updateStatus) {
+    els.statusLine.innerHTML = `<b>${compounding}</b> compounding · ${MATURITIES.length} tenors · Drag points or edit table`;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   UI WIRING
+   --------------------------------------------------------------------- */
+function applyPreset(name) {
+  zeros = PRESETS[name].slice();
+  // Reset shift sliders visually but don't double-apply
+  els.parallelShift.value = 0;
+  els.twist.value = 0;
+  els.v_parallel.textContent = '0';
+  els.v_twist.textContent = '0';
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
+  fullRender();
+}
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+});
+
+function applyShifts() {
+  // Shifts are applied relative to the active preset base — store base on first shift
+  // Simpler approach: treat current zeros as the working set; sliders show delta from last preset/reset
+  // For clean UX we re-derive from the last loaded preset each time the slider moves.
+}
+
+let lastPresetBase = PRESETS.normal.slice();
+
+function onShiftChange() {
+  const par = parseFloat(els.parallelShift.value) || 0;
+  const tw = parseFloat(els.twist.value) || 0;
+  els.v_parallel.textContent = (par >= 0 ? '+' : '') + par;
+  els.v_twist.textContent = (tw >= 0 ? '+' : '') + tw;
+
+  // Apply to lastPresetBase
+  const n = lastPresetBase.length;
+  zeros = lastPresetBase.map((z, i) => {
+    const T = MATURITIES[i].T;
+    // Twist: positive twist = higher short rates, lower long rates
+    const w = 1 - (Math.log(T + 0.1) - Math.log(MATURITIES[0].T + 0.1)) /
+                  (Math.log(MATURITIES[n-1].T + 0.1) - Math.log(MATURITIES[0].T + 0.1));
+    // w ≈ 1 at short end, 0 at long end
+    const twistEffect = (tw / 100) * (w - 0.5) * 2; // in percent
+    return Math.max(0.01, z + par / 100 + twistEffect);
+  });
+  fullRender();
+}
+
+els.parallelShift.addEventListener('input', onShiftChange);
+els.twist.addEventListener('input', onShiftChange);
+
+els.compounding.addEventListener('change', () => fullRender());
+els.showBaseline.addEventListener('change', () => fullRender());
+
+document.getElementById('snapshotBtn').addEventListener('click', () => {
+  baseline = zeros.slice();
+  els.statusLine.innerHTML = `Baseline snapshot taken · <b>${zeros.map(z => z.toFixed(2)).join(', ')}</b>`;
+  fullRender();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  lastPresetBase = PRESETS.normal.slice();
+  baseline = null;
+  applyPreset('normal');
+});
+
+// When user picks a preset, remember it as the shift base
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    lastPresetBase = PRESETS[btn.dataset.preset].slice();
+  });
+});
+
+/* ---------------------------------------------------------------------
+   INIT
+   --------------------------------------------------------------------- */
+fullRender();
+</script>
+</body>
+</html>

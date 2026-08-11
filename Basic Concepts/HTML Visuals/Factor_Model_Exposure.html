@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Factor Model & Portfolio Exposure Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C; --bg-2:#0C0E12; --panel:#111318; --panel-2:#15171D;
+  --border:#242730; --border-soft:#1A1C22;
+  --text:#E8E9EE; --text-dim:#8C90A0; --text-faint:#5A5E6B;
+  --accent:#4F8EFF; --accent-dim:#3A6BC4; --oos:#FFC145;
+  --profit:#2ED573; --loss:#FF4757; --warn:#F5A623; --choppy:#8C7CFF;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px; --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(46,213,115,0.04), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+.app{display:grid; grid-template-columns:360px 1fr; min-height:100vh;}
+@media (max-width:1150px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--accent), var(--choppy), var(--oos)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:11px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:15px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+select, input[type=number]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+.preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.preset-btn{padding:7px 8px; font-size:11px; text-align:center;}
+.preset-btn.active{border-color:var(--accent); color:var(--accent); background:rgba(79,142,255,0.08);}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.weight-row{display:grid; grid-template-columns:52px 1fr 44px; gap:8px; align-items:center; margin-bottom:8px; font-size:12px;}
+.weight-row .name{font-family:var(--mono); color:var(--text-dim); font-size:11px;}
+.weight-row .pct{font-family:var(--mono); text-align:right; font-weight:600; font-size:11.5px;}
+.weight-row input[type=range]{margin:0;}
+
+.main{padding:22px 28px 60px; max-width:1520px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:26px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:920px; font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px; max-width:920px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px 14px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.profit:before{background:var(--profit);}
+.kpi.loss:before{background:var(--loss);}
+.kpi.warn:before{background:var(--warn);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:17px; font-weight:600; margin-top:5px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:11.5px;}
+table.data-table th, table.data-table td{padding:6px 8px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left;}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+table.data-table input.beta-edit{width:56px; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:3px 4px; font-family:var(--mono); font-size:11px; text-align:right;}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.footer-note{margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; border:1px solid rgba(255,193,69,0.4); color:var(--oos); margin-left:8px;}
+.warn-banner{background:rgba(255,193,69,0.07); border:1px solid rgba(255,193,69,0.28); border-radius:8px; padding:11px 14px; font-size:12.5px; color:var(--oos); margin-bottom:14px; line-height:1.55;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">β</div><div class="brand-name">Factor Lab</div></div>
+    <div class="brand-sub">Exposure · Attribution · Risk</div>
+
+    <div class="ctrl-group">
+      <h4>Portfolio Presets</h4>
+      <div class="preset-grid">
+        <button class="btn preset-btn active" data-p="equal">Equal Weight</button>
+        <button class="btn preset-btn" data-p="market">Market-Heavy</button>
+        <button class="btn preset-btn" data-p="value">Value Tilt</button>
+        <button class="btn preset-btn" data-p="mom">Momentum Tilt</button>
+        <button class="btn preset-btn" data-p="defensive">Defensive</button>
+        <button class="btn preset-btn" data-p="concentrated">Concentrated</button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Portfolio Weights</h4>
+      <div id="weightControls"></div>
+      <div class="hint" id="weightSumHint">Weights are normalized to sum to 100%.</div>
+      <div class="btn-row">
+        <button class="btn" id="btnEqual">Equalize</button>
+        <button class="btn" id="btnLongOnly">Clip ≥ 0</button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Factor Premia (ann. %)</h4>
+      <div class="hint" style="margin-bottom:8px">Expected factor returns used for contribution analysis. Synthetic educational values.</div>
+      <div id="premiaControls"></div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Simulation</h4>
+      <div class="field">
+        <div class="field-label"><span>History (months)</span><span class="val" id="v_months">60</span></div>
+        <input type="range" id="months" min="24" max="120" step="6" value="60">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Idiosyncratic vol scale</span><span class="val" id="v_idio">1.0</span></div>
+        <input type="range" id="idioScale" min="0.3" max="2.5" step="0.1" value="1.0">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Seed</span></div>
+        <input type="number" id="seed" value="7" step="1">
+      </div>
+      <button class="btn btn-primary" id="btnResim" style="margin-top:6px;">Resimulate Factors</button>
+    </div>
+
+    <div class="status-line" id="statusLine">Synthetic factor model · educational</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Asset Pricing · Portfolio Construction</div>
+      <h1 class="page-title">Factor Model &amp; Portfolio Exposure Visualizer</h1>
+      <p class="page-desc">Explore a linear factor model R<sub>i</sub> = α<sub>i</sub> + β<sub>i</sub>′F + ε<sub>i</sub> with synthetic assets and six educational factors. Adjust portfolio weights and loadings to see exposures, return contributions, systematic vs residual risk, and unintended factor bets — all under clearly labelled synthetic data.</p>
+    </div>
+
+    <div class="warn-banner">
+      <b>Synthetic factors only.</b> Market, Size, Value, Momentum, Quality and Low Volatility here are simulated educational series — not published research factors or investable indices. Premia and loadings are illustrative.
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-title">Portfolio Snapshot</span>
+        <span class="badge">SYNTHETIC</span>
+      </div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Factor Exposure Heatmap &amp; Portfolio Betas</span></div>
+      <p class="section-desc">Asset-level loadings (edit cells in the table below). Portfolio beta to each factor is the weight-weighted sum of asset betas.</p>
+      <div class="grid grid-2">
+        <div class="card"><div id="heatChart" style="width:100%;height:360px;"></div></div>
+        <div class="card"><div id="portBetaChart" style="width:100%;height:360px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Factor Return Contribution &amp; Decomposition</span></div>
+      <div class="grid grid-2">
+        <div class="card"><div id="contribChart" style="width:100%;height:320px;"></div></div>
+        <div class="card"><div id="decompChart" style="width:100%;height:320px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Systematic vs Residual Risk</span></div>
+      <p class="section-desc">Portfolio variance is decomposed into factor-driven (systematic) and idiosyncratic (residual) components under a diagonal residual covariance assumption.</p>
+      <div class="grid grid-2">
+        <div class="card"><div id="riskChart" style="width:100%;height:320px;"></div></div>
+        <div class="card"><div id="rsqChart" style="width:100%;height:320px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Asset Loadings &amp; Weights</span></div>
+      <p class="section-desc">Edit any beta or alpha directly. Changes update exposures and risk immediately. Residual vol is annualized idiosyncratic σ(ε).</p>
+      <div class="card" style="overflow-x:auto;">
+        <table class="data-table">
+          <thead id="loadHead"></thead>
+          <tbody id="loadBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Factor Series (recent simulated path)</span></div>
+      <div class="card"><div id="factorPathChart" style="width:100%;height:300px;"></div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Formulas</span></div>
+      <div class="formula-block">
+        <div class="f-title">Linear Factor Model</div>
+        <div class="f-math">R_i = α_i + β_i′ F + ε_i</div>
+        <div class="f-note">F is a vector of factor returns. β_i are factor loadings. ε_i is residual (idiosyncratic) return, assumed uncorrelated across assets in this lab.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Portfolio Exposure</div>
+        <div class="f-math">β_p = Σ_i w_i β_i &nbsp;&nbsp; α_p = Σ_i w_i α_i</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Factor Contribution to Expected Return</div>
+        <div class="f-math">Contribution_k = β_{p,k} · λ_k</div>
+        <div class="f-note">λ_k is the assumed factor premium. E[R_p] ≈ α_p + Σ_k β_{p,k} λ_k.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Risk Decomposition</div>
+        <div class="f-math">Var(R_p) = β_p′ Cov(F) β_p + Σ_i w_i² σ²(ε_i)</div>
+        <div class="f-math">R² ≈ Var_systematic / Var_total</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Concepts</span></div>
+
+      <details class="disclosure" open>
+        <summary>Beta &amp; alpha</summary>
+        <div class="disclosure-body">
+          <p><b>Beta</b> measures sensitivity of an asset (or portfolio) to a factor: a market beta of 1.2 means the asset tends to move 1.2% when the market factor moves 1%, other factors held fixed in the model. <b>Alpha</b> is the intercept — average return not explained by the chosen factors. Positive alpha in-sample is not proof of skill; it can reflect missing factors, noise, or overfitting.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Systematic vs idiosyncratic risk</summary>
+        <div class="disclosure-body">
+          <p><b>Systematic</b> risk is driven by factor shocks shared across assets and does not diversify away when holdings load on the same factors. <b>Idiosyncratic</b> (residual) risk is asset-specific; under the model’s independence assumption it shrinks as the portfolio diversifies. Real residuals can be correlated — another reason this lab is educational rather than a production risk system.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Factor premia &amp; unintended bets</summary>
+        <div class="disclosure-body">
+          <p>A <b>factor premium</b> is the expected return attached to bearing that factor’s risk. Even a “stock picking” portfolio can embed large <b>unintended factor bets</b> (e.g. accidental size or momentum exposure). The exposure bar chart makes those bets visible so they can be sized deliberately or hedged.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational factor-model dashboard. All factor returns, premia and residual risks are synthetic. Not investable indices; not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   FACTOR MODEL & PORTFOLIO EXPOSURE VISUALIZER
+   Synthetic educational factors only
+   ===================================================================== */
+
+const FACTORS = ['Market', 'Size', 'Value', 'Momentum', 'Quality', 'LowVol'];
+const FACTOR_COLORS = {
+  Market: '#4F8EFF', Size: '#8C7CFF', Value: '#FFC145',
+  Momentum: '#FF4757', Quality: '#2ED573', LowVol: '#F5A623',
+};
+
+// Default premia (annualized decimal)
+const DEFAULT_PREMIA = {
+  Market: 0.05, Size: 0.015, Value: 0.02,
+  Momentum: 0.025, Quality: 0.015, LowVol: 0.01,
+};
+
+// Synthetic assets with default loadings [Market, Size, Value, Mom, Qual, LowVol], alpha (ann), resid vol (ann)
+const DEFAULT_ASSETS = [
+  { id: 'AlphaCore',   beta: [1.05, 0.10, 0.05, 0.15, 0.25, 0.05],  alpha: 0.01,  resid: 0.12 },
+  { id: 'ValueCo',     beta: [0.95, 0.35, 0.55,-0.10, 0.05,-0.05],  alpha: 0.005, resid: 0.16 },
+  { id: 'GrowthTech',  beta: [1.25, 0.40,-0.25, 0.45, 0.20,-0.20],  alpha: 0.00,  resid: 0.22 },
+  { id: 'MomentumX',   beta: [1.10, 0.15,-0.05, 0.70, 0.10,-0.10],  alpha: 0.008, resid: 0.18 },
+  { id: 'QualityDef',  beta: [0.75,-0.15, 0.10,-0.05, 0.55, 0.40],  alpha: 0.006, resid: 0.10 },
+  { id: 'SmallValue',  beta: [1.00, 0.70, 0.50, 0.05,-0.05,-0.15],  alpha: 0.004, resid: 0.24 },
+  { id: 'LowVolInc',   beta: [0.55,-0.10, 0.15,-0.15, 0.30, 0.65],  alpha: 0.002, resid: 0.09 },
+  { id: 'Cyclical',    beta: [1.30, 0.25, 0.30, 0.20,-0.10,-0.25],  alpha:-0.002, resid: 0.20 },
+];
+
+let assets = DEFAULT_ASSETS.map(a => ({
+  id: a.id,
+  beta: a.beta.slice(),
+  alpha: a.alpha,
+  resid: a.resid,
+}));
+let weights = assets.map(() => 1 / assets.length);
+let premia = { ...DEFAULT_PREMIA };
+let factorHistory = null; // { months, factors: {name: Float64Array}, assetReturns: {id: Float64Array} }
+
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function randn(rng) {
+  // Box-Muller
+  const u = Math.max(1e-12, rng());
+  const v = Math.max(1e-12, rng());
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+/* ---- Simulation of factor & residual paths ---- */
+function simulate() {
+  const months = parseInt(document.getElementById('months').value, 10) || 60;
+  const idioScale = parseFloat(document.getElementById('idioScale').value) || 1;
+  const seed = parseInt(document.getElementById('seed').value, 10) || 7;
+  const rng = mulberry32(seed >>> 0);
+
+  // Factor monthly vols (rough) and mild correlations via common shock
+  const fVol = {
+    Market: 0.15, Size: 0.10, Value: 0.11,
+    Momentum: 0.14, Quality: 0.09, LowVol: 0.08,
+  };
+  const factors = {};
+  FACTORS.forEach(f => { factors[f] = new Float64Array(months); });
+
+  for (let t = 0; t < months; t++) {
+    const common = randn(rng) * 0.3;
+    FACTORS.forEach(f => {
+      const monthlyVol = fVol[f] / Math.sqrt(12);
+      const mean = premia[f] / 12;
+      factors[f][t] = mean + monthlyVol * (0.85 * randn(rng) + 0.15 * common * 3);
+    });
+  }
+
+  const assetReturns = {};
+  assets.forEach((a, ai) => {
+    const r = new Float64Array(months);
+    const epsVol = (a.resid * idioScale) / Math.sqrt(12);
+    for (let t = 0; t < months; t++) {
+      let sys = a.alpha / 12;
+      FACTORS.forEach((f, fi) => { sys += a.beta[fi] * factors[f][t]; });
+      r[t] = sys + epsVol * randn(rng);
+    }
+    assetReturns[a.id] = r;
+  });
+
+  factorHistory = { months, factors, assetReturns };
+  return factorHistory;
+}
+
+/* ---- Portfolio math ---- */
+function normalizedWeights() {
+  const sum = weights.reduce((s, w) => s + w, 0);
+  if (Math.abs(sum) < 1e-12) return weights.map(() => 0);
+  return weights.map(w => w / sum);
+}
+
+function portfolioBetas(w) {
+  return FACTORS.map((_, fi) =>
+    assets.reduce((s, a, i) => s + w[i] * a.beta[fi], 0)
+  );
+}
+
+function portfolioAlpha(w) {
+  return assets.reduce((s, a, i) => s + w[i] * a.alpha, 0);
+}
+
+function factorCov(hist) {
+  // Sample covariance of monthly factor returns → annualized
+  const n = hist.months;
+  const k = FACTORS.length;
+  const means = FACTORS.map(f => {
+    let s = 0;
+    for (let t = 0; t < n; t++) s += hist.factors[f][t];
+    return s / n;
+  });
+  const cov = Array.from({ length: k }, () => new Float64Array(k));
+  for (let i = 0; i < k; i++) {
+    for (let j = i; j < k; j++) {
+      let s = 0;
+      for (let t = 0; t < n; t++) {
+        s += (hist.factors[FACTORS[i]][t] - means[i]) * (hist.factors[FACTORS[j]][t] - means[j]);
+      }
+      const c = (s / Math.max(1, n - 1)) * 12; // annualize
+      cov[i][j] = c;
+      cov[j][i] = c;
+    }
+  }
+  return cov;
+}
+
+function riskDecomp(w, hist) {
+  const b = portfolioBetas(w);
+  const cov = factorCov(hist);
+  let sysVar = 0;
+  for (let i = 0; i < FACTORS.length; i++) {
+    for (let j = 0; j < FACTORS.length; j++) {
+      sysVar += b[i] * cov[i][j] * b[j];
+    }
+  }
+  const idioScale = parseFloat(document.getElementById('idioScale').value) || 1;
+  let idioVar = 0;
+  assets.forEach((a, i) => {
+    idioVar += w[i] * w[i] * Math.pow(a.resid * idioScale, 2);
+  });
+  const totVar = sysVar + idioVar;
+  const rsq = totVar > 0 ? sysVar / totVar : 0;
+  return {
+    sysVol: Math.sqrt(Math.max(0, sysVar)),
+    idioVol: Math.sqrt(Math.max(0, idioVar)),
+    totVol: Math.sqrt(Math.max(0, totVar)),
+    rsq,
+    betas: b,
+  };
+}
+
+function expectedReturn(w) {
+  const a = portfolioAlpha(w);
+  const b = portfolioBetas(w);
+  let fr = 0;
+  FACTORS.forEach((f, i) => { fr += b[i] * premia[f]; });
+  return { alpha: a, factor: fr, total: a + fr, contrib: FACTORS.map((f, i) => b[i] * premia[f]) };
+}
+
+/* ---- UI: weights & premia & table ---- */
+function buildWeightControls() {
+  const el = document.getElementById('weightControls');
+  el.innerHTML = assets.map((a, i) => `
+    <div class="weight-row">
+      <span class="name">${a.id.slice(0, 8)}</span>
+      <input type="range" min="0" max="100" step="1" value="${Math.round(weights[i] * 100)}" data-i="${i}" class="w-slider">
+      <span class="pct" id="wpct-${i}">${(weights[i] * 100).toFixed(0)}%</span>
+    </div>
+  `).join('');
+  el.querySelectorAll('.w-slider').forEach(sl => {
+    sl.addEventListener('input', () => {
+      const i = parseInt(sl.dataset.i, 10);
+      weights[i] = parseFloat(sl.value) / 100;
+      // normalize display but keep relative
+      const s = weights.reduce((a, b) => a + b, 0) || 1;
+      document.getElementById(`wpct-${i}`).textContent = ((weights[i] / s) * 100).toFixed(0) + '%';
+      document.getElementById('weightSumHint').textContent =
+        `Raw sum ${(s * 100).toFixed(0)}% · normalized in calculations.`;
+      render();
+    });
+  });
+}
+
+function buildPremiaControls() {
+  const el = document.getElementById('premiaControls');
+  el.innerHTML = FACTORS.map(f => `
+    <div class="field">
+      <div class="field-label"><span>${f}</span><span class="val" id="v_prem_${f}">${(premia[f] * 100).toFixed(1)}%</span></div>
+      <input type="range" min="-5" max="12" step="0.5" value="${(premia[f] * 100).toFixed(1)}" data-f="${f}" class="prem-slider">
+    </div>
+  `).join('');
+  el.querySelectorAll('.prem-slider').forEach(sl => {
+    sl.addEventListener('input', () => {
+      const f = sl.dataset.f;
+      premia[f] = parseFloat(sl.value) / 100;
+      document.getElementById(`v_prem_${f}`).textContent = parseFloat(sl.value).toFixed(1) + '%';
+      render();
+    });
+  });
+}
+
+function buildLoadTable() {
+  document.getElementById('loadHead').innerHTML = `<tr>
+    <th>Asset</th><th>Weight</th><th>α (ann)</th>
+    ${FACTORS.map(f => `<th>${f}</th>`).join('')}
+    <th>σ(ε)</th><th>R² (asset)</th>
+  </tr>`;
+
+  const w = normalizedWeights();
+  const hist = factorHistory;
+  const cov = factorCov(hist);
+
+  document.getElementById('loadBody').innerHTML = assets.map((a, i) => {
+    // asset R²
+    let sysV = 0;
+    for (let x = 0; x < FACTORS.length; x++)
+      for (let y = 0; y < FACTORS.length; y++)
+        sysV += a.beta[x] * cov[x][y] * a.beta[y];
+    const idV = Math.pow(a.resid * (parseFloat(document.getElementById('idioScale').value) || 1), 2);
+    const r2 = (sysV + idV) > 0 ? sysV / (sysV + idV) : 0;
+
+    return `<tr>
+      <td>${a.id}</td>
+      <td>${(w[i] * 100).toFixed(1)}%</td>
+      <td><input class="beta-edit" type="number" step="0.001" value="${a.alpha.toFixed(3)}" data-a="${i}" data-field="alpha"></td>
+      ${a.beta.map((b, fi) =>
+        `<td><input class="beta-edit" type="number" step="0.05" value="${b.toFixed(2)}" data-a="${i}" data-field="beta" data-fi="${fi}"></td>`
+      ).join('')}
+      <td><input class="beta-edit" type="number" step="0.01" value="${a.resid.toFixed(2)}" data-a="${i}" data-field="resid"></td>
+      <td>${(r2 * 100).toFixed(0)}%</td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('.beta-edit').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const ai = parseInt(inp.dataset.a, 10);
+      const field = inp.dataset.field;
+      const v = parseFloat(inp.value);
+      if (!isFinite(v)) return;
+      if (field === 'alpha') assets[ai].alpha = v;
+      else if (field === 'resid') assets[ai].resid = Math.max(0.01, v);
+      else if (field === 'beta') assets[ai].beta[parseInt(inp.dataset.fi, 10)] = v;
+      simulate();
+      render();
+    });
+  });
+}
+
+/* ---- Presets ---- */
+const WEIGHT_PRESETS = {
+  equal: () => assets.map(() => 1 / assets.length),
+  market: () => {
+    // overweight high market beta
+    const raw = assets.map(a => Math.max(0.05, a.beta[0]));
+    const s = raw.reduce((a, b) => a + b, 0);
+    return raw.map(x => x / s);
+  },
+  value: () => {
+    const raw = assets.map(a => Math.max(0.05, 0.3 + a.beta[2]));
+    const s = raw.reduce((a, b) => a + b, 0);
+    return raw.map(x => x / s);
+  },
+  mom: () => {
+    const raw = assets.map(a => Math.max(0.05, 0.3 + a.beta[3]));
+    const s = raw.reduce((a, b) => a + b, 0);
+    return raw.map(x => x / s);
+  },
+  defensive: () => {
+    const raw = assets.map(a => Math.max(0.05, 0.4 + a.beta[5] + 0.5 * a.beta[4] - 0.3 * a.beta[0]));
+    const s = raw.reduce((a, b) => a + b, 0);
+    return raw.map(x => x / s);
+  },
+  concentrated: () => {
+    const w = assets.map(() => 0.02);
+    w[0] = 0.35; w[2] = 0.30; w[3] = 0.25;
+    const s = w.reduce((a, b) => a + b, 0);
+    return w.map(x => x / s);
+  },
+};
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+    weights = WEIGHT_PRESETS[btn.dataset.p]();
+    buildWeightControls();
+    render();
+  });
+});
+
+document.getElementById('btnEqual').onclick = () => {
+  weights = assets.map(() => 1 / assets.length);
+  buildWeightControls();
+  render();
+};
+document.getElementById('btnLongOnly').onclick = () => {
+  weights = weights.map(w => Math.max(0, w));
+  const s = weights.reduce((a, b) => a + b, 0) || 1;
+  weights = weights.map(w => w / s);
+  buildWeightControls();
+  render();
+};
+
+document.getElementById('months').addEventListener('input', () => {
+  document.getElementById('v_months').textContent = document.getElementById('months').value;
+});
+document.getElementById('idioScale').addEventListener('input', () => {
+  document.getElementById('v_idio').textContent = parseFloat(document.getElementById('idioScale').value).toFixed(1);
+  render();
+});
+document.getElementById('btnResim').onclick = () => { simulate(); render(); };
+
+/* ---- Render ---- */
+function fmt(x, d=2) { return isFinite(x) ? Number(x).toFixed(d) : '—'; }
+function pct(x, d=1) { return isFinite(x) ? (x * 100).toFixed(d) + '%' : '—'; }
+
+function plotlyBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 55, r: 20, t: 28, b: 48 },
+    xaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.14, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE' } },
+  }, extra || {});
+}
+const PCFG = { displayModeBar: false, responsive: true };
+
+function render() {
+  if (!factorHistory) simulate();
+  const w = normalizedWeights();
+  const risk = riskDecomp(w, factorHistory);
+  const exp = expectedReturn(w);
+  const betas = risk.betas;
+
+  // KPIs
+  const kpis = [
+    { l: 'E[R] portfolio', v: pct(exp.total, 2), s: `α ${pct(exp.alpha,2)} + factors ${pct(exp.factor,2)}`, c: 'oos' },
+    { l: 'Portfolio σ', v: pct(risk.totVol, 1), s: 'ann. model vol', c: '' },
+    { l: 'Systematic σ', v: pct(risk.sysVol, 1), s: 'factor-driven', c: '' },
+    { l: 'Residual σ', v: pct(risk.idioVol, 1), s: 'idiosyncratic', c: '' },
+    { l: 'R²', v: pct(risk.rsq, 1), s: 'sys / total var', c: risk.rsq > 0.7 ? 'profit' : 'warn' },
+    { l: 'Market β', v: fmt(betas[0], 2), s: 'portfolio', c: '' },
+    { l: 'Value β', v: fmt(betas[2], 2), s: 'unintended?', c: Math.abs(betas[2]) > 0.25 ? 'warn' : '' },
+    { l: 'Momentum β', v: fmt(betas[3], 2), s: 'unintended?', c: Math.abs(betas[3]) > 0.25 ? 'warn' : '' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
+  ).join('');
+
+  // Heatmap of betas
+  const z = assets.map(a => a.beta.slice());
+  Plotly.newPlot('heatChart', [{
+    z,
+    x: FACTORS,
+    y: assets.map(a => a.id),
+    type: 'heatmap',
+    colorscale: [
+      [0, '#FF4757'], [0.45, '#1A1C22'], [0.55, '#1A1C22'], [1, '#2ED573'],
+    ],
+    zmid: 0,
+    colorbar: { title: 'β', thickness: 12, tickfont: { color: '#8C90A0', size: 10 } },
+    hovertemplate: '%{y} · %{x}<br>β=%{z:.2f}<extra></extra>',
+  }], plotlyBase({
+    title: { text: 'Asset factor loadings (synthetic)', font: { size: 12, color: '#8C90A0' } },
+    margin: { l: 90, r: 20, t: 36, b: 48 },
+  }), PCFG);
+
+  // Portfolio betas bar
+  Plotly.newPlot('portBetaChart', [{
+    x: FACTORS,
+    y: betas,
+    type: 'bar',
+    marker: { color: FACTORS.map(f => FACTOR_COLORS[f]) },
+    text: betas.map(b => fmt(b, 2)),
+    textposition: 'outside',
+  }], plotlyBase({
+    title: { text: 'Portfolio factor exposure β_p', font: { size: 12, color: '#8C90A0' } },
+    yaxis: { title: 'Beta', zeroline: true, zerolinecolor: '#5A5E6B' },
+  }), PCFG);
+
+  // Factor contribution to expected return
+  Plotly.newPlot('contribChart', [{
+    x: [...FACTORS, 'Alpha'],
+    y: [...exp.contrib.map(c => c * 100), exp.alpha * 100],
+    type: 'bar',
+    marker: { color: [...FACTORS.map(f => FACTOR_COLORS[f]), '#E8E9EE'] },
+    text: [...exp.contrib, exp.alpha].map(c => (c * 100).toFixed(2)),
+    textposition: 'outside',
+  }], plotlyBase({
+    title: { text: 'Expected return contribution (ann. % pts)', font: { size: 12, color: '#8C90A0' } },
+    yaxis: { title: '%' },
+  }), PCFG);
+
+  // Asset return decomposition (expected): weight * (alpha + sum beta*premia)
+  const assetExp = assets.map((a, i) => {
+    let fr = a.alpha;
+    FACTORS.forEach((f, fi) => { fr += a.beta[fi] * premia[f]; });
+    return { id: a.id, total: fr * 100, weighted: w[i] * fr * 100 };
+  });
+  Plotly.newPlot('decompChart', [
+    {
+      x: assetExp.map(a => a.id),
+      y: assetExp.map(a => a.total),
+      type: 'bar',
+      name: 'Asset E[R] %',
+      marker: { color: 'rgba(79,142,255,0.7)' },
+    },
+    {
+      x: assetExp.map(a => a.id),
+      y: assetExp.map(a => a.weighted),
+      type: 'bar',
+      name: 'Weighted contrib %',
+      marker: { color: 'rgba(255,193,69,0.8)' },
+    },
+  ], plotlyBase({
+    barmode: 'group',
+    title: { text: 'Asset expected returns & portfolio contribution', font: { size: 12, color: '#8C90A0' } },
+    yaxis: { title: '%' },
+  }), PCFG);
+
+  // Risk stacked
+  Plotly.newPlot('riskChart', [{
+    x: ['Systematic', 'Residual', 'Total'],
+    y: [risk.sysVol * 100, risk.idioVol * 100, risk.totVol * 100],
+    type: 'bar',
+    marker: { color: ['#4F8EFF', '#FFC145', '#8C7CFF'] },
+    text: [risk.sysVol, risk.idioVol, risk.totVol].map(v => pct(v, 1)),
+    textposition: 'outside',
+  }], plotlyBase({
+    title: { text: 'Annualized volatility decomposition', font: { size: 12, color: '#8C90A0' } },
+    yaxis: { title: 'σ (%)' },
+  }), PCFG);
+
+  // R² comparison assets vs portfolio
+  const cov = factorCov(factorHistory);
+  const idioScale = parseFloat(document.getElementById('idioScale').value) || 1;
+  const assetR2 = assets.map(a => {
+    let sysV = 0;
+    for (let x = 0; x < FACTORS.length; x++)
+      for (let y = 0; y < FACTORS.length; y++)
+        sysV += a.beta[x] * cov[x][y] * a.beta[y];
+    const idV = Math.pow(a.resid * idioScale, 2);
+    return sysV / (sysV + idV);
+  });
+  Plotly.newPlot('rsqChart', [{
+    x: [...assets.map(a => a.id), 'PORT'],
+    y: [...assetR2.map(r => r * 100), risk.rsq * 100],
+    type: 'bar',
+    marker: {
+      color: [...assets.map(() => 'rgba(140,124,255,0.7)'), '#FFC145'],
+    },
+  }], plotlyBase({
+    title: { text: 'R² by asset vs portfolio', font: { size: 12, color: '#8C90A0' } },
+    yaxis: { title: 'R² (%)', range: [0, 100] },
+  }), PCFG);
+
+  // Factor paths (cumulative)
+  const xs = Array.from({ length: factorHistory.months }, (_, i) => i + 1);
+  const fTraces = FACTORS.map(f => {
+    const cum = [];
+    let v = 0;
+    for (let t = 0; t < factorHistory.months; t++) {
+      v += factorHistory.factors[f][t];
+      cum.push(v * 100);
+    }
+    return {
+      x: xs, y: cum, mode: 'lines',
+      line: { color: FACTOR_COLORS[f], width: 1.8 },
+      name: f,
+    };
+  });
+  Plotly.newPlot('factorPathChart', fTraces, plotlyBase({
+    title: { text: 'Cumulative synthetic factor returns (%)', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Month' }, yaxis: { title: 'Cumulative %' },
+  }), PCFG);
+
+  buildLoadTable();
+
+  document.getElementById('statusLine').innerHTML =
+    `β_mkt <b>${fmt(betas[0],2)}</b> · R² <b>${pct(risk.rsq,1)}</b> · E[R] <b>${pct(exp.total,2)}</b> · σ <b>${pct(risk.totVol,1)}</b> · synthetic`;
+}
+
+// Init
+document.getElementById('v_months').textContent = document.getElementById('months').value;
+document.getElementById('v_idio').textContent = document.getElementById('idioScale').value;
+buildPremiaControls();
+buildWeightControls();
+simulate();
+render();
+</script>
+</body>
+</html>

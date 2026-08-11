@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VWAP · TWAP · POV Execution Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C; --bg-2:#0C0E12; --panel:#111318; --panel-2:#15171D;
+  --border:#242730; --border-soft:#1A1C22;
+  --text:#E8E9EE; --text-dim:#8C90A0; --text-faint:#5A5E6B;
+  --accent:#4F8EFF; --accent-dim:#3A6BC4; --oos:#FFC145;
+  --profit:#2ED573; --loss:#FF4757; --warn:#F5A623; --choppy:#8C7CFF;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px; --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(255,193,69,0.04), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+
+.app{display:grid; grid-template-columns:360px 1fr; min-height:100vh;}
+@media (max-width:1200px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--accent), var(--oos), var(--choppy)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:11px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:15px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+select, input[type=number], input[type=text]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:22px 28px 60px; max-width:1560px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:26px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:920px; font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px; max-width:920px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px 14px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.profit:before{background:var(--profit);}
+.kpi.loss:before{background:var(--loss);}
+.kpi.warn:before{background:var(--warn);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:17px; font-weight:600; margin-top:5px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+table.data-table th, table.data-table td{padding:7px 8px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left; color:var(--text-dim);}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10.5px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+table.data-table tr:last-child td{border-bottom:none;}
+table.data-table .pos{color:var(--profit);}
+table.data-table .neg{color:var(--loss);}
+table.data-table .hl{color:var(--oos);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.legend-row{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); margin-bottom:8px;}
+.legend-line{display:inline-block; width:14px; height:2px; margin-right:5px; vertical-align:middle;}
+.footer-note{margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; border:1px solid rgba(79,142,255,0.4); color:var(--accent); margin-left:8px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">EX</div><div class="brand-name">Execution Lab</div></div>
+    <div class="brand-sub">VWAP · TWAP · POV · Shortfall</div>
+
+    <div class="ctrl-group">
+      <h4>Parent Order</h4>
+      <div class="field">
+        <div class="field-label"><span>Side</span></div>
+        <select id="side"><option value="buy" selected>Buy</option><option value="sell">Sell</option></select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Notional ($)</span></div>
+        <input type="number" id="notional" value="10000000" step="100000" min="100000">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Arrival Price</span></div>
+        <input type="number" id="arrivalPx" value="100.00" step="0.01" min="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Horizon (minutes)</span><span class="val" id="v_horizon">60</span></div>
+        <input type="range" id="horizon" min="15" max="240" step="5" value="60">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Time Buckets</span><span class="val" id="v_buckets">60</span></div>
+        <input type="range" id="buckets" min="20" max="120" step="5" value="60">
+      </div>
+      <div class="hint">Parent order is converted to shares via notional ÷ arrival price. Execution is simulated bucket-by-bucket over the horizon.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Strategy</h4>
+      <div class="field">
+        <div class="field-label"><span>Primary Strategy</span></div>
+        <select id="strategy">
+          <option value="twap">TWAP — equal qty / time</option>
+          <option value="vwap" selected>VWAP — follow volume curve</option>
+          <option value="pov">POV — % of market volume</option>
+          <option value="aggressive">Aggressive — market sweep</option>
+          <option value="passive">Passive — limit / mid bias</option>
+        </select>
+      </div>
+      <div class="field" id="povField">
+        <div class="field-label"><span>POV Target (%)</span><span class="val" id="v_pov">10</span></div>
+        <input type="range" id="povPct" min="1" max="40" step="1" value="10">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Urgency</span><span class="val" id="v_urg">Medium</span></div>
+        <input type="range" id="urgency" min="0" max="2" step="1" value="1">
+      </div>
+      <div class="hint">Urgency scales how aggressively each strategy crosses the spread and accepts impact. POV may finish early or leave residual if volume is insufficient.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Market Assumptions</h4>
+      <div class="field">
+        <div class="field-label"><span>Volatility</span><span class="val" id="v_vol">0.25</span></div>
+        <input type="range" id="vol" min="0.05" max="0.80" step="0.05" value="0.25">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Half-Spread (bps)</span><span class="val" id="v_spread">2.0</span></div>
+        <input type="range" id="spreadBps" min="0.5" max="15" step="0.5" value="2.0">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Impact Coefficient</span><span class="val" id="v_impact">0.10</span></div>
+        <input type="range" id="impact" min="0.01" max="0.40" step="0.01" value="0.10">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Daily Volume (shares)</span></div>
+        <input type="number" id="adv" value="5000000" step="100000" min="100000">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Volume Profile</span></div>
+        <select id="volProfile">
+          <option value="u" selected>U-shape (open/close heavy)</option>
+          <option value="flat">Flat</option>
+          <option value="front">Front-loaded</option>
+          <option value="back">Back-loaded</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Shock Probability</span><span class="val" id="v_shock">0.03</span></div>
+        <input type="range" id="shockProb" min="0" max="0.15" step="0.01" value="0.03">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Seed</span></div>
+        <input type="number" id="seed" value="42" step="1">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="runBtn">▶ Run Execution</button>
+    <div class="btn-row">
+      <button class="btn" id="compareBtn">Compare All</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+    <div class="status-line" id="statusLine">Ready · synthetic market only</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Algorithmic Execution · Transaction Cost Analysis</div>
+      <h1 class="page-title">VWAP, TWAP &amp; POV Execution Simulator</h1>
+      <p class="page-desc">Schedule a large parent order across a synthetic trading day and compare classical execution algorithms. The market is simulated — price, volume, spread, temporary impact and occasional shocks are generated under transparent assumptions so you can see how strategy choice, urgency and liquidity interact with implementation shortfall.</p>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-title">Execution Summary</span>
+        <span class="badge" id="stratBadge">VWAP</span>
+      </div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Price Path &amp; Child Executions</span></div>
+      <p class="section-desc">Mid price evolves with driftless noise, temporary impact from your prints, and optional shocks. Markers show child fills; size scales with executed quantity in that bucket.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-line" style="background:var(--accent)"></span>Mid</span>
+          <span><span class="legend-line" style="background:var(--oos)"></span>Arrival</span>
+          <span><span class="legend-line" style="background:var(--profit)"></span>Your VWAP</span>
+          <span><span class="legend-line" style="background:var(--choppy)"></span>Market VWAP</span>
+        </div>
+        <div id="priceChart" style="width:100%;height:380px;"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Cumulative Quantity &amp; Volume Profile</span></div>
+      <div class="grid grid-2">
+        <div class="card">
+          <div id="cumQtyChart" style="width:100%;height:320px;"></div>
+        </div>
+        <div class="card">
+          <div id="volChart" style="width:100%;height:320px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Cost Decomposition &amp; Benchmarks</span></div>
+      <div class="grid grid-2">
+        <div class="card">
+          <div id="costChart" style="width:100%;height:320px;"></div>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+            <tbody id="metricsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Strategy Comparison</span></div>
+      <p class="section-desc">Same market path and parent order, each strategy applied independently. Implementation shortfall is from the perspective of the order side (positive = costlier than arrival for buys).</div>
+      <div class="card" style="margin-bottom:14px;">
+        <div id="compareChart" style="width:100%;height:340px;"></div>
+      </div>
+      <div class="card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Strategy</th>
+              <th>Avg Px</th>
+              <th>IS (bps)</th>
+              <th>vs Mkt VWAP (bps)</th>
+              <th>Participation</th>
+              <th>Completion</th>
+              <th>Impact (bps)</th>
+            </tr>
+          </thead>
+          <tbody id="compareBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Bucket Detail (Primary Strategy)</span></div>
+      <div class="card" style="overflow-x:auto; max-height:360px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Bucket</th>
+              <th>Mid</th>
+              <th>Mkt Vol</th>
+              <th>Target Qty</th>
+              <th>Filled</th>
+              <th>Fill Px</th>
+              <th>Cum Filled</th>
+              <th>Participation</th>
+            </tr>
+          </thead>
+          <tbody id="bucketBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Implementation Shortfall (IS)</div>
+        <div class="f-math">IS_buy = AvgExecPx − ArrivalPx · IS_sell = ArrivalPx − AvgExecPx</div>
+        <div class="f-math">IS_bps = IS / ArrivalPx × 10 000</div>
+        <div class="f-note">Arrival price is the mid (or decision price) when the order is released. Positive IS means underperformance versus doing nothing at arrival.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Market VWAP &amp; Your VWAP</div>
+        <div class="f-math">Market VWAP = Σ (P_t · V_t) / Σ V_t · Your VWAP = Σ (P_fill · q_fill) / Σ q_fill</div>
+        <div class="f-note">Outperformance vs market VWAP is a common agent benchmark; it is not the same as implementation shortfall.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">TWAP / VWAP / POV Schedules</div>
+        <div class="f-math">TWAP: q_t = Q / N</div>
+        <div class="f-math">VWAP: q_t = Q · (E[V_t] / Σ E[V])</div>
+        <div class="f-math">POV: q_t = min( remaining, pov% · V_t )</div>
+        <div class="f-note">N = number of buckets. Expected volume curve is the chosen profile scaled to ADV over the session fraction.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Temporary Market Impact (synthetic)</div>
+        <div class="f-math">ΔP_impact ≈ sign · impactCoeff · σ · (q_t / V_t)^0.5 · P</div>
+        <div class="f-note">Square-root impact on participation in the bucket. Temporary impact mean-reverts partially in subsequent buckets; permanent fraction is smaller.</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Execution Concepts</span></div>
+
+      <details class="disclosure" open>
+        <summary>TWAP vs VWAP vs POV</summary>
+        <div class="disclosure-body">
+          <p><b>TWAP</b> slices the parent into equal quantities per time bucket. Simple and robust when you do not trust the volume forecast; can overweight thin periods and underweight the close.</p>
+          <p><b>VWAP</b> targets the market’s volume-weighted average price by scheduling size proportional to an expected volume curve (here: U-shape, flat, front- or back-loaded). It minimises tracking error to market VWAP when the forecast is accurate.</p>
+          <p><b>POV</b> (percentage of volume) trades as a fixed fraction of observed market volume each bucket. It automatically slows in quiet periods and speeds up when volume appears — completion is path-dependent.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Implementation shortfall &amp; cost components</summary>
+        <div class="disclosure-body">
+          <p>IS decomposes conceptually into <b>spread / instantaneous cost</b>, <b>market impact</b> (your own trading moving the price), and <b>timing / opportunity cost</b> (drift of the mid while you are still executing). Aggressive strategies pay more impact but less timing risk; passive strategies do the opposite.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Urgency, impact &amp; timing risk</summary>
+        <div class="disclosure-body">
+          <p>Higher urgency increases the fraction of each slice that crosses the spread and the effective participation, raising impact but finishing earlier. In a rising market, a slow buy order suffers opportunity cost; in a falling market, patience is rewarded. Volatility amplifies both impact uncertainty and timing risk.</p>
+        </div>
+      </details>
+
+      <details class="disclosure">
+        <summary>Why this market is synthetic</summary>
+        <div class="disclosure-body">
+          <p>Price paths, volume profiles, shocks and impact are generated from stylised models chosen for pedagogical clarity. They illustrate mechanisms — they are not calibrated to a specific venue or security, and must not be read as forecasts or as evidence of strategy performance in live markets.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational execution-algorithm simulator. All market data are synthetic. Impact and volume models are simplified. Not investment advice; not a production TCA tool.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   VWAP / TWAP / POV EXECUTION SIMULATOR
+   ===================================================================== */
+
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+const URGENCY_LABEL = ['Low', 'Medium', 'High'];
+
+const els = {
+  side: document.getElementById('side'),
+  notional: document.getElementById('notional'),
+  arrivalPx: document.getElementById('arrivalPx'),
+  horizon: document.getElementById('horizon'),
+  buckets: document.getElementById('buckets'),
+  strategy: document.getElementById('strategy'),
+  povPct: document.getElementById('povPct'),
+  urgency: document.getElementById('urgency'),
+  vol: document.getElementById('vol'),
+  spreadBps: document.getElementById('spreadBps'),
+  impact: document.getElementById('impact'),
+  adv: document.getElementById('adv'),
+  volProfile: document.getElementById('volProfile'),
+  shockProb: document.getElementById('shockProb'),
+  seed: document.getElementById('seed'),
+};
+
+function syncLabels() {
+  document.getElementById('v_horizon').textContent = els.horizon.value;
+  document.getElementById('v_buckets').textContent = els.buckets.value;
+  document.getElementById('v_pov').textContent = els.povPct.value;
+  document.getElementById('v_urg').textContent = URGENCY_LABEL[parseInt(els.urgency.value,10)] || 'Medium';
+  document.getElementById('v_vol').textContent = els.vol.value;
+  document.getElementById('v_spread').textContent = els.spreadBps.value;
+  document.getElementById('v_impact').textContent = els.impact.value;
+  document.getElementById('v_shock').textContent = els.shockProb.value;
+}
+['horizon','buckets','povPct','urgency','vol','spreadBps','impact','shockProb'].forEach(id => {
+  document.getElementById(id).addEventListener('input', syncLabels);
+});
+syncLabels();
+
+function inputs() {
+  return {
+    side: els.side.value,
+    notional: Math.max(1e5, parseFloat(els.notional.value) || 1e7),
+    arrival: Math.max(1, parseFloat(els.arrivalPx.value) || 100),
+    horizonMin: parseInt(els.horizon.value, 10) || 60,
+    n: parseInt(els.buckets.value, 10) || 60,
+    strategy: els.strategy.value,
+    pov: (parseFloat(els.povPct.value) || 10) / 100,
+    urgency: parseInt(els.urgency.value, 10) || 1,
+    vol: parseFloat(els.vol.value) || 0.25,
+    halfSpreadBps: parseFloat(els.spreadBps.value) || 2,
+    impact: parseFloat(els.impact.value) || 0.1,
+    adv: Math.max(1e5, parseFloat(els.adv.value) || 5e6),
+    profile: els.volProfile.value,
+    shockProb: parseFloat(els.shockProb.value) || 0,
+    seed: parseInt(els.seed.value, 10) || 42,
+  };
+}
+
+/* ---- Volume curve ---- */
+function volumeCurve(n, profile) {
+  const w = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = i / (n - 1); // 0..1
+    if (profile === 'flat') w[i] = 1;
+    else if (profile === 'front') w[i] = 1.8 - 1.2 * x;
+    else if (profile === 'back') w[i] = 0.6 + 1.2 * x;
+    else {
+      // U-shape
+      w[i] = 1.4 - 1.2 * Math.sin(Math.PI * x) + 0.15;
+    }
+    w[i] = Math.max(0.05, w[i]);
+  }
+  let s = 0; for (let i = 0; i < n; i++) s += w[i];
+  for (let i = 0; i < n; i++) w[i] /= s;
+  return w;
+}
+
+/* ---- Generate synthetic market ---- */
+function generateMarket(cfg) {
+  const rng = mulberry32(cfg.seed >>> 0);
+  const n = cfg.n;
+  const weights = volumeCurve(n, cfg.profile);
+  // Session volume ≈ ADV * (horizon / 390 trading minutes)
+  const sessionFrac = cfg.horizonMin / 390;
+  const sessionVol = cfg.adv * sessionFrac;
+
+  const mid = new Float64Array(n);
+  const mktVol = new Float64Array(n);
+  const shock = new Uint8Array(n);
+  mid[0] = cfg.arrival;
+  // per-bucket vol from annualised ~252*6.5h → scale to bucket
+  const bucketsPerYear = (252 * 390) / cfg.horizonMin * n;
+  const sigmaBucket = cfg.vol / Math.sqrt(bucketsPerYear);
+
+  for (let i = 0; i < n; i++) {
+    if (i > 0) {
+      const z = (rng() * 2 - 1) + (rng() * 2 - 1); // rough normal-ish
+      mid[i] = mid[i - 1] * (1 + z * sigmaBucket * 0.7);
+      if (rng() < cfg.shockProb) {
+        const dir = rng() < 0.5 ? -1 : 1;
+        mid[i] *= 1 + dir * (0.003 + rng() * 0.012);
+        shock[i] = 1;
+      }
+    }
+    // noisy volume around profile
+    const noise = 0.6 + rng() * 0.8;
+    mktVol[i] = Math.max(1, Math.round(sessionVol * weights[i] * noise));
+  }
+  return { mid, mktVol, shock, weights, sessionVol };
+}
+
+/* ---- Execution engine ---- */
+function scheduleTargets(cfg, mkt, parentQty) {
+  const n = cfg.n;
+  const targets = new Float64Array(n);
+  if (cfg.strategy === 'twap') {
+    const q = parentQty / n;
+    for (let i = 0; i < n; i++) targets[i] = q;
+  } else if (cfg.strategy === 'vwap') {
+    for (let i = 0; i < n; i++) targets[i] = parentQty * mkt.weights[i];
+  } else if (cfg.strategy === 'pov') {
+    // filled dynamically; targets are upper bounds
+    for (let i = 0; i < n; i++) targets[i] = cfg.pov * mkt.mktVol[i];
+  } else if (cfg.strategy === 'aggressive') {
+    // front-load heavily
+    let remaining = parentQty;
+    for (let i = 0; i < n; i++) {
+      const share = Math.pow(1 - i / n, 2);
+      targets[i] = 0; // computed in loop with remaining
+    }
+    // equal weight on first 20% of buckets
+    const front = Math.max(1, Math.floor(n * 0.2));
+    for (let i = 0; i < front; i++) targets[i] = parentQty / front;
+  } else if (cfg.strategy === 'passive') {
+    // back-loaded slightly + smaller size early
+    for (let i = 0; i < n; i++) {
+      const x = i / (n - 1);
+      targets[i] = parentQty * (0.5 + x) / n; // will renormalize
+    }
+    let s = 0; for (let i = 0; i < n; i++) s += targets[i];
+    for (let i = 0; i < n; i++) targets[i] *= parentQty / s;
+  }
+  return targets;
+}
+
+function execute(cfg, mkt, parentQty) {
+  const n = cfg.n;
+  const sign = cfg.side === 'buy' ? 1 : -1;
+  const targets = scheduleTargets(cfg, mkt, parentQty);
+  const urg = cfg.urgency; // 0,1,2
+  const crossFrac = [0.35, 0.65, 0.95][urg];
+  const halfSpread = cfg.arrival * (cfg.halfSpreadBps / 10000);
+
+  // working copy of mid with impact feedback
+  const mid = new Float64Array(mkt.mid);
+  const filled = new Float64Array(n);
+  const fillPx = new Float64Array(n);
+  const impactBps = new Float64Array(n);
+  let remaining = parentQty;
+  let permanentImpact = 0;
+
+  for (let i = 0; i < n; i++) {
+    mid[i] = mkt.mid[i] + permanentImpact;
+
+    let want;
+    if (cfg.strategy === 'pov') {
+      want = Math.min(remaining, cfg.pov * mkt.mktVol[i]);
+    } else {
+      want = Math.min(remaining, targets[i]);
+      // catch-up: if behind schedule on vwap/twap, slightly boost
+      if (cfg.strategy === 'vwap' || cfg.strategy === 'twap') {
+        const idealCum = (cfg.strategy === 'twap')
+          ? parentQty * (i + 1) / n
+          : parentQty * mkt.weights.slice(0, i + 1).reduce((a, b) => a + b, 0);
+        const done = parentQty - remaining;
+        if (done < idealCum * 0.92) want = Math.min(remaining, want * 1.15);
+      }
+    }
+    if (cfg.strategy === 'aggressive' && i > Math.floor(n * 0.25) && remaining > 0) {
+      // dump residual early
+      want = Math.min(remaining, Math.max(want, remaining / Math.max(1, Math.floor(n * 0.25) - i + 1)));
+    }
+
+    // cannot take more than available volume meaningfully
+    const maxPart = urg === 2 ? 0.5 : urg === 1 ? 0.35 : 0.2;
+    want = Math.min(want, maxPart * mkt.mktVol[i] + remaining * 0.02);
+    want = Math.max(0, Math.floor(want));
+
+    if (want <= 0 || remaining <= 0) {
+      filled[i] = 0;
+      fillPx[i] = mid[i];
+      continue;
+    }
+
+    const participation = want / Math.max(1, mkt.mktVol[i]);
+    // square-root temporary impact
+    const tempImpact = sign * cfg.impact * cfg.vol * Math.sqrt(Math.min(1, participation)) * mid[i] * 0.15;
+    const perm = tempImpact * 0.25;
+    permanentImpact += perm;
+
+    // execution price: mid + direction * (spread fraction + impact)
+    const spreadCost = sign * halfSpread * crossFrac;
+    // passive tries to capture spread
+    let px;
+    if (cfg.strategy === 'passive') {
+      const improve = sign * halfSpread * (0.4 - 0.15 * urg);
+      px = mid[i] + tempImpact * 0.6 - improve;
+      // fill rate lower when passive — miss some
+      if (Math.random() < 0.15 + 0.1 * (1 - urg / 2)) {
+        // partial miss
+        want = Math.floor(want * (0.5 + Math.random() * 0.4));
+      }
+    } else {
+      px = mid[i] + spreadCost + tempImpact;
+    }
+
+    filled[i] = Math.min(want, remaining);
+    fillPx[i] = px;
+    impactBps[i] = (tempImpact / mid[i]) * 10000;
+    remaining -= filled[i];
+
+    // mean-reversion of temporary component into next mid display
+    if (i + 1 < n) {
+      // already using permanentImpact on subsequent; temp fades
+    }
+  }
+
+  return { mid, filled, fillPx, impactBps, remaining, targets };
+}
+
+function analyse(cfg, mkt, exec, parentQty) {
+  const n = cfg.n;
+  let qty = 0, notional = 0;
+  for (let i = 0; i < n; i++) {
+    qty += exec.filled[i];
+    notional += exec.filled[i] * exec.fillPx[i];
+  }
+  const avgPx = qty > 0 ? notional / qty : cfg.arrival;
+  const sign = cfg.side === 'buy' ? 1 : -1;
+  const isAbs = sign * (avgPx - cfg.arrival);
+  const isBps = (isAbs / cfg.arrival) * 10000;
+
+  // market VWAP over session
+  let mktNotional = 0, mktQty = 0;
+  for (let i = 0; i < n; i++) {
+    mktNotional += mkt.mid[i] * mkt.mktVol[i];
+    mktQty += mkt.mktVol[i];
+  }
+  const mktVwap = mktQty > 0 ? mktNotional / mktQty : cfg.arrival;
+  const vsVwap = sign * (avgPx - mktVwap);
+  const vsVwapBps = (vsVwap / cfg.arrival) * 10000;
+
+  const totalMktVol = mktQty;
+  const participation = totalMktVol > 0 ? qty / totalMktVol : 0;
+  const completion = parentQty > 0 ? qty / parentQty : 0;
+
+  // approximate cost decomposition
+  const halfSpread = cfg.arrival * (cfg.halfSpreadBps / 10000);
+  const urg = cfg.urgency;
+  const crossFrac = [0.35, 0.65, 0.95][urg];
+  const spreadCostBps = (crossFrac * halfSpread / cfg.arrival) * 10000;
+  let avgImpactBps = 0;
+  if (qty > 0) {
+    let w = 0;
+    for (let i = 0; i < n; i++) { avgImpactBps += exec.impactBps[i] * exec.filled[i]; w += exec.filled[i]; }
+    avgImpactBps = w > 0 ? avgImpactBps / w : 0;
+  }
+  const timingBps = isBps - Math.abs(avgImpactBps) * (avgImpactBps >= 0 ? 1 : 1) - spreadCostBps * sign;
+  // simpler display decomposition:
+  const impactComp = Math.abs(avgImpactBps);
+  const spreadComp = spreadCostBps;
+  const timingComp = isBps - impactComp * Math.sign(isBps || 1) - spreadComp * (cfg.side === 'buy' ? 1 : 1);
+  // For buys: IS ≈ spread + impact + timing
+  const timingEst = isBps - spreadComp - impactComp;
+
+  return {
+    avgPx, qty, isAbs, isBps, mktVwap, vsVwapBps,
+    participation, completion,
+    spreadComp, impactComp, timingEst,
+    residual: exec.remaining,
+  };
+}
+
+/* ---- Run primary + comparison ---- */
+let lastPrimary = null;
+let lastCompare = null;
+
+function runPrimary() {
+  const cfg = inputs();
+  const parentQty = Math.floor(cfg.notional / cfg.arrival);
+  const mkt = generateMarket(cfg);
+  const exec = execute(cfg, mkt, parentQty);
+  const metrics = analyse(cfg, mkt, exec, parentQty);
+  lastPrimary = { cfg, mkt, exec, metrics, parentQty };
+  return lastPrimary;
+}
+
+function runCompare() {
+  const base = inputs();
+  const parentQty = Math.floor(base.notional / base.arrival);
+  const mkt = generateMarket(base);
+  const strats = ['twap', 'vwap', 'pov', 'aggressive', 'passive'];
+  const results = [];
+  for (const s of strats) {
+    const cfg = Object.assign({}, base, { strategy: s });
+    const exec = execute(cfg, mkt, parentQty);
+    const metrics = analyse(cfg, mkt, exec, parentQty);
+    results.push({ strategy: s, metrics, exec });
+  }
+  lastCompare = { base, mkt, parentQty, results };
+  return lastCompare;
+}
+
+/* ---- Render ---- */
+function fmt(x, d=2) { return isFinite(x) ? Number(x).toFixed(d) : '—'; }
+function fmtBps(x) {
+  if (!isFinite(x)) return '—';
+  return (x >= 0 ? '+' : '') + x.toFixed(1);
+}
+function fmtPct(x, d=1) { return isFinite(x) ? (x * 100).toFixed(d) + '%' : '—'; }
+
+function plotlyBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 55, r: 20, t: 24, b: 44 },
+    xaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.12, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE' } },
+  }, extra || {});
+}
+const CFG = { displayModeBar: false, responsive: true };
+
+function renderAll() {
+  if (!lastPrimary) return;
+  const { cfg, mkt, exec, metrics, parentQty } = lastPrimary;
+  const n = cfg.n;
+  const xs = Array.from({ length: n }, (_, i) => i);
+
+  document.getElementById('stratBadge').textContent = cfg.strategy.toUpperCase();
+
+  // KPIs
+  const isCls = metrics.isBps > 5 ? 'loss' : metrics.isBps < -2 ? 'profit' : 'oos';
+  const kpis = [
+    { l: 'Avg Exec Price', v: fmt(metrics.avgPx, 4), s: `arrival ${fmt(cfg.arrival,2)}`, c: '' },
+    { l: 'Implementation Shortfall', v: fmtBps(metrics.isBps) + ' bps', s: fmt(metrics.isAbs, 4) + ' / share', c: isCls },
+    { l: 'vs Market VWAP', v: fmtBps(metrics.vsVwapBps) + ' bps', s: `mkt VWAP ${fmt(metrics.mktVwap,4)}`, c: metrics.vsVwapBps > 0 ? 'loss' : 'profit' },
+    { l: 'Completion', v: fmtPct(metrics.completion, 1), s: `${Math.floor(metrics.qty).toLocaleString()} / ${parentQty.toLocaleString()} sh`, c: metrics.completion > 0.98 ? 'profit' : 'warn' },
+    { l: 'Participation', v: fmtPct(metrics.participation, 2), s: 'of session volume', c: 'oos' },
+    { l: 'Spread Cost (est.)', v: fmt(metrics.spreadComp, 1) + ' bps', s: 'cross component', c: '' },
+    { l: 'Impact (est.)', v: fmt(metrics.impactComp, 1) + ' bps', s: 'temp. impact', c: '' },
+    { l: 'Timing (residual)', v: fmtBps(metrics.timingEst) + ' bps', s: 'IS − spread − impact', c: '' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
+  ).join('');
+
+  // Price chart
+  const fillX = [], fillY = [], fillS = [];
+  for (let i = 0; i < n; i++) {
+    if (exec.filled[i] > 0) {
+      fillX.push(i);
+      fillY.push(exec.fillPx[i]);
+      fillS.push(Math.max(6, Math.min(22, 6 + exec.filled[i] / parentQty * n * 8)));
+    }
+  }
+  Plotly.newPlot('priceChart', [
+    { x: xs, y: Array.from(exec.mid), mode: 'lines', line: { color: '#4F8EFF', width: 1.8 }, name: 'Mid (w/ impact)' },
+    { x: xs, y: Array.from(mkt.mid), mode: 'lines', line: { color: '#5A5E6B', width: 1, dash: 'dot' }, name: 'Unaffected mid' },
+    { x: xs, y: xs.map(() => cfg.arrival), mode: 'lines', line: { color: '#FFC145', width: 1.5, dash: 'dash' }, name: 'Arrival' },
+    { x: xs, y: xs.map(() => metrics.avgPx), mode: 'lines', line: { color: '#2ED573', width: 1.5, dash: 'dash' }, name: 'Your VWAP' },
+    { x: xs, y: xs.map(() => metrics.mktVwap), mode: 'lines', line: { color: '#8C7CFF', width: 1.2, dash: 'dot' }, name: 'Market VWAP' },
+    { x: fillX, y: fillY, mode: 'markers', marker: { size: fillS, color: 'rgba(255,193,69,0.75)', line: { width: 1, color: '#050a14' } }, name: 'Fills', hovertemplate: 'bucket %{x}<br>px %{y:.4f}<extra></extra>' },
+  ], plotlyBase({
+    xaxis: { title: 'Bucket' }, yaxis: { title: 'Price' },
+  }), CFG);
+
+  // Cumulative qty
+  const cum = [];
+  let c = 0;
+  for (let i = 0; i < n; i++) { c += exec.filled[i]; cum.push(c); }
+  const ideal = [];
+  if (cfg.strategy === 'twap') {
+    for (let i = 0; i < n; i++) ideal.push(parentQty * (i + 1) / n);
+  } else {
+    let w = 0;
+    for (let i = 0; i < n; i++) { w += mkt.weights[i]; ideal.push(parentQty * w); }
+  }
+  Plotly.newPlot('cumQtyChart', [
+    { x: xs, y: cum, mode: 'lines', line: { color: '#4F8EFF', width: 2.5 }, name: 'Executed', fill: 'tozeroy', fillcolor: 'rgba(79,142,255,0.08)' },
+    { x: xs, y: ideal, mode: 'lines', line: { color: '#FFC145', width: 1.5, dash: 'dash' }, name: 'Schedule' },
+    { x: xs, y: xs.map(() => parentQty), mode: 'lines', line: { color: '#5A5E6B', width: 1, dash: 'dot' }, name: 'Parent qty' },
+  ], plotlyBase({ xaxis: { title: 'Bucket' }, yaxis: { title: 'Shares' } }), CFG);
+
+  // Volume profile
+  Plotly.newPlot('volChart', [
+    { x: xs, y: Array.from(mkt.mktVol), type: 'bar', name: 'Market volume', marker: { color: 'rgba(140,124,255,0.55)' } },
+    { x: xs, y: Array.from(exec.filled), type: 'bar', name: 'Your qty', marker: { color: 'rgba(255,193,69,0.8)' } },
+  ], plotlyBase({ barmode: 'overlay', xaxis: { title: 'Bucket' }, yaxis: { title: 'Shares' } }), CFG);
+
+  // Cost decomposition stacked bar
+  Plotly.newPlot('costChart', [{
+    x: ['Spread', 'Impact', 'Timing (est.)', 'Total IS'],
+    y: [metrics.spreadComp, metrics.impactComp, metrics.timingEst, metrics.isBps],
+    type: 'bar',
+    marker: { color: ['#4F8EFF', '#FF4757', '#FFC145', '#8C7CFF'] },
+    text: [metrics.spreadComp, metrics.impactComp, metrics.timingEst, metrics.isBps].map(v => fmt(v, 1)),
+    textposition: 'outside',
+  }], plotlyBase({
+    yaxis: { title: 'bps (buy cost convention)' },
+    title: { text: 'Cost decomposition (approximate)', font: { size: 12, color: '#8C90A0' } },
+  }), CFG);
+
+  // Metrics table
+  const rows = [
+    ['Side / Strategy', `${cfg.side} / ${cfg.strategy}`],
+    ['Parent shares', parentQty.toLocaleString()],
+    ['Filled shares', Math.floor(metrics.qty).toLocaleString()],
+    ['Residual', Math.floor(metrics.residual).toLocaleString()],
+    ['Arrival price', fmt(cfg.arrival, 4)],
+    ['Average exec price', fmt(metrics.avgPx, 4)],
+    ['Market VWAP', fmt(metrics.mktVwap, 4)],
+    ['IS (absolute)', fmt(metrics.isAbs, 4)],
+    ['IS (bps)', fmtBps(metrics.isBps)],
+    ['vs Market VWAP (bps)', fmtBps(metrics.vsVwapBps)],
+    ['Participation rate', fmtPct(metrics.participation, 2)],
+    ['Completion', fmtPct(metrics.completion, 2)],
+    ['Session market volume', Math.floor(mkt.sessionVol).toLocaleString()],
+    ['Horizon / buckets', `${cfg.horizonMin} min / ${n}`],
+  ];
+  document.getElementById('metricsBody').innerHTML = rows.map(([a,b]) =>
+    `<tr><td>${a}</td><td class="hl">${b}</td></tr>`
+  ).join('');
+
+  // Bucket table (subsample if many)
+  const step = n > 60 ? Math.ceil(n / 60) : 1;
+  let bhtml = '';
+  let cumQ = 0;
+  for (let i = 0; i < n; i += step) {
+    cumQ = cum.slice(i)[0];
+    const part = mkt.mktVol[i] > 0 ? exec.filled[i] / mkt.mktVol[i] : 0;
+    bhtml += `<tr>
+      <td>${i}</td>
+      <td>${fmt(exec.mid[i],3)}</td>
+      <td>${Math.floor(mkt.mktVol[i]).toLocaleString()}</td>
+      <td>${Math.floor(exec.targets[i]).toLocaleString()}</td>
+      <td>${Math.floor(exec.filled[i]).toLocaleString()}</td>
+      <td>${exec.filled[i] ? fmt(exec.fillPx[i],3) : '—'}</td>
+      <td>${Math.floor(cum[i]).toLocaleString()}</td>
+      <td>${fmtPct(part,1)}</td>
+    </tr>`;
+  }
+  document.getElementById('bucketBody').innerHTML = bhtml;
+
+  // Comparison
+  if (lastCompare) {
+    const labels = lastCompare.results.map(r => r.strategy);
+    const isArr = lastCompare.results.map(r => r.metrics.isBps);
+    const vwapArr = lastCompare.results.map(r => r.metrics.vsVwapBps);
+    Plotly.newPlot('compareChart', [
+      { x: labels, y: isArr, type: 'bar', name: 'IS (bps)', marker: { color: '#4F8EFF' } },
+      { x: labels, y: vwapArr, type: 'bar', name: 'vs Mkt VWAP (bps)', marker: { color: '#FFC145' } },
+    ], plotlyBase({
+      barmode: 'group',
+      yaxis: { title: 'bps' },
+      title: { text: 'Same market path · all strategies', font: { size: 12, color: '#8C90A0' } },
+    }), CFG);
+
+    document.getElementById('compareBody').innerHTML = lastCompare.results.map(r => {
+      const m = r.metrics;
+      return `<tr>
+        <td>${r.strategy}</td>
+        <td>${fmt(m.avgPx,4)}</td>
+        <td class="${m.isBps>0?'neg':'pos'}">${fmtBps(m.isBps)}</td>
+        <td class="${m.vsVwapBps>0?'neg':'pos'}">${fmtBps(m.vsVwapBps)}</td>
+        <td>${fmtPct(m.participation,2)}</td>
+        <td>${fmtPct(m.completion,1)}</td>
+        <td>${fmt(m.impactComp,1)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('statusLine').innerHTML =
+    `Executed <b>${cfg.strategy}</b> · IS <b>${fmtBps(metrics.isBps)} bps</b> · completion <b>${fmtPct(metrics.completion,1)}</b> · synthetic path seed ${cfg.seed}`;
+}
+
+document.getElementById('runBtn').onclick = () => {
+  runPrimary();
+  runCompare();
+  renderAll();
+};
+document.getElementById('compareBtn').onclick = () => {
+  if (!lastPrimary) runPrimary();
+  runCompare();
+  renderAll();
+};
+document.getElementById('resetBtn').onclick = () => {
+  els.side.value = 'buy';
+  els.notional.value = 10000000;
+  els.arrivalPx.value = 100;
+  els.horizon.value = 60;
+  els.buckets.value = 60;
+  els.strategy.value = 'vwap';
+  els.povPct.value = 10;
+  els.urgency.value = 1;
+  els.vol.value = 0.25;
+  els.spreadBps.value = 2;
+  els.impact.value = 0.1;
+  els.adv.value = 5000000;
+  els.volProfile.value = 'u';
+  els.shockProb.value = 0.03;
+  els.seed.value = 42;
+  syncLabels();
+  runPrimary();
+  runCompare();
+  renderAll();
+};
+
+// initial
+runPrimary();
+runCompare();
+renderAll();
+</script>
+</body>
+</html>

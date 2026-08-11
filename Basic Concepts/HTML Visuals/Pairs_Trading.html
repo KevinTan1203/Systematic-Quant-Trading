@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pairs Trading & Statistical Arbitrage Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C; --bg-2:#0C0E12; --panel:#111318; --panel-2:#15171D;
+  --border:#242730; --border-soft:#1A1C22;
+  --text:#E8E9EE; --text-dim:#8C90A0; --text-faint:#5A5E6B;
+  --accent:#4F8EFF; --accent-dim:#3A6BC4; --oos:#FFC145;
+  --profit:#2ED573; --loss:#FF4757; --warn:#F5A623; --choppy:#8C7CFF;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px; --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(46,213,115,0.04), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+.app{display:grid; grid-template-columns:350px 1fr; min-height:100vh;}
+@media (max-width:1150px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--accent), var(--profit), var(--loss)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:11px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:15px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+select, input[type=number]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:22px 28px 60px; max-width:1520px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:26px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:920px; font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px; max-width:920px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px 14px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.profit:before{background:var(--profit);}
+.kpi.loss:before{background:var(--loss);}
+.kpi.warn:before{background:var(--warn);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:17px; font-weight:600; margin-top:5px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+table.data-table th, table.data-table td{padding:7px 8px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left;}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10.5px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+table.data-table .pos{color:var(--profit);}
+table.data-table .neg{color:var(--loss);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.legend-row{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); margin-bottom:8px;}
+.legend-line{display:inline-block; width:14px; height:2px; margin-right:5px; vertical-align:middle;}
+.footer-note{margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; border:1px solid rgba(255,193,69,0.4); color:var(--oos); margin-left:8px;}
+.warn-banner{background:rgba(255,193,69,0.07); border:1px solid rgba(255,193,69,0.28); border-radius:8px; padding:11px 14px; font-size:12.5px; color:var(--oos); margin-bottom:14px; line-height:1.55;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">±</div><div class="brand-name">Pairs Lab</div></div>
+    <div class="brand-sub">Spread · Z-Score · Stat Arb</div>
+
+    <div class="ctrl-group">
+      <h4>Price Process</h4>
+      <div class="row2">
+        <div class="field">
+          <div class="field-label"><span>A₀</span></div>
+          <input type="number" id="a0" value="100" step="1" min="1">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>B₀</span></div>
+          <input type="number" id="b0" value="100" step="1" min="1">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Days</span><span class="val" id="v_days">750</span></div>
+        <input type="range" id="days" min="250" max="2000" step="50" value="750">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>True hedge β</span><span class="val" id="v_beta">1.00</span></div>
+        <input type="range" id="beta" min="0.40" max="2.00" step="0.05" value="1.00">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Correlation (drivers)</span><span class="val" id="v_corr">0.85</span></div>
+        <input type="range" id="corr" min="0.20" max="0.98" step="0.01" value="0.85">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Volatility</span><span class="val" id="v_vol">0.22</span></div>
+        <input type="range" id="vol" min="0.08" max="0.50" step="0.01" value="0.22">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Mean-reversion κ</span><span class="val" id="v_kappa">8.0</span></div>
+        <input type="range" id="kappa" min="0.5" max="30" step="0.5" value="8.0">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Spread noise</span><span class="val" id="v_noise">0.08</span></div>
+        <input type="range" id="noise" min="0.02" max="0.25" step="0.01" value="0.08">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Seed</span></div>
+        <input type="number" id="seed" value="42" step="1">
+      </div>
+      <div class="hint">κ is the OU speed of the cointegrating residual. Higher κ → faster reversion → shorter half-life.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Signal &amp; Trading</h4>
+      <div class="field">
+        <div class="field-label"><span>Lookback (days)</span><span class="val" id="v_lb">60</span></div>
+        <input type="range" id="lookback" min="20" max="200" step="5" value="60">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Hedge ratio mode</span></div>
+        <select id="hedgeMode">
+          <option value="true">True β (oracle)</option>
+          <option value="rolling" selected>Rolling OLS</option>
+          <option value="fixed">Fixed = 1</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Entry |Z|</span><span class="val" id="v_entry">2.0</span></div>
+        <input type="range" id="entryZ" min="1.0" max="3.5" step="0.1" value="2.0">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Exit |Z|</span><span class="val" id="v_exit">0.5</span></div>
+        <input type="range" id="exitZ" min="0.0" max="1.5" step="0.1" value="0.5">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Txn cost / leg (bps)</span><span class="val" id="v_tc">5</span></div>
+        <input type="range" id="tcBps" min="0" max="40" step="1" value="5">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Slippage / leg (bps)</span><span class="val" id="v_slip">2</span></div>
+        <input type="range" id="slipBps" min="0" max="20" step="1" value="2">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="runBtn">▶ Simulate &amp; Trade</button>
+    <div class="btn-row">
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+    <div class="status-line" id="statusLine">Ready · synthetic series</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Statistical Arbitrage · Mean Reversion</div>
+      <h1 class="page-title">Pairs Trading &amp; Statistical Arbitrage Lab</h1>
+      <p class="page-desc">Simulate two cointegrated-style price series, form the log-spread S<sub>t</sub> = ln A<sub>t</sub> − β ln B<sub>t</sub>, trade z-score excursions, and measure P&amp;L after costs. Explore how correlation, mean-reversion speed and estimation of β affect signals — and why relationships that worked historically can fail.</p>
+    </div>
+
+    <div class="warn-banner">
+      <b>Synthetic data only.</b> Prices are generated from a stylised common-factor + Ornstein–Uhlenbeck residual model. Not real market data. Not investment advice.
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-title">Performance Snapshot</span>
+        <span class="badge">SYNTHETIC</span>
+      </div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Prices A &amp; B with Trade Markers</span></div>
+      <p class="section-desc">Green markers = enter long spread (long A / short β·B). Red = enter short spread. Yellow = exit to flat.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-line" style="background:var(--accent)"></span>A</span>
+          <span><span class="legend-line" style="background:var(--choppy)"></span>B</span>
+        </div>
+        <div id="priceChart" style="width:100%;height:360px;"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Spread, Bands &amp; Z-Score</span></div>
+      <div class="grid grid-2">
+        <div class="card">
+          <div id="spreadChart" style="width:100%;height:340px;"></div>
+        </div>
+        <div class="card">
+          <div id="zChart" style="width:100%;height:340px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Equity Curve &amp; Drawdown</span></div>
+      <div class="grid grid-2">
+        <div class="card"><div id="eqChart" style="width:100%;height:300px;"></div></div>
+        <div class="card"><div id="ddChart" style="width:100%;height:300px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Rolling Diagnostics</span></div>
+      <div class="grid grid-2">
+        <div class="card"><div id="corrChart" style="width:100%;height:280px;"></div></div>
+        <div class="card"><div id="betaChart" style="width:100%;height:280px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Trade Log &amp; Stats</span></div>
+      <div class="grid grid-2">
+        <div class="card" style="max-height:340px; overflow:auto;">
+          <table class="data-table">
+            <thead>
+              <tr><th>#</th><th>Side</th><th>Entry</th><th>Exit</th><th>Days</th><th>P&amp;L</th><th>Ret %</th></tr>
+            </thead>
+            <tbody id="tradeBody"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+            <tbody id="statsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Formulas</span></div>
+      <div class="formula-block">
+        <div class="f-title">Log Spread &amp; Z-Score</div>
+        <div class="f-math">S_t = ln(A_t) − β_t · ln(B_t)</div>
+        <div class="f-math">Z_t = (S_t − μ̂_t) / σ̂_t</div>
+        <div class="f-note">μ̂, σ̂ estimated over a rolling window. β_t is either fixed, true, or rolling OLS of ln A on ln B.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Half-Life (OU approximation)</div>
+        <div class="f-math">ΔS_t = a + b S_{t−1} + ε_t &nbsp;⇒&nbsp; κ̂ ≈ −ln(1+b) &nbsp;⇒&nbsp; HL ≈ ln(2)/κ̂</div>
+        <div class="f-note">Estimated on the full-sample spread path (educational). Requires −1 &lt; b &lt; 0 for mean reversion.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Trading Rule</div>
+        <div class="f-math">Z &gt; +Z_entry → short spread (short A, long β·B)</div>
+        <div class="f-math">Z &lt; −Z_entry → long spread (long A, short β·B)</div>
+        <div class="f-math">Exit when |Z| &lt; Z_exit</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">P&amp;L (unit notional on A)</div>
+        <div class="f-math">Long-spread daily P&amp;L ≈ r_A − β · r_B − costs on position changes</div>
+        <div class="f-note">Costs = (txn + slippage) bps applied to each leg when the position changes.</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Concepts</span></div>
+
+      <details class="disclosure" open>
+        <summary>Correlation vs cointegration</summary>
+        <div class="disclosure-body">
+          <p><b>Correlation</b> measures co-movement of returns over a window — it can be high even when the price spread wanders without bound. <b>Cointegration</b> is a stronger notion: a linear combination of levels (here log prices) is stationary, so the spread mean-reverts. Pairs trading needs mean reversion of the spread, not merely correlated returns.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Stationarity, mean reversion &amp; half-life</summary>
+        <div class="disclosure-body">
+          <p>A stationary series fluctuates around a constant mean with finite variance. The <b>half-life</b> estimates how many days the spread takes to close half of a shock under an OU model. Very long half-lives mean capital is tied up; very short ones may be noise dominated after costs.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Hedge ratio &amp; z-score</summary>
+        <div class="disclosure-body">
+          <p>The hedge ratio β scales the short leg so that the residual is closer to stationary. Using rolling OLS adapts to changing relationships but introduces estimation lag and noise. The <b>z-score</b> standardises the spread so entry/exit rules are comparable across regimes of volatility.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Why historical relationships break</summary>
+        <div class="disclosure-body">
+          <p>Regime shifts, corporate actions, changing business mix, index reconstitution, or a structural break in the cointegrating vector can all destroy a previously reliable spread. Backtests over a single calm regime overstate edge. Always ask what economic force anchors the spread — and what would invalidate it.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational pairs-trading simulator with synthetic cointegrated-style series. Transaction costs are stylised. Not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   PAIRS TRADING & STATISTICAL ARBITRAGE LAB
+   ===================================================================== */
+
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function randn(rng) {
+  const u = Math.max(1e-12, rng()), v = Math.max(1e-12, rng());
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function syncLabels() {
+  const map = [
+    ['days','v_days'],['beta','v_beta'],['corr','v_corr'],['vol','v_vol'],
+    ['kappa','v_kappa'],['noise','v_noise'],['lookback','v_lb'],
+    ['entryZ','v_entry'],['exitZ','v_exit'],['tcBps','v_tc'],['slipBps','v_slip'],
+  ];
+  map.forEach(([id, vid]) => {
+    const el = document.getElementById(id);
+    const v = document.getElementById(vid);
+    if (el && v) v.textContent = el.value;
+  });
+}
+['days','beta','corr','vol','kappa','noise','lookback','entryZ','exitZ','tcBps','slipBps'].forEach(id => {
+  document.getElementById(id).addEventListener('input', syncLabels);
+});
+syncLabels();
+
+function inputs() {
+  return {
+    a0: Math.max(1, parseFloat(document.getElementById('a0').value) || 100),
+    b0: Math.max(1, parseFloat(document.getElementById('b0').value) || 100),
+    days: parseInt(document.getElementById('days').value, 10) || 750,
+    beta: parseFloat(document.getElementById('beta').value) || 1,
+    corr: parseFloat(document.getElementById('corr').value) || 0.85,
+    vol: parseFloat(document.getElementById('vol').value) || 0.22,
+    kappa: parseFloat(document.getElementById('kappa').value) || 8,
+    noise: parseFloat(document.getElementById('noise').value) || 0.08,
+    seed: parseInt(document.getElementById('seed').value, 10) || 42,
+    lookback: parseInt(document.getElementById('lookback').value, 10) || 60,
+    hedgeMode: document.getElementById('hedgeMode').value,
+    entryZ: parseFloat(document.getElementById('entryZ').value) || 2,
+    exitZ: parseFloat(document.getElementById('exitZ').value) || 0.5,
+    tcBps: parseFloat(document.getElementById('tcBps').value) || 0,
+    slipBps: parseFloat(document.getElementById('slipBps').value) || 0,
+  };
+}
+
+/* ---- Generate cointegrated-style pair ---- */
+function generatePair(cfg) {
+  const rng = mulberry32(cfg.seed >>> 0);
+  const n = cfg.days;
+  const dt = 1 / 252;
+  const A = new Float64Array(n);
+  const B = new Float64Array(n);
+  A[0] = cfg.a0;
+  B[0] = cfg.b0;
+
+  // Common log-factor X and OU residual U for spread
+  // ln B = X, ln A = beta * X + U, dU = -kappa U dt + noise dW
+  let X = Math.log(cfg.b0);
+  let U = Math.log(cfg.a0) - cfg.beta * X;
+  const sigX = cfg.vol;
+  const sigU = cfg.noise;
+  const rho = cfg.corr;
+
+  for (let t = 1; t < n; t++) {
+    const z1 = randn(rng);
+    const z2 = rho * z1 + Math.sqrt(Math.max(0, 1 - rho * rho)) * randn(rng);
+    // X is near-random-walk with drift 0
+    X += sigX * Math.sqrt(dt) * z1;
+    // OU residual
+    U += -cfg.kappa * U * dt + sigU * Math.sqrt(dt) * z2;
+    const lnB = X;
+    const lnA = cfg.beta * X + U;
+    B[t] = Math.exp(lnB);
+    A[t] = Math.exp(lnA);
+    if (!isFinite(A[t]) || A[t] <= 0) A[t] = A[t - 1];
+    if (!isFinite(B[t]) || B[t] <= 0) B[t] = B[t - 1];
+  }
+  return { A, B };
+}
+
+/* ---- Rolling OLS beta of lnA on lnB ---- */
+function rollingBeta(A, B, lookback) {
+  const n = A.length;
+  const beta = new Float64Array(n);
+  for (let t = 0; t < n; t++) {
+    if (t < lookback) {
+      beta[t] = NaN;
+      continue;
+    }
+    let sumX = 0, sumY = 0, sumXX = 0, sumXY = 0;
+    const m = lookback;
+    for (let i = t - m; i < t; i++) {
+      const x = Math.log(B[i]), y = Math.log(A[i]);
+      sumX += x; sumY += y; sumXX += x * x; sumXY += x * y;
+    }
+    const den = m * sumXX - sumX * sumX;
+    beta[t] = Math.abs(den) < 1e-12 ? 1 : (m * sumXY - sumX * sumY) / den;
+  }
+  return beta;
+}
+
+function rollingCorr(A, B, lookback) {
+  const n = A.length;
+  const out = new Float64Array(n);
+  for (let t = 0; t < n; t++) {
+    if (t < lookback + 1) { out[t] = NaN; continue; }
+    // correlation of returns
+    let sumX = 0, sumY = 0, sumXX = 0, sumYY = 0, sumXY = 0, m = 0;
+    for (let i = t - lookback + 1; i <= t; i++) {
+      const x = Math.log(A[i] / A[i - 1]);
+      const y = Math.log(B[i] / B[i - 1]);
+      sumX += x; sumY += y; sumXX += x * x; sumYY += y * y; sumXY += x * y;
+      m++;
+    }
+    const cov = sumXY / m - (sumX / m) * (sumY / m);
+    const sx = Math.sqrt(Math.max(0, sumXX / m - (sumX / m) ** 2));
+    const sy = Math.sqrt(Math.max(0, sumYY / m - (sumY / m) ** 2));
+    out[t] = sx * sy > 1e-12 ? cov / (sx * sy) : 0;
+  }
+  return out;
+}
+
+function halfLife(spread) {
+  // AR(1) on levels: S_t = a + phi S_{t-1} + e
+  // or on differences: dS = a + b S_{t-1}
+  let sumS = 0, sumY = 0, sumSS = 0, sumSY = 0, m = 0;
+  for (let t = 1; t < spread.length; t++) {
+    if (!isFinite(spread[t]) || !isFinite(spread[t - 1])) continue;
+    const s = spread[t - 1];
+    const y = spread[t] - spread[t - 1];
+    sumS += s; sumY += y; sumSS += s * s; sumSY += s * y;
+    m++;
+  }
+  if (m < 30) return NaN;
+  const den = m * sumSS - sumS * sumS;
+  if (Math.abs(den) < 1e-14) return NaN;
+  const b = (m * sumSY - sumS * sumY) / den;
+  if (b >= 0 || b <= -1) return NaN;
+  const kappa = -Math.log(1 + b);
+  return Math.log(2) / kappa;
+}
+
+/* ---- Signals & backtest ---- */
+function runStrategy(A, B, cfg) {
+  const n = A.length;
+  let betaArr;
+  if (cfg.hedgeMode === 'true') {
+    betaArr = new Float64Array(n).fill(cfg.beta);
+  } else if (cfg.hedgeMode === 'fixed') {
+    betaArr = new Float64Array(n).fill(1);
+  } else {
+    betaArr = rollingBeta(A, B, cfg.lookback);
+  }
+
+  const spread = new Float64Array(n);
+  const mu = new Float64Array(n);
+  const sd = new Float64Array(n);
+  const z = new Float64Array(n);
+
+  for (let t = 0; t < n; t++) {
+    const b = isFinite(betaArr[t]) ? betaArr[t] : cfg.beta;
+    spread[t] = Math.log(A[t]) - b * Math.log(B[t]);
+  }
+
+  for (let t = 0; t < n; t++) {
+    if (t < cfg.lookback) {
+      mu[t] = sd[t] = z[t] = NaN;
+      continue;
+    }
+    let s = 0, s2 = 0;
+    for (let i = t - cfg.lookback; i < t; i++) {
+      s += spread[i];
+      s2 += spread[i] * spread[i];
+    }
+    const m = s / cfg.lookback;
+    const v = Math.max(0, s2 / cfg.lookback - m * m);
+    mu[t] = m;
+    sd[t] = Math.sqrt(v);
+    z[t] = sd[t] > 1e-10 ? (spread[t] - mu[t]) / sd[t] : 0;
+  }
+
+  // Positions: +1 long spread, -1 short spread, 0 flat
+  // Position held from close t to close t+1 based on signal at t
+  const pos = new Float64Array(n);
+  let cur = 0;
+  for (let t = 0; t < n; t++) {
+    if (!isFinite(z[t])) { pos[t] = 0; cur = 0; continue; }
+    if (cur === 0) {
+      if (z[t] > cfg.entryZ) cur = -1;
+      else if (z[t] < -cfg.entryZ) cur = 1;
+    } else if (cur === 1) {
+      if (z[t] > -cfg.exitZ) cur = 0; // exit long when z recovers above -exit
+      // also flip?
+      if (z[t] > cfg.entryZ) cur = -1;
+    } else if (cur === -1) {
+      if (z[t] < cfg.exitZ) cur = 0;
+      if (z[t] < -cfg.entryZ) cur = 1;
+    }
+    pos[t] = cur;
+  }
+
+  // Daily P&L
+  const ret = new Float64Array(n);
+  const equity = new Float64Array(n);
+  equity[0] = 1;
+  const costRate = (cfg.tcBps + cfg.slipBps) / 10000;
+  let trades = [];
+  let open = null;
+
+  for (let t = 1; t < n; t++) {
+    const b = isFinite(betaArr[t - 1]) ? betaArr[t - 1] : cfg.beta;
+    const rA = A[t] / A[t - 1] - 1;
+    const rB = B[t] / B[t - 1] - 1;
+    const p = pos[t - 1];
+    // gross spread return for +1 long spread
+    let pnl = p * (rA - b * rB);
+    // costs on position change (both legs)
+    const dPos = Math.abs(pos[t] - pos[t - 1]);
+    if (dPos > 0) {
+      // each unit of position change trades ~1 unit A and |β| unit B
+      pnl -= dPos * costRate * (1 + Math.abs(b));
+    }
+    ret[t] = pnl;
+    equity[t] = equity[t - 1] * (1 + pnl);
+
+    // trade log
+    if (pos[t] !== pos[t - 1]) {
+      if (pos[t - 1] !== 0 && (pos[t] === 0 || pos[t] !== pos[t - 1])) {
+        // close previous
+        if (open) {
+          open.exit = t;
+          open.exitZ = z[t];
+          let tradeRet = 1;
+          for (let k = open.entry + 1; k <= t; k++) tradeRet *= (1 + ret[k]);
+          // isolate roughly — use equity ratio
+          open.pnl = equity[t] / equity[open.entry] - 1;
+          open.days = t - open.entry;
+          trades.push(open);
+          open = null;
+        }
+      }
+      if (pos[t] !== 0 && pos[t] !== pos[t - 1]) {
+        open = { side: pos[t] > 0 ? 'long' : 'short', entry: t, entryZ: z[t] };
+      }
+    }
+  }
+  if (open) {
+    open.exit = n - 1;
+    open.exitZ = z[n - 1];
+    open.pnl = equity[n - 1] / equity[open.entry] - 1;
+    open.days = n - 1 - open.entry;
+    trades.push(open);
+  }
+
+  const corr = rollingCorr(A, B, cfg.lookback);
+  const hl = halfLife(Array.from(spread).filter(isFinite));
+
+  return { spread, mu, sd, z, pos, ret, equity, betaArr, corr, trades, halfLife: hl };
+}
+
+function metrics(ret, equity, trades, cfg) {
+  const n = ret.length;
+  let sum = 0, sum2 = 0, sumDown2 = 0, m = 0;
+  for (let t = 1; t < n; t++) {
+    sum += ret[t];
+    sum2 += ret[t] * ret[t];
+    if (ret[t] < 0) sumDown2 += ret[t] * ret[t];
+    m++;
+  }
+  const mean = sum / m;
+  const variance = Math.max(0, sum2 / m - mean * mean);
+  const std = Math.sqrt(variance);
+  const downStd = Math.sqrt(sumDown2 / m);
+  const sharpe = std > 1e-12 ? (mean / std) * Math.sqrt(252) : 0;
+  const sortino = downStd > 1e-12 ? (mean / downStd) * Math.sqrt(252) : 0;
+  const totalReturn = equity[n - 1] - 1;
+  const years = n / 252;
+  const annReturn = years > 0 ? Math.pow(Math.max(equity[n - 1], 1e-12), 1 / years) - 1 : 0;
+
+  let peak = 1, maxDD = 0;
+  for (let t = 0; t < n; t++) {
+    if (equity[t] > peak) peak = equity[t];
+    const dd = (peak - equity[t]) / peak;
+    if (dd > maxDD) maxDD = dd;
+  }
+
+  const wins = trades.filter(t => t.pnl > 0).length;
+  const winRate = trades.length ? wins / trades.length : 0;
+  const avgTrade = trades.length ? trades.reduce((s, t) => s + t.pnl, 0) / trades.length : 0;
+
+  // turnover proxy: sum |dPos|
+  let turnover = 0;
+  // recount from pos changes in ret costs — approximate via trades
+  turnover = trades.length * 2;
+
+  return {
+    totalReturn, annReturn, sharpe, sortino, maxDD,
+    winRate, avgTrade, nTrades: trades.length, turnover,
+  };
+}
+
+/* ---- Render ---- */
+function fmt(x, d=2) { return isFinite(x) ? Number(x).toFixed(d) : '—'; }
+function pct(x, d=2) { return isFinite(x) ? (x * 100).toFixed(d) + '%' : '—'; }
+
+function plotlyBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 55, r: 20, t: 28, b: 44 },
+    xaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.14, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE' } },
+  }, extra || {});
+}
+const PCFG = { displayModeBar: false, responsive: true };
+
+let LAST = null;
+
+function run() {
+  const cfg = inputs();
+  const { A, B } = generatePair(cfg);
+  const res = runStrategy(A, B, cfg);
+  const met = metrics(res.ret, res.equity, res.trades, cfg);
+  LAST = { cfg, A, B, res, met };
+  render();
+}
+
+function render() {
+  if (!LAST) return;
+  const { cfg, A, B, res, met } = LAST;
+  const n = A.length;
+  const xs = Array.from({ length: n }, (_, i) => i);
+
+  // entry/exit markers
+  const longX = [], longY = [], shortX = [], shortY = [], exitX = [], exitY = [];
+  const longXA = [], longYA = [], shortXA = [], shortYA = [], exitXA = [], exitYA = [];
+  for (let t = 1; t < n; t++) {
+    if (res.pos[t] === res.pos[t - 1]) continue;
+    if (res.pos[t] === 1) {
+      longX.push(t); longY.push(res.spread[t]);
+      longXA.push(t); longYA.push(A[t]);
+    } else if (res.pos[t] === -1) {
+      shortX.push(t); shortY.push(res.spread[t]);
+      shortXA.push(t); shortYA.push(A[t]);
+    } else {
+      exitX.push(t); exitY.push(res.spread[t]);
+      exitXA.push(t); exitYA.push(A[t]);
+    }
+  }
+
+  // KPIs
+  const kpis = [
+    { l: 'Total Return', v: pct(met.totalReturn), s: `${cfg.days} days`, c: met.totalReturn >= 0 ? 'profit' : 'loss' },
+    { l: 'Ann. Return', v: pct(met.annReturn), s: 'compounded', c: 'oos' },
+    { l: 'Sharpe', v: fmt(met.sharpe, 2), s: 'ann. rf=0', c: met.sharpe > 1 ? 'profit' : '' },
+    { l: 'Sortino', v: fmt(met.sortino, 2), s: 'downside', c: '' },
+    { l: 'Max Drawdown', v: pct(met.maxDD), s: 'equity peak-to-trough', c: 'loss' },
+    { l: 'Win Rate', v: pct(met.winRate, 1), s: `${met.nTrades} trades`, c: '' },
+    { l: 'Avg Trade', v: pct(met.avgTrade), s: 'per round-trip', c: met.avgTrade >= 0 ? 'profit' : 'loss' },
+    { l: 'Half-Life', v: isFinite(res.halfLife) ? fmt(res.halfLife, 1) + ' d' : '—', s: 'OU estimate', c: 'oos' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
+  ).join('');
+
+  // Prices
+  Plotly.newPlot('priceChart', [
+    { x: xs, y: Array.from(A), mode: 'lines', line: { color: '#4F8EFF', width: 1.5 }, name: 'A' },
+    { x: xs, y: Array.from(B), mode: 'lines', line: { color: '#8C7CFF', width: 1.5 }, name: 'B' },
+    { x: longXA, y: longYA, mode: 'markers', marker: { size: 9, color: '#2ED573', symbol: 'triangle-up' }, name: 'Long spread' },
+    { x: shortXA, y: shortYA, mode: 'markers', marker: { size: 9, color: '#FF4757', symbol: 'triangle-down' }, name: 'Short spread' },
+    { x: exitXA, y: exitYA, mode: 'markers', marker: { size: 8, color: '#FFC145', symbol: 'x' }, name: 'Exit' },
+  ], plotlyBase({ xaxis: { title: 'Day' }, yaxis: { title: 'Price' } }), PCFG);
+
+  // Spread with bands
+  const upper = res.mu.map((m, i) => isFinite(m) && isFinite(res.sd[i]) ? m + cfg.entryZ * res.sd[i] : null);
+  const lower = res.mu.map((m, i) => isFinite(m) && isFinite(res.sd[i]) ? m - cfg.entryZ * res.sd[i] : null);
+  Plotly.newPlot('spreadChart', [
+    { x: xs, y: Array.from(res.spread), mode: 'lines', line: { color: '#E8E9EE', width: 1.3 }, name: 'Spread' },
+    { x: xs, y: Array.from(res.mu), mode: 'lines', line: { color: '#4F8EFF', width: 1.2, dash: 'dash' }, name: 'Rolling mean' },
+    { x: xs, y: upper, mode: 'lines', line: { color: '#FF4757', width: 1, dash: 'dot' }, name: '+entry band' },
+    { x: xs, y: lower, mode: 'lines', line: { color: '#2ED573', width: 1, dash: 'dot' }, name: '−entry band' },
+    { x: longX, y: longY, mode: 'markers', marker: { size: 8, color: '#2ED573', symbol: 'triangle-up' }, name: 'Long', showlegend: false },
+    { x: shortX, y: shortY, mode: 'markers', marker: { size: 8, color: '#FF4757', symbol: 'triangle-down' }, name: 'Short', showlegend: false },
+    { x: exitX, y: exitY, mode: 'markers', marker: { size: 7, color: '#FFC145', symbol: 'x' }, name: 'Exit', showlegend: false },
+  ], plotlyBase({
+    title: { text: 'S = ln A − β ln B', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Day' }, yaxis: { title: 'Spread' },
+  }), PCFG);
+
+  // Z-score
+  Plotly.newPlot('zChart', [
+    { x: xs, y: Array.from(res.z), mode: 'lines', line: { color: '#FFC145', width: 1.4 }, name: 'Z' },
+    { x: xs, y: xs.map(() => cfg.entryZ), mode: 'lines', line: { color: '#FF4757', width: 1, dash: 'dot' }, name: '+entry' },
+    { x: xs, y: xs.map(() => -cfg.entryZ), mode: 'lines', line: { color: '#2ED573', width: 1, dash: 'dot' }, name: '−entry' },
+    { x: xs, y: xs.map(() => cfg.exitZ), mode: 'lines', line: { color: '#5A5E6B', width: 1, dash: 'dash' }, name: '+exit' },
+    { x: xs, y: xs.map(() => -cfg.exitZ), mode: 'lines', line: { color: '#5A5E6B', width: 1, dash: 'dash' }, name: '−exit' },
+  ], plotlyBase({
+    title: { text: 'Z-score', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Day' }, yaxis: { title: 'Z' },
+  }), PCFG);
+
+  // Equity
+  Plotly.newPlot('eqChart', [{
+    x: xs, y: Array.from(res.equity), mode: 'lines',
+    line: { color: '#4F8EFF', width: 2 }, name: 'Equity',
+    fill: 'tozeroy', fillcolor: 'rgba(79,142,255,0.08)',
+  }], plotlyBase({
+    title: { text: 'Strategy equity (starts at 1)', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Day' }, yaxis: { title: 'Equity' },
+  }), PCFG);
+
+  // Drawdown
+  let peak = 1;
+  const dd = Array.from(res.equity).map(e => {
+    if (e > peak) peak = e;
+    return -((peak - e) / peak) * 100;
+  });
+  Plotly.newPlot('ddChart', [{
+    x: xs, y: dd, mode: 'lines', line: { color: '#FF4757', width: 1.5 },
+    fill: 'tozeroy', fillcolor: 'rgba(255,71,87,0.15)', name: 'Drawdown %',
+  }], plotlyBase({
+    title: { text: 'Drawdown', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Day' }, yaxis: { title: 'DD %' },
+  }), PCFG);
+
+  // Rolling corr
+  Plotly.newPlot('corrChart', [{
+    x: xs, y: Array.from(res.corr), mode: 'lines', line: { color: '#8C7CFF', width: 1.5 }, name: 'Rolling corr',
+  }], plotlyBase({
+    title: { text: 'Rolling return correlation', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Day' }, yaxis: { title: 'ρ', range: [-1, 1] },
+  }), PCFG);
+
+  // Rolling beta
+  Plotly.newPlot('betaChart', [
+    { x: xs, y: Array.from(res.betaArr), mode: 'lines', line: { color: '#FFC145', width: 1.5 }, name: 'β used' },
+    { x: xs, y: xs.map(() => cfg.beta), mode: 'lines', line: { color: '#5A5E6B', width: 1, dash: 'dash' }, name: 'True β' },
+  ], plotlyBase({
+    title: { text: 'Hedge ratio', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Day' }, yaxis: { title: 'β' },
+  }), PCFG);
+
+  // Trade log
+  document.getElementById('tradeBody').innerHTML = res.trades.length
+    ? res.trades.map((t, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="${t.side === 'long' ? 'pos' : 'neg'}">${t.side}</td>
+        <td>${t.entry}</td>
+        <td>${t.exit}</td>
+        <td>${t.days}</td>
+        <td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${pct(t.pnl)}</td>
+        <td class="${t.pnl >= 0 ? 'pos' : 'neg'}">${pct(t.pnl)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="7" style="text-align:center;color:var(--text-faint)">No trades</td></tr>';
+
+  const costBps = cfg.tcBps + cfg.slipBps;
+  document.getElementById('statsBody').innerHTML = [
+    ['Days', cfg.days],
+    ['True β / mode', `${cfg.beta.toFixed(2)} / ${cfg.hedgeMode}`],
+    ['Half-life (days)', fmt(res.halfLife, 2)],
+    ['Entry / Exit Z', `${cfg.entryZ} / ${cfg.exitZ}`],
+    ['Cost+slip / leg (bps)', costBps],
+    ['Trades', met.nTrades],
+    ['Win rate', pct(met.winRate, 1)],
+    ['Avg trade', pct(met.avgTrade)],
+    ['Total return', pct(met.totalReturn)],
+    ['Ann. return', pct(met.annReturn)],
+    ['Sharpe', fmt(met.sharpe, 2)],
+    ['Sortino', fmt(met.sortino, 2)],
+    ['Max DD', pct(met.maxDD)],
+    ['Final equity', fmt(res.equity[n - 1], 4)],
+  ].map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('');
+
+  document.getElementById('statusLine').innerHTML =
+    `Trades <b>${met.nTrades}</b> · Sharpe <b>${fmt(met.sharpe,2)}</b> · Ret <b>${pct(met.totalReturn)}</b> · HL <b>${fmt(res.halfLife,1)}d</b>`;
+}
+
+document.getElementById('runBtn').onclick = run;
+document.getElementById('resetBtn').onclick = () => {
+  document.getElementById('a0').value = 100;
+  document.getElementById('b0').value = 100;
+  document.getElementById('days').value = 750;
+  document.getElementById('beta').value = 1;
+  document.getElementById('corr').value = 0.85;
+  document.getElementById('vol').value = 0.22;
+  document.getElementById('kappa').value = 8;
+  document.getElementById('noise').value = 0.08;
+  document.getElementById('seed').value = 42;
+  document.getElementById('lookback').value = 60;
+  document.getElementById('hedgeMode').value = 'rolling';
+  document.getElementById('entryZ').value = 2;
+  document.getElementById('exitZ').value = 0.5;
+  document.getElementById('tcBps').value = 5;
+  document.getElementById('slipBps').value = 2;
+  syncLabels();
+  run();
+};
+
+run();
+</script>
+</body>
+</html>

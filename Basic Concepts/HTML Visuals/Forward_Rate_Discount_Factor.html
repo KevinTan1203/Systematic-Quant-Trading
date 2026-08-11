@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forward Rate & Discount Factor Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C; --bg-2:#0C0E12; --panel:#111318; --panel-2:#15171D;
+  --border:#242730; --border-soft:#1A1C22;
+  --text:#E8E9EE; --text-dim:#8C90A0; --text-faint:#5A5E6B;
+  --accent:#4F8EFF; --accent-dim:#3A6BC4; --oos:#FFC145;
+  --profit:#2ED573; --loss:#FF4757; --warn:#F5A623; --choppy:#8C7CFF;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px; --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(46,213,115,0.04), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+.app{display:grid; grid-template-columns:340px 1fr; min-height:100vh;}
+@media (max-width:1100px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--accent), var(--profit), var(--oos)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:11px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:15px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+select, input[type=number], input[type=text]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+.preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.preset-btn{padding:7px 8px; font-size:11.5px; text-align:center;}
+.preset-btn.active{border-color:var(--accent); color:var(--accent); background:rgba(79,142,255,0.08);}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:22px 28px 60px; max-width:1480px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:26px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:880px; font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px; max-width:880px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px 14px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.profit:before{background:var(--profit);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:18px; font-weight:600; margin-top:5px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+table.data-table th, table.data-table td{padding:7px 8px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left;}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10.5px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+table.data-table tr.selected td{background:rgba(79,142,255,0.1);}
+table.data-table tr{cursor:pointer;}
+table.data-table tr:hover td{background:rgba(255,255,255,0.03);}
+table.data-table input.rate-edit{width:72px; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:3px 5px; font-family:var(--mono); font-size:12px; text-align:right;}
+table.data-table .oos-col{color:var(--oos);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.legend-row{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); margin-bottom:8px;}
+.legend-line{display:inline-block; width:14px; height:2px; margin-right:5px; vertical-align:middle;}
+.footer-note{margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:20px; border:1px solid rgba(79,142,255,0.4); color:var(--accent); margin-left:8px;}
+.fwd-box{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-top:12px;}
+.fwd-box .fb-title{font-family:var(--display); font-weight:600; font-size:13px; color:var(--oos); margin-bottom:8px;}
+.fwd-box .fb-math{font-family:var(--mono); font-size:12.5px; color:var(--text); line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">DF</div><div class="brand-name">DF & Forward Lab</div></div>
+    <div class="brand-sub">Spot · Discount · Forward · Par</div>
+
+    <div class="ctrl-group">
+      <h4>Curve Presets</h4>
+      <div class="preset-grid">
+        <button class="btn preset-btn active" data-p="normal">Normal</button>
+        <button class="btn preset-btn" data-p="flat">Flat</button>
+        <button class="btn preset-btn" data-p="inverted">Inverted</button>
+        <button class="btn preset-btn" data-p="steep">Steep</button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Compounding Convention</h4>
+      <div class="field">
+        <div class="field-label"><span>Frequency</span></div>
+        <select id="compounding">
+          <option value="annual" selected>Annual</option>
+          <option value="semi">Semi-annual</option>
+          <option value="continuous">Continuous</option>
+        </select>
+      </div>
+      <div class="hint" id="conventionHint">DF(T) = 1 / (1+y)^T with y annually compounded.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Global Shifts</h4>
+      <div class="field">
+        <div class="field-label"><span>Parallel shift (bp)</span><span class="val" id="v_par">0</span></div>
+        <input type="range" id="parallel" min="-150" max="150" step="5" value="0">
+      </div>
+      <div class="hint">Applied on top of the active preset base. Edit individual zeros in the table for local changes.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Forward Period Highlight</h4>
+      <div class="field">
+        <div class="field-label"><span>From maturity</span></div>
+        <select id="fwdFrom"></select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>To maturity</span></div>
+        <select id="fwdTo"></select>
+      </div>
+      <div class="fwd-box" id="fwdBox">
+        <div class="fb-title">Implied forward</div>
+        <div class="fb-math" id="fwdMath">Select two maturities.</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="resetBtn">Reset to Normal</button>
+    <div class="status-line" id="statusLine">Ready.</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Fixed Income · Term Structure Building Blocks</div>
+      <h1 class="page-title">Forward Rate &amp; Discount Factor Builder</h1>
+      <p class="page-desc">Enter or load a zero curve, choose a compounding convention, and watch discount factors, implied forwards and par yields update instantly. Change any spot rate to see how the forward curve responds — the central mechanism of no-arbitrage curve construction.</p>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-title">Curve Snapshot</span>
+        <span class="badge" id="convBadge">Annual compounding</span>
+      </div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Zero Curve &amp; Discount Factors</span></div>
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="legend-row"><span><span class="legend-line" style="background:var(--accent)"></span>Zero / spot rate</span></div>
+          <div id="zeroChart" style="width:100%;height:340px;"></div>
+        </div>
+        <div class="card">
+          <div class="legend-row"><span><span class="legend-line" style="background:var(--profit)"></span>Discount factor</span></div>
+          <div id="dfChart" style="width:100%;height:340px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Forward Curve &amp; Par Yields</span></div>
+      <p class="section-desc">Simply compounded one-period forwards between adjacent maturities, plus the highlighted multi-period forward. Par yields assume annual coupons under the same discount curve.</p>
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="legend-row">
+            <span><span class="legend-line" style="background:var(--oos)"></span>Adj. period forward</span>
+            <span><span class="legend-line" style="background:var(--choppy)"></span>Selected forward</span>
+          </div>
+          <div id="fwdChart" style="width:100%;height:340px;"></div>
+        </div>
+        <div class="card">
+          <div class="legend-row">
+            <span><span class="legend-line" style="background:var(--accent)"></span>Zero</span>
+            <span><span class="legend-line" style="background:var(--profit)"></span>Par</span>
+          </div>
+          <div id="parChart" style="width:100%;height:340px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Interactive Maturity Table</span></div>
+      <p class="section-desc">Edit any zero rate (%). Click a row to set the forward “from” maturity; the forward box uses From → To selectors. All dependent quantities recompute under the active compounding convention.</p>
+      <div class="card" style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Maturity</th>
+              <th>Years T</th>
+              <th>Zero / Spot (%)</th>
+              <th>Discount Factor</th>
+              <th>Par Yield (%)</th>
+              <th>Fwd to next (%)</th>
+            </tr>
+          </thead>
+          <tbody id="termBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Formula Reference</span></div>
+      <div class="formula-block">
+        <div class="f-title">Discount Factor — Annual Compounding</div>
+        <div class="f-math">DF(T) = 1 / (1 + y(T))^T</div>
+        <div class="f-note">y(T) is the annually compounded zero rate to maturity T (years).</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Discount Factor — Semi-Annual Compounding</div>
+        <div class="f-math">DF(T) = 1 / (1 + y(T)/2)^(2T)</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Discount Factor — Continuous Compounding</div>
+        <div class="f-math">DF(T) = e^(−y(T)·T)</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Simply Compounded Forward Rate (T₁ → T₂)</div>
+        <div class="f-math">DF(T₁) = DF(T₂) · (1 + f·τ) &nbsp; with &nbsp; τ = T₂ − T₁</div>
+        <div class="f-math">f = ( DF(T₁)/DF(T₂) − 1 ) / τ</div>
+        <div class="f-note">This f is the simply compounded rate for the period [T₁,T₂] implied by today’s discount curve. Convention is labelled in the UI.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Annually Compounded Forward (alternative form)</div>
+        <div class="f-math">(1+y₂)^T₂ = (1+y₁)^T₁ · (1+f_ann)^(T₂−T₁)</div>
+        <div class="f-note">Used when the annual compounding convention is selected for display consistency with input zeros.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Par Yield (annual coupon)</div>
+        <div class="f-math">c = (1 − DF(T)) / Σ_{i=1…N} DF(t_i)</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Concepts</span></div>
+
+      <details class="disclosure" open>
+        <summary>Time value of money &amp; discounting</summary>
+        <div class="disclosure-body">
+          <p>A dollar received in the future is worth less than a dollar today when positive interest rates prevail. The <b>discount factor</b> DF(T) is the present value of 1 unit paid at T. Multiplying any future cash flow by DF(T) converts it to today’s value under the chosen curve and compounding convention.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Spot / zero rates</summary>
+        <div class="disclosure-body">
+          <p>The <b>zero (spot) rate</b> y(T) is the yield on a zero-coupon instrument maturing at T. It is in one-to-one correspondence with DF(T) once the compounding convention is fixed. Quoting zeros is often more intuitive than quoting discount factors; pricing engines typically work with DFs internally.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Forward rates are implied, not guaranteed</summary>
+        <div class="disclosure-body">
+          <p>The forward rate from T₁ to T₂ is the break-even future rate that equates rolling a T₁ zero into a T₁→T₂ investment with holding the T₂ zero. It is locked in by today’s bond prices (under no-arbitrage assumptions). Realised future spot rates can — and usually do — differ. Forwards embed expectations, risk premia and convenience yields; they are not pure forecasts.</p>
+        </div>
+      </details>
+
+      <details class="disclosure">
+        <summary>Why changing one zero moves forwards</summary>
+        <div class="disclosure-body">
+          <p>Because f depends on the ratio DF(T₁)/DF(T₂), raising the longer zero (lowering DF(T₂)) increases the implied forward, while raising the shorter zero compresses it. Editing the table makes this dependence visible in the forward curve immediately.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational fixed-income tool. Curves are synthetic. Compounding conventions are applied consistently within each mode. Not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   FORWARD RATE & DISCOUNT FACTOR BUILDER
+   ===================================================================== */
+
+const TENORS = [
+  { label: '1M',  T: 1/12 },
+  { label: '3M',  T: 0.25 },
+  { label: '6M',  T: 0.5 },
+  { label: '1Y',  T: 1 },
+  { label: '2Y',  T: 2 },
+  { label: '3Y',  T: 3 },
+  { label: '5Y',  T: 5 },
+  { label: '7Y',  T: 7 },
+  { label: '10Y', T: 10 },
+  { label: '15Y', T: 15 },
+  { label: '20Y', T: 20 },
+  { label: '30Y', T: 30 },
+];
+
+const PRESETS = {
+  normal:   [4.90, 4.95, 5.00, 5.00, 4.70, 4.55, 4.40, 4.35, 4.30, 4.25, 4.20, 4.15],
+  flat:     [4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50, 4.50],
+  inverted: [5.35, 5.25, 5.15, 5.00, 4.60, 4.30, 4.00, 3.85, 3.75, 3.65, 3.60, 3.55],
+  steep:    [3.80, 3.95, 4.10, 4.30, 4.60, 4.85, 5.15, 5.30, 5.45, 5.55, 5.60, 5.65],
+};
+
+let baseZeros = PRESETS.normal.slice(); // percent
+let zeros = baseZeros.slice();
+let selectedRow = 0;
+let compounding = 'annual';
+
+function conventionLabel() {
+  if (compounding === 'annual') return 'Annual compounding';
+  if (compounding === 'semi') return 'Semi-annual compounding';
+  return 'Continuous compounding';
+}
+
+function conventionHint() {
+  if (compounding === 'annual') return 'DF(T) = 1 / (1+y)^T with y annually compounded.';
+  if (compounding === 'semi') return 'DF(T) = 1 / (1+y/2)^(2T) with y semi-annually compounded.';
+  return 'DF(T) = e^(−y·T) with y continuously compounded.';
+}
+
+/* ---- Math ---- */
+function dfFromZero(yPct, T) {
+  const y = yPct / 100;
+  if (T <= 0) return 1;
+  if (compounding === 'continuous') return Math.exp(-y * T);
+  if (compounding === 'semi') return 1 / Math.pow(1 + y / 2, 2 * T);
+  return 1 / Math.pow(1 + y, T);
+}
+
+function simplyCompoundedForward(df1, T1, df2, T2) {
+  const tau = T2 - T1;
+  if (tau <= 0 || df2 <= 0) return NaN;
+  return (df1 / df2 - 1) / tau;
+}
+
+function annuallyCompoundedForward(y1, T1, y2, T2) {
+  // only meaningful display under annual input convention
+  const tau = T2 - T1;
+  if (tau <= 0) return NaN;
+  const a = Math.pow(1 + y2 / 100, T2) / Math.pow(1 + y1 / 100, T1);
+  return Math.pow(a, 1 / tau) - 1;
+}
+
+function continuousForward(y1, T1, y2, T2) {
+  const tau = T2 - T1;
+  if (tau <= 0) return NaN;
+  return (y2 / 100 * T2 - y1 / 100 * T1) / tau;
+}
+
+function forwardRate(i, j) {
+  // from TENORS[i] to TENORS[j]
+  if (j <= i) return NaN;
+  const T1 = TENORS[i].T, T2 = TENORS[j].T;
+  const df1 = dfFromZero(zeros[i], T1);
+  const df2 = dfFromZero(zeros[j], T2);
+  if (compounding === 'continuous') {
+    return continuousForward(zeros[i], T1, zeros[j], T2);
+  }
+  if (compounding === 'annual') {
+    return annuallyCompoundedForward(zeros[i], T1, zeros[j], T2);
+  }
+  // semi: use DF-based simply compounded, or convert — use simply compounded ACT/365-style on DF ratio
+  return simplyCompoundedForward(df1, T1, df2, T2);
+}
+
+function adjForward(i) {
+  // forward from i to i+1
+  if (i >= TENORS.length - 1) return NaN;
+  return forwardRate(i, i + 1);
+}
+
+function interpZeroAt(T) {
+  if (T <= TENORS[0].T) return zeros[0];
+  if (T >= TENORS[TENORS.length - 1].T) return zeros[zeros.length - 1];
+  for (let i = 0; i < TENORS.length - 1; i++) {
+    if (T >= TENORS[i].T && T <= TENORS[i + 1].T) {
+      const w = (T - TENORS[i].T) / (TENORS[i + 1].T - TENORS[i].T);
+      return zeros[i] * (1 - w) + zeros[i + 1] * w;
+    }
+  }
+  return zeros[zeros.length - 1];
+}
+
+function parYield(maturityIdx) {
+  const T = TENORS[maturityIdx].T;
+  if (T < 1) return zeros[maturityIdx] / 100;
+  const n = Math.round(T);
+  let sumDF = 0;
+  for (let t = 1; t <= n; t++) {
+    const z = interpZeroAt(t);
+    sumDF += dfFromZero(z, t);
+  }
+  const dfT = dfFromZero(zeros[maturityIdx], T);
+  if (sumDF <= 0) return NaN;
+  return (1 - dfT) / sumDF;
+}
+
+function computeAll() {
+  const dfs = zeros.map((z, i) => dfFromZero(z, TENORS[i].T));
+  const pars = zeros.map((_, i) => parYield(i) * 100);
+  const fwds = zeros.map((_, i) => adjForward(i) * 100);
+  return { dfs, pars, fwds };
+}
+
+/* ---- UI wiring ---- */
+function applyShift() {
+  const bp = parseFloat(document.getElementById('parallel').value) || 0;
+  document.getElementById('v_par').textContent = (bp >= 0 ? '+' : '') + bp;
+  zeros = baseZeros.map(z => Math.max(0.01, z + bp / 100));
+  render();
+}
+
+function loadPreset(name) {
+  baseZeros = PRESETS[name].slice();
+  document.getElementById('parallel').value = 0;
+  document.getElementById('v_par').textContent = '0';
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.p === name));
+  zeros = baseZeros.slice();
+  render();
+}
+
+document.querySelectorAll('.preset-btn').forEach(b => {
+  b.addEventListener('click', () => loadPreset(b.dataset.p));
+});
+document.getElementById('parallel').addEventListener('input', applyShift);
+document.getElementById('compounding').addEventListener('change', () => {
+  compounding = document.getElementById('compounding').value;
+  document.getElementById('convBadge').textContent = conventionLabel();
+  document.getElementById('conventionHint').textContent = conventionHint();
+  render();
+});
+document.getElementById('resetBtn').onclick = () => loadPreset('normal');
+
+function populateFwdSelects() {
+  const from = document.getElementById('fwdFrom');
+  const to = document.getElementById('fwdTo');
+  const curFrom = from.value;
+  const curTo = to.value;
+  from.innerHTML = TENORS.map((t, i) => `<option value="${i}">${t.label} (${t.T}Y)</option>`).join('');
+  to.innerHTML = TENORS.map((t, i) => `<option value="${i}">${t.label} (${t.T}Y)</option>`).join('');
+  from.value = curFrom && parseInt(curFrom, 10) < TENORS.length - 1 ? curFrom : '3';
+  to.value = curTo && parseInt(curTo, 10) > parseInt(from.value, 10) ? curTo : '6';
+  if (parseInt(to.value, 10) <= parseInt(from.value, 10)) {
+    to.value = String(Math.min(TENORS.length - 1, parseInt(from.value, 10) + 1));
+  }
+}
+document.getElementById('fwdFrom').addEventListener('change', render);
+document.getElementById('fwdTo').addEventListener('change', render);
+
+/* ---- Render ---- */
+function fmt(x, d=2) { return isFinite(x) ? Number(x).toFixed(d) : '—'; }
+function fmtDF(x) { return isFinite(x) ? x.toFixed(6) : '—'; }
+
+function plotlyBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 55, r: 20, t: 24, b: 48 },
+    xaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.12, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE' } },
+  }, extra || {});
+}
+const PCFG = { displayModeBar: false, responsive: true };
+
+function render() {
+  compounding = document.getElementById('compounding').value;
+  const calc = computeAll();
+  const xs = TENORS.map(t => t.T);
+  const labels = TENORS.map(t => t.label);
+
+  const iFrom = parseInt(document.getElementById('fwdFrom').value, 10) || 0;
+  let iTo = parseInt(document.getElementById('fwdTo').value, 10) || 1;
+  if (iTo <= iFrom) iTo = Math.min(TENORS.length - 1, iFrom + 1);
+
+  const fSel = forwardRate(iFrom, iTo);
+  const T1 = TENORS[iFrom].T, T2 = TENORS[iTo].T;
+  const df1 = dfFromZero(zeros[iFrom], T1);
+  const df2 = dfFromZero(zeros[iTo], T2);
+
+  // KPIs
+  const z2 = zeros[TENORS.findIndex(t => t.label === '2Y')];
+  const z10 = zeros[TENORS.findIndex(t => t.label === '10Y')];
+  const kpis = [
+    { l: '2s10s Zero Slope', v: ((z10 - z2) >= 0 ? '+' : '') + (z10 - z2).toFixed(2) + '%', s: '10Y − 2Y', c: z10 < z2 ? 'oos' : 'profit' },
+    { l: 'Selected Forward', v: isFinite(fSel) ? (fSel * 100).toFixed(3) + '%' : '—', s: `${TENORS[iFrom].label} → ${TENORS[iTo].label}`, c: 'oos' },
+    { l: 'DF(10Y)', v: fmtDF(dfFromZero(zeros[TENORS.findIndex(t => t.label === '10Y')], 10)), s: conventionLabel(), c: '' },
+    { l: 'Longest Zero', v: zeros[zeros.length - 1].toFixed(2) + '%', s: TENORS[TENORS.length - 1].label, c: '' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
+  ).join('');
+
+  // Forward math box
+  let formulaLines = '';
+  if (compounding === 'annual') {
+    formulaLines = `
+      (1 + y₂)^T₂ = (1 + y₁)^T₁ · (1 + f)^(T₂ − T₁)<br>
+      y₁ = ${(zeros[iFrom]).toFixed(4)}%, T₁ = ${T1}<br>
+      y₂ = ${(zeros[iTo]).toFixed(4)}%, T₂ = ${T2}<br>
+      <b>f = ${isFinite(fSel) ? (fSel * 100).toFixed(4) + '%' : '—'}</b> (annually compounded)`;
+  } else if (compounding === 'continuous') {
+    formulaLines = `
+      f = (y₂ T₂ − y₁ T₁) / (T₂ − T₁)<br>
+      DF₁ = ${fmtDF(df1)}, DF₂ = ${fmtDF(df2)}<br>
+      <b>f = ${isFinite(fSel) ? (fSel * 100).toFixed(4) + '%' : '—'}</b> (continuous)`;
+  } else {
+    formulaLines = `
+      f_simple = (DF₁/DF₂ − 1) / (T₂ − T₁)<br>
+      DF₁ = ${fmtDF(df1)}, DF₂ = ${fmtDF(df2)}, τ = ${(T2 - T1).toFixed(4)}<br>
+      <b>f = ${isFinite(fSel) ? (fSel * 100).toFixed(4) + '%' : '—'}</b> (simply compounded)`;
+  }
+  document.getElementById('fwdMath').innerHTML = formulaLines;
+
+  // Zero chart
+  Plotly.newPlot('zeroChart', [{
+    x: xs, y: zeros, mode: 'lines+markers',
+    line: { color: '#4F8EFF', width: 2.5 },
+    marker: { size: 8, color: '#4F8EFF' },
+    text: labels,
+    hovertemplate: '%{text}<br>%{y:.3f}%<extra></extra>',
+  }], plotlyBase({
+    xaxis: { title: 'Maturity (years)', type: 'log', tickvals: xs, ticktext: labels },
+    yaxis: { title: `Zero rate (%) · ${conventionLabel()}` },
+  }), PCFG);
+
+  // DF chart
+  Plotly.newPlot('dfChart', [{
+    x: xs, y: calc.dfs, mode: 'lines+markers',
+    line: { color: '#2ED573', width: 2.5 },
+    marker: { size: 8, color: '#2ED573' },
+    fill: 'tozeroy', fillcolor: 'rgba(46,213,115,0.08)',
+    hovertemplate: 'DF=%{y:.6f}<extra></extra>',
+  }], plotlyBase({
+    xaxis: { title: 'Maturity (years)', type: 'log', tickvals: xs, ticktext: labels },
+    yaxis: { title: 'Discount factor', range: [0, 1.05] },
+  }), PCFG);
+
+  // Forward chart
+  const fwdX = [];
+  const fwdY = [];
+  for (let i = 0; i < TENORS.length - 1; i++) {
+    fwdX.push((TENORS[i].T + TENORS[i + 1].T) / 2);
+    fwdY.push(calc.fwds[i]);
+  }
+  // selected forward as a horizontal segment
+  const selX = [T1, T2];
+  const selY = [fSel * 100, fSel * 100];
+
+  Plotly.newPlot('fwdChart', [
+    { x: fwdX, y: fwdY, mode: 'lines+markers', line: { color: '#FFC145', width: 2.5 }, marker: { size: 7 }, name: 'Adj. forward' },
+    { x: selX, y: selY, mode: 'lines+markers', line: { color: '#8C7CFF', width: 3 }, marker: { size: 10, symbol: 'diamond' }, name: `${TENORS[iFrom].label}→${TENORS[iTo].label}` },
+  ], plotlyBase({
+    xaxis: { title: 'Start / mid of period (years)', type: 'log' },
+    yaxis: { title: 'Forward rate (%)' },
+  }), PCFG);
+
+  // Par vs zero
+  Plotly.newPlot('parChart', [
+    { x: xs, y: zeros, mode: 'lines+markers', line: { color: '#4F8EFF', width: 2.5 }, name: 'Zero' },
+    { x: xs, y: calc.pars, mode: 'lines+markers', line: { color: '#2ED573', width: 2 }, name: 'Par' },
+  ], plotlyBase({
+    xaxis: { title: 'Maturity (years)', type: 'log', tickvals: xs, ticktext: labels },
+    yaxis: { title: 'Yield (%)' },
+  }), PCFG);
+
+  // Table
+  document.getElementById('termBody').innerHTML = TENORS.map((t, i) => `
+    <tr class="${i === selectedRow ? 'selected' : ''}" data-i="${i}">
+      <td>${t.label}</td>
+      <td>${t.T < 1 ? t.T.toFixed(4) : t.T}</td>
+      <td><input class="rate-edit" type="number" step="0.01" min="0.01" max="30" value="${zeros[i].toFixed(3)}" data-i="${i}"></td>
+      <td>${fmtDF(calc.dfs[i])}</td>
+      <td class="oos-col">${fmt(calc.pars[i], 3)}</td>
+      <td>${fmt(calc.fwds[i], 3)}</td>
+    </tr>
+  `).join('');
+
+  document.querySelectorAll('#termBody tr').forEach(tr => {
+    tr.addEventListener('click', e => {
+      if (e.target.tagName === 'INPUT') return;
+      selectedRow = parseInt(tr.dataset.i, 10);
+      document.getElementById('fwdFrom').value = String(selectedRow);
+      render();
+    });
+  });
+  document.querySelectorAll('.rate-edit').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const i = parseInt(inp.dataset.i, 10);
+      let v = parseFloat(inp.value);
+      if (!isFinite(v)) v = zeros[i];
+      zeros[i] = Math.max(0.01, Math.min(30, v));
+      // update base so parallel shift is relative to edited curve
+      const bp = parseFloat(document.getElementById('parallel').value) || 0;
+      baseZeros[i] = zeros[i] - bp / 100;
+      render();
+    });
+  });
+
+  document.getElementById('statusLine').innerHTML =
+    `<b>${conventionLabel()}</b> · forward <b>${TENORS[iFrom].label}→${TENORS[iTo].label}</b> = <b>${isFinite(fSel) ? (fSel*100).toFixed(3)+'%' : '—'}</b>`;
+  document.getElementById('convBadge').textContent = conventionLabel();
+  document.getElementById('conventionHint').textContent = conventionHint();
+}
+
+// Init
+populateFwdSelects();
+document.getElementById('fwdFrom').value = '3';
+document.getElementById('fwdTo').value = '6';
+render();
+</script>
+</body>
+</html>

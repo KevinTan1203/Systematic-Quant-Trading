@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transaction Cost Analysis & Implementation Shortfall Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/1.58.5/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#08090C; --bg-2:#0C0E12; --panel:#111318; --panel-2:#15171D;
+  --border:#242730; --border-soft:#1A1C22;
+  --text:#E8E9EE; --text-dim:#8C90A0; --text-faint:#5A5E6B;
+  --accent:#4F8EFF; --accent-dim:#3A6BC4; --oos:#FFC145;
+  --profit:#2ED573; --loss:#FF4757; --warn:#F5A623; --choppy:#8C7CFF;
+  --mono:'JetBrains Mono', monospace;
+  --display:'Space Grotesk', sans-serif;
+  --body:'Inter', sans-serif;
+  --radius:10px; --shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 550px at 10% -10%, rgba(79,142,255,0.06), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(255,71,87,0.04), transparent),
+    var(--bg);
+  color:var(--text); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+::selection{background:var(--accent); color:#050a14;}
+.app{display:grid; grid-template-columns:360px 1fr; min-height:100vh;}
+@media (max-width:1150px){.app{grid-template-columns:1fr;} .sidebar{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border);}}
+
+.sidebar{position:sticky; top:0; height:100vh; overflow-y:auto; background:linear-gradient(180deg, var(--panel), var(--bg-2)); border-right:1px solid var(--border); padding:20px 18px 40px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:30px;height:30px;border-radius:8px; background:conic-gradient(from 200deg, var(--loss), var(--accent), var(--oos)); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-weight:700; color:#050a14; font-size:11px;}
+.brand-name{font-family:var(--display); font-weight:700; font-size:15px;}
+.brand-sub{font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin:2px 0 18px; letter-spacing:0.4px; text-transform:uppercase;}
+
+.ctrl-group{border:1px solid var(--border-soft); border-radius:var(--radius); background:rgba(255,255,255,0.015); padding:12px 14px 14px; margin-bottom:12px;}
+.ctrl-group h4{margin:0 0 10px; font-family:var(--display); font-size:11.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-dim); font-weight:600;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; font-size:12px; color:var(--text-dim);}
+.field-label .val{font-family:var(--mono); color:var(--text); font-weight:600; font-size:12.5px;}
+input[type=range]{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--border); outline:none; margin:6px 0 2px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #050a14; box-shadow:0 0 0 2px rgba(79,142,255,0.25);}
+select, input[type=number]{width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:7px 8px; font-family:var(--mono); font-size:12.5px;}
+select:focus, input:focus{outline:1.5px solid var(--accent);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.hint{font-size:11px; color:var(--text-faint); margin-top:5px; line-height:1.4;}
+.btn{width:100%; padding:9px 12px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-family:var(--body); font-weight:600; font-size:12.5px; cursor:pointer; transition:all .15s ease;}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn-primary{background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#050a14; border:none; font-weight:700;}
+.btn-primary:hover{filter:brightness(1.1); color:#050a14;}
+.btn-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+.status-line{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:14px; border-top:1px dashed var(--border-soft); padding-top:10px; line-height:1.6;}
+.status-line b{color:var(--accent); font-weight:600;}
+
+.main{padding:22px 28px 60px; max-width:1540px;}
+.page-header{margin-bottom:18px;}
+.eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent);}
+.page-title{font-family:var(--display); font-size:26px; font-weight:700; margin:6px 0 8px; letter-spacing:-0.3px;}
+.page-desc{color:var(--text-dim); max-width:920px; font-size:13.5px;}
+
+.section{margin-top:28px;}
+.section-head{display:flex; align-items:baseline; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.section-num{font-family:var(--mono); color:var(--accent); font-size:12px;}
+.section-title{font-family:var(--display); font-weight:600; font-size:16px;}
+.section-desc{color:var(--text-dim); font-size:12.5px; margin:-4px 0 12px; max-width:920px;}
+
+.card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+.grid{display:grid; gap:14px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+@media (max-width:1180px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:640px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
+
+.kpi{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px 14px; position:relative; overflow:hidden;}
+.kpi:before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent);}
+.kpi.oos:before{background:var(--oos);}
+.kpi.profit:before{background:var(--profit);}
+.kpi.loss:before{background:var(--loss);}
+.kpi.warn:before{background:var(--warn);}
+.kpi-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; font-family:var(--mono);}
+.kpi-value{font-family:var(--mono); font-size:17px; font-weight:600; margin-top:5px;}
+.kpi-sub{font-size:11px; color:var(--text-faint); margin-top:3px;}
+
+table.data-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+table.data-table th, table.data-table td{padding:7px 8px; text-align:right; border-bottom:1px solid var(--border-soft);}
+table.data-table th:first-child, table.data-table td:first-child{text-align:left;}
+table.data-table th{color:var(--text-dim); font-weight:600; font-size:10.5px; text-transform:uppercase; border-bottom:1px solid var(--border);}
+table.data-table .neg{color:var(--loss);}
+table.data-table .pos{color:var(--profit);}
+table.data-table .hl{color:var(--oos);}
+
+.formula-block{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:14px 16px; margin-bottom:12px;}
+.formula-block .f-title{font-family:var(--display); font-size:13px; font-weight:600; color:var(--accent); margin-bottom:6px;}
+.formula-block .f-math{font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px;}
+.formula-block .f-note{font-size:12px; color:var(--text-dim);}
+
+details.disclosure{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:14px 18px; margin-bottom:12px;}
+details.disclosure > summary{cursor:pointer; font-family:var(--display); font-weight:600; font-size:14.5px; list-style:none; display:flex; align-items:center; gap:8px;}
+details.disclosure > summary::-webkit-details-marker{display:none;}
+details.disclosure > summary:before{content:"›"; color:var(--accent); font-size:18px; transition:transform .15s;}
+details.disclosure[open] > summary:before{transform:rotate(90deg);}
+.disclosure-body{margin-top:12px; color:var(--text-dim); font-size:13px;}
+.disclosure-body p{margin:4px 0 10px;}
+
+.legend-row{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); margin-bottom:8px;}
+.legend-line{display:inline-block; width:14px; height:2px; margin-right:5px; vertical-align:middle;}
+.footer-note{margin-top:40px; padding-top:16px; border-top:1px solid var(--border-soft); color:var(--text-faint); font-size:11.5px; line-height:1.7;}
+.badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; border:1px solid rgba(255,193,69,0.4); color:var(--oos); margin-left:8px;}
+.warn-banner{background:rgba(255,193,69,0.07); border:1px solid rgba(255,193,69,0.28); border-radius:8px; padding:11px 14px; font-size:12.5px; color:var(--oos); margin-bottom:14px; line-height:1.55;}
+
+.flow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-family:var(--mono); font-size:12.5px; margin-bottom:4px;}
+.flow .node{background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; min-width:120px;}
+.flow .node .lbl{font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px;}
+.flow .node .val{font-weight:600; margin-top:3px; color:var(--text);}
+.flow .arrow{color:var(--text-faint); font-size:18px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">IS</div><div class="brand-name">TCA Lab</div></div>
+    <div class="brand-sub">Implementation Shortfall · Costs</div>
+
+    <div class="ctrl-group">
+      <h4>Parent Order</h4>
+      <div class="field">
+        <div class="field-label"><span>Side</span></div>
+        <select id="side"><option value="buy" selected>Buy</option><option value="sell">Sell</option></select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Order size (shares)</span></div>
+        <input type="number" id="qty" value="250000" step="10000" min="1000">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Arrival price</span></div>
+        <input type="number" id="arrival" value="50.00" step="0.01" min="1">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Horizon (minutes)</span><span class="val" id="v_hor">60</span></div>
+        <input type="range" id="horizon" min="10" max="240" step="5" value="60">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Time buckets</span><span class="val" id="v_n">48</span></div>
+        <input type="range" id="nBuckets" min="12" max="96" step="4" value="48">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Strategy</h4>
+      <div class="field">
+        <div class="field-label"><span>Primary strategy</span></div>
+        <select id="strategy">
+          <option value="twap">TWAP</option>
+          <option value="vwap" selected>VWAP</option>
+          <option value="pov">POV</option>
+          <option value="aggressive">Aggressive</option>
+          <option value="passive">Passive</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Participation rate</span><span class="val" id="v_pov">12%</span></div>
+        <input type="range" id="pov" min="2" max="40" step="1" value="12">
+      </div>
+      <div class="hint">POV uses this directly. Other strategies use it as a cap on bucket participation.</div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Market Assumptions</h4>
+      <div class="field">
+        <div class="field-label"><span>Half-spread (bps)</span><span class="val" id="v_spr">2.5</span></div>
+        <input type="range" id="spreadBps" min="0.5" max="20" step="0.5" value="2.5">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Volatility (ann.)</span><span class="val" id="v_vol">0.25</span></div>
+        <input type="range" id="vol" min="0.05" max="0.80" step="0.05" value="0.25">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>ADV (shares)</span></div>
+        <input type="number" id="adv" value="8000000" step="100000" min="100000">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Impact coefficient</span><span class="val" id="v_imp">0.12</span></div>
+        <input type="range" id="impact" min="0.02" max="0.40" step="0.01" value="0.12">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Volume profile</span></div>
+        <select id="profile">
+          <option value="u" selected>U-shape</option>
+          <option value="flat">Flat</option>
+          <option value="front">Front-loaded</option>
+          <option value="back">Back-loaded</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Drift during horizon (bps)</span><span class="val" id="v_drift">0</span></div>
+        <input type="range" id="drift" min="-80" max="80" step="5" value="0">
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <h4>Explicit Costs</h4>
+      <div class="field">
+        <div class="field-label"><span>Commission (¢/share)</span><span class="val" id="v_comm">0.30</span></div>
+        <input type="range" id="comm" min="0" max="2" step="0.05" value="0.30">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Extra fees (bps of notional)</span><span class="val" id="v_fee">0.5</span></div>
+        <input type="range" id="feesBps" min="0" max="5" step="0.1" value="0.5">
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Seed</span></div>
+        <input type="number" id="seed" value="42" step="1">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="runBtn">▶ Run TCA</button>
+    <div class="btn-row">
+      <button class="btn" id="compareBtn">Compare Strategies</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+    <div class="status-line" id="statusLine">Ready · synthetic market</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="eyebrow">Transaction Cost Analysis · Best Execution</div>
+      <h1 class="page-title">TCA &amp; Implementation Shortfall Lab</h1>
+      <p class="page-desc">Simulate a parent order from decision (arrival) price through child fills to a final benchmark. Decompose implementation shortfall into spread, impact, timing, opportunity and explicit fees — and compare how aggressive, passive, TWAP, VWAP and POV strategies trade those costs off against each other.</p>
+    </div>
+
+    <div class="warn-banner">
+      <b>Synthetic market only.</b> Price paths, volume, impact and slippage are generated from stylised assumptions for teaching TCA concepts. Not calibrated to a live venue.
+    </div>
+
+    <!-- Arrival → Exec → Benchmark -->
+    <section class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <span class="section-title">Price Chain</span>
+        <span class="badge">SYNTHETIC</span>
+      </div>
+      <div class="card">
+        <div class="flow" id="priceFlow"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">02</span><span class="section-title">Cost Snapshot</span></div>
+      <div class="grid grid-4" id="kpiGrid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">03</span><span class="section-title">Execution Timeline · Price &amp; Fills</span></div>
+      <p class="section-desc">Mid evolves with drift, noise, and temporary impact from your participation. Markers are child fills; size scales with quantity.</p>
+      <div class="card">
+        <div class="legend-row">
+          <span><span class="legend-line" style="background:var(--accent)"></span>Mid</span>
+          <span><span class="legend-line" style="background:var(--oos)"></span>Arrival</span>
+          <span><span class="legend-line" style="background:var(--profit)"></span>Avg exec</span>
+          <span><span class="legend-line" style="background:var(--choppy)"></span>Interval VWAP</span>
+        </div>
+        <div id="priceChart" style="width:100%;height:380px;"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">04</span><span class="section-title">Cost Waterfall &amp; Cumulative Quantity</span></div>
+      <div class="grid grid-2">
+        <div class="card"><div id="waterfallChart" style="width:100%;height:340px;"></div></div>
+        <div class="card"><div id="cumChart" style="width:100%;height:340px;"></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">05</span><span class="section-title">Cost vs Participation Rate</span></div>
+      <p class="section-desc">Re-runs the same market path under POV at different participation rates. Higher POV usually raises impact and lowers timing risk — the classic trade-off.</p>
+      <div class="card"><div id="povSweepChart" style="width:100%;height:340px;"></div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">06</span><span class="section-title">Strategy Comparison</span></div>
+      <div class="card" style="margin-bottom:14px;"><div id="compareChart" style="width:100%;height:340px;"></div></div>
+      <div class="card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Strategy</th>
+              <th>Avg Px</th>
+              <th>IS (bps)</th>
+              <th>Spread</th>
+              <th>Impact</th>
+              <th>Timing</th>
+              <th>Opportunity</th>
+              <th>Explicit</th>
+              <th>Total $</th>
+              <th>Fill %</th>
+            </tr>
+          </thead>
+          <tbody id="compareBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">07</span><span class="section-title">Detailed Cost Table</span></div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr><th>Component</th><th>$ Cost</th><th>bps of Arrival Notional</th><th>Type</th></tr></thead>
+          <tbody id="costBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">08</span><span class="section-title">Formulas</span></div>
+      <div class="formula-block">
+        <div class="f-title">Implementation Shortfall (IS)</div>
+        <div class="f-math">IS_buy = AvgExecPx − ArrivalPx &nbsp;&nbsp; IS_sell = ArrivalPx − AvgExecPx</div>
+        <div class="f-math">IS_bps = IS / ArrivalPx × 10 000 &nbsp;&nbsp; IS_$ = IS × FilledQty</div>
+        <div class="f-note">Arrival price is the decision benchmark when the order is released to the desk / algo.</div>
+      </div>
+      <div class="formula-block">
+        <div class="f-title">Cost Decomposition (stylised)</div>
+        <div class="f-math">Spread ≈ cross fraction × half-spread</div>
+        <div class="f-math">Impact ≈ impactCoeff · σ · √participation · mid &nbsp;(temporary, square-root)</div>
+        <div class="f-math">Timing ≈ mid drift while executing on residual size</div>
+        <div class="f-math">Opportunity ≈ unfilled quantity × (end mid − arrival) with sign</div>
+        <div class="f-math">Explicit = commission/share × qty + fee bps × notional</div>
+        <div class="f-note">Components are approximate attributions that sum near total IS + explicit costs; residuals absorb model noise.</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-num">09</span><span class="section-title">Explicit vs Implicit Costs</span></div>
+
+      <details class="disclosure" open>
+        <summary>Explicit costs</summary>
+        <div class="disclosure-body">
+          <p>Commissions, exchange fees, taxes and clear, invoiceable charges. They are easy to measure and often small relative to market impact on large orders — but they still belong in a full TCA.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Implicit costs</summary>
+        <div class="disclosure-body">
+          <p>Spread paid when demanding liquidity, market impact from your own size, delay/timing costs as the mid moves, and opportunity cost on size you never filled. These dominate institutional TCA and require a benchmark (arrival, VWAP, close, etc.) to estimate.</p>
+        </div>
+      </details>
+
+      <details class="disclosure" open>
+        <summary>Why minimising one cost can raise another</summary>
+        <div class="disclosure-body">
+          <p>Trading slower reduces impact but increases timing and opportunity risk if the market runs away. Trading faster locks in price but walks the book and pays more impact and spread. Passive limit strategies may earn the spread when they fill — and incur large opportunity cost when they do not. TCA is about the <b>trade-off surface</b>, not a single cost line item.</p>
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">
+      Educational TCA simulator. Synthetic prices, volumes and impact. Not a production transaction-cost system. Not investment advice.
+    </div>
+  </main>
+</div>
+
+<script>
+/* =====================================================================
+   TCA & IMPLEMENTATION SHORTFALL LAB
+   ===================================================================== */
+
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+const els = {
+  side: document.getElementById('side'),
+  qty: document.getElementById('qty'),
+  arrival: document.getElementById('arrival'),
+  horizon: document.getElementById('horizon'),
+  nBuckets: document.getElementById('nBuckets'),
+  strategy: document.getElementById('strategy'),
+  pov: document.getElementById('pov'),
+  spreadBps: document.getElementById('spreadBps'),
+  vol: document.getElementById('vol'),
+  adv: document.getElementById('adv'),
+  impact: document.getElementById('impact'),
+  profile: document.getElementById('profile'),
+  drift: document.getElementById('drift'),
+  comm: document.getElementById('comm'),
+  feesBps: document.getElementById('feesBps'),
+  seed: document.getElementById('seed'),
+};
+
+function syncLabels() {
+  document.getElementById('v_hor').textContent = els.horizon.value;
+  document.getElementById('v_n').textContent = els.nBuckets.value;
+  document.getElementById('v_pov').textContent = els.pov.value + '%';
+  document.getElementById('v_spr').textContent = els.spreadBps.value;
+  document.getElementById('v_vol').textContent = els.vol.value;
+  document.getElementById('v_imp').textContent = els.impact.value;
+  document.getElementById('v_drift').textContent = els.drift.value;
+  document.getElementById('v_comm').textContent = parseFloat(els.comm.value).toFixed(2);
+  document.getElementById('v_fee').textContent = els.feesBps.value;
+}
+['horizon','nBuckets','pov','spreadBps','vol','impact','drift','comm','feesBps'].forEach(id => {
+  document.getElementById(id).addEventListener('input', syncLabels);
+});
+syncLabels();
+
+function cfg() {
+  return {
+    side: els.side.value,
+    qty: Math.max(1000, Math.floor(parseFloat(els.qty.value) || 250000)),
+    arrival: Math.max(1, parseFloat(els.arrival.value) || 50),
+    horizonMin: parseInt(els.horizon.value, 10) || 60,
+    n: parseInt(els.nBuckets.value, 10) || 48,
+    strategy: els.strategy.value,
+    pov: (parseFloat(els.pov.value) || 12) / 100,
+    halfSpreadBps: parseFloat(els.spreadBps.value) || 2.5,
+    vol: parseFloat(els.vol.value) || 0.25,
+    adv: Math.max(1e5, parseFloat(els.adv.value) || 8e6),
+    impact: parseFloat(els.impact.value) || 0.12,
+    profile: els.profile.value,
+    driftBps: parseFloat(els.drift.value) || 0,
+    commPerShare: (parseFloat(els.comm.value) || 0) / 100, // dollars
+    feesBps: parseFloat(els.feesBps.value) || 0,
+    seed: parseInt(els.seed.value, 10) || 42,
+  };
+}
+
+function volumeWeights(n, profile) {
+  const w = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = n === 1 ? 0.5 : i / (n - 1);
+    if (profile === 'flat') w[i] = 1;
+    else if (profile === 'front') w[i] = 1.8 - 1.2 * x;
+    else if (profile === 'back') w[i] = 0.6 + 1.2 * x;
+    else w[i] = 1.4 - 1.2 * Math.sin(Math.PI * x) + 0.15;
+    w[i] = Math.max(0.05, w[i]);
+  }
+  let s = 0; for (let i = 0; i < n; i++) s += w[i];
+  for (let i = 0; i < n; i++) w[i] /= s;
+  return w;
+}
+
+function generateMarket(c) {
+  const rng = mulberry32(c.seed >>> 0);
+  const n = c.n;
+  const weights = volumeWeights(n, c.profile);
+  const sessionFrac = c.horizonMin / 390;
+  const sessionVol = c.adv * sessionFrac;
+  const mid = new Float64Array(n);
+  const mktVol = new Float64Array(n);
+  mid[0] = c.arrival;
+  const bucketsPerYear = (252 * 390) / c.horizonMin * n;
+  const sigmaB = c.vol / Math.sqrt(Math.max(1, bucketsPerYear));
+  const driftPer = (c.driftBps / 10000) / n;
+
+  for (let i = 0; i < n; i++) {
+    if (i > 0) {
+      const z = (rng() * 2 - 1) + (rng() * 2 - 1);
+      mid[i] = mid[i - 1] * (1 + driftPer + z * sigmaB * 0.65);
+    }
+    mktVol[i] = Math.max(1, Math.round(sessionVol * weights[i] * (0.65 + rng() * 0.7)));
+  }
+  return { mid, mktVol, weights, sessionVol };
+}
+
+function schedule(c, mkt, parentQty) {
+  const n = c.n;
+  const targets = new Float64Array(n);
+  if (c.strategy === 'twap') {
+    for (let i = 0; i < n; i++) targets[i] = parentQty / n;
+  } else if (c.strategy === 'vwap') {
+    for (let i = 0; i < n; i++) targets[i] = parentQty * mkt.weights[i];
+  } else if (c.strategy === 'pov') {
+    for (let i = 0; i < n; i++) targets[i] = c.pov * mkt.mktVol[i];
+  } else if (c.strategy === 'aggressive') {
+    const front = Math.max(1, Math.floor(n * 0.2));
+    for (let i = 0; i < front; i++) targets[i] = parentQty / front;
+  } else {
+    // passive — back-loaded
+    let s = 0;
+    for (let i = 0; i < n; i++) {
+      const x = n === 1 ? 1 : i / (n - 1);
+      targets[i] = 0.4 + x;
+      s += targets[i];
+    }
+    for (let i = 0; i < n; i++) targets[i] *= parentQty / s;
+  }
+  return targets;
+}
+
+function execute(c, mkt, parentQty) {
+  const n = c.n;
+  const sign = c.side === 'buy' ? 1 : -1;
+  const targets = schedule(c, mkt, parentQty);
+  const halfSpread = c.arrival * (c.halfSpreadBps / 10000);
+  // cross intensity by strategy
+  const crossMap = { aggressive: 0.95, twap: 0.65, vwap: 0.60, pov: 0.70, passive: 0.25 };
+  const crossFrac = crossMap[c.strategy] ?? 0.6;
+  const maxPart = c.strategy === 'aggressive' ? 0.55 : c.strategy === 'passive' ? 0.12 : Math.max(c.pov, 0.15);
+
+  const mid = new Float64Array(mkt.mid);
+  const filled = new Float64Array(n);
+  const fillPx = new Float64Array(n);
+  const impactPx = new Float64Array(n);
+  let remaining = parentQty;
+  let permanent = 0;
+
+  for (let i = 0; i < n; i++) {
+    mid[i] = mkt.mid[i] + permanent;
+
+    let want;
+    if (c.strategy === 'pov') {
+      want = Math.min(remaining, c.pov * mkt.mktVol[i]);
+    } else {
+      want = Math.min(remaining, targets[i]);
+    }
+    // participation cap
+    want = Math.min(want, maxPart * mkt.mktVol[i] + remaining * 0.01);
+    // passive miss rate
+    if (c.strategy === 'passive') {
+      want *= (0.55 + Math.random() * 0.35);
+    }
+    want = Math.max(0, Math.floor(want));
+    if (want <= 0 || remaining <= 0) {
+      filled[i] = 0;
+      fillPx[i] = mid[i];
+      continue;
+    }
+
+    const part = want / Math.max(1, mkt.mktVol[i]);
+    const temp = sign * c.impact * c.vol * Math.sqrt(Math.min(1, part)) * mid[i] * 0.14;
+    permanent += temp * 0.28;
+    impactPx[i] = temp;
+
+    let px;
+    if (c.strategy === 'passive') {
+      px = mid[i] + temp * 0.5 - sign * halfSpread * 0.35;
+    } else {
+      px = mid[i] + sign * halfSpread * crossFrac + temp;
+    }
+
+    filled[i] = Math.min(want, remaining);
+    fillPx[i] = px;
+    remaining -= filled[i];
+  }
+
+  return { mid, filled, fillPx, impactPx, remaining, targets };
+}
+
+function analyse(c, mkt, exec, parentQty) {
+  const n = c.n;
+  const sign = c.side === 'buy' ? 1 : -1;
+  let qty = 0, notional = 0;
+  let impactSum = 0;
+  for (let i = 0; i < n; i++) {
+    qty += exec.filled[i];
+    notional += exec.filled[i] * exec.fillPx[i];
+    impactSum += exec.impactPx[i] * exec.filled[i];
+  }
+  const avgPx = qty > 0 ? notional / qty : c.arrival;
+  const isPerShare = sign * (avgPx - c.arrival);
+  const arrivalNotional = c.arrival * parentQty;
+  const isBps = (isPerShare / c.arrival) * 10000;
+  const isDollar = isPerShare * qty;
+
+  // Interval VWAP (market)
+  let mktN = 0, mktQ = 0;
+  for (let i = 0; i < n; i++) {
+    mktN += exec.mid[i] * mkt.mktVol[i];
+    mktQ += mkt.mktVol[i];
+  }
+  const intervalVwap = mktQ > 0 ? mktN / mktQ : c.arrival;
+  const endMid = exec.mid[n - 1];
+
+  // Component attribution (approximate, buy-oriented costs as positive $)
+  const crossMap = { aggressive: 0.95, twap: 0.65, vwap: 0.60, pov: 0.70, passive: 0.25 };
+  const crossFrac = crossMap[c.strategy] ?? 0.6;
+  const halfSpread = c.arrival * (c.halfSpreadBps / 10000);
+  const spreadPerShare = crossFrac * halfSpread;
+  const spreadDollar = spreadPerShare * qty;
+  const spreadBps = (spreadPerShare / c.arrival) * 10000;
+
+  const impactPerShare = qty > 0 ? Math.abs(impactSum / qty) : 0;
+  const impactDollar = impactPerShare * qty;
+  const impactBps = (impactPerShare / c.arrival) * 10000;
+
+  // Timing: mid move from arrival to volume-weighted exec time on filled size
+  let twMid = 0;
+  for (let i = 0; i < n; i++) twMid += exec.filled[i] * exec.mid[i];
+  const avgMidAtFill = qty > 0 ? twMid / qty : c.arrival;
+  const timingPerShare = sign * (avgMidAtFill - c.arrival);
+  // remove pure impact already in mid path roughly
+  const timingDollar = Math.max(0, timingPerShare) * qty * 0.5 + timingPerShare * qty * 0.5;
+  // simpler: residual of IS after spread & impact
+  // Opportunity on unfilled
+  const unfilled = parentQty - qty;
+  const oppPerShare = sign * (endMid - c.arrival);
+  const oppDollar = Math.max(0, oppPerShare) * unfilled; // cost only if adverse
+  const oppBps = arrivalNotional > 0 ? (oppDollar / arrivalNotional) * 10000 : 0;
+
+  const explicitDollar = c.commPerShare * qty + (c.feesBps / 10000) * (avgPx * qty);
+  const explicitBps = arrivalNotional > 0 ? (explicitDollar / arrivalNotional) * 10000 : 0;
+
+  // Residual timing so components relate to IS
+  const timingDollarAdj = isDollar - spreadDollar - impactDollar;
+  const timingBps = arrivalNotional > 0 ? (timingDollarAdj / arrivalNotional) * 10000 : 0;
+
+  const totalDollar = isDollar + explicitDollar + oppDollar;
+  const totalBps = arrivalNotional > 0 ? (totalDollar / arrivalNotional) * 10000 : 0;
+
+  return {
+    avgPx, qty, unfilled, isPerShare, isBps, isDollar,
+    intervalVwap, endMid,
+    spreadDollar, spreadBps,
+    impactDollar, impactBps,
+    timingDollar: timingDollarAdj, timingBps,
+    oppDollar, oppBps,
+    explicitDollar, explicitBps,
+    totalDollar, totalBps,
+    completion: qty / parentQty,
+    participation: mktQ > 0 ? qty / mktQ : 0,
+  };
+}
+
+function runOne(strategyOverride, povOverride) {
+  const c = cfg();
+  if (strategyOverride) c.strategy = strategyOverride;
+  if (povOverride != null) c.pov = povOverride;
+  const parentQty = c.qty;
+  const mkt = generateMarket(c);
+  const exec = execute(c, mkt, parentQty);
+  const metrics = analyse(c, mkt, exec, parentQty);
+  return { c, mkt, exec, metrics, parentQty };
+}
+
+let PRIMARY = null;
+let COMPARE = null;
+
+/* ---- Render ---- */
+function fmt(x, d=2) { return isFinite(x) ? Number(x).toFixed(d) : '—'; }
+function fmtBps(x) { return isFinite(x) ? (x >= 0 ? '+' : '') + x.toFixed(1) : '—'; }
+function fmt$(x) {
+  if (!isFinite(x)) return '—';
+  const sign = x < 0 ? '-' : '';
+  const a = Math.abs(x);
+  if (a >= 1e6) return sign + '$' + (a / 1e6).toFixed(2) + 'M';
+  if (a >= 1e3) return sign + '$' + (a / 1e3).toFixed(1) + 'k';
+  return sign + '$' + a.toFixed(0);
+}
+function pct(x, d=1) { return isFinite(x) ? (x * 100).toFixed(d) + '%' : '—'; }
+
+function plotlyBase(extra) {
+  return Object.assign({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'JetBrains Mono, monospace', color: '#8C90A0', size: 11 },
+    margin: { l: 55, r: 20, t: 28, b: 48 },
+    xaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    yaxis: { gridcolor: '#1A1C22', linecolor: '#242730' },
+    legend: { orientation: 'h', y: 1.12, font: { color: '#8C90A0' } },
+    hoverlabel: { bgcolor: '#15171D', bordercolor: '#242730', font: { color: '#E8E9EE' } },
+  }, extra || {});
+}
+const PCFG = { displayModeBar: false, responsive: true };
+
+function render() {
+  if (!PRIMARY) return;
+  const { c, mkt, exec, metrics: m, parentQty } = PRIMARY;
+  const n = c.n;
+  const xs = Array.from({ length: n }, (_, i) => i);
+
+  // Price flow
+  document.getElementById('priceFlow').innerHTML = `
+    <div class="node"><div class="lbl">Arrival</div><div class="val">${fmt(c.arrival,4)}</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="lbl">Avg Exec</div><div class="val" style="color:var(--oos)">${fmt(m.avgPx,4)}</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="lbl">Interval VWAP</div><div class="val">${fmt(m.intervalVwap,4)}</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="lbl">End Mid</div><div class="val">${fmt(m.endMid,4)}</div></div>
+    <div class="arrow">·</div>
+    <div class="node"><div class="lbl">IS / share</div><div class="val" style="color:var(--loss)">${fmt(m.isPerShare,4)}</div></div>
+  `;
+
+  // KPIs
+  const kpis = [
+    { l: 'Implementation Shortfall', v: fmtBps(m.isBps) + ' bps', s: fmt$(m.isDollar) + ' on filled', c: m.isBps > 5 ? 'loss' : 'oos' },
+    { l: 'Total Cost', v: fmtBps(m.totalBps) + ' bps', s: fmt$(m.totalDollar) + ' incl. fees & opp.', c: 'loss' },
+    { l: 'Avg Exec Price', v: fmt(m.avgPx, 4), s: `arrival ${fmt(c.arrival,2)}`, c: '' },
+    { l: 'Completion', v: pct(m.completion, 1), s: `${Math.floor(m.qty).toLocaleString()} sh`, c: m.completion > 0.97 ? 'profit' : 'warn' },
+    { l: 'Spread cost', v: fmtBps(m.spreadBps) + ' bps', s: fmt$(m.spreadDollar), c: '' },
+    { l: 'Impact cost', v: fmtBps(m.impactBps) + ' bps', s: fmt$(m.impactDollar), c: '' },
+    { l: 'Timing (residual)', v: fmtBps(m.timingBps) + ' bps', s: fmt$(m.timingDollar), c: '' },
+    { l: 'Explicit fees', v: fmtBps(m.explicitBps) + ' bps', s: fmt$(m.explicitDollar), c: '' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
+  ).join('');
+
+  // Price chart
+  const fx = [], fy = [], fs = [];
+  for (let i = 0; i < n; i++) {
+    if (exec.filled[i] > 0) {
+      fx.push(i); fy.push(exec.fillPx[i]);
+      fs.push(Math.max(5, Math.min(20, 5 + (exec.filled[i] / parentQty) * n * 6)));
+    }
+  }
+  Plotly.newPlot('priceChart', [
+    { x: xs, y: Array.from(exec.mid), mode: 'lines', line: { color: '#4F8EFF', width: 1.8 }, name: 'Mid' },
+    { x: xs, y: xs.map(() => c.arrival), mode: 'lines', line: { color: '#FFC145', width: 1.5, dash: 'dash' }, name: 'Arrival' },
+    { x: xs, y: xs.map(() => m.avgPx), mode: 'lines', line: { color: '#2ED573', width: 1.5, dash: 'dash' }, name: 'Avg exec' },
+    { x: xs, y: xs.map(() => m.intervalVwap), mode: 'lines', line: { color: '#8C7CFF', width: 1.2, dash: 'dot' }, name: 'Interval VWAP' },
+    { x: fx, y: fy, mode: 'markers', marker: { size: fs, color: 'rgba(255,193,69,0.8)', line: { width: 1, color: '#050a14' } }, name: 'Fills' },
+  ], plotlyBase({ xaxis: { title: 'Bucket' }, yaxis: { title: 'Price' } }), PCFG);
+
+  // Waterfall
+  const wfLabels = ['Spread', 'Impact', 'Timing', 'Opportunity', 'Explicit', 'Total'];
+  const wfVals = [m.spreadDollar, m.impactDollar, m.timingDollar, m.oppDollar, m.explicitDollar, m.totalDollar];
+  Plotly.newPlot('waterfallChart', [{
+    x: wfLabels,
+    y: wfVals,
+    type: 'bar',
+    marker: { color: ['#4F8EFF', '#FF4757', '#FFC145', '#F5A623', '#8C7CFF', '#E8E9EE'] },
+    text: wfVals.map(v => fmt$(v)),
+    textposition: 'outside',
+  }], plotlyBase({
+    title: { text: 'Cost waterfall ($)', font: { size: 12, color: '#8C90A0' } },
+    yaxis: { title: '$' },
+  }), PCFG);
+
+  // Cumulative qty
+  const cum = [];
+  let cq = 0;
+  for (let i = 0; i < n; i++) { cq += exec.filled[i]; cum.push(cq); }
+  Plotly.newPlot('cumChart', [
+    { x: xs, y: cum, mode: 'lines', line: { color: '#4F8EFF', width: 2.5 }, name: 'Executed', fill: 'tozeroy', fillcolor: 'rgba(79,142,255,0.08)' },
+    { x: xs, y: xs.map(() => parentQty), mode: 'lines', line: { color: '#5A5E6B', width: 1, dash: 'dot' }, name: 'Parent' },
+  ], plotlyBase({
+    title: { text: 'Cumulative executed quantity', font: { size: 12, color: '#8C90A0' } },
+    xaxis: { title: 'Bucket' }, yaxis: { title: 'Shares' },
+  }), PCFG);
+
+  // POV sweep
+  const povGrid = [];
+  const isArr = [], impArr = [], totArr = [];
+  for (let p = 3; p <= 35; p += 2) {
+    const r = runOne('pov', p / 100);
+    povGrid.push(p);
+    isArr.push(r.metrics.isBps);
+    impArr.push(r.metrics.impactBps);
+    totArr.push(r.metrics.totalBps);
+  }
+  Plotly.newPlot('povSweepChart', [
+    { x: povGrid, y: isArr, mode: 'lines+markers', line: { color: '#FFC145', width: 2 }, name: 'IS (bps)' },
+    { x: povGrid, y: impArr, mode: 'lines+markers', line: { color: '#FF4757', width: 2 }, name: 'Impact (bps)' },
+    { x: povGrid, y: totArr, mode: 'lines+markers', line: { color: '#4F8EFF', width: 2 }, name: 'Total cost (bps)' },
+  ], plotlyBase({
+    xaxis: { title: 'POV participation %' },
+    yaxis: { title: 'bps' },
+    title: { text: 'Cost vs participation (same seed / path family)', font: { size: 12, color: '#8C90A0' } },
+  }), PCFG);
+
+  // Cost table
+  const costRows = [
+    ['Spread', m.spreadDollar, m.spreadBps, 'Implicit'],
+    ['Market impact', m.impactDollar, m.impactBps, 'Implicit'],
+    ['Timing / delay', m.timingDollar, m.timingBps, 'Implicit'],
+    ['Opportunity (unfilled)', m.oppDollar, m.oppBps, 'Implicit'],
+    ['Commissions & fees', m.explicitDollar, m.explicitBps, 'Explicit'],
+    ['Implementation shortfall (fills)', m.isDollar, m.isBps, 'Benchmark'],
+    ['Total (IS + explicit + opp.)', m.totalDollar, m.totalBps, 'All-in'],
+  ];
+  document.getElementById('costBody').innerHTML = costRows.map(([a, d, b, t]) =>
+    `<tr><td>${a}</td><td class="neg">${fmt$(d)}</td><td class="hl">${fmtBps(b)}</td><td>${t}</td></tr>`
+  ).join('');
+
+  // Strategy comparison
+  if (COMPARE) {
+    const labels = COMPARE.map(r => r.c.strategy);
+    Plotly.newPlot('compareChart', [
+      { x: labels, y: COMPARE.map(r => r.metrics.isBps), type: 'bar', name: 'IS', marker: { color: '#FFC145' } },
+      { x: labels, y: COMPARE.map(r => r.metrics.impactBps), type: 'bar', name: 'Impact', marker: { color: '#FF4757' } },
+      { x: labels, y: COMPARE.map(r => r.metrics.explicitBps), type: 'bar', name: 'Explicit', marker: { color: '#8C7CFF' } },
+      { x: labels, y: COMPARE.map(r => r.metrics.totalBps), type: 'bar', name: 'Total', marker: { color: '#4F8EFF' } },
+    ], plotlyBase({
+      barmode: 'group',
+      yaxis: { title: 'bps' },
+      title: { text: 'Strategy comparison (bps of arrival notional)', font: { size: 12, color: '#8C90A0' } },
+    }), PCFG);
+
+    document.getElementById('compareBody').innerHTML = COMPARE.map(r => {
+      const x = r.metrics;
+      return `<tr>
+        <td>${r.c.strategy}</td>
+        <td>${fmt(x.avgPx,4)}</td>
+        <td class="neg">${fmtBps(x.isBps)}</td>
+        <td>${fmt(x.spreadBps,1)}</td>
+        <td>${fmt(x.impactBps,1)}</td>
+        <td>${fmt(x.timingBps,1)}</td>
+        <td>${fmt(x.oppBps,1)}</td>
+        <td>${fmt(x.explicitBps,1)}</td>
+        <td class="neg">${fmt$(x.totalDollar)}</td>
+        <td>${pct(x.completion,1)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('statusLine').innerHTML =
+    `<b>${c.strategy}</b> · IS <b>${fmtBps(m.isBps)} bps</b> · total <b>${fmt$(m.totalDollar)}</b> · fill <b>${pct(m.completion,1)}</b> · synthetic`;
+}
+
+function runAll() {
+  PRIMARY = runOne();
+  const strats = ['aggressive', 'passive', 'twap', 'vwap', 'pov'];
+  COMPARE = strats.map(s => runOne(s));
+  render();
+}
+
+document.getElementById('runBtn').onclick = runAll;
+document.getElementById('compareBtn').onclick = runAll;
+document.getElementById('resetBtn').onclick = () => {
+  els.side.value = 'buy';
+  els.qty.value = 250000;
+  els.arrival.value = 50;
+  els.horizon.value = 60;
+  els.nBuckets.value = 48;
+  els.strategy.value = 'vwap';
+  els.pov.value = 12;
+  els.spreadBps.value = 2.5;
+  els.vol.value = 0.25;
+  els.adv.value = 8000000;
+  els.impact.value = 0.12;
+  els.profile.value = 'u';
+  els.drift.value = 0;
+  els.comm.value = 0.3;
+  els.feesBps.value = 0.5;
+  els.seed.value = 42;
+  syncLabels();
+  runAll();
+};
+
+runAll();
+</script>
+</body>
+</html>
