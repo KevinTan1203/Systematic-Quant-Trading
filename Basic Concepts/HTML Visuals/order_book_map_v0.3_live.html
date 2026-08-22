@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Order Book Map v0.3 — Live Exchange Feed</title>
+<style>
+:root{--bg:#06090e;--panel:#0c1119;--panel2:#101722;--line:#202a38;--text:#e8eef7;--muted:#7e8ca1;--green:#35d39a;--red:#ff596b;--yellow:#f4c85d;--blue:#62a8ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px Inter,system-ui,-apple-system,sans-serif}
+.app{max-width:1800px;margin:auto;padding:16px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
+.brand{display:flex;gap:11px;align-items:center}.logo{width:38px;height:38px;border:1px solid #2a394d;border-radius:9px;display:grid;place-items:center;color:#52d6ff;background:#0d151f;font-weight:800}
+h1{font-size:17px;margin:0}.sub{font-size:10px;color:var(--muted);margin-top:2px}.controls{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+button,select{background:#101722;color:var(--text);border:1px solid #2a3749;border-radius:7px;padding:7px 9px;font-size:12px}button{cursor:pointer}button:hover{border-color:#50647e}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.toolbar{height:43px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:8px 10px}
+.badge{font-size:10px;font-weight:800;padding:3px 7px;border-radius:5px;background:#13251f;color:var(--green)}.badge.demo{background:#282317;color:var(--yellow)}.badge.off{background:#2a161a;color:var(--red)}
+.legend{display:flex;gap:12px;color:var(--muted);font-size:10px}.sw{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.map{height:700px;position:relative}.map canvas{width:100%;height:100%;display:block}
+.map-label{position:absolute;color:#66758a;font-size:10px;pointer-events:none}.yl{left:7px;top:8px}.xl{right:8px;bottom:8px}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--line)}
+.stat{padding:9px 10px;border-right:1px solid var(--line)}.stat:last-child{border:0}.k{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.v{font-size:14px;font-weight:750;margin-top:2px}
+.side{display:flex;flex-direction:column;gap:12px}.section{padding:11px}.section h3{margin:0 0 9px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#9eabc0}
+.metric{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #19222e}.metric:last-child{border:0}
+.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}.muted{color:var(--muted)}.small{font-size:10px;color:var(--muted)}
+.depth{height:7px;border-radius:4px;background:#19212d;overflow:hidden;margin:7px 0}.depth i{display:block;height:100%;float:left}.bidbar{background:var(--green)}.askbar{background:var(--red)}
+.replay{height:5px;background:#1b2532;border-radius:4px;margin:8px 0;position:relative}.replay i{display:block;height:100%;background:var(--yellow);width:0}.replay input{position:absolute;left:0;right:0;top:-7px;width:100%;opacity:0;cursor:pointer}
+.statusline{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.dot{width:7px;height:7px;border-radius:50%;display:inline-block;background:var(--green);margin-right:5px}.dot.off{background:var(--red)}
+footer{text-align:right;color:#5f6e83;font-size:9px;margin-top:8px}
+@media(max-width:1100px){.grid{grid-template-columns:1fr}.side{display:grid;grid-template-columns:1fr 1fr}.map{height:580px}}
+@media(max-width:700px){.top{align-items:flex-start;flex-direction:column}.controls{justify-content:flex-start}.stats{grid-template-columns:repeat(2,1fr)}.side{display:flex}.map{height:500px}}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="top">
+  <div class="brand"><div class="logo">OB</div><div><h1>Order Book Map v0.3</h1><div class="sub">Live Exchange Feed · L2 Liquidity Heatmap · No trading functionality</div></div></div>
+  <div class="controls">
+    <select id="exchange"><option>Kraken</option><option disabled>Binance — adapter placeholder</option></select>
+    <select id="symbol"><option value="BTC/USD">BTC / USD</option><option value="ETH/USD">ETH / USD</option></select>
+    <select id="depth"><option value="25">25 levels</option><option value="50">50 levels</option><option value="100">100 levels</option></select>
+    <select id="history"><option value="90">90 sec</option><option value="180">3 min</option><option value="300">5 min</option></select>
+    <button id="connect">Connect</button><button id="pause">Pause</button><button id="dummy">Dummy</button><button id="reset">Reset</button>
+  </div>
+</div>
+
+<div class="grid">
+<main class="panel">
+  <div class="toolbar">
+    <div><span id="badge" class="badge demo">DUMMY</span><b style="margin-left:8px" id="pair">BTC/USD</b><span class="small"> · time × price × liquidity</span></div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--green)"></i>bid</span>
+      <span><i class="sw" style="background:var(--red)"></i>ask</span>
+      <span><i class="sw" style="background:var(--yellow)"></i>large wall / price</span>
+      <span>bubble = size</span>
+    </div>
+  </div>
+  <div class="map"><canvas id="canvas"></canvas><span class="map-label yl">PRICE</span><span class="map-label xl">TIME →</span></div>
+  <div class="stats">
+    <div class="stat"><div class="k">Last price</div><div class="v" id="last">—</div></div>
+    <div class="stat"><div class="k">Spread</div><div class="v" id="spread">—</div></div>
+    <div class="stat"><div class="k">Bid depth</div><div class="v green" id="bd">—</div></div>
+    <div class="stat"><div class="k">Ask depth</div><div class="v red" id="ad">—</div></div>
+    <div class="stat"><div class="k">Imbalance</div><div class="v" id="imb">—</div></div>
+    <div class="stat"><div class="k">Trades</div><div class="v" id="tradeCount">—</div></div>
+  </div>
+</main>
+
+<aside class="side">
+  <div class="panel section">
+    <div class="statusline"><h3 style="margin:0">Connection</h3><span class="small"><i class="dot" id="connDot"></i><span id="connText">Dummy feed</span></span></div>
+    <div class="metric"><span>Exchange</span><b>Kraken</b></div>
+    <div class="metric"><span>Channel</span><b>Spot WebSocket v2</b></div>
+    <div class="metric"><span>Book</span><b>L2 aggregated</b></div>
+    <div class="metric"><span>Fallback</span><b class="yellow">Automatic dummy</b></div>
+  </div>
+
+  <div class="panel section">
+    <h3>Order-book analytics</h3>
+    <div class="metric"><span>Best bid</span><b class="green" id="bb">—</b></div>
+    <div class="metric"><span>Best ask</span><b class="red" id="ba">—</b></div>
+    <div class="metric"><span>Spread (bps)</span><b id="bps">—</b></div>
+    <div class="metric"><span>Microprice</span><b class="yellow" id="micro">—</b></div>
+    <div class="metric"><span>Bid / ask share</span><b id="share">—</b></div>
+    <div class="depth"><i class="bidbar" id="bbar" style="width:50%"></i><i class="askbar" id="abar" style="width:50%"></i></div>
+  </div>
+
+  <div class="panel section">
+    <h3>Liquidity walls</h3>
+    <div class="metric"><span>Largest bid wall</span><b class="green" id="bidwall">—</b></div>
+    <div class="metric"><span>Largest ask wall</span><b class="red" id="askwall">—</b></div>
+    <div class="metric"><span>Persistence</span><b id="persist">—</b></div>
+  </div>
+
+  <div class="panel section">
+    <h3>Historical replay</h3>
+    <div class="small">Pause the live feed, then drag through captured map history.</div>
+    <div class="replay"><i id="replayBar"></i><input id="replay" type="range" min="0" max="0" value="0"></div>
+    <div class="metric"><span>Snapshots</span><b id="snapshots">0</b></div>
+    <div class="metric"><span>Replay position</span><b id="replayPos">Live</b></div>
+  </div>
+
+  <div class="panel section">
+    <h3>Architecture</h3>
+    <div class="small">
+      The visual layer consumes a normalised market-data event model:
+      <b>snapshot → book delta → trade</b>. Kraken is implemented first;
+      a Binance adapter can emit the same model without changing the renderer.
+    </div>
+  </div>
+</aside>
+</div>
+<footer>v0.3 prototype · Public market data only · The dashboard never submits, modifies or cancels orders.</footer>
+</div>
+
+<script>
+/*
+  EXCHANGE ABSTRACTION
+  Any exchange adapter only needs to emit:
+    {type:"snapshot", symbol, bids:[{price,qty}], asks:[{price,qty}], ts}
+    {type:"delta", side:"bid"|"ask", price, qty, ts}
+    {type:"trade", price, qty, side:"buy"|"sell", ts}
+*/
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+const book={bids:new Map(),asks:new Map()};
+let ws=null,mode='dummy',running=true,replayMode=false;
+let history=[],trades=[],dummyTimer=null,renderTimer=null;
+let symbol='BTC/USD',maxLevels=25,historySec=90,lastPrice=0;
+
+const $=id=>document.getElementById(id);
+function n(v){return Number(v)}
+function fmt(v){return n(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+function rnd(a,b){return a+Math.random()*(b-a)}
+function key(v){return Number(v).toFixed(8)}
+function clearBook(){book.bids.clear();book.asks.clear()}
+function setBook(side,arr){const m=side==='bid'?book.bids:book.asks;m.clear();arr.forEach(x=>{if(n(x.qty)>0)m.set(key(x.price),n(x.qty))})}
+function applyDelta(side,price,qty){const m=side==='bid'?book.bids:book.asks;qty=n(qty);if(qty<=0)m.delete(key(price));else m.set(key(price),qty)}
+function sortedBook(){
+  const bids=[...book.bids].map(([price,qty])=>({price:n(price),qty})).sort((a,b)=>b.price-a.price);
+  const asks=[...book.asks].map(([price,qty])=>({price:n(price),qty})).sort((a,b)=>a.price-b.price);
+  return {bids:bids.slice(0,maxLevels),asks:asks.slice(0,maxLevels)}
+}
+function processSnapshot(x){
+  clearBook();setBook('bid',x.bids||[]);setBook('ask',x.asks||[]);
+  const b=sortedBook();if(b.bids[0]&&b.asks[0])lastPrice=(b.bids[0].price+b.asks[0].price)/2;
+  capture(x.ts||Date.now(),b);
+}
+function processDelta(x){
+  applyDelta(x.side,x.price,x.qty);
+  const b=sortedBook();if(b.bids[0]&&b.asks[0])lastPrice=(b.bids[0].price+b.asks[0].price)/2;
+  capture(x.ts||Date.now(),b);
+}
+function processTrade(x){
+  if(n(x.price)>0)lastPrice=n(x.price);
+  trades.push({ts:x.ts||Date.now(),price:n(x.price),qty:n(x.qty),side:x.side||'unknown'});
+  trades=trades.slice(-500);
+}
+function capture(ts,b){
+  history.push({ts,mid:lastPrice,bids:b.bids.map(x=>({...x})),asks:b.asks.map(x=>({...x})),trades:trades.slice(-25)});
+  const cutoff=Date.now()-historySec*1000;
+  while(history.length>2&&history[0].ts<cutoff)history.shift();
+  $('snapshots').textContent=history.length;
+}
+function normaliseKrakenMessage(msg){
+  // Spot WebSocket v2 book messages are JSON objects with channel/data.
+  // Supports both snapshot and update-style data payloads.
+  if(msg.channel==='book'&&Array.isArray(msg.data)){
+    msg.data.forEach(d=>{
+      const symbolFrom=d.symbol||symbol;
+      if(symbolFrom!==symbol)return;
+      if(d.bids&&d.asks) processSnapshot({
+        symbol:symbolFrom,ts:Date.parse(d.timestamp||'')||Date.now(),
+        bids:d.bids.map(x=>({price:x.price,qty:x.qty})),
+        asks:d.asks.map(x=>({price:x.price,qty:x.qty}))
+      });
+      else {
+        const side=(d.side||'').toLowerCase()==='buy'?'bid':'ask';
+        processDelta({symbol:symbolFrom,side,price:d.price,qty:d.qty,ts:Date.parse(d.timestamp||'')||Date.now()});
+      }
+    });
+  }
+  if(msg.channel==='trade'&&Array.isArray(msg.data)){
+    msg.data.forEach(d=>{if((d.symbol||symbol)===symbol)processTrade({price:d.price,qty:d.qty,side:d.side,ts:Date.parse(d.timestamp||'')||Date.now()})});
+  }
+}
+function connectKraken(){
+  disconnect(false); mode='live'; setStatus('Connecting…','demo');
+  try{
+    ws=new WebSocket('wss://ws.kraken.com/v2');
+    ws.onopen=()=>{
+      setStatus('LIVE · KRAKEN','live');$('connText').textContent='WebSocket connected';$('connDot').className='dot';
+      ws.send(JSON.stringify({method:'subscribe',params:{channel:'book',symbol:[symbol],depth:maxLevels,snapshot:true}}));
+      ws.send(JSON.stringify({method:'subscribe',params:{channel:'trade',symbol:[symbol],snapshot:false}}));
+    };
+    ws.onmessage=e=>{try{normaliseKrakenMessage(JSON.parse(e.data))}catch(err){}};
+    ws.onerror=()=>fallback('WebSocket error — using dummy feed');
+    ws.onclose=()=>{if(mode==='live')fallback('Disconnected — using dummy feed')};
+  }catch(e){fallback('Connection failed — using dummy feed')}
+}
+function disconnect(clear=true){if(ws){try{ws.close()}catch(e){}ws=null}if(clear){mode='offline';clearInterval(dummyTimer)}}
+function fallback(reason){
+  if(mode==='dummy')return;
+  if(ws){try{ws.close()}catch(e){}ws=null}
+  mode='dummy';setStatus('DUMMY FALLBACK','demo');$('connText').textContent=reason;$('connDot').className='dot off';startDummy();
+}
+function setStatus(text,type){
+  $('badge').textContent=text;$('badge').className='badge '+(type==='live'?'':'demo');
+}
+function basePrice(){return symbol==='ETH/USD'?3500:112500}
+function dummySnapshot(){
+  if(!lastPrice)lastPrice=basePrice();
+  lastPrice+=rnd(-lastPrice*.00012,lastPrice*.00012);
+  const step=symbol==='ETH/USD'?.5:10;
+  lastPrice=Math.round(lastPrice/step)*step;
+  const bids=[],asks=[],center=lastPrice;
+  const walls=[center+rnd(-center*.003,center*.003),center+rnd(-center*.002,center*.002)];
+  for(let i=1;i<=maxLevels;i++){
+    const pB=center-i*step,pA=center+i*step;
+    let qB=rnd(.02,symbol==='ETH/USD'?.9:1.8)*(1+(i<4?1.4:0));
+    let qA=rnd(.02,symbol==='ETH/USD'?.9:1.8)*(1+(i<4?1.4:0));
+    qB*=1+Math.exp(-((pB-walls[0])**2)/(2*(step*4)**2))*rnd(2,6);
+    qA*=1+Math.exp(-((pA-walls[1])**2)/(2*(step*4)**2))*rnd(2,6);
+    if(Math.random()<.035)qB*=rnd(3,7);if(Math.random()<.035)qA*=rnd(3,7);
+    bids.push({price:pB,qty:qB});asks.push({price:pA,qty:qA});
+  }
+  processSnapshot({ts:Date.now(),bids,asks});
+  if(Math.random()<.7)processTrade({ts:Date.now(),price:center+rnd(-step*2,step*2),qty:rnd(.01,symbol==='ETH/USD'?.7:1.2),side:Math.random()>.5?'buy':'sell'});
+}
+function startDummy(){clearInterval(dummyTimer);dummySnapshot();dummyTimer=setInterval(dummySnapshot,650)}
+function updateUI(){
+  if(!history.length)return;
+  const h=history[history.length-1],b=h.bids,a=h.asks;if(!b.length||!a.length)return;
+  const bb=b[0].price,ba=a[0].price,spread=ba-bb;
+  const bd=b.reduce((s,x)=>s+x.qty*x.price,0),ad=a.reduce((s,x)=>s+x.qty*x.price,0),imb=(bd-ad)/(bd+ad);
+  const micro=(ba*b[0].qty+bb*a[0].qty)/(b[0].qty+a[0].qty),share=bd/(bd+ad)*100;
+  const bw=b.reduce((x,y)=>y.qty>x.qty?y:x,b[0]),aw=a.reduce((x,y)=>y.qty>x.qty?y:x,a[0]);
+  $('pair').textContent=symbol;$('last').textContent=fmt(h.mid);$('spread').textContent='$'+fmt(spread);
+  $('bd').textContent='$'+(bd/1e6).toFixed(2)+'m';$('ad').textContent='$'+(ad/1e6).toFixed(2)+'m';
+  $('imb').textContent=(imb>=0?'+':'')+(imb*100).toFixed(1)+'%';
+  $('bb').textContent=fmt(bb);$('ba').textContent=fmt(ba);$('bps').textContent=(spread/h.mid*10000).toFixed(2);
+  $('micro').textContent=fmt(micro);$('share').textContent=share.toFixed(1)+'% / '+(100-share).toFixed(1)+'%';
+  $('bbar').style.width=share+'%';$('abar').style.width=(100-share)+'%';
+  $('bidwall').textContent=fmt(bw.price)+' · '+bw.qty.toFixed(3);
+  $('askwall').textContent=fmt(aw.price)+' · '+aw.qty.toFixed(3);
+  $('persist').textContent=wallPersistence(bw.price,aw.price)+' snapshots';
+  $('tradeCount').textContent=trades.length;
+}
+function wallPersistence(bp,ap){
+  let c=0;for(let i=history.length-1;i>=0&&i>history.length-25;i--){const h=history[i];if(h.bids.some(x=>Math.abs(x.price-bp)<.00001)||h.asks.some(x=>Math.abs(x.price-ap)<.00001))c++}return c;
+}
+function resize(){const r=canvas.getBoundingClientRect(),d=devicePixelRatio||1;canvas.width=r.width*d;canvas.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);draw()}
+function draw(index=null){
+  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle='#080d14';ctx.fillRect(0,0,w,h);
+  if(!history.length)return;
+  const data=index===null?history:history.slice(0,index+1);const shown=data.slice(-Math.max(20,Math.floor(historySec/0.65)));
+  const mids=shown.map(x=>x.mid),min=Math.min(...mids),max=Math.max(...mids),range=Math.max(max-min,(symbol==='ETH/USD'?80:200));
+  const center=(min+max)/2,lo=center-range*.75,hi=center+range*.75,left=54,right=w-15,top=18,bottom=h-30;
+  const x=i=>left+i/(shown.length-1||1)*(right-left),y=p=>top+(hi-p)/(hi-lo)*(bottom-top);
+  ctx.font='10px ui-monospace,monospace';
+  const gridStep=symbol==='ETH/USD'?20:100;
+  for(let p=Math.floor(lo/gridStep)*gridStep;p<=hi;p+=gridStep){const yy=y(p);ctx.strokeStyle='#17202a';ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(right,yy);ctx.stroke();ctx.fillStyle='#65748a';ctx.textAlign='right';ctx.fillText(fmt(p),left-7,yy+3)}
+  for(let i=0;i<shown.length;i+=Math.max(1,Math.floor(shown.length/8))){const xx=x(i);ctx.strokeStyle='#111923';ctx.beginPath();ctx.moveTo(xx,top);ctx.lineTo(xx,bottom);ctx.stroke();const d=new Date(shown[i].ts);ctx.fillStyle='#65748a';ctx.textAlign='center';ctx.fillText(d.toLocaleTimeString([],{minute:'2-digit',second:'2-digit'}),xx,bottom+17)}
+  let maxQ=.001;shown.forEach(s=>[...s.bids,...s.asks].forEach(r=>maxQ=Math.max(maxQ,r.qty)));
+  shown.forEach((s,i)=>{
+    const xx=x(i);
+    [...s.bids,...s.asks].forEach(r=>{
+      const yy=y(r.price);if(yy<top||yy>bottom)return;const q=r.qty/maxQ,rad=1.5+Math.sqrt(q)*10,alpha=.07+.75*q;
+      ctx.beginPath();ctx.arc(xx,yy,rad,0,Math.PI*2);
+      ctx.fillStyle=r.side==='bid'?`rgba(53,211,154,${alpha})`:`rgba(255,89,107,${alpha})`;ctx.fill();
+      if(q>.82){ctx.beginPath();ctx.arc(xx,yy,rad*.35,0,Math.PI*2);ctx.fillStyle='rgba(244,200,93,.55)';ctx.fill()}
+    });
+  });
+  ctx.beginPath();shown.forEach((s,i)=>{const xx=x(i),yy=y(s.mid);i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)});ctx.strokeStyle='#f4c85d';ctx.lineWidth=2;ctx.stroke();
+  const current=shown[shown.length-1],cy=y(current.mid);ctx.setLineDash([4,4]);ctx.strokeStyle='#f4c85d66';ctx.beginPath();ctx.moveTo(left,cy);ctx.lineTo(right,cy);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#f4c85d';ctx.beginPath();ctx.arc(x(shown.length-1),cy,4,0,Math.PI*2);ctx.fill();
+  // Executed trades as larger outlined bubbles.
+  const t0=shown[0].ts,t1=shown[shown.length-1].ts;
+  trades.filter(t=>t.ts>=t0&&t.ts<=t1).forEach(t=>{
+    const xx=left+(t.ts-t0)/(t1-t0||1)*(right-left),yy=y(t.price),rad=3+Math.sqrt(Math.max(t.qty,.001))*5;
+    ctx.beginPath();ctx.arc(xx,yy,rad,0,Math.PI*2);ctx.strokeStyle=t.side==='buy'?'#35d39a':'#ff596b';ctx.lineWidth=1.3;ctx.stroke();
+  });
+  if(replayMode){ctx.fillStyle='#f4c85d';ctx.font='10px Inter,sans-serif';ctx.textAlign='left';ctx.fillText('REPLAY',left,top+12)}
+}
+function setReplay(i){replayMode=true;running=false;clearInterval(dummyTimer);$('pause').textContent='Resume';$('replayPos').textContent=(i+1)+' / '+history.length;const pct=history.length>1?i/(history.length-1)*100:0;$('replayBar').style.width=pct+'%';draw(i)}
+$('replay').oninput=e=>setReplay(+e.target.value);
+$('pause').onclick=()=>{
+  running=!running;replayMode=false;$('pause').textContent=running?'Pause':'Resume';
+  if(running){if(mode==='dummy')startDummy();else if(mode==='live')connectKraken()}
+};
+$('connect').onclick=connectKraken;
+$('dummy').onclick=()=>{disconnect();mode='dummy';setStatus('DUMMY','demo');$('connText').textContent='Dummy feed';$('connDot').className='dot off';startDummy()};
+$('reset').onclick=()=>{history=[];trades=[];lastPrice=basePrice();$('replay').max=0;startDummy()};
+$('symbol').onchange=e=>{symbol=e.target.value;history=[];trades=[];lastPrice=basePrice();if(mode==='live')connectKraken();else startDummy()};
+$('depth').onchange=e=>{maxLevels=+e.target.value;if(mode==='live')connectKraken()};
+$('history').onchange=e=>{historySec=+e.target.value};
+setInterval(()=>{$('replay').max=Math.max(0,history.length-1);if(!replayMode)$('replayPos').textContent='Live';updateUI();draw()},250);
+window.addEventListener('resize',resize);
+lastPrice=basePrice();startDummy();resize();
+</script>
+</body>
+</html>
