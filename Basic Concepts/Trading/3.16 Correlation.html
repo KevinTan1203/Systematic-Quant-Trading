@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 3.16 Correlation</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;   /* bid = green — buyers */
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;   /* ask = red — sellers */
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;   /* spread = purple */
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;   /* mid-price = blue */
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  /* micro dot texture */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  /* ── HEADER ── */
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  /* live correlation display widget */
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 240px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  /* header border */
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── ENTRY ── */
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  /* topic-colour left bars */
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  /* colour badge */
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  /* formula pill */
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  /* ── BODY ── */
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  /* formula display */
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  /* visual ladder */
+  .price-ladder {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .ladder-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ladder-row {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+  }
+
+  .ladder-row:last-child { border-bottom: none; }
+
+  .lr-price {
+    padding: 7px 16px;
+    min-width: 90px;
+    font-weight: 600;
+    border-right: 1px solid var(--border);
+  }
+
+  .lr-size {
+    padding: 7px 12px;
+    min-width: 80px;
+    color: var(--muted);
+    border-right: 1px solid var(--border);
+    text-align: right;
+  }
+
+  .lr-bar-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 4px 12px;
+  }
+
+  .lr-bar {
+    height: 10px;
+    border-radius: 2px;
+    opacity: 0.7;
+  }
+
+  .lr-label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    color: var(--muted);
+    text-align: right;
+    min-width: 80px;
+  }
+
+  .ask-row { background: var(--ask-light); }
+  .ask-row .lr-price { color: var(--ask); }
+  .ask-row .lr-bar   { background: var(--ask); }
+  .ask-row .lr-label { color: var(--ask); }
+
+  .bid-row { background: var(--bid-light); }
+  .bid-row .lr-price { color: var(--bid); }
+  .bid-row .lr-bar   { background: var(--bid); }
+  .bid-row .lr-label { color: var(--bid); }
+
+  .spread-row { background: var(--spread-light); }
+  .spread-row .lr-price { color: var(--spread); font-weight: 700; }
+  .spread-row .lr-label { color: var(--spread); font-weight: 700; }
+
+  .mid-row-style { background: var(--mid-light); }
+  .mid-row-style .lr-price { color: var(--mid); font-weight: 700; }
+  .mid-row-style .lr-label { color: var(--mid); font-weight: 700; }
+
+  /* data comparison table */
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  /* split box */
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* key insight */
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  /* tags */
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  /* foot */
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 3 · Section 3.16 · Core Trading Foundations</div>
+        <h1 class="hdr-title">Correlation<br><em>&amp; Dependence</em></h1>
+        <div class="hdr-sub">The statistical backbone of diversification, risk, and portfolio construction — when assets move together and when they don’t</div>
+      </div>
+
+      <!-- live widget -->
+      <div class="spread-widget">
+        <div class="sw-title">Example: SPY vs TLT (illustrative)</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Pearson ρ</div>
+            <div class="sw-price">−0.42</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Spearman ρ</div>
+            <div class="sw-price">−0.38</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Rolling 60d ρ</div>
+          <div class="sw-spread-val">−0.18 → +0.61</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Crisis Regime</div>
+          <div class="sw-mid-val">ρ → +0.85+</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">10 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>3.16 Correlation</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "3.16.01",
+    icon: "📊",
+    tClass: "t-mid",
+    title: "Pearson Correlation Coefficient",
+    sub: "The linear measure of co-movement — scaled covariance between −1 and +1",
+    formula: "ρ = Cov(X,Y) / (σₓ σᵧ)",
+    tags: [["pearson","mid"], ["linear dependence","mid"], ["covariance","spread"], ["standardisation",""]],
+    formulaBox: {
+      main: "<span class='mid-part'>ρ</span> = Cov(X,Y) ÷ (σ<sub>X</sub> σ<sub>Y</sub>)",
+      note: "Range: −1 (perfect inverse) → 0 (none) → +1 (perfect)\nAssumes linear relationship & finite variance\nSensitive to outliers and non-normal returns"
+    },
+    body: [
+      `The <em>Pearson product-moment correlation coefficient</em> is the default measure of linear dependence between two random variables. It is simply the covariance of the two series scaled by the product of their standard deviations, which forces the result into the closed interval [−1, +1]. A value of +1 means the series move in exact lockstep (perfect positive linear relationship); −1 means they move in exact opposite directions; 0 means no linear relationship is detectable.`,
+      `In finance the inputs are almost always <strong>returns</strong> (log or simple), not prices. Correlating price levels produces spurious results because prices are non-stationary; returns are (approximately) stationary and the correlation then has a meaningful economic interpretation as co-movement of percentage changes. The coefficient is symmetric: ρ(X,Y) = ρ(Y,X). It is also invariant to positive affine transformations — scaling or shifting either series does not change ρ.`,
+      `Pearson correlation has well-known limitations. It only captures <em>linear</em> relationships; two series can be strongly dependent (e.g., Y = X²) yet show near-zero Pearson ρ. It is highly sensitive to outliers: a single extreme day can materially alter the estimate. It assumes the second moments exist; for heavy-tailed return distributions this is not always true. Finally, a high correlation does not imply causation — both series may simply be responding to a common factor.`,
+      `Despite these caveats, Pearson ρ remains the workhorse of portfolio theory, risk management, and quantitative research because it is computationally trivial, has a clear geometric interpretation (the cosine of the angle between the two centred return vectors), and enters directly into the formula for portfolio variance.`
+    ],
+    keyPoint: "Pearson correlation is scaled covariance. It answers only one question: how much of the linear co-movement between two return series is left after normalising for their individual volatilities. Everything else — non-linearity, tail dependence, regime shifts — is invisible to it."
+  },
+  {
+    num: "3.16.02",
+    icon: "🔢",
+    tClass: "t-spread",
+    title: "Rank Correlation (Spearman)",
+    sub: "Monotonic dependence measured on ranks — robust to outliers and non-linearity",
+    formula: "ρₛ = Pearson(rank X, rank Y)",
+    tags: [["spearman","spread"], ["rank correlation","spread"], ["monotonic","mid"], ["robustness","gold"]],
+    formulaBox: {
+      main: "<span class='spread-part'>ρₛ</span> = Pearson(ranks of X, ranks of Y)",
+      note: "Converts values → ranks then applies Pearson\nCaptures any monotonic relationship\nLess sensitive to extreme returns"
+    },
+    body: [
+      `Spearman’s rank correlation coefficient is the Pearson correlation computed on the <em>ranks</em> of the two series rather than on their raw values. Each observation is replaced by its position in the ordered sample (1 = smallest, n = largest). The resulting coefficient therefore measures the strength of a <em>monotonic</em> relationship — any relationship in which one variable consistently increases or decreases with the other — without requiring that relationship to be linear.`,
+      `Because ranks discard magnitude information, Spearman is far more robust to outliers than Pearson. A single 10-standard-deviation return that would dominate a Pearson estimate is simply the highest (or lowest) rank and exerts no disproportionate influence. This property is especially valuable in financial markets, where return distributions are leptokurtic and extreme events are common.`,
+      `When the true relationship is linear and the data are approximately normal, Pearson and Spearman give similar numerical values. When the relationship is strongly non-linear but still monotonic (e.g., exponential growth), Spearman remains high while Pearson may fall. When the relationship is non-monotonic (e.g., U-shaped), both coefficients tend toward zero; neither can capture that form of dependence.`,
+      `In practice, many risk managers and quant researchers report both coefficients side-by-side. A large discrepancy is itself informative: it signals either outliers, non-linearity, or both. Spearman is also the natural choice when correlating ordinal data or when the economic relationship of interest is better described as “higher values of X tend to accompany higher values of Y” rather than a precise linear slope.`
+    ],
+    keyPoint: "Spearman answers a different question from Pearson: not “how linear is the co-movement?” but “how consistently do the two series rank in the same order?” That shift makes it the more robust default whenever returns contain extremes or the relationship may be non-linear."
+  },
+  {
+    num: "3.16.03",
+    icon: "📈",
+    tClass: "t-dynamics",
+    title: "Rolling Correlation",
+    sub: "Time-local estimates that reveal how dependence itself evolves",
+    formula: "ρₜ = Corr(X,Y) over [t−w, t]",
+    tags: [["rolling","dynamics"], ["time-varying","dynamics"], ["window length",""], ["non-stationarity",""]],
+    body: [
+      `A single full-sample correlation is a long-run average. Markets, however, are non-stationary: the strength of co-movement between assets changes with macroeconomic regimes, risk appetite, and structural breaks. <em>Rolling correlation</em> recomputes the Pearson (or Spearman) coefficient on a moving window of fixed length w, producing a time series ρₜ that shows how dependence has evolved.`,
+      `Window length is the central design choice. A short window (20–60 trading days) is responsive but noisy; a long window (1–3 years) is stable but lags regime changes. Practitioners often examine several windows simultaneously or use exponentially weighted schemes that give more weight to recent observations without an abrupt cut-off. The choice of return frequency (daily, weekly, monthly) also matters: higher-frequency returns typically produce lower correlations because of microstructure noise and asynchronous trading.`,
+      `Rolling correlations are indispensable for risk management and tactical allocation. A risk model that assumes a constant equity–bond correlation of −0.3 will be dangerously wrong during a period when the rolling estimate has risen to +0.6. Likewise, a pairs-trading strategy that enters when the rolling correlation is high and exits when it collapses is explicitly trading the dynamics of dependence itself.`,
+      `Visual inspection of rolling-correlation plots often reveals the same stylised facts: correlations among equities rise in bear markets, equity–bond correlations flip sign across inflation regimes, and cross-asset correlations spike during global risk-off episodes. These patterns are the empirical foundation for the later topics of instability and crisis breakdown.`
+    ],
+    keyPoint: "Rolling correlation turns a static number into a time series. It is the simplest way to see that dependence is itself a risk factor — one that changes precisely when portfolio construction assumptions are most stressed."
+  },
+  {
+    num: "3.16.04",
+    icon: "🔄",
+    tClass: "t-impact",
+    title: "Correlation Instability / Regime Change",
+    sub: "Dependence is not constant — structural breaks and regime shifts invalidate long-run averages",
+    formula: "ρ ≠ constant",
+    tags: [["regime change","impact"], ["structural break",""], ["non-stationarity","dynamics"], ["model risk","gold"]],
+    splitBox: [
+      { cls: "bid",  label: "Stable Regime", text: "Correlations fluctuate within a narrow band. Historical estimates remain useful for risk and allocation. Example: equity–bond ρ ≈ −0.3 for much of the 2000s–2010s." },
+      { cls: "ask",  label: "Regime Shift", text: "A persistent change in the level or sign of correlation. Historical averages become misleading. Example: equity–bond ρ turning positive under high inflation (2021–2023)." },
+      { cls: "gold", label: "Detection Tools", text: "Rolling windows, Bai–Perron structural-break tests, Markov-switching models, and regime-conditional correlation estimates all help identify when the old ρ is no longer valid." },
+      { cls: "spread", label: "Portfolio Consequence", text: "Optimisers that treat correlation as fixed produce concentrated portfolios that fail exactly when the regime changes. Dynamic or robust estimation is required." },
+    ],
+    body: [
+      `Correlation instability is the recognition that the co-movement parameters used in portfolio construction and risk models are not fixed constants but themselves stochastic and subject to abrupt change. A regime change occurs when the data-generating process for returns shifts in a way that permanently (or for a prolonged period) alters the correlation structure.`,
+      `Classic examples include the shift from negative to positive equity–bond correlation when inflation expectations rose sharply in 2021–2022, the secular decline in stock–commodity correlations after the financialisation of commodities, and the post-GFC compression of credit spreads that altered correlations between investment-grade and high-yield bonds. In each case, risk models calibrated on the previous decade produced systematically wrong risk forecasts.`,
+      `From a statistical perspective, the problem is non-stationarity of the second-moment structure. Standard estimators assume a single population correlation; when that assumption is violated, the sample estimate is a weighted average across regimes and may not represent any regime that will actually be experienced. Techniques such as regime-switching models, time-varying parameter models, and robust optimisation that explicitly allow for uncertainty in the correlation matrix are responses to this reality.`,
+      `For practitioners the implication is clear: any risk or allocation process that treats a single historical correlation matrix as “the truth” is embedding a large, unmeasured model risk. Monitoring for regime change — via rolling estimates, formal break tests, or economic indicators of the drivers of correlation — is as important as estimating the correlations themselves.`
+    ],
+    keyPoint: "Correlation is a regime-dependent parameter, not a constant of nature. Using a long-run average when the current regime is different is one of the most common and costly forms of model risk in quantitative finance."
+  },
+  {
+    num: "3.16.05",
+    icon: "💥",
+    tClass: "t-ask",
+    title: "Correlation Breakdown in Crises",
+    sub: "When diversification disappears — correlations spike toward 1 exactly when you need them most",
+    formula: "ρ_crisis → 1",
+    tags: [["crisis","ask"], ["tail dependence","ask"], ["diversification failure","gold"], ["risk-off",""]],
+    body: [
+      `One of the most robust empirical regularities in financial markets is that correlations among risky assets rise sharply during crises. Equities across countries, sectors, and styles that normally exhibit moderate correlations of 0.3–0.6 can jump to 0.8–0.95 within days of a systemic shock. The practical consequence is that diversification benefits evaporate precisely when portfolio protection is most valuable.`,
+      `The economic drivers are well understood. In a risk-off episode, investors sell liquid risky assets indiscriminately to raise cash or meet margin calls (the “common liquidity shock”). Simultaneously, risk premia widen across the board, so assets that share exposure to the market factor experience correlated drawdowns. Fire-sale dynamics and forced deleveraging further synchronise price moves. The result is a temporary but severe increase in both linear correlation and, more importantly, <em>tail dependence</em> — the probability that extreme losses occur together.`,
+      `Pearson correlation, being a linear, full-sample measure, understates the severity of co-movement in the left tail. Measures such as lower-tail dependence coefficients, exceedance correlations, or conditional correlations given that both assets are below a threshold capture the phenomenon more accurately. These metrics routinely show that the dependence structure in the worst 5 % of outcomes is far stronger than the unconditional correlation suggests.`,
+      `Historical episodes illustrate the pattern repeatedly: October 1987, the LTCM crisis of 1998, the 2008 Global Financial Crisis, the March 2020 COVID crash, and the 2022 inflation-driven sell-off all produced correlation spikes. In each case, portfolios that looked well-diversified on the basis of full-sample or even recent rolling correlations suffered simultaneous losses across many holdings.`
+    ],
+    keyPoint: "Crisis correlation is not an anomaly — it is the normal behaviour of markets under stress. Any diversification strategy that ignores the tendency of correlations to rise toward 1 in the left tail is systematically overestimating its ability to protect capital when it matters most."
+  },
+  {
+    num: "3.16.06",
+    icon: "🌍",
+    tClass: "t-classes",
+    title: "Cross-Asset Correlations",
+    sub: "Equities, bonds, commodities, currencies, credit — the inter-market dependence map",
+    formula: "ρ(asset class i, j)",
+    tags: [["cross-asset","classes"], ["equity-bond","mid"], ["commodities",""], ["FX",""], ["credit",""]],
+    table: {
+      cols: ["Pair", "Typical Calm ρ", "Crisis ρ", "Key Driver"],
+      rows: [
+        ["US Equity – US Treasury","−0.2 to −0.4","+0.3 to +0.7","Inflation regime / flight-to-quality"],
+        ["US Equity – IG Credit","+0.4 to +0.6","+0.7 to +0.9","Common risk premium"],
+        ["US Equity – HY Credit","+0.6 to +0.8","+0.85 to +0.95","Default risk & equity beta"],
+        ["US Equity – Oil","+0.1 to +0.4","Variable","Demand shock vs supply shock"],
+        ["US Equity – Gold","−0.1 to +0.2","Often rises","Safe-haven vs risk-on demand"],
+        ["EUR/USD – Equity","Mixed","Risk-off → $ strength","Global risk appetite"],
+        ["Equity – Volatility (VIX)","−0.7 to −0.85","−0.9+","Leverage effect & fear"],
+        ["Commodity – Commodity","Low–moderate","Rises in demand shocks","Common macro factor"],
+      ]
+    },
+    body: [
+      `Cross-asset correlations form the skeleton of multi-asset portfolio construction and macro risk management. Unlike intra-equity correlations, which are almost always positive, cross-asset correlations can be negative, near zero, or strongly positive depending on the pair and the macroeconomic regime.`,
+      `The equity–bond correlation is the single most important cross-asset relationship for traditional balanced portfolios. For much of the post-1990s period it was negative, delivering the diversification that made 60/40 portfolios attractive. That relationship is regime-dependent: it tends to be negative when growth shocks dominate (bonds rally as equities fall) and positive when inflation shocks dominate (both assets sell off together). The 2022 experience reminded investors that the sign is not guaranteed.`,
+      `Credit spreads and equities share a strong positive correlation because both are claims on corporate cash flows and both embed a risk premium that expands in bad times. Commodities are more heterogeneous: industrial metals and energy often move with the global growth cycle and therefore with equities, while gold frequently behaves as a safe-haven or inflation hedge. Currency correlations are driven by relative monetary policy, risk appetite (the “dollar smile”), and commodity terms of trade.`,
+      `Mapping these relationships — and monitoring how they change — is essential for any allocator who holds more than one asset class. A correlation matrix that treats all cross-asset ρ as fixed constants will mis-state both risk and the marginal contribution of each asset to portfolio diversification.`
+    ],
+    keyPoint: "Cross-asset correlations are the levers of multi-asset diversification. Their signs and magnitudes are not structural constants; they are the visible expression of which macroeconomic shocks currently dominate the market."
+  },
+  {
+    num: "3.16.07",
+    icon: "🏢",
+    tClass: "t-markets",
+    title: "Intra-Sector vs. Inter-Sector Correlation",
+    sub: "Stocks within the same industry move together far more than stocks across industries",
+    formula: "ρ_intra ≫ ρ_inter",
+    tags: [["sector","markets"], ["industry","markets"], ["factor exposure",""], ["diversification","bid"]],
+    splitBox: [
+      { cls: "ask",  label: "Intra-Sector", text: "High average correlation (often 0.6–0.85). Common industry factors, similar business models, shared regulatory and demand shocks. Limited diversification benefit inside a single sector." },
+      { cls: "bid",  label: "Inter-Sector", text: "Lower average correlation (0.3–0.6 in calm markets). Different cyclical exposures, different interest-rate sensitivities, different commodity linkages. Primary source of equity diversification." },
+      { cls: "gold", label: "Crisis Behaviour", text: "Inter-sector correlations rise sharply in systemic events, but intra-sector correlations rise even further. Relative ranking is preserved; absolute levels are not." },
+      { cls: "spread", label: "Practical Use", text: "Sector-neutral portfolio construction, risk-parity across industries, and concentration limits all rest on the intra- vs inter-sector distinction." },
+    ],
+    body: [
+      `Within equity markets, the strongest and most persistent correlation structure is the industry or sector effect. Stocks that belong to the same GICS sector or industry group share common factor exposures — demand cycles, input costs, regulatory regimes, technological disruption — and therefore exhibit substantially higher pairwise correlations than stocks drawn from different sectors.`,
+      `Empirical estimates typically show average intra-sector correlations in the 0.6–0.85 range for large-cap equities in normal times, while average inter-sector correlations sit closer to 0.3–0.55. The gap narrows in crises as the market factor overwhelms industry differentials, but the ranking remains: same-sector pairs still co-move more tightly than cross-sector pairs.`,
+      `This hierarchy has direct portfolio consequences. A portfolio that is concentrated in a single sector (even if it holds dozens of names) is far less diversified than a portfolio that is spread across sectors with the same number of holdings. Risk models that ignore industry factors will understate the volatility of sector-concentrated books. Conversely, explicit sector constraints or industry-neutral constructions are among the most effective ways to control residual risk in active equity portfolios.`,
+      `The same logic extends to style and factor correlations: value stocks tend to move together, growth stocks tend to move together, and the correlation between the two groups is lower (and sometimes negative). Understanding the nested hierarchy — market → sector → industry → style → idiosyncratic — is the foundation of modern equity risk modelling.`
+    ],
+    keyPoint: "True equity diversification is achieved primarily across sectors, not within them. Holding twenty technology stocks is not twenty times more diversified than holding one; it is closer to holding one concentrated technology bet."
+  },
+  {
+    num: "3.16.08",
+    icon: "🛡️",
+    tClass: "t-bid",
+    title: "Correlation and Diversification",
+    sub: "The only free lunch in finance — but only when correlations are less than 1",
+    formula: "σₚ² = Σ wᵢ²σᵢ² + Σᵢ≠ⱼ wᵢwⱼσᵢσⱼρᵢⱼ",
+    tags: [["diversification","bid"], ["portfolio variance","mid"], ["free lunch","gold"], ["correlation benefit",""]],
+    formulaBox: {
+      main: "σ<sub>p</sub>² = Σ wᵢ²σᵢ² + Σ<sub>i≠j</sub> wᵢ wⱼ σᵢ σⱼ <span class='spread-part'>ρᵢⱼ</span>",
+      note: "The double-sum term is the only place correlation enters.\nWhen all ρᵢⱼ < 1, portfolio risk < weighted average risk.\nWhen all ρᵢⱼ → 1, diversification benefit → 0."
+    },
+    body: [
+      `Modern portfolio theory’s central insight is that the volatility of a portfolio is not the weighted average of the volatilities of its constituents; it is lower whenever the assets are imperfectly correlated. The reduction in risk that comes from combining assets whose returns do not move in perfect lockstep is the diversification benefit — often called the only free lunch in finance because it improves the risk-return trade-off without requiring superior foresight.`,
+      `Mathematically the benefit appears in the covariance terms of the portfolio-variance formula. Each pairwise product wᵢwⱼσᵢσⱼρᵢⱼ is smaller than the corresponding product that would arise if ρᵢⱼ = 1. Summing these reductions across all pairs produces the total diversification gain. The lower the average pairwise correlation, the larger the gain. In the limiting case of zero average correlation, portfolio volatility falls with the square root of the number of holdings (under equal weighting and equal volatilities).`,
+      `The practical limits of diversification are equally important. Once a portfolio already holds 30–40 well-chosen, low-correlation names, additional holdings add little further risk reduction. More critically, if the correlations that were estimated in calm markets rise toward 1 in a crisis, the realised diversification benefit collapses. Diversification is therefore a statistical property that is regime-dependent, not a permanent guarantee.`,
+      `Effective diversification requires three ingredients: a broad opportunity set, genuinely low (or negative) correlations among the chosen assets, and an awareness that those correlations can change. Simply holding many assets is not enough; the assets must be imperfectly correlated under the scenarios that matter.`
+    ],
+    keyPoint: "Diversification works only to the extent that correlations stay below 1. The free lunch is real in normal times; it becomes expensive or disappears exactly when the bill for risk arrives."
+  },
+  {
+    num: "3.16.09",
+    icon: "🧮",
+    tClass: "t-cost",
+    title: "Covariance Matrix Estimation",
+    sub: "From sample moments to robust, positive-definite matrices usable in optimisation",
+    formula: "Σ̂ = sample or structured estimate",
+    tags: [["covariance matrix","gold"], ["estimation","gold"], ["shrinkage","mid"], ["positive definite",""]],
+    body: [
+      `Every mean-variance optimiser, risk-parity scheme, and parametric VaR calculation requires a covariance matrix Σ of asset returns. The naïve sample covariance matrix — the matrix of pairwise sample covariances — is unbiased in large samples but suffers from severe problems in the high-dimensional setting typical of finance: when the number of assets N is large relative to the number of observations T, the sample matrix is noisy, often ill-conditioned, and can even fail to be positive semi-definite.`,
+      `A battery of improved estimators has been developed. <em>Shrinkage</em> methods (Ledoit–Wolf and successors) pull the sample matrix toward a structured target (constant correlation, single-factor, or identity) with an optimally chosen intensity; the result is better conditioned and has lower mean-squared error. <em>Factor models</em> (fundamental, statistical, or macroeconomic) impose a low-rank plus diagonal structure that dramatically reduces the number of free parameters. <em>Exponentially weighted</em> and <em>GARCH-type</em> estimators allow the matrix to adapt to changing volatility and correlation regimes. <em>Robust</em> estimators down-weight outliers so that a few extreme days do not dominate the entire matrix.`,
+      `Numerical properties matter as much as statistical ones. Optimisers require a positive-definite matrix; any estimator that can produce negative eigenvalues must be repaired (eigenvalue clipping, nearest-correlation-matrix algorithms, or projection onto the positive-definite cone). Conditioning also matters: a matrix whose largest eigenvalue is orders of magnitude larger than its smallest will amplify estimation error in the inverse, leading to unstable and extreme portfolio weights.`,
+      `In practice the choice of estimator is a trade-off among bias, variance, computational cost, and the economic structure one is willing to impose. There is no universally best method; the appropriate choice depends on the number of assets, the length and quality of the history, and the ultimate use (risk reporting versus active optimisation).`
+    ],
+    keyPoint: "The covariance matrix is the single most important and most fragile input to quantitative portfolio construction. A sophisticated optimiser fed a naïve, noisy sample matrix will confidently produce nonsense. Estimation quality dominates optimisation sophistication."
+  },
+  {
+    num: "3.16.10",
+    icon: "🏗️",
+    tClass: "t-spread",
+    title: "Correlation in Portfolio Construction",
+    sub: "How dependence structure shapes weights, risk contributions, and optimisation outcomes",
+    formula: "w* = f(μ, Σ(ρ))",
+    tags: [["portfolio construction","spread"], ["optimisation","mid"], ["risk contribution","gold"], ["diversification ratio",""]],
+    body: [
+      `In mean-variance optimisation the correlation structure enters solely through the covariance matrix Σ. Changing any ρᵢⱼ changes the curvature of the efficient frontier, the composition of the minimum-variance portfolio, and the risk contributions of individual assets. Low average correlations expand the set of attainable risk-return combinations; high average correlations shrink it toward the weighted-average volatility line.`,
+      `Beyond classical mean-variance, correlation appears in virtually every modern construction technique. Risk-parity and equal-risk-contribution portfolios allocate so that each asset (or factor) contributes the same amount of portfolio volatility; those contributions are direct functions of the covariances. Maximum-diversification portfolios maximise the ratio of weighted-average volatility to portfolio volatility — a ratio that rises when correlations fall. Hierarchical risk-parity and other clustering methods explicitly use the correlation matrix to form groups of similar assets before allocating capital.`,
+      `Because small changes in estimated correlations can produce large changes in optimised weights, naïve optimisers are notoriously unstable. Practical implementations therefore employ constraints (turnover, sector, factor exposure), regularisation, or robust optimisation that explicitly allows for uncertainty in Σ. Some approaches replace the full correlation matrix with a factor structure or with a shrinkage estimator precisely to reduce this sensitivity.`,
+      `Finally, correlation governs the marginal risk of adding a new asset. An asset that is highly correlated with the existing portfolio contributes little diversification and must offer a correspondingly higher expected return to justify inclusion. An asset with low or negative correlation can be attractive even with a modest expected return because it improves the overall risk profile. This logic is the quantitative foundation of the search for “alternative” return streams whose correlations with traditional portfolios are low.`
+    ],
+    keyPoint: "Correlation is not a side calculation in portfolio construction — it is the central determinant of how risk is shared among holdings. Every weight, every risk contribution, and every claim of diversification ultimately rests on the estimated dependence structure."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    // formula box
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    // price ladder (none used in this section)
+    const ladderHtml = e.ladder ? `` : '';
+
+    // split box
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    // data table
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + ladderHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

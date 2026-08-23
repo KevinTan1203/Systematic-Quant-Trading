@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 3.15 Carry</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 240px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 3 · Section 3.15 · Core Trading Foundations</div>
+        <h1 class="hdr-title">Carry<br><em>&amp; Yield</em></h1>
+        <div class="hdr-sub">The return you earn simply by holding a position — the quiet engine of many systematic strategies</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Example: AUD/JPY Carry (illustrative)</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">AUD Yield</div>
+            <div class="sw-price">4.2%</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">JPY Yield</div>
+            <div class="sw-price">0.1%</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Gross Carry</div>
+          <div class="sw-spread-val">+4.1%</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Crash Risk</div>
+          <div class="sw-mid-val">Elevated in stress</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">9 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>3.15 Carry</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "3.15.01",
+    icon: "💰",
+    tClass: "t-gold",
+    title: "Carry = Yield Earned While Holding",
+    sub: "The return that accrues simply from owning (or funding) a position, independent of price change",
+    formula: "Carry = Income − Financing Cost",
+    tags: [["carry","gold"], ["yield","gold"], ["holding period",""], ["expected return",""]],
+    formulaBox: {
+      main: "<span class='gold-part'>Carry</span> = Income − Cost of Funding",
+      note: "If price is unchanged, P&L ≈ Carry × time\nPositive carry = you are paid to hold\nNegative carry = you pay to hold"
+    },
+    body: [
+      `Carry is the expected return of a position assuming that prices (spot, forward, or yield curve) remain unchanged. It is the net cash-flow or accrual that the holder receives simply for maintaining the exposure. In every asset class the economic content is the same: income earned minus the cost of financing or storing the position.`,
+      `When carry is positive, the position generates a steady positive drift even if the market price does not move. When carry is negative, the holder must pay to keep the position open; the price must rise (or the short must fall) by more than the carry cost for the trade to be profitable. This simple accounting identity is the starting point for every carry strategy.`,
+      `Carry is not risk-free. The assumption that prices remain unchanged is an idealisation; in reality prices move, sometimes violently, and those moves can more than wipe out months or years of accumulated carry. The existence of positive average carry across many markets is therefore best understood as compensation for bearing the risk that the carry will reverse or that the underlying price will gap against the position.`,
+      `Because carry can be measured ex ante with reasonable precision (yields, dividends, funding rates, storage costs and convenience yields are all observable), it is one of the most robust and widely exploited sources of return in systematic investing. The rest of this section examines how the same concept appears in FX, bonds, equities, commodities and crypto, and why the returns are not free.`
+    ],
+    keyPoint: "Carry is the return you earn if nothing else happens. It is the most transparent component of expected return — and the component that most frequently tempts investors to ignore the risks that make it available in the first place."
+  },
+  {
+    num: "3.15.02",
+    icon: "💱",
+    tClass: "t-mid",
+    title: "FX Carry: Borrow Low, Invest High",
+    sub: "The classic currency carry trade — long high-yielding currencies, short low-yielding ones",
+    formula: "Carry ≈ i_high − i_low",
+    tags: [["fx carry","mid"], ["interest differential","mid"], ["uncovered interest parity",""], ["funding currency",""]],
+    formulaBox: {
+      main: "FX Carry ≈ i<sub>target</sub> − i<sub>funding</sub>",
+      note: "Long AUD / short JPY → earn AUD rate, pay JPY rate\nIf the exchange rate is unchanged, P&L = interest differential\nUncovered Interest Parity says the FX move should offset the differential — empirically it does not on average"
+    },
+    body: [
+      `The FX carry trade is the purest expression of the carry idea. An investor borrows in a low-interest-rate currency (the funding currency — historically the Japanese yen or Swiss franc) and invests in a high-interest-rate currency (the target currency — historically the Australian or New Zealand dollar, or various emerging-market currencies). As long as the exchange rate does not move against the position, the interest differential is earned as positive carry.`,
+      `Uncovered Interest Parity (UIP) asserts that the high-yielding currency should depreciate by exactly the interest differential, so that expected returns are equalised. Decades of empirical evidence show that UIP fails on average: high-yielding currencies have tended to appreciate, or at least not to depreciate enough to offset the yield advantage. The resulting positive average return to the carry trade is one of the most studied anomalies in international finance.`,
+      `The trade is typically implemented in the forward market (selling the forward of the funding currency) or via an outright long/short spot position financed in the money markets. Because the position is usually levered, small adverse exchange-rate moves can produce large losses. The classic “carry crash” occurs when risk aversion spikes and investors simultaneously unwind crowded long positions in high-yielding currencies, causing those currencies to fall sharply while the funding currencies rally.`,
+      `FX carry remains a core building block of currency overlay, global macro and risk-premia strategies. Its performance is strongly regime-dependent: it tends to do well in calm, risk-on environments and to suffer in risk-off episodes.`
+    ],
+    keyPoint: "FX carry harvests the failure of uncovered interest parity. You are paid the interest differential for as long as the exchange rate cooperates — and you give it all back, often with interest, when risk appetite collapses."
+  },
+  {
+    num: "3.15.03",
+    icon: "📜",
+    tClass: "t-spread",
+    title: "Bond Carry: Coupon minus Financing",
+    sub: "The net income from holding a bond financed at the short-term rate (or repo)",
+    formula: "Carry ≈ Coupon/Price − Financing Rate",
+    tags: [["bond carry","spread"], ["roll-down",""], ["repo","spread"], ["duration",""]],
+    formulaBox: {
+      main: "Bond Carry ≈ (Coupon / Price) − r<sub>financing</sub>",
+      note: "Often combined with roll-down (the capital gain\nif the yield curve is unchanged).\nTotal ‘carry + roll-down’ is the standard\nfixed-income expected-return measure."
+    },
+    body: [
+      `In fixed income, carry is the difference between the yield (or coupon income) earned on a bond and the cost of financing that bond in the repo or money market. A long bond position financed at a short-term rate earns positive carry when the bond’s yield exceeds the financing rate — the normal upward-sloping yield-curve case.`,
+      `Practitioners almost always combine pure carry with <em>roll-down</em>: the capital gain that occurs if the yield curve remains unchanged and the bond simply ages into a lower-yield point on the curve. The sum “carry + roll-down” is the standard ex-ante expected-return measure used by rates traders and relative-value desks when the curve is assumed static.`,
+      `Carry is larger for longer-duration bonds when the curve is steep, but those bonds also have greater exposure to parallel yield shifts. Consequently bond-carry strategies are implicitly duration strategies unless the duration risk is hedged. Fully hedged carry trades (e.g., long a high-yielding bond versus short a duration-matched low-yielding bond, or curve-steepener/flattener packages) isolate the carry component more cleanly.`,
+      `Negative carry appears when the curve is inverted or when financing costs spike (special repo, balance-sheet constraints). In those regimes the holder of long-duration bonds pays to hold the position and must rely on favourable yield moves for profit.`
+    ],
+    keyPoint: "Bond carry is the net income from riding the yield curve. It is positive when the curve is upward-sloping and financing is cheap; it becomes a cost when the curve inverts or funding becomes scarce."
+  },
+  {
+    num: "3.15.04",
+    icon: "📈",
+    tClass: "t-bid",
+    title: "Equity Carry: Dividend Yield minus Borrow",
+    sub: "The net yield from holding (or shorting) stock, after financing and borrow costs",
+    formula: "Carry ≈ Div Yield − Borrow Cost − Funding",
+    tags: [["equity carry","bid"], ["dividend yield","bid"], ["stock borrow",""], ["long-short",""]],
+    body: [
+      `For a long equity position the primary source of carry is the dividend yield. Against this must be set the cost of funding the purchase (or the opportunity cost of capital) and, for short positions, the stock-borrow fee. Net equity carry is therefore dividend yield minus financing cost for longs, and borrow fee minus dividend yield (plus any short-proceeds interest) for shorts.`,
+      `In a long-short equity portfolio the carry contribution is the dividend yield earned on the longs minus the dividend yield paid on the shorts, minus the net borrow cost of the short book. High-dividend-yield stocks have historically delivered a positive carry premium, related to the broader value and income factors. Hard-to-borrow names (low inventory, high retail short interest) can turn a short position into a significant negative-carry drag.`,
+      `Index futures and total-return swaps embed equity carry in their pricing: the futures basis reflects the net cost of carry (funding minus expected dividends). When the basis is rich or cheap relative to fair value, arbitrageurs and basis traders act to restore the relationship, so that the implied carry remains tightly linked to observable dividend forecasts and funding rates.`,
+      `Equity carry is generally smaller in magnitude than FX or commodity carry and is more heavily researched as part of the value/income complex than as a pure stand-alone carry strategy. Nevertheless it remains an important component of expected returns for any equity portfolio that is not delta-hedged to zero.`
+    ],
+    keyPoint: "Equity carry is the dividend you collect (or pay) after financing and borrow costs. It is the quiet income component of stock returns — and the reason hard-to-borrow shorts can become expensive to maintain."
+  },
+  {
+    num: "3.15.05",
+    icon: "🛢️",
+    tClass: "t-impact",
+    title: "Commodity Carry: Convenience Yield minus Storage",
+    sub: "The net benefit (or cost) of holding the physical commodity versus the futures",
+    formula: "Carry ≈ Convenience Yield − Storage − Funding",
+    tags: [["commodity carry","impact"], ["convenience yield",""], ["storage cost",""], ["curve shape",""]],
+    formulaBox: {
+      main: "Futures Basis ≈ r + Storage − Convenience Yield",
+      note: "Backwardation (spot > futures) → positive roll yield\nContango (spot < futures) → negative roll yield\nRoll yield is the dominant source of commodity carry"
+    },
+    body: [
+      `Commodity carry is most cleanly observed in the futures curve. The shape of the curve embeds the market’s net cost of carry: financing plus storage costs minus the convenience yield (the non-monetary benefit of holding the physical inventory). When the curve is in backwardation, a long futures position earns positive roll yield as contracts converge upward toward a higher spot; when the curve is in contango, the long position suffers negative roll yield.`,
+      `Convenience yield is high when inventories are scarce and the market places a premium on immediate access to the physical commodity (oil during supply shocks, agricultural products before harvest shortages). Storage costs are high for bulky or perishable commodities and low for precious metals. The interplay of these forces determines whether a given contract offers positive or negative carry.`,
+      `Systematic commodity strategies that go long the most backwardated contracts and short the most contangoed contracts are pure carry (or “curve”) strategies. They have historically produced positive average returns, consistent with the idea that backwardation compensates for the risk of holding scarce inventory and for the hedging pressure of commercial producers.`,
+      `Commodity carry is strongly linked to the physical market and can change rapidly when inventory data, weather, or geopolitical events alter the scarcity outlook. It is therefore both a source of return and a source of sudden regime shifts.`
+    ],
+    keyPoint: "Commodity carry lives in the futures curve. Backwardation pays the long; contango charges the long. The curve is the market’s real-time verdict on scarcity versus abundance."
+  },
+  {
+    num: "3.15.06",
+    icon: "₿",
+    tClass: "t-classes",
+    title: "Crypto Carry: Funding Rate Arbitrage",
+    sub: "Harvesting the perpetual-futures funding rate — the crypto-native carry trade",
+    formula: "Carry ≈ Funding Rate (long pays short or vice versa)",
+    tags: [["crypto","classes"], ["funding rate","classes"], ["perpetual futures",""], ["basis",""]],
+    body: [
+      `In crypto markets the dominant carry instrument is the perpetual futures contract. Perpetuals have no expiry; instead they use a funding-rate mechanism that periodically transfers payments between longs and shorts so that the perpetual price stays anchored to spot. When the perpetual trades at a premium to spot, longs pay shorts (positive funding); when it trades at a discount, shorts pay longs (negative funding).`,
+      `The classic crypto carry trade is to be long spot (or a long-dated future) and short the perpetual when funding is positive, thereby collecting the funding payment while remaining market-neutral. The reverse trade is used when funding is deeply negative. Because funding rates can be extreme (tens or hundreds of percent annualised in manic periods), the carry on offer is often far larger than in traditional asset classes — and far more volatile.`,
+      `Risks include basis risk (the perpetual–spot spread can move against the arbitrageur), exchange and custody risk, liquidations in volatile moves, and the sudden disappearance of the funding opportunity when sentiment flips. Crowded funding trades have unwound violently in several crypto drawdowns.`,
+      `Crypto carry is the purest high-frequency, high-magnitude version of the same idea that appears in FX and commodities: a cash-flow that accrues for holding a relative position, paid by the side of the market that is more eager for exposure.`
+    ],
+    keyPoint: "Crypto funding-rate carry is the same economic object as classic carry — a payment for providing the other side of a desired exposure — delivered at crypto speed and crypto magnitude."
+  },
+  {
+    num: "3.15.07",
+    icon: "💥",
+    tClass: "t-ask",
+    title: "Carry Crash Risk",
+    sub: "The sudden, violent reversal that erases months or years of accumulated carry",
+    formula: "Crash ≈ crowded unwind + liquidity vacuum",
+    tags: [["crash risk","ask"], ["tail risk","ask"], ["crowding",""], ["risk-off",""]],
+    splitBox: [
+      { cls: "bid",  label: "Normal Times", text: "Carry accrues steadily. Volatility is low. Positions are comfortable. The strategy looks like a money-printing machine." },
+      { cls: "ask",  label: "Crash Phase", text: "Risk aversion spikes. Crowded positions are unwound simultaneously. Liquidity disappears. High-carry assets fall sharply; funding currencies rally." },
+      { cls: "gold", label: "Classic Episodes", text: "1998 LTCM / Russia, 2008 GFC, 2013 Taper Tantrum, 2018 Volmageddon, 2020 COVID, various EM carry crashes. Pattern repeats across asset classes." },
+      { cls: "spread", label: "Why It Happens", text: "Carry strategies are short volatility and short liquidity. When both spike, the strategies are forced to deleverage into a falling market, amplifying the move." },
+    ],
+    body: [
+      `Carry strategies earn a positive average return precisely because they are exposed to the risk of infrequent but severe drawdowns. A carry crash occurs when the market’s willingness to hold high-carry, high-risk positions evaporates. Investors who have leveraged those positions are forced to reduce exposure at the same time, producing a self-reinforcing liquidation cascade.`,
+      `In FX the classic pattern is a sharp appreciation of the funding currency and a collapse of the high-yielding targets. In fixed income it is a sudden steepening or a blow-out in credit spreads. In equities it is a rapid underperformance of high-dividend or high-carry factors. In commodities it is an abrupt shift from backwardation into deep contango (or the reverse). In crypto it is a simultaneous collapse of funding rates and a basis blow-out.`,
+      `Because the crashes are correlated with rises in risk aversion and volatility, carry strategies exhibit negative skewness and high tail dependence with other risky assets. The average positive return is compensation for bearing this crash risk. Any performance evaluation that ignores the skewness and the drawdowns will dramatically overstate the attractiveness of the strategy.`,
+      `Risk management of carry therefore centres on position sizing, diversification across carry styles and asset classes, and explicit recognition that the worst days will be far worse than a normal-distribution assumption suggests.`
+    ],
+    keyPoint: "Carry is a trade that pays you a little every day and takes a lot back on a few days. The crash risk is not an accident; it is the reason the carry exists."
+  },
+  {
+    num: "3.15.08",
+    icon: "⚖️",
+    tClass: "t-cost",
+    title: "Risk-Adjusted Carry",
+    sub: "Scaling raw carry by volatility (or other risk measures) so that comparisons are meaningful",
+    formula: "RAC = Carry / σ",
+    tags: [["risk-adjusted","gold"], ["sharpe","gold"], ["vol scaling",""], ["position sizing",""]],
+    formulaBox: {
+      main: "Risk-Adjusted Carry = Carry ÷ σ",
+      note: "Also used: Carry / VaR, Carry / Expected Shortfall\nEqual risk-adjusted carry → equal expected Sharpe\n(under the assumption that carry is the risk premium)"
+    },
+    body: [
+      `Raw carry numbers are not comparable across assets. A 5 % carry on a bond with 3 % annualised volatility is far more attractive than a 5 % carry on an emerging-market currency with 15 % volatility. Risk-adjusted carry divides the expected carry by a measure of risk — most commonly realised or implied volatility — so that the signal is expressed in units of return per unit of risk.`,
+      `In systematic portfolios this scaling is used both for ranking (which assets offer the most carry per unit of risk?) and for position sizing (allocate so that each position contributes roughly equal expected risk-adjusted return). The resulting portfolio is closer to a risk-parity or equal-Sharpe construction than to a simple equal-notional or equal-carry construction.`,
+      `Other denominators are sometimes used: Value-at-Risk, expected shortfall, or a measure of crash risk (e.g., historical drawdown or option-implied tail risk). The choice depends on whether the dominant risk is ordinary volatility or the jump/crash risk that characterises many carry strategies.`,
+      `Risk-adjusted carry is also the natural input to optimisers and to multi-strategy risk-budgeting frameworks. It converts a heterogeneous set of yield differentials into a common language that can be compared with momentum, value, and other style premia.`
+    ],
+    keyPoint: "Raw carry is a yield; risk-adjusted carry is a Sharpe ratio. Only the latter tells you whether the compensation is attractive relative to the risk you are being asked to bear."
+  },
+  {
+    num: "3.15.09",
+    icon: "🔄",
+    tClass: "t-dynamics",
+    title: "Carry vs. Momentum Interplay",
+    sub: "Two powerful style premia that sometimes reinforce and sometimes collide",
+    formula: "Carry × Momentum interaction",
+    tags: [["momentum","dynamics"], ["style premia","dynamics"], ["crowding",""], ["diversification","bid"]],
+    splitBox: [
+      { cls: "bid",  label: "Reinforcing", text: "High-carry assets that are also in up-trends produce the strongest historical returns. Both signals point in the same direction; the position is comfortable for both camps." },
+      { cls: "ask",  label: "Colliding", text: "High-carry assets that are in down-trends create conflict. Carry wants to stay long; momentum wants to sell. These are often the most dangerous positions — crowded and already losing." },
+      { cls: "mid",  label: "Empirical Pattern", text: "Studies show that carry strategies perform better when conditioned on positive momentum, and that pure carry without momentum filters suffers larger drawdowns." },
+      { cls: "gold", label: "Portfolio Construction", text: "Many modern risk-premia portfolios run carry and momentum as separate sleeves, then combine them with risk budgeting. The diversification benefit is real but imperfect." },
+    ],
+    body: [
+      `Carry and momentum are two of the most robust style premia across asset classes. Carry is a slow, yield-based signal; momentum is a price-based signal that reacts to recent performance. Because they are constructed from different information, their correlation is imperfect and their combination has historically improved risk-adjusted returns.`,
+      `The interaction is economically intuitive. When a high-carry asset is also rising, both the income and the capital-gain channels are positive; the position attracts both carry and trend-following capital. When a high-carry asset begins to trend down, the two signals diverge. Carry investors who ignore the trend can end up holding a falling knife, while pure momentum investors may exit just as the yield becomes most attractive.`,
+      `Empirical work across FX, bonds, commodities and equities consistently finds that carry strategies filtered by momentum (or vice versa) exhibit higher Sharpe ratios and lower drawdowns than either strategy alone. The improvement is especially visible in the reduction of crash severity: momentum tends to cut positions as the crash begins, limiting the damage that pure carry would otherwise suffer.`,
+      `In practice the two styles are often run as distinct sleeves inside a multi-strategy portfolio, with explicit risk budgets and rebalancing rules. The interplay is monitored both for diversification benefit and for the warning signal that appears when the two styles become unusually correlated or when high-carry assets start to show persistent negative momentum.`
+    ],
+    keyPoint: "Carry and momentum are natural partners and occasional adversaries. Used together they diversify each other’s weaknesses; ignored, their conflicts produce some of the most painful drawdowns in systematic investing."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>
