@@ -1,0 +1,1171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Order Book Map v1.0 — Market Depth Workstation</title>
+<style>
+  :root{
+    --bg:#05070b; --panel:#0b0f16; --panel2:#0f141d; --line:#1c2531; --line2:#141b26;
+    --text:#e6ecf5; --muted:#7c8aa0; --dim:#54607a;
+    --green:#31d199; --green-dim:#1a5a45; --red:#ff5468; --red-dim:#5c1f28;
+    --amber:#f2bd52; --blue:#5aa3ff; --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Consolas,monospace;
+    --sans:Inter,-apple-system,"Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:12.5px var(--sans);}
+  .app{max-width:1900px;margin:auto;padding:14px 16px 20px}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  /* ---- top bar ---- */
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+  .brand{display:flex;gap:10px;align-items:center}
+  .logo{width:36px;height:36px;border:1px solid #26344a;border-radius:8px;display:grid;place-items:center;
+        background:linear-gradient(160deg,#0e1520,#0a0e15);color:#4fd3e0;font-weight:800;font-size:12px;letter-spacing:.02em}
+  h1{font-size:15.5px;margin:0;font-weight:700;letter-spacing:.01em}
+  .sub{font-size:10px;color:var(--muted);margin-top:2px}
+  .controls{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+  .ctrl-group{display:flex;gap:1px;background:var(--line);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+  button,select,input[type=number]{background:#0f151f;color:var(--text);border:1px solid #263145;border-radius:6px;
+        padding:6px 8px;font-size:11px;font-family:var(--sans)}
+  select,input[type=number]{font-family:var(--mono)}
+  button{cursor:pointer;transition:border-color .1s}
+  button:hover{border-color:#44536e}
+  button.active{border-color:#4fd3e0;color:#4fd3e0}
+  button.warn{border-color:#5c1f28;color:var(--red)}
+  .seg{display:flex;border:1px solid #263145;border-radius:6px;overflow:hidden}
+  .seg button{border:0;border-radius:0;border-right:1px solid #263145}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:#152234;color:#4fd3e0}
+
+  /* ---- status strip ---- */
+  .statusbar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);
+        border-radius:8px;padding:7px 12px;margin-bottom:10px;font-size:10.5px;color:var(--muted)}
+  .statusbar b{color:var(--text)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;background:var(--dim)}
+  .dot.live{background:var(--green);box-shadow:0 0 6px #31d19980}
+  .dot.sim{background:var(--amber)}
+  .dot.off{background:var(--red)}
+  .dot.pending{background:var(--blue);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .badge{font-size:9.5px;font-weight:800;letter-spacing:.04em;padding:3px 7px;border-radius:4px;background:#1a2233;color:var(--muted)}
+  .badge.live{background:#0f2a20;color:var(--green)}
+  .badge.sim{background:#2a2312;color:var(--amber)}
+  .badge.off{background:#2a1418;color:var(--red)}
+  .badge.pending{background:#0f1f2e;color:var(--blue)}
+  .spacer{flex:1}
+
+  /* ---- layout ---- */
+  .layout{display:grid;grid-template-columns:262px minmax(0,1fr) 320px;gap:10px;align-items:start}
+  .col{display:flex;flex-direction:column;gap:10px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .panel-h{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border-bottom:1px solid var(--line)}
+  .panel-h h3{margin:0;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#93a1b8;font-weight:700}
+  .panel-h .hint{font-size:9.5px;color:var(--dim)}
+  .panel-b{padding:10px 11px}
+
+  .metric{display:flex;justify-content:space-between;align-items:baseline;padding:5.5px 0;border-bottom:1px solid var(--line2)}
+  .metric:last-child{border:0}
+  .metric span{color:var(--muted);font-size:10.5px}
+  .metric b{font-size:12px}
+  .green{color:var(--green)} .red{color:var(--red)} .amber{color:var(--amber)} .blue{color:var(--blue)} .muted{color:var(--muted)}
+
+  .bipolar{height:6px;border-radius:3px;background:var(--line2);overflow:hidden;display:flex;margin:6px 0}
+  .bipolar i{display:block;height:100%}
+  .bipolar .b{background:var(--green)} .bipolar .a{background:var(--red)}
+
+  .small{font-size:10px;color:var(--muted);line-height:1.5}
+
+  /* ---- order book ladder ---- */
+  .midbanner{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--panel2);
+        border-bottom:1px solid var(--line)}
+  .midbanner .mp{font-size:19px;font-weight:700;font-family:var(--mono)}
+  .midbanner .spreadinfo{text-align:right;font-size:10px;color:var(--muted)}
+  .ladder-head{display:grid;grid-template-columns:1fr 1fr 34px 1fr 1fr;font-size:9px;color:var(--dim);
+        text-transform:uppercase;letter-spacing:.05em;padding:5px 12px;border-bottom:1px solid var(--line)}
+  .ladder-head span:nth-child(1),.ladder-head span:nth-child(2){text-align:right}
+  .ladder-head span:nth-child(4),.ladder-head span:nth-child(5){text-align:left}
+  .ladder-head span:nth-child(3){text-align:center}
+  .ladder{max-height:420px;overflow-y:auto}
+  .lrow{position:relative;display:grid;grid-template-columns:1fr 1fr 34px 1fr 1fr;align-items:center;
+        padding:2.5px 12px;font-family:var(--mono);font-size:11px;isolation:isolate}
+  .lrow .bar{position:absolute;top:1px;bottom:1px;z-index:-1;opacity:.16}
+  .lrow .bar.bid{right:calc(60% + 34px);background:var(--green)}
+  .lrow .bar.ask{left:calc(60% + 34px);background:var(--red)}
+  .lrow .cell{text-align:right;white-space:nowrap;overflow:hidden}
+  .lrow .cell.left{text-align:left}
+  .lrow .bsize{color:#a8e9cf}
+  .lrow .bcum{color:var(--dim)}
+  .lrow .asize{color:#ffb3ba}
+  .lrow .acum{color:var(--dim)}
+  .lrow .price{text-align:center;font-weight:700}
+  .lrow .price.bid{color:var(--green)}
+  .lrow .price.ask{color:var(--red)}
+  .lrow.best{background:#0e1a17}
+  .lrow.best .price{font-size:12px}
+  .lrow.wall .price{text-shadow:0 0 8px currentColor}
+  .lrow.flash-up{animation:flashUp .5s ease-out}
+  .lrow.flash-down{animation:flashDown .5s ease-out}
+  @keyframes flashUp{0%{background:#123322}100%{background:transparent}}
+  @keyframes flashDown{0%{background:#331419}100%{background:transparent}}
+
+  /* ---- canvases ---- */
+  .mapwrap{height:430px;position:relative}
+  .mapwrap canvas{width:100%;height:100%;display:block}
+  .maplabel{position:absolute;font-size:9.5px;color:var(--dim);pointer-events:none}
+  .depthwrap{height:150px;position:relative}
+  .depthwrap canvas{width:100%;height:100%;display:block}
+  .legend{display:flex;gap:11px;color:var(--muted);font-size:9.5px;align-items:center;flex-wrap:wrap}
+  .sw{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+
+  /* ---- trade tape ---- */
+  .tape-filter{display:flex;gap:4px}
+  .tape-filter button{padding:3px 7px;font-size:9.5px}
+  .tape{max-height:230px;overflow-y:auto;font-family:var(--mono);font-size:10.5px}
+  .trow{display:grid;grid-template-columns:56px 34px 1fr 1fr 1fr;gap:6px;padding:3px 11px;border-bottom:1px solid var(--line2)}
+  .trow:last-child{border:0}
+  .trow .side.buy{color:var(--green)} .trow .side.sell{color:var(--red)}
+  .trow span{text-align:right;overflow:hidden;white-space:nowrap}
+  .trow span:first-child{text-align:left;color:var(--dim)}
+  .trow span:nth-child(2){text-align:left}
+
+  /* ---- footer ---- */
+  .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .foot .limits{font-size:9.5px;color:var(--dim);max-width:900px;line-height:1.5}
+  .foot .exportbtns{display:flex;gap:6px}
+
+  input[type=range]{width:100%;accent-color:#4fd3e0}
+  input[type=number]{width:64px}
+
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#1f2a3a;border-radius:4px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  @media(max-width:1400px){.layout{grid-template-columns:1fr}}
+  @media(max-width:700px){.top{flex-direction:column}.controls{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="top">
+    <div class="brand">
+      <div class="logo">OB</div>
+      <div>
+        <h1>Order Book Map <span style="color:#4fd3e0">v1.0</span></h1>
+        <div class="sub">Market-depth workstation · Time × Price liquidity · No order entry, view-only</div>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="seg" id="sourceSeg">
+        <button data-src="sim" class="on">Simulation</button>
+        <button data-src="live">Kraken Live</button>
+      </div>
+      <select id="symbol">
+        <option value="BTC/USD">BTC / USD</option>
+        <option value="ETH/USD">ETH / USD</option>
+        <option value="SOL/USD">SOL / USD</option>
+      </select>
+      <select id="depthSel">
+        <option value="10">10 levels</option>
+        <option value="20" selected>20 levels</option>
+        <option value="50">50 levels</option>
+        <option value="100">100 levels</option>
+      </select>
+      <select id="aggSel" title="Price aggregation">
+        <option value="0">Tick</option>
+        <option value="0.1">0.1</option>
+        <option value="1">1</option>
+        <option value="5">5</option>
+        <option value="10">10</option>
+      </select>
+      <select id="unitSel" title="Quantity / Notional">
+        <option value="qty">BTC/ETH/SOL</option>
+        <option value="usd">USD notional</option>
+      </select>
+      <select id="histSel" title="Heatmap duration">
+        <option value="30">30 sec</option>
+        <option value="60">1 min</option>
+        <option value="300" selected>5 min</option>
+        <option value="900">15 min</option>
+      </select>
+      <button id="pauseBtn">Pause</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span><span class="dot sim" id="feedDot"></span><span class="badge sim" id="feedBadge">SIMULATED</span></span>
+    <span>Symbol <b id="stSymbol">BTC/USD</b></span>
+    <span>Exchange <b id="stExchange">Simulation engine</b></span>
+    <span>Last update <b class="num" id="stLast">—</b></span>
+    <span>Latency <b class="num" id="stLatency">—</b></span>
+    <span>Snapshots <b class="num" id="stSnaps">0</b></span>
+    <span id="stReconnectWrap" style="display:none">Reconnect in <b class="num" id="stReconnect">—</b></span>
+    <span class="spacer"></span>
+    <span class="small">Public market data only. This dashboard never places, modifies or cancels orders.</span>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT COLUMN -->
+    <div class="col">
+      <div class="panel">
+        <div class="panel-h"><h3>Market metrics</h3></div>
+        <div class="panel-b">
+          <div class="metric"><span>Best bid</span><b class="num green" id="mBestBid">—</b></div>
+          <div class="metric"><span>Best ask</span><b class="num red" id="mBestAsk">—</b></div>
+          <div class="metric"><span>Mid price</span><b class="num" id="mMid">—</b></div>
+          <div class="metric"><span>Last trade</span><b class="num" id="mLast">—</b></div>
+          <div class="metric"><span>Trades / sec</span><b class="num" id="mTps">—</b></div>
+          <div class="metric"><span>Buy / sell ratio</span><b class="num" id="mRatio">—</b></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><h3>Spread analysis</h3></div>
+        <div class="panel-b">
+          <div class="metric"><span>Spread ($)</span><b class="num" id="sSpread">—</b></div>
+          <div class="metric"><span>Spread (bps)</span><b class="num" id="sBps">—</b></div>
+          <div class="metric"><span>Microprice</span><b class="num amber" id="sMicro">—</b></div>
+          <div class="metric"><span>Session high</span><b class="num" id="sHigh">—</b></div>
+          <div class="metric"><span>Session low</span><b class="num" id="sLow">—</b></div>
+          <div class="metric"><span>Session change</span><b class="num" id="sChange">—</b></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><h3>Order book imbalance</h3>
+          <select id="imbDepthSel" style="font-size:9.5px;padding:3px 5px">
+            <option value="5">Top 5</option><option value="10" selected>Top 10</option>
+            <option value="20">Top 20</option><option value="50">Top 50</option>
+          </select>
+        </div>
+        <div class="panel-b">
+          <div class="metric"><span>Bid depth</span><b class="num green" id="iBidDepth">—</b></div>
+          <div class="metric"><span>Ask depth</span><b class="num red" id="iAskDepth">—</b></div>
+          <div class="bipolar"><i class="b" id="iBidBar" style="width:50%"></i><i class="a" id="iAskBar" style="width:50%"></i></div>
+          <div class="metric"><span>Imbalance</span><b class="num" id="iImb">—</b></div>
+          <div class="metric"><span>Bias</span><b id="iBias">Balanced</b></div>
+          <div class="small" style="margin-top:6px">Depth imbalance reflects resting liquidity only — it is not a guaranteed directional signal.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><h3>Aggressive flow</h3></div>
+        <div class="panel-b">
+          <div class="metric"><span>Buy volume</span><b class="num green" id="fBuyVol">—</b></div>
+          <div class="metric"><span>Sell volume</span><b class="num red" id="fSellVol">—</b></div>
+          <div class="bipolar"><i class="b" id="fBuyBar" style="width:50%"></i><i class="a" id="fSellBar" style="width:50%"></i></div>
+          <div class="metric"><span>Aggressive flow</span><b id="fBias">—</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER COLUMN -->
+    <div class="col">
+      <div class="panel">
+        <div class="midbanner">
+          <div><span class="small">MID PRICE</span><div class="mp num" id="ladderMid">—</div></div>
+          <div class="spreadinfo">
+            spread <b class="num" id="ladderSpread">—</b> · <b class="num" id="ladderBps">—</b> bps
+          </div>
+          <div class="seg" id="liqModeSeg">
+            <button data-mode="individual" class="on">Individual</button>
+            <button data-mode="cumulative">Cumulative</button>
+            <button data-mode="both">Both</button>
+          </div>
+        </div>
+        <div class="ladder-head">
+          <span>Size</span><span>Cum.</span><span>·</span><span style="text-align:left">Price</span><span style="text-align:left">Cum.</span>
+        </div>
+        <div class="ladder-head" style="border-bottom:none;padding-top:0;margin-top:-4px">
+          <span></span><span></span><span></span><span style="text-align:left"></span><span style="text-align:left"></span>
+        </div>
+        <div class="ladder" id="ladder"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">
+          <h3>Depth map — time × price × liquidity</h3>
+          <div class="legend">
+            <span><i class="sw" style="background:var(--green)"></i>bid liquidity</span>
+            <span><i class="sw" style="background:var(--red)"></i>ask liquidity</span>
+            <span><i class="sw" style="background:var(--amber)"></i>high concentration</span>
+            <span>○ trade print</span>
+          </div>
+        </div>
+        <div class="mapwrap">
+          <canvas id="heatmap"></canvas>
+          <div class="maplabel" style="left:7px;top:6px">PRICE</div>
+          <div class="maplabel" style="right:7px;bottom:6px">TIME →</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">
+          <h3>Depth chart — cumulative bid / ask</h3>
+          <span class="hint" id="depthChartHint">quantity</span>
+        </div>
+        <div class="depthwrap"><canvas id="depthchart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="col">
+      <div class="panel">
+        <div class="panel-h"><h3>Liquidity walls</h3></div>
+        <div class="panel-b">
+          <div class="metric"><span>Largest bid wall</span><b class="num green" id="wBid">—</b></div>
+          <div class="metric"><span>Largest ask wall</span><b class="num red" id="wAsk">—</b></div>
+          <div class="metric"><span>Wall persistence</span><b class="num" id="wPersist">—</b></div>
+          <div class="metric" style="align-items:center">
+            <span>Threshold mode</span>
+            <select id="wallMode" style="font-size:9.5px;padding:3px 5px">
+              <option value="median">× local median</option>
+              <option value="abs">Absolute qty</option>
+            </select>
+          </div>
+          <div class="metric"><span>Threshold value</span><input type="number" id="wallVal" value="5" step="0.5" min="0.5"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><h3>Liquidity flow</h3>
+          <select id="flowWin" style="font-size:9.5px;padding:3px 5px">
+            <option value="5">5 sec</option><option value="30" selected>30 sec</option>
+            <option value="60">1 min</option><option value="300">5 min</option>
+          </select>
+        </div>
+        <div class="panel-b">
+          <div class="metric"><span>Bid added</span><b class="num green" id="flBidAdd">—</b></div>
+          <div class="metric"><span>Bid removed</span><b class="num red" id="flBidRem">—</b></div>
+          <div class="metric"><span>Ask added</span><b class="num green" id="flAskAdd">—</b></div>
+          <div class="metric"><span>Ask removed</span><b class="num red" id="flAskRem">—</b></div>
+          <div class="metric"><span>Net bid flow</span><b class="num" id="flNetBid">—</b></div>
+          <div class="metric"><span>Net ask flow</span><b class="num" id="flNetAsk">—</b></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><h3>Recent trades</h3>
+          <div class="tape-filter" id="tapeFilter">
+            <button data-f="all" class="active">ALL</button><button data-f="buy">BUY</button><button data-f="sell">SELL</button>
+          </div>
+        </div>
+        <div class="tape" id="tape"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><h3>Architecture</h3></div>
+        <div class="panel-b small">
+          The renderer consumes a normalised event model — <b class="num" style="font-size:10px">snapshot / delta / trade</b> —
+          emitted by an <b>ExchangeAdapter</b>. <b>MockExchangeAdapter</b> is active now; <b>KrakenExchangeAdapter</b> speaks
+          the same interface over Kraken's public Spot WebSocket v2, so switching feeds never touches this view layer.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="limits">
+      Prototype workstation. Simulation mode generates synthetic L2 data for UI development; it is never labelled LIVE.
+      Kraken mode uses only public market-data channels (book, trade) and never submits, amends or cancels orders.
+      Heatmap and history buffers are time-bounded to prevent unbounded memory growth.
+    </div>
+    <div class="exportbtns">
+      <button id="copySnapBtn">Copy snapshot</button>
+      <button id="exportJsonBtn">Export JSON</button>
+      <button id="exportCsvBtn">Export CSV</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   ORDER BOOK MAP v1.0
+   Layered architecture:
+     ExchangeAdapter  ->  OrderBookStore / TradeStore  ->  AnalyticsEngine
+     ->  HeatmapEngine / DepthChartEngine / OrderBookRenderer / TradeTape
+     ->  UIController
+   All adapters emit a normalised event model regardless of exchange:
+     {type:'snapshot', symbol, bids:[{price,qty}], asks:[{price,qty}], ts}
+     {type:'delta',    symbol, side:'bid'|'ask', price, qty, ts}
+     {type:'trade',    symbol, price, qty, side:'buy'|'sell', ts}
+   ========================================================================= */
+
+const $ = id => document.getElementById(id);
+const now = () => Date.now();
+function fmt(v, dp=2){ if(v==null||!isFinite(v)) return "—"; return Number(v).toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
+function fmtQty(v, dp=4){ if(v==null||!isFinite(v)) return "—"; return Number(v).toFixed(dp); }
+function fmtUsd(v){ if(v==null||!isFinite(v)) return "—";
+  const a=Math.abs(v);
+  if(a>=1e6) return (v/1e6).toFixed(2)+"m";
+  if(a>=1e3) return (v/1e3).toFixed(1)+"k";
+  return v.toFixed(0);
+}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function rnd(a,b){return a+Math.random()*(b-a);}
+
+/* ---------------------------------------------------------------------
+   EXCHANGE ADAPTER LAYER
+   --------------------------------------------------------------------- */
+class ExchangeAdapter{
+  constructor(onEvent, onStatus){ this.onEvent=onEvent; this.onStatus=onStatus; }
+  connect(){ throw new Error("not implemented"); }
+  disconnect(){ throw new Error("not implemented"); }
+  setSymbol(sym){ this.symbol=sym; }
+  setDepth(n){ this.depth=n; }
+}
+
+/** Deterministic-ish synthetic market data generator. Behaves like a live
+ *  book: liquidity walls drift, spread breathes, trades occur, sizes move -
+ *  rather than independent random numbers per level. */
+class MockExchangeAdapter extends ExchangeAdapter{
+  constructor(onEvent,onStatus){ super(onEvent,onStatus); this.timer=null; this.price=0; this.walls=[0,0]; }
+  basePrice(sym){ return sym==="ETH/USD"?3500:(sym==="SOL/USD"?190:112500); }
+  step(sym){ return sym==="ETH/USD"?0.5:(sym==="SOL/USD"?0.05:10); }
+  connect(){
+    this.onStatus({state:"simulated", label:"SIMULATED", exchange:"Simulation engine"});
+    this.price = this.basePrice(this.symbol);
+    this._walk();
+    clearInterval(this.timer);
+    this.timer=setInterval(()=>this._walk(), 650);
+  }
+  disconnect(){ clearInterval(this.timer); this.timer=null; }
+  _walk(){
+    const sym=this.symbol, step=this.step(sym);
+    this.price += rnd(-this.price*0.00012, this.price*0.00012);
+    this.price = Math.round(this.price/step)*step;
+    const center=this.price;
+    if(!this._wallTick || this._wallTick<=0){
+      this.walls=[center+rnd(-center*0.003,center*0.003), center+rnd(-center*0.002,center*0.002)];
+      this._wallTick = Math.floor(rnd(8,20));
+    }
+    this._wallTick--;
+    const bids=[], asks=[], n=this.depth||20;
+    for(let i=1;i<=n;i++){
+      const pB=center-i*step, pA=center+i*step;
+      let qB=rnd(0.02, sym==="ETH/USD"?0.9:(sym==="SOL/USD"?12:1.8))*(1+(i<4?1.4:0));
+      let qA=rnd(0.02, sym==="ETH/USD"?0.9:(sym==="SOL/USD"?12:1.8))*(1+(i<4?1.4:0));
+      qB *= 1+Math.exp(-((pB-this.walls[0])**2)/(2*(step*4)**2))*rnd(2,6);
+      qA *= 1+Math.exp(-((pA-this.walls[1])**2)/(2*(step*4)**2))*rnd(2,6);
+      if(Math.random()<0.035) qB*=rnd(3,7);
+      if(Math.random()<0.035) qA*=rnd(3,7);
+      bids.push({price:pB, qty:qB}); asks.push({price:pA, qty:qA});
+    }
+    const ts=now();
+    this.onEvent({type:"snapshot", symbol:sym, bids, asks, ts});
+    if(Math.random()<0.7){
+      this.onEvent({type:"trade", symbol:sym, ts,
+        price: center+rnd(-step*2,step*2),
+        qty: rnd(0.01, sym==="ETH/USD"?0.7:(sym==="SOL/USD"?8:1.2)),
+        side: Math.random()>0.5?"buy":"sell"});
+    }
+  }
+}
+
+/** Speaks Kraken's public Spot WebSocket v2. Subscribes to book + trade
+ *  channels for the active symbol and normalises messages into the same
+ *  snapshot/delta/trade event model the mock adapter emits, so the
+ *  visualisation layer never depends on Kraken-specific shapes. Falls back
+ *  to the mock adapter with exponential-backoff reconnect + heartbeat
+ *  staleness detection. */
+class KrakenExchangeAdapter extends ExchangeAdapter{
+  constructor(onEvent,onStatus,onFallback){
+    super(onEvent,onStatus); this.onFallback=onFallback; this.ws=null;
+    this.attempt=0; this.lastMsg=0; this.watchdog=null; this.reconnectTimer=null; this.reconnectCountdown=null;
+  }
+  connect(){
+    this._clearTimers();
+    this.onStatus({state:"pending", label:"CONNECTING…", exchange:"Kraken Spot WS v2"});
+    try{
+      this.ws = new WebSocket("wss://ws.kraken.com/v2");
+      this.ws.onopen = () => {
+        this.attempt=0; this.lastMsg=now();
+        this.onStatus({state:"live", label:"LIVE · KRAKEN", exchange:"Kraken Spot WS v2"});
+        this.ws.send(JSON.stringify({method:"subscribe", params:{channel:"book", symbol:[this.symbol], depth:this._krakenDepth(), snapshot:true}}));
+        this.ws.send(JSON.stringify({method:"subscribe", params:{channel:"trade", symbol:[this.symbol], snapshot:false}}));
+        this.watchdog = setInterval(()=>{
+          if(now()-this.lastMsg > 12000){ this._reconnect("Feed stale — no messages for 12s"); }
+        }, 3000);
+      };
+      this.ws.onmessage = (e) => { this.lastMsg=now(); try{ this._normalise(JSON.parse(e.data)); }catch(err){} };
+      this.ws.onerror = () => this._reconnect("WebSocket error");
+      this.ws.onclose  = () => this._reconnect("Connection closed");
+    }catch(e){ this._reconnect("Connection failed"); }
+  }
+  _krakenDepth(){ const d=this.depth||20; return d<=10?10:d<=25?25:d<=100?100:500; }
+  _reconnect(reason){
+    if(this.ws){ try{this.ws.close();}catch(e){} this.ws=null; }
+    clearInterval(this.watchdog);
+    this.attempt++;
+    if(this.attempt>5){ this.onStatus({state:"off", label:"DISCONNECTED", exchange:"Kraken Spot WS v2"}); this.onFallback(reason); return; }
+    const wait = Math.min(16000, 1000*Math.pow(2,this.attempt-1));
+    this.onStatus({state:"pending", label:"RECONNECTING…", exchange:"Kraken Spot WS v2", reconnectMs:wait});
+    let remain=wait;
+    this.reconnectCountdown = setInterval(()=>{ remain-=250; this.onStatus({state:"pending", label:"RECONNECTING…", exchange:"Kraken Spot WS v2", reconnectMs:Math.max(0,remain)}); if(remain<=0) clearInterval(this.reconnectCountdown); },250);
+    this.reconnectTimer = setTimeout(()=>this.connect(), wait);
+  }
+  _clearTimers(){ clearInterval(this.watchdog); clearInterval(this.reconnectCountdown); clearTimeout(this.reconnectTimer); }
+  disconnect(){ this._clearTimers(); if(this.ws){ try{this.ws.close();}catch(e){} this.ws=null; } this.attempt=0; }
+  _normalise(msg){
+    if(msg.channel==="book" && Array.isArray(msg.data)){
+      msg.data.forEach(d=>{
+        const sym = d.symbol || this.symbol;
+        if(sym!==this.symbol) return;
+        if(d.bids && d.asks){
+          this.onEvent({type:"snapshot", symbol:sym, ts:Date.parse(d.timestamp||"")||now(),
+            bids:d.bids.map(x=>({price:+x.price, qty:+x.qty})), asks:d.asks.map(x=>({price:+x.price, qty:+x.qty}))});
+        } else {
+          const side=(d.side||"").toLowerCase()==="buy"?"bid":"ask";
+          this.onEvent({type:"delta", symbol:sym, side, price:+d.price, qty:+d.qty, ts:Date.parse(d.timestamp||"")||now()});
+        }
+      });
+    }
+    if(msg.channel==="trade" && Array.isArray(msg.data)){
+      msg.data.forEach(d=>{
+        if((d.symbol||this.symbol)!==this.symbol) return;
+        this.onEvent({type:"trade", symbol:this.symbol, price:+d.price, qty:+d.qty, side:d.side, ts:Date.parse(d.timestamp||"")||now()});
+      });
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------
+   ORDER BOOK STORE — maintains raw book state + bounded snapshot history
+   for the heatmap/depth-chart, and exposes diffs for the flow tracker.
+   --------------------------------------------------------------------- */
+class OrderBookStore{
+  constructor(){ this.bids=new Map(); this.asks=new Map(); this.history=[]; this.historyMs=300000; this.maxLevels=20; this.lastDiff=null; }
+  key(p){ return Number(p).toFixed(6); }
+  reset(){ this.bids.clear(); this.asks.clear(); this.history=[]; }
+  applySnapshot(x){
+    const prevB=new Map(this.bids), prevA=new Map(this.asks);
+    this.bids.clear(); this.asks.clear();
+    (x.bids||[]).forEach(o=>{ if(o.qty>0) this.bids.set(this.key(o.price), o.qty); });
+    (x.asks||[]).forEach(o=>{ if(o.qty>0) this.asks.set(this.key(o.price), o.qty); });
+    this.lastDiff = { bid: diffMaps(prevB,this.bids), ask: diffMaps(prevA,this.asks) };
+    this._capture(x.ts||now());
+  }
+  applyDelta(x){
+    const m = x.side==="bid"?this.bids:this.asks;
+    const k=this.key(x.price), prevQ=m.get(k)||0;
+    if(x.qty<=0) m.delete(k); else m.set(k,x.qty);
+    const added = Math.max(0,(x.qty>0?x.qty:0)-prevQ)*x.price;
+    const removed = Math.max(0, prevQ-(x.qty>0?x.qty:0))*x.price;
+    this.lastDiff = x.side==="bid" ? {bid:{added,removed},ask:{added:0,removed:0}} : {bid:{added:0,removed:0},ask:{added,removed}};
+    this._capture(x.ts||now());
+  }
+  sorted(limit){
+    const n = limit||this.maxLevels;
+    const bids=[...this.bids].map(([p,q])=>({price:+p,qty:q})).sort((a,b)=>b.price-a.price).slice(0,n);
+    const asks=[...this.asks].map(([p,q])=>({price:+p,qty:q})).sort((a,b)=>a.price-b.price).slice(0,n);
+    return {bids,asks};
+  }
+  _capture(ts){
+    const b=this.sorted(this.maxLevels);
+    let mid=null;
+    if(b.bids[0] && b.asks[0]) mid=(b.bids[0].price+b.asks[0].price)/2;
+    this.history.push({ts, mid, bids:b.bids, asks:b.asks});
+    const cutoff = now()-this.historyMs;
+    while(this.history.length>2 && this.history[0].ts<cutoff) this.history.shift();
+  }
+}
+function diffMaps(oldM,newM){
+  let added=0, removed=0;
+  newM.forEach((q,k)=>{ const prev=oldM.get(k)||0; if(q>prev) added += (q-prev)*Number(k); });
+  oldM.forEach((q,k)=>{ const cur=newM.get(k)||0; if(cur<q) removed += (q-cur)*Number(k); });
+  return {added, removed};
+}
+
+/* ---------------------------------------------------------------------
+   TRADE STORE
+   --------------------------------------------------------------------- */
+class TradeStore{
+  constructor(){ this.trades=[]; this.max=800; }
+  reset(){ this.trades=[]; }
+  add(t){ this.trades.push(t); if(this.trades.length>this.max) this.trades=this.trades.slice(-this.max); }
+  recent(n){ return this.trades.slice(-n); }
+  since(ms){ const cutoff=now()-ms; return this.trades.filter(t=>t.ts>=cutoff); }
+}
+
+/* ---------------------------------------------------------------------
+   ANALYTICS ENGINE — pure functions over a book snapshot
+   --------------------------------------------------------------------- */
+const Analytics = {
+  spread(bids,asks){
+    if(!bids.length||!asks.length) return null;
+    const bb=bids[0].price, ba=asks[0].price, mid=(bb+ba)/2;
+    return { bestBid:bb, bestAsk:ba, mid, spread: ba-bb, bps: (ba-bb)/mid*10000 };
+  },
+  microprice(bids,asks){
+    if(!bids.length||!asks.length) return null;
+    const bb=bids[0], ba=asks[0];
+    return (ba.price*bb.qty + bb.price*ba.qty)/(bb.qty+ba.qty);
+  },
+  cumulative(levels){
+    let cq=0, cn=0;
+    return levels.map(l=>{ cq+=l.qty; cn+=l.qty*l.price; return {...l, cumQty:cq, cumNotional:cn}; });
+  },
+  depthAt(levels,n){
+    const slice=levels.slice(0,n);
+    const qty=slice.reduce((s,l)=>s+l.qty,0);
+    const notional=slice.reduce((s,l)=>s+l.qty*l.price,0);
+    return {qty,notional};
+  },
+  imbalance(bidQty,askQty){
+    if(bidQty+askQty<=0) return 0;
+    return (bidQty-askQty)/(bidQty+askQty);
+  },
+  wall(levels, mode, val){
+    if(!levels.length) return null;
+    const qtys=levels.map(l=>l.qty).slice().sort((a,b)=>a-b);
+    const median = qtys[Math.floor(qtys.length/2)] || 0.0001;
+    const threshold = mode==="abs" ? val : median*val;
+    let best=null;
+    levels.forEach(l=>{ if(l.qty>=threshold && (!best||l.qty>best.qty)) best={...l, medianMult: l.qty/median}; });
+    if(!best){ best = levels.reduce((a,b)=>b.qty>a.qty?b:a, levels[0]); best.medianMult = best.qty/median; }
+    return best;
+  }
+};
+
+/* ---------------------------------------------------------------------
+   LIQUIDITY FLOW TRACKER — accumulates OrderBookStore diffs into a
+   bounded rolling event log, summed on demand over a chosen window.
+   --------------------------------------------------------------------- */
+class FlowTracker{
+  constructor(){ this.events=[]; this.maxAgeMs=310000; }
+  reset(){ this.events=[]; }
+  push(diff, ts){
+    if(!diff) return;
+    this.events.push({ts, bidAdd:diff.bid.added, bidRem:diff.bid.removed, askAdd:diff.ask.added, askRem:diff.ask.removed});
+    const cutoff=now()-this.maxAgeMs;
+    while(this.events.length && this.events[0].ts<cutoff) this.events.shift();
+  }
+  windowSum(ms){
+    const cutoff=now()-ms;
+    let bidAdd=0,bidRem=0,askAdd=0,askRem=0;
+    for(let i=this.events.length-1;i>=0;i--){
+      const e=this.events[i]; if(e.ts<cutoff) break;
+      bidAdd+=e.bidAdd; bidRem+=e.bidRem; askAdd+=e.askAdd; askRem+=e.askRem;
+    }
+    return {bidAdd,bidRem,askAdd,askRem, netBid:bidAdd-bidRem, netAsk:askAdd-askRem};
+  }
+}
+
+/* ---------------------------------------------------------------------
+   AGGREGATION — group price levels into ticks for ladder / heatmap /
+   depth chart display without mutating the underlying store.
+   --------------------------------------------------------------------- */
+function aggregateLevels(levels, bucket, isBid){
+  if(!bucket || bucket<=0) return levels;
+  const map=new Map();
+  levels.forEach(l=>{
+    const b = isBid ? Math.floor(l.price/bucket)*bucket : Math.ceil(l.price/bucket)*bucket;
+    const k=b.toFixed(6);
+    map.set(k, (map.get(k)||0)+l.qty);
+  });
+  const out=[...map].map(([p,q])=>({price:+p, qty:q}));
+  out.sort((a,b)=> isBid ? b.price-a.price : a.price-b.price);
+  return out;
+}
+
+/* ---------------------------------------------------------------------
+   HEATMAP ENGINE — canvas, bounded time/price bins recomputed each draw
+   from a bounded history slice (never an unbounded DOM/array).
+   --------------------------------------------------------------------- */
+class HeatmapEngine{
+  constructor(canvas){ this.canvas=canvas; this.ctx=canvas.getContext("2d"); }
+  resize(){ const r=this.canvas.getBoundingClientRect(), d=devicePixelRatio||1;
+    this.canvas.width=r.width*d; this.canvas.height=r.height*d; this.ctx.setTransform(d,0,0,d,0,0); }
+  heatColor(t,alpha){
+    t=clamp(t,0,1);
+    const stops=[{t:0,c:[9,26,43]},{t:.25,c:[19,84,120]},{t:.5,c:[33,176,233]},{t:.72,c:[247,197,84]},{t:.88,c:[255,150,35]},{t:1,c:[255,64,64]}];
+    let a=stops[0],b=stops[stops.length-1];
+    for(let i=0;i<stops.length-1;i++){ if(t>=stops[i].t&&t<=stops[i+1].t){a=stops[i];b=stops[i+1];break;} }
+    const u=(t-a.t)/Math.max(1e-6,b.t-a.t);
+    const r=Math.round(a.c[0]+(b.c[0]-a.c[0])*u), g=Math.round(a.c[1]+(b.c[1]-a.c[1])*u), bl=Math.round(a.c[2]+(b.c[2]-a.c[2])*u);
+    return `rgba(${r},${g},${bl},${alpha})`;
+  }
+  draw(shown, trades, symbol, aggBucket){
+    const ctx=this.ctx, w=this.canvas.clientWidth, h=this.canvas.clientHeight;
+    ctx.clearRect(0,0,w,h); ctx.fillStyle="#070b11"; ctx.fillRect(0,0,w,h);
+    if(!shown.length) return;
+    const mids=shown.map(s=>s.mid).filter(v=>v!=null);
+    if(!mids.length) return;
+    const min=Math.min(...mids), max=Math.max(...mids);
+    const range=Math.max(max-min, symbol==="ETH/USD"?60:(symbol==="SOL/USD"?6:180));
+    const center=(min+max)/2, lo=center-range*0.75, hi=center+range*0.75;
+    const left=54,right=w-14,top=16,bottom=h-28;
+    const X=i=>left+(i/(shown.length-1||1))*(right-left);
+    const Y=p=>top+((hi-p)/(hi-lo))*(bottom-top);
+
+    const tBins=Math.min(160,Math.max(30,shown.length)), pBins=110;
+    const heat=Array.from({length:tBins},()=>new Float32Array(pBins));
+    const add=(ti,pi,val)=>{ if(ti<0||ti>=tBins||pi<0||pi>=pBins) return; heat[ti][pi]+=val; };
+    shown.forEach((s,i)=>{
+      const ti=Math.floor((i/Math.max(1,shown.length-1))*(tBins-1));
+      const ingest=row=>{
+        const pr=(hi-row.price)/(hi-lo); const pi=Math.floor(pr*(pBins-1));
+        if(pi<0||pi>=pBins) return;
+        const wgt=Math.sqrt(Math.max(row.qty,0));
+        add(ti,pi,wgt); add(ti,pi-1,wgt*.45); add(ti,pi+1,wgt*.45); add(ti-1,pi,wgt*.2); add(ti+1,pi,wgt*.2);
+      };
+      (s.bids||[]).forEach(ingest); (s.asks||[]).forEach(ingest);
+    });
+    const vals=[]; for(let ti=0;ti<tBins;ti++) for(let pi=0;pi<pBins;pi++) if(heat[ti][pi]>0) vals.push(heat[ti][pi]);
+    if(vals.length){
+      vals.sort((a,b)=>a-b);
+      const maxHeat = vals[Math.floor(vals.length*0.985)] || vals[vals.length-1];
+      const cw=(right-left)/tBins, ch=(bottom-top)/pBins;
+      for(let ti=0;ti<tBins;ti++) for(let pi=0;pi<pBins;pi++){
+        const raw=heat[ti][pi]; if(raw<=0) continue;
+        const t=Math.pow(Math.min(1,raw/Math.max(1e-6,maxHeat)),0.82);
+        if(t<0.04) continue;
+        ctx.fillStyle=this.heatColor(t, 0.1+t*0.7);
+        ctx.fillRect(left+ti*cw, top+pi*ch, Math.ceil(cw)+1, Math.ceil(ch)+1);
+      }
+    }
+    ctx.font="10px ui-monospace,monospace";
+    const gridStep = symbol==="ETH/USD"?15:(symbol==="SOL/USD"?1.5:100);
+    for(let p=Math.floor(lo/gridStep)*gridStep;p<=hi;p+=gridStep){
+      const yy=Y(p); ctx.strokeStyle="#151d28"; ctx.beginPath(); ctx.moveTo(left,yy); ctx.lineTo(right,yy); ctx.stroke();
+      ctx.fillStyle="#63728a"; ctx.textAlign="right"; ctx.fillText(fmt(p,symbol==="SOL/USD"?2:2), left-7, yy+3);
+    }
+    for(let i=0;i<shown.length;i+=Math.max(1,Math.floor(shown.length/8))){
+      const xx=X(i); ctx.strokeStyle="#101823"; ctx.beginPath(); ctx.moveTo(xx,top); ctx.lineTo(xx,bottom); ctx.stroke();
+      const d=new Date(shown[i].ts);
+      ctx.fillStyle="#63728a"; ctx.textAlign="center";
+      ctx.fillText(d.toLocaleTimeString([], {minute:"2-digit",second:"2-digit"}), xx, bottom+17);
+    }
+    let maxQ=0.001;
+    shown.forEach(s=>[...(s.bids||[]),...(s.asks||[])].forEach(r=>maxQ=Math.max(maxQ,r.qty)));
+    shown.forEach((s,i)=>{
+      const xx=X(i);
+      (s.bids||[]).forEach(r=>{ const yy=Y(r.price); if(yy<top||yy>bottom) return;
+        const q=r.qty/maxQ, rad=1.4+Math.sqrt(q)*9, alpha=0.07+0.7*q;
+        ctx.beginPath(); ctx.arc(xx,yy,rad,0,Math.PI*2); ctx.fillStyle=`rgba(49,209,153,${alpha})`; ctx.fill();
+        if(q>0.82){ ctx.beginPath(); ctx.arc(xx,yy,rad*0.35,0,Math.PI*2); ctx.fillStyle="rgba(242,189,82,.55)"; ctx.fill(); } });
+      (s.asks||[]).forEach(r=>{ const yy=Y(r.price); if(yy<top||yy>bottom) return;
+        const q=r.qty/maxQ, rad=1.4+Math.sqrt(q)*9, alpha=0.07+0.7*q;
+        ctx.beginPath(); ctx.arc(xx,yy,rad,0,Math.PI*2); ctx.fillStyle=`rgba(255,84,104,${alpha})`; ctx.fill();
+        if(q>0.82){ ctx.beginPath(); ctx.arc(xx,yy,rad*0.35,0,Math.PI*2); ctx.fillStyle="rgba(242,189,82,.55)"; ctx.fill(); } });
+    });
+    ctx.beginPath();
+    shown.forEach((s,i)=>{ if(s.mid==null) return; const xx=X(i), yy=Y(s.mid); i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy); });
+    ctx.strokeStyle="#f2bd52"; ctx.lineWidth=1.8; ctx.stroke();
+    const last=shown[shown.length-1];
+    if(last && last.mid!=null){
+      const cy=Y(last.mid), cx=X(shown.length-1);
+      ctx.setLineDash([4,4]); ctx.strokeStyle="#f2bd5266"; ctx.beginPath(); ctx.moveTo(left,cy); ctx.lineTo(right,cy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle="#f2bd52"; ctx.beginPath(); ctx.arc(cx,cy,3.5,0,Math.PI*2); ctx.fill();
+    }
+    const t0=shown[0].ts, t1=shown[shown.length-1].ts;
+    trades.filter(t=>t.ts>=t0&&t.ts<=t1).forEach(t=>{
+      const xx=left+((t.ts-t0)/(t1-t0||1))*(right-left), yy=Y(t.price), rad=3+Math.sqrt(Math.max(t.qty,0.001))*4.2;
+      ctx.beginPath(); ctx.arc(xx,yy,rad,0,Math.PI*2); ctx.strokeStyle=t.side==="buy"?"#31d199":"#ff5468"; ctx.lineWidth=1.2; ctx.stroke();
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------
+   DEPTH CHART ENGINE — stepped cumulative depth, canvas-based.
+   --------------------------------------------------------------------- */
+class DepthChartEngine{
+  constructor(canvas){ this.canvas=canvas; this.ctx=canvas.getContext("2d"); }
+  resize(){ const r=this.canvas.getBoundingClientRect(), d=devicePixelRatio||1;
+    this.canvas.width=r.width*d; this.canvas.height=r.height*d; this.ctx.setTransform(d,0,0,d,0,0); }
+  draw(bidsCum, asksCum, unit){
+    const ctx=this.ctx, w=this.canvas.clientWidth, h=this.canvas.clientHeight;
+    ctx.clearRect(0,0,w,h); ctx.fillStyle="#070b11"; ctx.fillRect(0,0,w,h);
+    if(!bidsCum.length || !asksCum.length) return;
+    const key = unit==="usd" ? "cumNotional" : "cumQty";
+    const allPrices=[...bidsCum.map(l=>l.price), ...asksCum.map(l=>l.price)];
+    const lo=Math.min(...allPrices), hi=Math.max(...allPrices);
+    const maxY=Math.max(bidsCum[bidsCum.length-1][key]||0, asksCum[asksCum.length-1][key]||0, 0.0001);
+    const left=52,right=w-12,top=10,bottom=h-18;
+    const X=p=>left+((p-lo)/(hi-lo||1))*(right-left);
+    const Y=v=>bottom-(v/maxY)*(bottom-top);
+    ctx.strokeStyle="#151d28"; ctx.font="9px ui-monospace,monospace"; ctx.fillStyle="#63728a";
+    for(let i=0;i<=3;i++){ const yy=top+(bottom-top)*i/3; ctx.beginPath(); ctx.moveTo(left,yy); ctx.lineTo(right,yy); ctx.stroke();
+      ctx.textAlign="right"; ctx.fillText(fmtUsd(maxY*(1-i/3)), left-5, yy+3); }
+    const drawStep=(levels, color, fillColor)=>{
+      ctx.beginPath();
+      let started=false;
+      levels.forEach((l,i)=>{
+        const xx=X(l.price), yy=Y(l[key]);
+        if(!started){ ctx.moveTo(xx,bottom); ctx.lineTo(xx,yy); started=true; }
+        else { const prevY = Y(levels[i-1][key]); ctx.lineTo(xx, prevY); ctx.lineTo(xx, yy); }
+      });
+      const lastX = X(levels[levels.length-1].price);
+      ctx.lineTo(lastX, bottom); ctx.closePath();
+      ctx.fillStyle=fillColor; ctx.fill();
+      ctx.beginPath();
+      levels.forEach((l,i)=>{ const xx=X(l.price), yy=Y(l[key]); if(i===0) ctx.moveTo(xx,yy); else { const prevY=Y(levels[i-1][key]); ctx.lineTo(xx,prevY); ctx.lineTo(xx,yy);} });
+      ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.stroke();
+    };
+    drawStep(bidsCum.slice().reverse(), "#31d199", "rgba(49,209,153,0.14)");
+    drawStep(asksCum, "#ff5468", "rgba(255,84,104,0.14)");
+  }
+}
+
+/* =========================================================================
+   UI CONTROLLER
+   ========================================================================= */
+const store = new OrderBookStore();
+const trades = new TradeStore();
+const flow = new FlowTracker();
+const heatmap = new HeatmapEngine($("heatmap"));
+const depthChart = new DepthChartEngine($("depthchart"));
+
+let state = {
+  source: "sim", symbol: "BTC/USD", depth: 20, agg: 0, unit: "qty",
+  historyMs: 300000, liqMode: "individual", tapeFilter: "all",
+  paused: false, wallMode: "median", wallVal: 5, imbDepth: 10, flowWin: 30,
+  sessionHigh: null, sessionLow: null, sessionStart: null,
+  feed: {state:"simulated", label:"SIMULATED", exchange:"Simulation engine"},
+};
+let adapter = null;
+let tradeTimestamps = []; // for trades/sec
+
+function makeAdapter(){
+  if(state.source==="live"){
+    adapter = new KrakenExchangeAdapter(onMarketEvent, onFeedStatus, reason=>{
+      // graceful fallback to simulation, never mislabelled as live
+      state.source="sim";
+      document.querySelectorAll("#sourceSeg button").forEach(b=>b.classList.toggle("on", b.dataset.src==="sim"));
+      adapter = new MockExchangeAdapter(onMarketEvent, onFeedStatus);
+      adapter.symbol=state.symbol; adapter.depth=state.depth; adapter.connect();
+      state.feed.exchange = "Simulation engine (fallback: "+reason+")";
+    });
+  } else {
+    adapter = new MockExchangeAdapter(onMarketEvent, onFeedStatus);
+  }
+  adapter.symbol=state.symbol; adapter.depth=state.depth;
+}
+
+function onFeedStatus(s){
+  state.feed = s;
+  const dot=$("feedDot"), badge=$("feedBadge");
+  dot.className="dot"; badge.className="badge";
+  if(s.state==="live"){ dot.classList.add("live"); badge.classList.add("live"); badge.textContent="LIVE"; }
+  else if(s.state==="simulated"){ dot.classList.add("sim"); badge.classList.add("sim"); badge.textContent="SIMULATED"; }
+  else if(s.state==="pending"){ dot.classList.add("pending"); badge.classList.add("pending"); badge.textContent=s.label||"CONNECTING"; }
+  else { dot.classList.add("off"); badge.classList.add("off"); badge.textContent=s.label||"DISCONNECTED"; }
+  $("stExchange").textContent = s.exchange||"—";
+  $("stReconnectWrap").style.display = s.reconnectMs!=null ? "inline" : "none";
+  if(s.reconnectMs!=null) $("stReconnect").textContent = (s.reconnectMs/1000).toFixed(1)+"s";
+}
+
+function onMarketEvent(evt){
+  if(evt.symbol && evt.symbol!==state.symbol) return;
+  const latency = Math.max(0, now()-evt.ts);
+  $("stLatency").textContent = latency+" ms";
+  $("stLast").textContent = new Date(evt.ts).toLocaleTimeString();
+  if(evt.type==="snapshot"){
+    store.applySnapshot(evt);
+    flow.push(store.lastDiff, evt.ts);
+  } else if(evt.type==="delta"){
+    store.applyDelta(evt);
+    flow.push(store.lastDiff, evt.ts);
+  } else if(evt.type==="trade"){
+    trades.add({ts:evt.ts, price:evt.price, qty:evt.qty, side:(evt.side||"").toLowerCase()==="sell"?"sell":"buy"});
+    tradeTimestamps.push(evt.ts);
+    const cutoff=now()-10000; tradeTimestamps=tradeTimestamps.filter(t=>t>=cutoff);
+  }
+  $("stSnaps").textContent = store.history.length;
+}
+
+/* ---- render loop, decoupled from ingest rate ---- */
+function render(){
+  if(state.paused) return;
+  const {bids,asks} = store.sorted(state.depth);
+  const aggBids = aggregateLevels(bids, +state.agg, true);
+  const aggAsks = aggregateLevels(asks, +state.agg, false);
+  const sp = Analytics.spread(aggBids, aggAsks);
+  const micro = Analytics.microprice(aggBids, aggAsks);
+
+  if(sp){
+    if(state.sessionHigh==null || sp.mid>state.sessionHigh) state.sessionHigh=sp.mid;
+    if(state.sessionLow==null || sp.mid<state.sessionLow) state.sessionLow=sp.mid;
+    if(state.sessionStart==null) state.sessionStart=sp.mid;
+  }
+
+  renderMetrics(sp, micro, aggBids, aggAsks);
+  renderLadder(aggBids, aggAsks, sp);
+  renderWalls(aggBids, aggAsks);
+  renderFlow();
+  renderTape();
+  renderDepthChart(aggBids, aggAsks);
+  renderHeatmap();
+  $("stSymbol").textContent = state.symbol;
+}
+
+function unitVal(qty, price){ return state.unit==="usd" ? qty*price : qty; }
+function unitLabel(){ return state.unit==="usd" ? "$" : (state.symbol.split("/")[0]); }
+function fmtQ(qty, price){
+  if(state.unit==="usd") return "$"+fmtUsd(qty*price);
+  return fmtQty(qty, state.symbol==="SOL/USD"?2:4);
+}
+
+function renderMetrics(sp, micro, bids, asks){
+  $("mBestBid").textContent = sp? fmt(sp.bestBid, state.symbol==="SOL/USD"?3:2) : "—";
+  $("mBestAsk").textContent = sp? fmt(sp.bestAsk, state.symbol==="SOL/USD"?3:2) : "—";
+  $("mMid").textContent = sp? fmt(sp.mid, state.symbol==="SOL/USD"?3:2) : "—";
+  const lastTrade = trades.trades[trades.trades.length-1];
+  $("mLast").textContent = lastTrade ? fmt(lastTrade.price, state.symbol==="SOL/USD"?3:2) : "—";
+  $("mTps").textContent = (tradeTimestamps.length/10).toFixed(2);
+  const recentTrades = trades.since(60000);
+  const buyN = recentTrades.filter(t=>t.side==="buy").length, sellN=recentTrades.length-buyN;
+  $("mRatio").textContent = sellN? (buyN/sellN).toFixed(2) : (buyN? "∞":"—");
+
+  $("sSpread").textContent = sp? "$"+fmt(sp.spread, state.symbol==="SOL/USD"?4:2) : "—";
+  $("sBps").textContent = sp? sp.bps.toFixed(2) : "—";
+  $("sMicro").textContent = micro!=null? fmt(micro, state.symbol==="SOL/USD"?3:2) : "—";
+  $("sHigh").textContent = state.sessionHigh!=null? fmt(state.sessionHigh, state.symbol==="SOL/USD"?3:2) : "—";
+  $("sLow").textContent = state.sessionLow!=null? fmt(state.sessionLow, state.symbol==="SOL/USD"?3:2) : "—";
+  if(state.sessionStart && sp){
+    const chg=(sp.mid-state.sessionStart)/state.sessionStart*100;
+    const el=$("sChange"); el.textContent=(chg>=0?"+":"")+chg.toFixed(3)+"%"; el.className="num "+(chg>=0?"green":"red");
+  }
+
+  const n=state.imbDepth;
+  const bd = Analytics.depthAt(bids, n), ad = Analytics.depthAt(asks, n);
+  const bidV = state.unit==="usd"?bd.notional:bd.qty, askV = state.unit==="usd"?ad.notional:ad.qty;
+  $("iBidDepth").textContent = state.unit==="usd" ? "$"+fmtUsd(bd.notional) : fmtQty(bd.qty,3)+" "+unitLabel();
+  $("iAskDepth").textContent = state.unit==="usd" ? "$"+fmtUsd(ad.notional) : fmtQty(ad.qty,3)+" "+unitLabel();
+  const total=bidV+askV||1;
+  $("iBidBar").style.width=(bidV/total*100)+"%"; $("iAskBar").style.width=(askV/total*100)+"%";
+  const imb = Analytics.imbalance(bidV,askV);
+  const imbEl=$("iImb"); imbEl.textContent=(imb>=0?"+":"")+(imb*100).toFixed(1)+"%"; imbEl.className="num "+(imb>0.05?"green":imb<-0.05?"red":"");
+  const biasEl=$("iBias");
+  biasEl.textContent = imb>0.15?"BID HEAVY":imb<-0.15?"ASK HEAVY":"Balanced";
+  biasEl.className = imb>0.15?"green":imb<-0.15?"red":"muted";
+
+  const buyVol=recentTrades.filter(t=>t.side==="buy").reduce((s,t)=>s+t.qty*t.price,0);
+  const sellVol=recentTrades.filter(t=>t.side==="sell").reduce((s,t)=>s+t.qty*t.price,0);
+  $("fBuyVol").textContent="$"+fmtUsd(buyVol); $("fSellVol").textContent="$"+fmtUsd(sellVol);
+  const ft=buyVol+sellVol||1;
+  $("fBuyBar").style.width=(buyVol/ft*100)+"%"; $("fSellBar").style.width=(sellVol/ft*100)+"%";
+  const fBiasEl=$("fBias");
+  if(buyVol+sellVol<1){ fBiasEl.textContent="—"; fBiasEl.className="muted"; }
+  else if(buyVol>sellVol*1.3){ fBiasEl.textContent="BUY DOMINANT"; fBiasEl.className="green"; }
+  else if(sellVol>buyVol*1.3){ fBiasEl.textContent="SELL DOMINANT"; fBiasEl.className="red"; }
+  else { fBiasEl.textContent="Balanced"; fBiasEl.className="muted"; }
+}
+
+let prevLevels = {bid:new Map(), ask:new Map()};
+function renderLadder(bids, asks, sp){
+  $("ladderMid").textContent = sp? fmt(sp.mid, state.symbol==="SOL/USD"?3:2) : "—";
+  $("ladderSpread").textContent = sp? "$"+fmt(sp.spread, state.symbol==="SOL/USD"?4:2) : "—";
+  $("ladderBps").textContent = sp? sp.bps.toFixed(2) : "—";
+
+  const bidsCum = Analytics.cumulative(bids);
+  const asksCum = Analytics.cumulative(asks);
+  const maxCum = Math.max(
+    bidsCum.length? bidsCum[bidsCum.length-1][state.unit==="usd"?"cumNotional":"cumQty"]:0,
+    asksCum.length? asksCum[asksCum.length-1][state.unit==="usd"?"cumNotional":"cumQty"]:0, 0.0001);
+  let maxSize=0.0001; bids.forEach(l=>maxSize=Math.max(maxSize,l.qty)); asks.forEach(l=>maxSize=Math.max(maxSize,l.qty));
+
+  const rows=[];
+  const n=Math.max(bidsCum.length, asksCum.length);
+  const bidWall = bids.length? Analytics.wall(bids, state.wallMode, state.wallVal) : null;
+  const askWall = asks.length? Analytics.wall(asks, state.wallMode, state.wallVal) : null;
+  const newBidMap=new Map(), newAskMap=new Map();
+
+  for(let i=0;i<n;i++){
+    const b=bidsCum[i], a=asksCum[i];
+    const bBarKey = state.liqMode==="cumulative" ? (b?b.cumQty/maxCum*100:0) : (b? b.qty/maxSize*100 : 0);
+    const aBarKey = state.liqMode==="cumulative" ? (a?a.cumQty/maxCum*100:0) : (a? a.qty/maxSize*100 : 0);
+    const bBarVal = state.unit==="usd" ? (state.liqMode==="cumulative"? b?.cumNotional/maxCum*100 : b? unitVal(b.qty,b.price)/(maxSize*(b?b.price:1))*100:0) : bBarKey;
+    let flashB="", flashA="";
+    if(b){ const k=b.price.toFixed(6); const prevQ=prevLevels.bid.get(k); if(prevQ!=null && prevQ!==b.qty) flashB = b.qty>prevQ?"flash-up":"flash-down"; newBidMap.set(k,b.qty); }
+    if(a){ const k=a.price.toFixed(6); const prevQ=prevLevels.ask.get(k); if(prevQ!=null && prevQ!==a.qty) flashA = a.qty>prevQ?"flash-up":"flash-down"; newAskMap.set(k,a.qty); }
+
+    const isBestBid=i===0, isBestAsk=i===0;
+    const isBidWall = bidWall && b && Math.abs(b.price-bidWall.price)<1e-6;
+    const isAskWall = askWall && a && Math.abs(a.price-askWall.price)<1e-6;
+
+    const showIndividualBid = state.liqMode!=="cumulative";
+    const showIndividualAsk = state.liqMode!=="cumulative";
+    const bidBarPct = state.liqMode==="cumulative" ? (b? b.cumQty/maxCum*100 : 0) : (b? b.qty/maxSize*100 : 0);
+    const askBarPct = state.liqMode==="cumulative" ? (a? a.cumQty/maxCum*100 : 0) : (a? a.qty/maxSize*100 : 0);
+
+    rows.push(`
+      <div class="lrow ${isBestBid||isBestAsk?'best':''} ${isBidWall||isAskWall?'wall':''} ${flashB||flashA}">
+        <div class="bar bid" style="width:${bidBarPct*0.6}%"></div>
+        <div class="bar ask" style="width:${askBarPct*0.6}%"></div>
+        <span class="cell bsize">${b? fmtQ(b.qty,b.price):""}</span>
+        <span class="cell bcum">${b? fmtQ(b.cumQty,b.price):""}</span>
+        <span class="price ${b?'bid':''} ${a?'ask':''}" style="color:${b?'var(--green)':a?'var(--red)':'inherit'}">${b?fmt(b.price,state.symbol==="SOL/USD"?3:2):(a?fmt(a.price,state.symbol==="SOL/USD"?3:2):"")}</span>
+        <span class="cell left acum">${a? fmtQ(a.cumQty,a.price):""}</span>
+        <span class="cell left asize">${a? fmtQ(a.qty,a.price):""}</span>
+      </div>`);
+  }
+  prevLevels = {bid:newBidMap, ask:newAskMap};
+  $("ladder").innerHTML = rows.join("");
+}
+
+function renderWalls(bids, asks){
+  const bw = bids.length? Analytics.wall(bids, state.wallMode, state.wallVal) : null;
+  const aw = asks.length? Analytics.wall(asks, state.wallMode, state.wallVal) : null;
+  $("wBid").textContent = bw? fmt(bw.price,state.symbol==="SOL/USD"?3:2)+" · "+fmtQty(bw.qty,3)+" ("+bw.medianMult.toFixed(1)+"×)" : "—";
+  $("wAsk").textContent = aw? fmt(aw.price,state.symbol==="SOL/USD"?3:2)+" · "+fmtQty(aw.qty,3)+" ("+aw.medianMult.toFixed(1)+"×)" : "—";
+  if(bw && aw){
+    let c=0;
+    const window=store.history.slice(-25);
+    window.forEach(h=>{
+      if(h.bids.some(x=>Math.abs(x.price-bw.price)<1e-6) || h.asks.some(x=>Math.abs(x.price-aw.price)<1e-6)) c++;
+    });
+    $("wPersist").textContent = c+" / "+window.length+" snapshots";
+  } else $("wPersist").textContent="—";
+}
+
+function renderFlow(){
+  const w = flow.windowSum(state.flowWin*1000);
+  $("flBidAdd").textContent="+$"+fmtUsd(w.bidAdd);
+  $("flBidRem").textContent="-$"+fmtUsd(w.bidRem);
+  $("flAskAdd").textContent="+$"+fmtUsd(w.askAdd);
+  $("flAskRem").textContent="-$"+fmtUsd(w.askRem);
+  const nb=$("flNetBid"), na=$("flNetAsk");
+  nb.textContent=(w.netBid>=0?"+$":"-$")+fmtUsd(Math.abs(w.netBid)); nb.className="num "+(w.netBid>=0?"green":"red");
+  na.textContent=(w.netAsk>=0?"+$":"-$")+fmtUsd(Math.abs(w.netAsk)); na.className="num "+(w.netAsk>=0?"green":"red");
+}
+
+function renderTape(){
+  let list = trades.recent(60).slice().reverse();
+  if(state.tapeFilter!=="all") list=list.filter(t=>t.side===state.tapeFilter);
+  list=list.slice(0,30);
+  $("tape").innerHTML = list.map(t=>{
+    const d=new Date(t.ts);
+    const time=d.toLocaleTimeString([], {hour12:false})+"."+String(d.getMilliseconds()).padStart(3,"0").slice(0,2);
+    return `<div class="trow">
+      <span>${time}</span>
+      <span class="side ${t.side}">${t.side.toUpperCase()}</span>
+      <span>${fmt(t.price, state.symbol==="SOL/USD"?3:2)}</span>
+      <span>${fmtQty(t.qty, state.symbol==="SOL/USD"?2:4)}</span>
+      <span>$${fmtUsd(t.qty*t.price)}</span>
+    </div>`;
+  }).join("") || `<div class="small" style="padding:10px">No trades yet.</div>`;
+}
+
+function renderDepthChart(bids, asks){
+  const bidsCum = Analytics.cumulative(bids.slice().sort((a,b)=>a.price-b.price));
+  const asksCum = Analytics.cumulative(asks);
+  $("depthChartHint").textContent = state.unit==="usd" ? "usd notional" : "quantity";
+  depthChart.draw(bidsCum, asksCum, state.unit);
+}
+
+function renderHeatmap(){
+  const secPerSnap = 0.65;
+  const showN = Math.max(20, Math.floor(state.historyMs/1000/secPerSnap));
+  const shown = store.history.slice(-showN).map(s=>({
+    ts:s.ts, mid:s.mid,
+    bids: aggregateLevels(s.bids, +state.agg, true),
+    asks: aggregateLevels(s.asks, +state.agg, false),
+  }));
+  const tCutoff = now()-state.historyMs;
+  const recentTrades = trades.trades.filter(t=>t.ts>=tCutoff);
+  heatmap.draw(shown, recentTrades, state.symbol, +state.agg);
+}
+
+/* ---- controls wiring ---- */
+$("sourceSeg").addEventListener("click", e=>{
+  const btn=e.target.closest("button"); if(!btn) return;
+  document.querySelectorAll("#sourceSeg button").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  state.source = btn.dataset.src;
+  restartAdapter();
+});
+$("symbol").onchange = e=>{ state.symbol=e.target.value; store.reset(); trades.reset(); flow.reset();
+  state.sessionHigh=state.sessionLow=state.sessionStart=null; restartAdapter(); };
+$("depthSel").onchange = e=>{ state.depth=+e.target.value; store.maxLevels=state.depth; if(adapter){adapter.depth=state.depth;} if(state.source==="live") restartAdapter(); };
+$("aggSel").onchange = e=>{ state.agg=+e.target.value; };
+$("unitSel").onchange = e=>{ state.unit=e.target.value; };
+$("histSel").onchange = e=>{ state.historyMs=+e.target.value*1000; store.historyMs=Math.max(state.historyMs,300000); flow.maxAgeMs=Math.max(flow.maxAgeMs,state.historyMs+10000); };
+$("imbDepthSel").onchange = e=>{ state.imbDepth=+e.target.value; };
+$("flowWin").onchange = e=>{ state.flowWin=+e.target.value; };
+$("wallMode").onchange = e=>{ state.wallMode=e.target.value; $("wallVal").value = state.wallMode==="median"?5:1; };
+$("wallVal").onchange = e=>{ state.wallVal=+e.target.value; };
+document.getElementById("liqModeSeg").addEventListener("click", e=>{
+  const btn=e.target.closest("button"); if(!btn) return;
+  document.querySelectorAll("#liqModeSeg button").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on"); state.liqMode=btn.dataset.mode;
+});
+document.getElementById("tapeFilter").addEventListener("click", e=>{
+  const btn=e.target.closest("button"); if(!btn) return;
+  document.querySelectorAll("#tapeFilter button").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active"); state.tapeFilter=btn.dataset.f;
+});
+$("pauseBtn").onclick = ()=>{
+  state.paused=!state.paused;
+  $("pauseBtn").textContent = state.paused? "Resume":"Pause";
+  $("pauseBtn").classList.toggle("active", state.paused);
+};
+$("resetBtn").onclick = ()=>{
+  store.reset(); trades.reset(); flow.reset();
+  state.sessionHigh=state.sessionLow=state.sessionStart=null;
+  tradeTimestamps=[];
+};
+
+function restartAdapter(){
+  if(adapter) adapter.disconnect();
+  makeAdapter();
+  adapter.connect();
+}
+
+/* ---- export / snapshot ---- */
+function buildSnapshotText(){
+  const {bids,asks} = store.sorted(state.depth);
+  const sp = Analytics.spread(bids, asks);
+  const n = state.imbDepth;
+  const bd = Analytics.depthAt(bids,n), ad = Analytics.depthAt(asks,n);
+  const imb = Analytics.imbalance(bd.qty, ad.qty);
+  let out = `${state.symbol} ORDER BOOK\n`;
+  out += `Timestamp: ${new Date().toISOString()}\n\n`;
+  if(sp){
+    out += `Mid: ${fmt(sp.mid,2)}\nBest Bid: ${fmt(sp.bestBid,2)}\nBest Ask: ${fmt(sp.bestAsk,2)}\n`;
+    out += `Spread: ${fmt(sp.spread,2)}\nSpread: ${sp.bps.toFixed(2)} bps\n\n`;
+  }
+  out += `BIDS\n`; bids.slice(0,10).forEach(b=>out+=`${fmt(b.price,2)} | ${fmtQty(b.qty,4)}\n`);
+  out += `\nASKS\n`; asks.slice(0,10).forEach(a=>out+=`${fmt(a.price,2)} | ${fmtQty(a.qty,4)}\n`);
+  out += `\n${n}-Level Imbalance: ${(imb>=0?"+":"")+(imb*100).toFixed(1)}%\n`;
+  return out;
+}
+$("copySnapBtn").onclick = async ()=>{
+  const txt = buildSnapshotText();
+  try{ await navigator.clipboard.writeText(txt); flashBtn($("copySnapBtn"),"Copied ✓"); }
+  catch(e){ const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); flashBtn($("copySnapBtn"),"Copied ✓"); }catch(e2){ flashBtn($("copySnapBtn"),"Copy failed"); }
+    ta.remove(); }
+};
+function flashBtn(btn,label){ const old=btn.textContent; btn.textContent=label; setTimeout(()=>btn.textContent=old,1200); }
+function download(filename, text, mime){
+  const blob=new Blob([text],{type:mime}); const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=filename; a.click(); URL.revokeObjectURL(a.href);
+}
+$("exportJsonBtn").onclick = ()=>{
+  const {bids,asks} = store.sorted(state.depth);
+  const payload = { symbol:state.symbol, ts:new Date().toISOString(), bids, asks, trades: trades.recent(100) };
+  download(`orderbook_${state.symbol.replace("/","")}_${Date.now()}.json`, JSON.stringify(payload,null,2), "application/json");
+};
+$("exportCsvBtn").onclick = ()=>{
+  const {bids,asks} = store.sorted(state.depth);
+  let csv="side,price,qty\n";
+  bids.forEach(b=>csv+=`bid,${b.price},${b.qty}\n`);
+  asks.forEach(a=>csv+=`ask,${a.price},${a.qty}\n`);
+  download(`orderbook_${state.symbol.replace("/","")}_${Date.now()}.csv`, csv, "text/csv");
+};
+
+/* ---- boot ---- */
+function resizeCanvases(){ heatmap.resize(); depthChart.resize(); render(); }
+window.addEventListener("resize", resizeCanvases);
+store.maxLevels = state.depth;
+makeAdapter();
+adapter.connect();
+resizeCanvases();
+setInterval(render, 350);
+</script>
+</body>
+</html>
