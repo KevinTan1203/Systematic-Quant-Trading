@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.7 Stochastic Calculus</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 260px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 10px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.7 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Stochastic<br><em>Calculus</em></h1>
+        <div class="hdr-sub">The continuous-time mathematics of random paths — Brownian motion, Itô calculus, SDEs and the bridge to pricing PDEs</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Core Objects</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">GBM</div>
+            <div class="sw-price">dS = μS dt<br>+ σS dW</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Itô</div>
+            <div class="sw-price">df = … dt<br>+ … dW</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Girsanov</div>
+          <div class="sw-spread-val">P → Q</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Feynman-Kac</div>
+          <div class="sw-mid-val">SDE ↔ PDE</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">12 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.7 Stochastic Calculus</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.7.01",
+    icon: "W",
+    tClass: "t-mid",
+    title: "Brownian Motion (Wiener Process)",
+    sub: "The fundamental continuous-time noise — continuous paths, independent Gaussian increments, quadratic variation t",
+    formula: "W_t  —  W_0=0,  dW ~ N(0,dt)",
+    tags: [["brownian","mid"], ["wiener","mid"], ["increments",""], ["quadratic variation",""]],
+    formulaBox: {
+      main: "W<sub>t</sub> − W<sub>s</sub> ~ N(0, t−s),  independent of past",
+      note: "Continuous paths (a.s.)\nQuadratic variation ⟨W⟩_t = t\nNot finite variation — classical calculus fails"
+    },
+    body: [
+      `Brownian motion (standard Wiener process) W = (W_t)_{t≥0} is the continuous-time process that starts at zero, has continuous paths almost surely, and possesses independent increments that are normally distributed with mean zero and variance equal to the length of the time interval. It is the mathematical idealisation of pure random noise with no drift.`,
+      `The decisive analytic property is that its quadratic variation over [0,t] equals t. Consequently the formal differential satisfies the multiplication table (dW)² = dt, while dt·dW = 0 and (dt)² = 0. This single rule is the source of every extra term that appears in Itô calculus and is absent from ordinary Newton–Leibniz calculus.`,
+      `Brownian motion is a martingale and a Markov process. Scaled and shifted versions (μt + σW_t) remain Gaussian and are the building blocks of the Black–Scholes world. Multi-dimensional Brownian motions with a given correlation structure generate the noise that drives multi-asset and factor models.`,
+      `Because paths are continuous but nowhere differentiable and of infinite total variation, stochastic integrals cannot be defined pathwise by ordinary Riemann–Stieltjes sums; a specific limiting procedure (Itô, Stratonovich, \ldots) is required.`
+    ],
+    keyPoint: "Brownian motion is the continuous-time embodiment of independent Gaussian noise. Its quadratic variation equals elapsed time — the fact that forces every stochastic calculus to differ from ordinary calculus."
+  },
+  {
+    num: "4.7.02",
+    icon: "Itô",
+    tClass: "t-spread",
+    title: "Itô’s Lemma",
+    sub: "The chain rule of stochastic calculus — Taylor expansion kept up to order dt, using (dW)² = dt",
+    formula: "df = (f_t + μ f_x + ½ σ² f_xx) dt + σ f_x dW",
+    tags: [["ito lemma","spread"], ["chain rule","spread"], ["taylor",""], ["generator",""]],
+    formulaBox: {
+      main: "df(t,X) = f<sub>t</sub> dt + f<sub>x</sub> dX + ½ f<sub>xx</sub> (dX)²",
+      note: "If dX = μ dt + σ dW then (dX)² = σ² dt\nExtra second-derivative term is the Itô correction"
+    },
+    body: [
+      `Itô’s lemma is the stochastic counterpart of the ordinary chain rule. If a process X follows an SDE dX = μ dt + σ dW and f is a smooth function of t and X, then the differential of f is obtained by a second-order Taylor expansion in which the second-order term (dX)² is replaced by its quadratic-variation contribution σ² dt.`,
+      `The resulting drift contains the familiar first-order terms plus the second-derivative correction ½ σ² f_xx. That correction is absent in ordinary calculus and is responsible for the difference between the Black–Scholes PDE and a naïve transport equation, for the convexity adjustment of forward rates, and for countless other “Itô terms” in finance.`,
+      `Multi-dimensional and time-dependent versions follow the same pattern: every pair of Brownian motions contributes a cross term involving the mixed second partial derivative and the instantaneous covariance. Jump processes require an additional integral term that accounts for the discontinuous changes.`,
+      `Once Itô’s lemma is available, any smooth function of an Itô process is again an Itô process whose drift and diffusion coefficients are known explicitly. This is the engine that converts SDEs into pricing PDEs and that produces the dynamics of derived quantities (option prices, yields, variances, \ldots).`
+    ],
+    keyPoint: "Itô’s lemma is Taylor’s formula truncated at order dt after substituting (dW)² = dt. The second-derivative correction is the signature of stochastic calculus and the source of most closed-form adjustments in derivative pricing."
+  },
+  {
+    num: "4.7.03",
+    icon: "∫",
+    tClass: "t-cost",
+    title: "Itô Integral",
+    sub: "Integration with respect to Brownian motion — defined as an L² limit of non-anticipating simple sums",
+    formula: "∫ H dW  (Itô)",
+    tags: [["ito integral","gold"], ["stochastic integral","gold"], ["non-anticipating",""], ["martingale",""]],
+    body: [
+      `The Itô integral ∫ H dW is constructed for integrands H that are adapted (non-anticipating) and square-integrable. One first defines the integral for simple (piecewise-constant, left-continuous) processes as an ordinary sum, then passes to the L²-limit. The resulting integral is a continuous martingale whose quadratic variation is ∫ H² dt.`,
+      `The non-anticipating requirement is essential: the integrand at time t may depend only on information available up to t. Evaluating the integrand at the left endpoint of each partition interval produces the Itô integral; evaluating it at the midpoint produces the Stratonovich integral, which obeys ordinary calculus rules but is less natural for financial modelling.`,
+      `The Itô isometry E[(∫ H dW)²] = E[∫ H² dt] is the fundamental computational tool. It turns questions about the variance of stochastic integrals into ordinary Lebesgue integrals and underpins the construction of the space of square-integrable martingales.`,
+      `In finance the Itô integral represents the cumulative gains of a self-financing trading strategy whose holdings are given by H. The martingale property of the integral (when H is suitably integrable) is the mathematical expression of the absence of arbitrage under a risk-neutral measure.`
+    ],
+    keyPoint: "The Itô integral is the L²-limit of non-anticipating simple sums against Brownian motion. It is a martingale, obeys the isometry, and is the continuous-time model of cumulative trading gains."
+  },
+  {
+    num: "4.7.04",
+    icon: "SDE",
+    tClass: "t-dynamics",
+    title: "Stochastic Differential Equations (SDEs)",
+    sub: "Differential equations driven by Brownian noise — the continuous-time description of random dynamics",
+    formula: "dX = μ(t,X) dt + σ(t,X) dW",
+    tags: [["sde","dynamics"], ["drift","dynamics"], ["diffusion",""], ["existence",""]],
+    formulaBox: {
+      main: "dX_t = μ(t, X_t) dt + σ(t, X_t) dW_t",
+      note: "μ = drift, σ = diffusion coefficient\nStrong existence/uniqueness under Lipschitz conditions\nSolution is an Itô process"
+    },
+    body: [
+      `A stochastic differential equation specifies the instantaneous drift and diffusion of a process. The integral form X_t = X_0 + ∫ μ ds + ∫ σ dW is the mathematically precise statement; the differential notation is a convenient shorthand. Under standard Lipschitz and linear-growth conditions a unique strong solution exists and is a Markov process.`,
+      `The drift μ determines the deterministic tendency; the diffusion coefficient σ determines the amplitude of the random shocks. When σ is constant the noise is additive; when σ depends on X the noise is multiplicative (state-dependent). Geometric Brownian motion is the canonical multiplicative example.`,
+      `SDEs are simulated by discretisation schemes (Euler–Maruyama, Milstein, higher-order weak schemes). The choice of scheme affects both strong (pathwise) and weak (distributional) accuracy; financial applications that need only expectation estimates can use weaker, cheaper schemes.`,
+      `Virtually every continuous-time model in quantitative finance is an SDE or a system of SDEs: equity prices, interest rates, variance processes, default intensities, and foreign-exchange rates are all written in this language.`
+    ],
+    keyPoint: "An SDE is a drift plus a diffusion driven by Brownian motion. It is the standard continuous-time model of a financial state variable and the starting point for both analytic pricing and Monte-Carlo simulation."
+  },
+  {
+    num: "4.7.05",
+    icon: "GBM",
+    tClass: "t-bid",
+    title: "Geometric Brownian Motion (GBM)",
+    sub: "The Black–Scholes engine — proportional drift and diffusion, log-normal marginals, positive paths",
+    formula: "dS = μ S dt + σ S dW",
+    tags: [["gbm","bid"], ["black-scholes","bid"], ["log-normal",""], ["multiplicative",""]],
+    formulaBox: {
+      main: "dS_t = μ S_t dt + σ S_t dW_t",
+      note: "Solution: S_t = S_0 exp((μ−½σ²)t + σ W_t)\nE[S_t] = S_0 e^{μ t}\nlog S_t ~ Normal"
+    },
+    body: [
+      `Geometric Brownian motion is the SDE in which both drift and diffusion are proportional to the current level. The solution is an exponential of Brownian motion with drift and is therefore strictly positive and log-normally distributed at every fixed time. These properties made GBM the natural model for stock prices in the Black–Scholes–Merton framework.`,
+      `Applying Itô’s lemma to log S recovers an ordinary Brownian motion with drift μ − ½σ²; the −½σ² term is the classic Itô correction. Conversely, the solution formula can be verified by applying Itô’s lemma to the exponential expression.`,
+      `GBM is Markov, has independent log-returns over non-overlapping intervals, and scales in a self-similar way. Its relative simplicity yields closed-form transition densities, explicit option prices, and straightforward Monte-Carlo paths.`,
+      `Empirically, pure GBM fails to capture volatility clustering, fat tails and the leverage effect. It remains the pedagogical and numerical baseline against which richer models (local volatility, stochastic volatility, jumps) are compared.`
+    ],
+    keyPoint: "GBM is the unique continuous process whose percentage returns are independent and stationary. It delivers positive log-normal prices and is the analytic core of the Black–Scholes world."
+  },
+  {
+    num: "4.7.06",
+    icon: "OU",
+    tClass: "t-dynamics",
+    title: "Mean-Reverting Processes (Ornstein–Uhlenbeck)",
+    sub: "Pull-back to a long-run level — the continuous-time AR(1) and the standard model for rates and spreads",
+    formula: "dX = κ(θ − X) dt + σ dW",
+    tags: [["ornstein-uhlenbeck","dynamics"], ["mean reversion","dynamics"], ["vasicek",""], ["rates",""]],
+    formulaBox: {
+      main: "dX_t = κ (θ − X_t) dt + σ dW_t",
+      note: "κ = speed of reversion, θ = long-run mean\nStationary distribution N(θ, σ²/(2κ))\nExplicit Gaussian transition density"
+    },
+    body: [
+      `The Ornstein–Uhlenbeck (OU) process is the linear mean-reverting SDE. The drift points toward a long-run mean θ with strength proportional to the distance from θ; the diffusion is typically additive. The process is Gaussian, Markov and possesses a unique stationary normal distribution.`,
+      `Its explicit solution is an exponentially weighted integral of past Brownian increments. The transition density is therefore known in closed form, which makes maximum-likelihood estimation, filtering and derivative pricing comparatively straightforward.`,
+      `In finance the OU process (and its variants) models short rates (Vasicek), credit spreads, volatility (in the long-run), convenience yields and any quantity that is empirically pulled back to a historical norm. The CIR process replaces the constant diffusion by a square-root diffusion to keep the variable non-negative.`,
+      `Mean reversion speed κ determines the half-life of shocks (log 2 / κ). Calibration to the term structure of volatility or to autocorrelation functions is a standard econometric task.`
+    ],
+    keyPoint: "The Ornstein–Uhlenbeck process is Brownian motion plus a linear restoring force. It is the continuous-time prototype of mean reversion and the workhorse model for interest rates, spreads and other anchored quantities."
+  },
+  {
+    num: "4.7.07",
+    icon: "J",
+    tClass: "t-impact",
+    title: "Jump-Diffusion Models (Merton)",
+    sub: "Brownian motion interrupted by discontinuous jumps — capturing sudden moves that continuous paths cannot produce",
+    formula: "dS/S = μ dt + σ dW + J dN",
+    tags: [["jump diffusion","impact"], ["merton","impact"], ["poisson",""], ["discontinuity",""]],
+    formulaBox: {
+      main: "dS = μ S dt + σ S dW + S (e<sup>J</sup>−1) dN",
+      note: "N = Poisson process intensity λ\nJ = random jump size (log)\nMerton: J ~ Normal ⇒ compound Poisson"
+    },
+    body: [
+      `A jump-diffusion supplements the continuous Brownian driver with a Poisson (or compound-Poisson) random measure that produces discontinuous jumps. Between jumps the process behaves like an ordinary diffusion; at a jump time it instantaneously displaces by a random size.`,
+      `Merton’s classic model takes log-normal jump sizes and a constant intensity, yielding a closed-form European option price as an infinite sum of Black–Scholes prices (the Poisson mixture). The model generates leptokurtic returns and can produce a volatility smile even with constant parameters.`,
+      `More general specifications allow state-dependent intensities, infinite-activity Lévy jumps (Variance Gamma, NIG, CGMY), or jumps in both the price and the variance process. The pricing equation acquires an integral term that reflects the expected jump contribution; numerical methods become either PIDE solvers or transform techniques.`,
+      `Jumps break the completeness of the Black–Scholes market: a single traded option is no longer sufficient to hedge. Risk-neutral measures are no longer unique and calibration must confront the additional degrees of freedom carefully.`
+    ],
+    keyPoint: "Jump-diffusions add discontinuous moves to Brownian paths. They explain fat tails and sudden crashes that pure diffusions cannot produce, at the cost of market incompleteness and a richer pricing equation."
+  },
+  {
+    num: "4.7.08",
+    icon: "σₜ",
+    tClass: "t-classes",
+    title: "Stochastic Volatility Models (Heston, SABR)",
+    sub: "Volatility itself follows a diffusion — generating realistic smiles, skews and volatility clustering",
+    formula: "dS = \ldots  |  dσ = \ldots (coupled SDEs)",
+    tags: [["heston","classes"], ["sabr","classes"], ["stochastic vol",""], ["smile",""]],
+    splitBox: [
+      { cls: "mid",  label: "Heston", text: "Variance follows a CIR process. Closed-form characteristic function → fast Fourier pricing. Mean-reverting vol, leverage effect via correlation ρ." },
+      { cls: "spread", label: "SABR", text: "Stochastic Alpha Beta Rho. CEV-type backbone plus log-normal volatility. Analytic asymptotic smile formula widely used for rates and FX." },
+      { cls: "gold", label: "Common Features", text: "Two-dimensional diffusion, correlation between price and vol shocks, extra state variable that must be filtered or calibrated to the volatility surface." },
+      { cls: "ask",  label: "Limitations", text: "Still continuous paths; pure stochastic volatility struggles with short-term skew. Often combined with jumps (SVJ) for equity indices." },
+    ],
+    body: [
+      `Stochastic volatility models treat the diffusion coefficient of the asset as a second stochastic process. The resulting two-dimensional SDE system can generate volatility clustering, the leverage effect (negative price–volatility correlation), and a non-flat implied-volatility surface.`,
+      `Heston’s model lets instantaneous variance follow a CIR square-root diffusion. Its characteristic function is known in closed form, enabling efficient Fourier-transform pricing of European claims. Correlation between the two Brownian motions controls the skew; the mean-reversion and vol-of-vol parameters control the term structure and the curvature of the smile.`,
+      `SABR combines a CEV-type local-volatility backbone with a log-normal stochastic volatility. Its popular asymptotic formula maps the SABR parameters directly onto the observed smile and has become a market standard for quoting and interpolating rates and FX options.`,
+      `Both models remain diffusions and therefore cannot produce the extreme short-term skew observed in equity markets without unrealistically large vol-of-vol; hybrid stochastic-volatility-plus-jump specifications address that gap.`
+    ],
+    keyPoint: "Stochastic volatility lets σ itself diffuse. Heston and SABR are the two workhorses that turn a flat Black–Scholes surface into a dynamic, mean-reverting, correlated smile."
+  },
+  {
+    num: "4.7.09",
+    icon: "dQ",
+    tClass: "t-spread",
+    title: "Girsanov’s Theorem (Change of Measure)",
+    sub: "Shifting the drift of Brownian motion by re-weighting probability — the technical engine of measure changes",
+    formula: "W^Q_t = W^P_t + ∫ λ_s ds",
+    tags: [["girsanov","spread"], ["measure change","spread"], ["radon-nikodym",""], ["kernel",""]],
+    formulaBox: {
+      main: "dQ/dP = exp(−∫ λ dW^P − ½∫ λ² dt)",
+      note: "Under Q the process W^Q = W^P + ∫ λ dt is Brownian\nλ = market price of risk / Girsanov kernel"
+    },
+    body: [
+      `Girsanov’s theorem states that an equivalent change of probability measure can absorb a drift into Brownian motion. If one multiplies the original measure P by a suitable exponential martingale (the Radon–Nikodym density), then under the new measure Q the process W^P + ∫ λ dt becomes a Brownian motion. The process λ is the Girsanov kernel (market price of risk).`,
+      `The theorem is the rigorous justification for the passage from the physical measure (where assets earn risk premia) to a risk-neutral measure (where discounted asset prices are martingales). The same device produces forward measures, annuity measures and any other numeraire change used in interest-rate and hybrid modelling.`,
+      `Existence of the density process requires the Novikov (or Kazamaki) condition that guarantees the exponential is a true martingale. In multi-dimensional settings λ becomes a vector and the kernel must match the dimension of the driving Brownian motion.`,
+      `Girsanov works only for equivalent measure changes (same null sets). It cannot remove jumps or change the quadratic variation; those require different absolute-continuity results (e.g., for Lévy processes).`
+    ],
+    keyPoint: "Girsanov re-weights paths so that a Brownian motion with drift becomes a driftless Brownian motion under a new measure. It is the mathematical switch that turns physical dynamics into pricing dynamics."
+  },
+  {
+    num: "4.7.10",
+    icon: "Q",
+    tClass: "t-bid",
+    title: "Risk-Neutral Measure",
+    sub: "An equivalent measure under which discounted asset prices are martingales — the pricing measure",
+    formula: "S_t / B_t  is a Q-martingale",
+    tags: [["risk-neutral","bid"], ["martingale measure","bid"], ["no-arbitrage",""], ["pricing",""]],
+    body: [
+      `A risk-neutral (equivalent martingale) measure Q is a probability measure equivalent to the physical measure P under which the discounted price of every traded asset is a martingale. The First Fundamental Theorem of Asset Pricing asserts that the existence of such a measure is essentially equivalent to the absence of arbitrage.`,
+      `Under Q the drift of every traded asset equals the risk-free rate (or the appropriate cost-of-carry). Consequently the price of a attainable contingent claim is the Q-expectation of its discounted payoff. Changing numeraire produces other martingale measures (forward measure, annuity measure, \ldots) that simplify particular classes of payoffs.`,
+      `In complete markets the risk-neutral measure is unique and every claim can be perfectly hedged. In incomplete markets (stochastic volatility, jumps, \ldots) many risk-neutral measures exist; the choice among them is an extra modelling decision, often fixed by calibration to observed option prices.`,
+      `The practical workflow is therefore: specify dynamics under Q (directly or via a Girsanov kernel from P), compute the discounted expectation, and obtain the arbitrage-free price. Calibration ensures that the chosen Q correctly reproduces the market’s liquid instruments.`
+    ],
+    keyPoint: "Under a risk-neutral measure discounted prices are martingales. Pricing reduces to taking an expectation — the fundamental theorem that converts no-arbitrage into a concrete computational recipe."
+  },
+  {
+    num: "4.7.11",
+    icon: "FK",
+    tClass: "t-cost",
+    title: "Feynman–Kac Formula",
+    sub: "The rigorous link between conditional expectations of diffusions and parabolic PDEs",
+    formula: "u(t,x) = E[payoff | X_t = x]  ↔  PDE",
+    tags: [["feynman-kac","gold"], ["expectation","gold"], ["pde link",""], ["generator",""]],
+    formulaBox: {
+      main: "u_t + μ u_x + ½ σ² u_xx − r u = 0",
+      note: "with terminal condition u(T,x) = payoff(x)\nSolution u(t,x) = E[e^{−∫r} payoff(X_T) | X_t = x]"
+    },
+    body: [
+      `The Feynman–Kac theorem states that the solution of a linear parabolic PDE can be represented as the expected value of a functional of a diffusion, and conversely that the conditional expectation of a payoff of an Itô process solves a PDE whose differential operator is the infinitesimal generator of that process.`,
+      `In finance the theorem supplies the bridge between the probabilistic representation of a derivative price (discounted risk-neutral expectation) and the Black–Scholes-type PDE. Once the SDE for the underlying is given, the generator is known and the PDE is written down automatically; once the PDE is solved, its solution is the desired expectation.`,
+      `The formula extends to running payoffs (integrals along the path), to killing/discounting terms, and to systems of PDEs that arise from regime-switching or from multi-factor models. Boundary conditions correspond to absorbing or reflecting behaviour of the diffusion.`,
+      `Feynman–Kac is the reason one can freely switch between Monte-Carlo (expectation) and finite-difference / finite-element (PDE) methods for the same pricing problem.`
+    ],
+    keyPoint: "Feynman–Kac identifies conditional expectations of diffusions with solutions of parabolic PDEs. It is the formal bridge that lets a quant price the same claim by Monte Carlo or by solving a PDE."
+  },
+  {
+    num: "4.7.12",
+    icon: "PDE",
+    tClass: "t-markets",
+    title: "PDEs in Finance (Black–Scholes PDE)",
+    sub: "The deterministic equation whose solution is the arbitrage-free price of a derivative",
+    formula: "V_t + ½ σ² S² V_SS + r S V_S − r V = 0",
+    tags: [["black-scholes pde","markets"], ["pricing pde","markets"], ["terminal condition",""], ["hedging",""]],
+    formulaBox: {
+      main: "V_t + ½ σ² S² V<sub>SS</sub> + (r−q) S V<sub>S</sub> − r V = 0",
+      note: "Terminal: V(T,S) = payoff(S)\nDerived by Itô + self-financing + no-arbitrage\nor by Feynman–Kac under the risk-neutral SDE"
+    },
+    body: [
+      `The Black–Scholes PDE is the linear parabolic equation that must be satisfied by the price of any derivative written on a geometric Brownian motion under the usual frictionless-market assumptions. It is obtained either by forming a locally riskless portfolio (delta-hedging) and invoking no-arbitrage, or by writing the Feynman–Kac representation under the risk-neutral dynamics and reading off the generator.`,
+      `The terminal condition is the contractual payoff at expiry. Boundary conditions depend on the specific claim (call, put, barrier, \ldots). Once the PDE is solved, the first spatial derivative supplies the delta hedge, the second the gamma, and so on.`,
+      `When the underlying follows a richer diffusion (local volatility, stochastic volatility, jumps) the PDE acquires additional terms or becomes a PIDE. Multi-factor models produce multi-dimensional PDEs that quickly become expensive to solve by grid methods and are then attacked by Monte Carlo, asymptotic expansions or sparse-grid / machine-learning techniques.`,
+      `The PDE viewpoint emphasises hedging and continuous-time replication; the expectation viewpoint emphasises probabilistic representation. Both are indispensable and are linked by Feynman–Kac.`
+    ],
+    keyPoint: "The Black–Scholes PDE is the deterministic shadow of the risk-neutral SDE. Solving it with the appropriate terminal condition yields the arbitrage-free price and all the Greeks that follow by differentiation."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

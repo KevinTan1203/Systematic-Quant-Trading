@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.15 Signal Processing</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 260px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 10px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.15 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Signal<br><em>Processing</em></h1>
+        <div class="hdr-sub">Extracting structure from noisy time series — frequency, filters, wavelets and the signal-to-noise ratio of alpha</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Core Tools</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Fourier</div>
+            <div class="sw-price">Time ↔ Freq</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Filters</div>
+            <div class="sw-price">LP · HP · BP</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Kalman / Wavelet</div>
+          <div class="sw-spread-val">Optimal / Multi-scale</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">ACF / PACF</div>
+          <div class="sw-mid-val">Dependence structure</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">11 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.15 Signal Processing</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.15.01",
+    icon: "ℱ",
+    tClass: "t-mid",
+    title: "Fourier Transform",
+    sub: "Decomposing a time series into a sum of sinusoids of different frequencies and amplitudes",
+    formula: "X(ω) = ∫ x(t) e^{−iωt} dt",
+    tags: [["fourier","mid"], ["frequency domain","mid"], ["spectrum",""], ["sinusoids",""]],
+    formulaBox: {
+      main: "X(ω) = ∫<sub>−∞</sub><sup>∞</sup> x(t) e<sup>−iωt</sup> dt",
+      note: "Inverse recovers x(t) from X(ω)\n|X(ω)|² = power at frequency ω\nDiscrete version for sampled data"
+    },
+    body: [
+      `The Fourier transform converts a time-domain signal into its frequency-domain representation. Any (sufficiently regular) signal can be written as a superposition of complex exponentials (or equivalently sines and cosines) of different frequencies; the transform coefficient at each frequency gives the amplitude and phase of that component.`,
+      `In discrete time the Discrete Fourier Transform (DFT) maps a finite vector of observations to a finite vector of frequency bins. The resulting spectrum shows how the total variance (or energy) is distributed across frequencies. Peaks indicate dominant periodicities; a flat spectrum is the signature of white noise.`,
+      `Financial applications include detecting intra-day or calendar periodicities, analysing the frequency content of volatility, and constructing frequency-specific risk measures or filters. Because financial series are non-stationary, the ordinary Fourier transform is often applied to rolling windows or replaced by time-frequency methods (wavelets, STFT).`,
+      `The transform is linear and invertible: no information is lost, only reorganised. Operations that are convolutions in time become multiplications in frequency, which is the algebraic basis of many fast filtering algorithms.`
+    ],
+    keyPoint: "The Fourier transform rewrites a signal as a sum of sinusoids. It moves analysis from the time domain into the frequency domain, where periodicities and spectral structure become visible."
+  },
+  {
+    num: "4.15.02",
+    icon: "FFT",
+    tClass: "t-mid",
+    title: "Fast Fourier Transform (FFT)",
+    sub: "The efficient algorithm that computes the DFT in O(N log N) rather than O(N²) operations",
+    formula: "DFT via divide-and-conquer  →  O(N log N)",
+    tags: [["fft","mid"], ["algorithm","mid"], ["efficiency",""], ["cooley-tukey",""]],
+    body: [
+      `Direct evaluation of the DFT costs O(N²) arithmetic operations. The Fast Fourier Transform (FFT) family of algorithms, of which the Cooley–Tukey radix-2 procedure is the best known, reduces the cost to O(N log N) by recursively decomposing the transform into smaller transforms and exploiting symmetry.`,
+      `The dramatic speed-up makes spectral analysis practical for long series and for real-time applications. Most numerical libraries implement highly optimised FFT routines that also handle non-power-of-two lengths via mixed-radix or Bluestein methods.`,
+      `In quantitative finance the FFT is used for option pricing under characteristic-function methods (Carr–Madan, Lewis, \ldots), for fast convolution in portfolio or risk calculations, for spectral estimation, and for the efficient application of linear filters. It is also the engine behind many quasi-Monte Carlo and random-number generation techniques.`,
+      `Practical caveats include the periodic boundary assumption of the DFT (addressed by windowing or zero-padding), numerical round-off for very long transforms, and the need to interpret the resulting frequency bins correctly (resolution = 1/T, Nyquist limit = 1/(2Δt)).`
+    ],
+    keyPoint: "The FFT makes the Discrete Fourier Transform computationally cheap. It is the workhorse that turns frequency-domain methods from theoretical curiosities into routine tools."
+  },
+  {
+    num: "4.15.03",
+    icon: "S",
+    tClass: "t-spread",
+    title: "Spectral Density Estimation",
+    sub: "Estimating how variance is distributed across frequencies — the power spectrum of a stationary series",
+    formula: "f(ω) = (1/2π) Σ γ(k) e^{−iωk}",
+    tags: [["spectral density","spread"], ["periodogram","spread"], ["power spectrum",""], ["smoothing",""]],
+    formulaBox: {
+      main: "Periodogram I(ω) = (1/N) |Σ x_t e^{−iωt}|²",
+      note: "Raw periodogram is inconsistent\nSmooth by windowing / averaging / multitaper\nPeaks = dominant cycles; shape diagnoses ARMA / long memory"
+    },
+    body: [
+      `The spectral density (power spectrum) of a stationary process is the Fourier transform of its autocovariance function. It describes the contribution of each frequency to the total variance. White noise has a flat spectrum; an AR(1) has more power at low frequencies when the autoregressive coefficient is positive.`,
+      `The periodogram is the sample analogue obtained from the squared modulus of the DFT. It is an asymptotically unbiased but inconsistent estimator (variance does not shrink with N). Consistency is restored by smoothing—averaging neighbouring frequency bins, applying a lag window to the sample autocovariances, or using multitaper methods.`,
+      `In finance the spectrum of returns is often close to flat (weak serial correlation), while the spectrum of absolute or squared returns shows strong low-frequency power, reflecting volatility clustering. Long-memory processes are characterised by a spectrum that diverges as ω → 0 like ω^{1−2d}.`,
+      `Parametric spectral estimation fits an ARMA model and evaluates its theoretical spectrum; non-parametric methods stay closer to the data. Both are used for cycle detection, for pre-whitening, and for specifying the frequency response of filters.`
+    ],
+    keyPoint: "The spectral density shows which frequencies carry the variance. The periodogram is the basic estimator; smoothing turns it into a consistent picture of the series’ frequency content."
+  },
+  {
+    num: "4.15.04",
+    icon: "Filt",
+    tClass: "t-classes",
+    title: "Filters: Low-Pass, High-Pass, Band-Pass",
+    sub: "Linear operators that attenuate or pass selected frequency bands — smoothing, detrending, cycle extraction",
+    formula: "y_t = Σ ψ_j x_{t−j}",
+    tags: [["filters","classes"], ["low-pass","classes"], ["high-pass",""], ["band-pass",""]],
+    splitBox: [
+      { cls: "bid",  label: "Low-Pass", text: "Passes low frequencies, attenuates high. Smoothing, trend extraction (e.g., moving average, HP filter trend)." },
+      { cls: "ask",  label: "High-Pass", text: "Passes high frequencies, attenuates low. Detrending, isolating short-term fluctuations or noise." },
+      { cls: "mid",  label: "Band-Pass", text: "Passes a chosen frequency band. Business-cycle extraction (Baxter–King, Christiano–Fitzgerald)." },
+      { cls: "gold", label: "Design", text: "Ideal filters are non-causal and infinite; practical filters trade phase distortion, leakage and delay." },
+    ],
+    body: [
+      `A linear time-invariant filter transforms an input series by convolution with a coefficient sequence (or equivalently multiplies the Fourier transform by a frequency-response function). Low-pass filters keep slow movements and suppress rapid noise; high-pass filters do the opposite; band-pass filters isolate a chosen range of periodicities.`,
+      `Classic examples in finance and macroeconomics include moving averages, exponential smoothers, the Hodrick–Prescott filter (trend/cycle decomposition), and the Baxter–King or Christiano–Fitzgerald band-pass filters used to extract business-cycle components.`,
+      `Filter design balances several criteria: how sharply the frequency response cuts off, whether phase (timing) is distorted, whether the filter is causal (real-time usable) or two-sided, and how much leakage occurs from neighbouring frequencies. No finite filter is perfect on all criteria simultaneously.`,
+      `In alpha research, filters are used to clean signals, to separate time-scales, and to construct features that emphasise particular horizons. Over-filtering can remove genuine predictive information; under-filtering leaves noise that degrades out-of-sample performance.`
+    ],
+    keyPoint: "Filters selectively pass or attenuate frequency bands. Low-pass smooths, high-pass detrends, band-pass isolates cycles. They are the basic tool for separating signal from noise at chosen time-scales."
+  },
+  {
+    num: "4.15.05",
+    icon: "K",
+    tClass: "t-dynamics",
+    title: "Kalman Filter as Optimal Signal Estimator",
+    sub: "The recursive minimum-MSE estimator of a latent state given noisy observations — optimal under linear-Gaussian assumptions",
+    formula: "Predict → Update  (mean & covariance)",
+    tags: [["kalman","dynamics"], ["state space","dynamics"], ["optimal filtering",""], ["recursive",""]],
+    formulaBox: {
+      main: "State: α_t = T α_{t−1} + R η_t\nObs:   y_t = Z α_t + ε_t",
+      note: "Kalman filter = optimal recursive estimator of α_t | y_1…y_t\nUnder linear dynamics + Gaussian noise\nAlso yields the likelihood for parameter estimation"
+    },
+    body: [
+      `The Kalman filter is the closed-form recursive solution to the problem of estimating a latent linear-Gaussian state from a sequence of noisy measurements. At each time step it forms a prediction from the previous state estimate and then updates that prediction with the new observation, weighting the two sources of information by their relative precisions.`,
+      `Under the stated assumptions the filter is optimal: no other causal estimator has smaller mean-squared error. The same recursion produces the one-step prediction errors whose variance enters the Gaussian likelihood, allowing maximum-likelihood estimation of the state-space parameters.`,
+      `In signal-processing terms the Kalman filter is an adaptive low-pass filter whose gain automatically adjusts to the signal-to-noise ratio. When observations are noisy the gain is small and the filter trusts the model; when observations are precise the gain rises and the filter follows the data more closely.`,
+      `Finance applications include extracting latent factors from yield curves or from noisy alpha signals, filtering time-varying betas, denoising high-frequency prices, and estimating stochastic-volatility or unobserved-component models. Non-linear or non-Gaussian extensions (EKF, UKF, particle filters) relax the classical assumptions at higher computational cost.`
+    ],
+    keyPoint: "The Kalman filter is the optimal recursive estimator of a linear-Gaussian latent signal. It automatically balances model prediction against noisy observation and is the principled tool for real-time signal extraction."
+  },
+  {
+    num: "4.15.06",
+    icon: "W",
+    tClass: "t-classes",
+    title: "Wavelet Transforms",
+    sub: "Multi-scale decomposition that localises features in both time and frequency — better for non-stationary series",
+    formula: "W(a,b) = ∫ x(t) ψ_{a,b}(t) dt",
+    tags: [["wavelet","classes"], ["multi-scale","classes"], ["time-frequency",""], ["non-stationary",""]],
+    body: [
+      `Wavelets are localised waveform basis functions that can be scaled (to capture different frequencies) and translated (to capture different times). The continuous or discrete wavelet transform therefore produces a time-frequency map rather than a purely frequency-domain spectrum, making it suitable for series whose spectral content changes over time.`,
+      `The discrete wavelet transform (DWT) and its maximal-overlap variant (MODWT) decompose a series into a set of detail (high-frequency) coefficients and a smooth (low-frequency) approximation at successive dyadic scales. Reconstruction is exact; energy is preserved (Parseval).`,
+      `In finance wavelets are used to separate short-term noise from longer-term trends, to study scale-dependent correlations (wavelet coherence), to denoise returns or volatility estimates, and to construct multi-horizon features for forecasting. Because they adapt to localised bursts, they handle volatility clustering and structural breaks more gracefully than a global Fourier transform.`,
+      `Choice of mother wavelet (Haar, Daubechies, Symmlet, \ldots) and of decomposition depth affects the results; as with any basis expansion, the analyst must verify that the retained scales correspond to economically meaningful horizons.`
+    ],
+    keyPoint: "Wavelets provide a multi-scale, time-localised decomposition. They are the natural tool when the frequency content of a financial series is itself changing through time."
+  },
+  {
+    num: "4.15.07",
+    icon: "ℋ",
+    tClass: "t-cost",
+    title: "Hilbert Transform",
+    sub: "Producing the analytic signal — instantaneous amplitude and phase of a real-valued series",
+    formula: "x̃(t) = (1/π) p.v. ∫ x(τ)/(t−τ) dτ",
+    tags: [["hilbert","gold"], ["analytic signal","gold"], ["instantaneous phase",""], ["envelope",""]],
+    formulaBox: {
+      main: "z(t) = x(t) + i x̃(t) = A(t) e^{i φ(t)}",
+      note: "A(t) = instantaneous amplitude (envelope)\nφ(t) = instantaneous phase\nφ′(t) = instantaneous frequency"
+    },
+    body: [
+      `The Hilbert transform shifts the phase of every positive-frequency component by −π/2 and every negative-frequency component by +π/2. Combined with the original signal it forms the complex analytic signal, from which instantaneous amplitude (envelope) and instantaneous phase (and hence instantaneous frequency) are obtained by polar conversion.`,
+      `The transform is most meaningful for narrow-band signals; for broad-band or non-stationary series the instantaneous frequency can be noisy and should be interpreted with care. In practice the Hilbert transform is often applied after a band-pass filter has isolated a frequency range of interest.`,
+      `Financial applications include the construction of the Hilbert–Huang transform (empirical mode decomposition + Hilbert spectral analysis), the measurement of instantaneous phase synchronisation between markets, and the extraction of amplitude envelopes from oscillatory alpha signals or from volatility cycles.`,
+      `Because the Hilbert transform is a convolution, it is efficiently implemented via the FFT: transform, multiply by the appropriate frequency-domain mask, and inverse-transform.`
+    ],
+    keyPoint: "The Hilbert transform builds the analytic signal, yielding instantaneous amplitude and phase. It turns a real series into a time-varying phasor—useful for envelope and synchronisation analysis."
+  },
+  {
+    num: "4.15.08",
+    icon: "ACF",
+    tClass: "t-spread",
+    title: "Autocorrelation Function (ACF)",
+    sub: "The correlation of a series with its own lagged values — the basic map of linear temporal dependence",
+    formula: "ρ(k) = Cov(x_t, x_{t−k}) / Var(x_t)",
+    tags: [["acf","spread"], ["autocorrelation","spread"], ["lags",""], ["dependence",""]],
+    formulaBox: {
+      main: "ρ̂(k) = Σ (x_t − x̄)(x_{t−k} − x̄) / Σ (x_t − x̄)²",
+      note: "ACF of white noise ≈ 0 for k ≠ 0\nSlow decay ⇒ persistence / long memory\nCuts off after q ⇒ MA(q) signature"
+    },
+    body: [
+      `The autocorrelation function records the linear dependence between a series and its lags. For a stationary process it depends only on the lag and is normalised so that ρ(0) = 1. A plot of ρ̂(k) against k (the correlogram) is the first diagnostic in any time-series analysis.`,
+      `White noise has theoretical ACF equal to zero at all non-zero lags; significant spikes indicate predictability. An exponentially decaying ACF is characteristic of stationary AR processes; a sharp cut-off after lag q suggests an MA(q). Long-memory series exhibit a hyperbolic decay that remains detectable at large lags.`,
+      `In finance the ACF of raw returns is usually weak (consistent with weak-form efficiency), while the ACF of absolute or squared returns is strongly positive and persistent—the signature of volatility clustering. The ACF of order-flow or of certain alternative-data series can reveal short-term predictability that alpha models attempt to exploit.`,
+      `Standard errors under the null of white noise are approximately 1/√T; Bartlett bands or more refined HAC intervals help judge significance. Pre-whitening or residual ACF tests are used after a model has been fitted.`
+    ],
+    keyPoint: "The ACF is the lag-by-lag correlation of a series with itself. It is the primary visual and numerical summary of linear serial dependence and the starting point for ARMA identification."
+  },
+  {
+    num: "4.15.09",
+    icon: "PACF",
+    tClass: "t-spread",
+    title: "Partial Autocorrelation (PACF)",
+    sub: "The residual correlation at lag k after intermediate lags have been partialled out",
+    formula: "φ_{kk} = Corr(x_t, x_{t−k} | x_{t−1},\ldots,x_{t−k+1})",
+    tags: [["pacf","spread"], ["partial","spread"], ["ar order",""], ["identification",""]],
+    formulaBox: {
+      main: "PACF cuts off after lag p  ⇒  AR(p) candidate",
+      note: "Estimated via successive AR fits or Levinson–Durbin\nComplementary to ACF for Box–Jenkins identification"
+    },
+    body: [
+      `The partial autocorrelation at lag k is the correlation between x_t and x_{t−k} that remains after the linear influence of the intervening lags has been removed. It isolates the direct dependence at that lag.`,
+      `For an AR(p) process the theoretical PACF is non-zero up to lag p and zero thereafter; the sample PACF therefore supplies a practical estimate of the autoregressive order. Conversely the ACF of an AR process decays gradually, so the two functions together distinguish AR from MA behaviour.`,
+      `In the Box–Jenkins identification cycle one examines the ACF for an MA signature (cut-off) and the PACF for an AR signature (cut-off). Mixed ARMA processes show gradual decay in both, requiring information criteria or residual diagnostics for final order selection.`,
+      `In alpha research the PACF of a candidate signal (or of its residual after known factors) helps decide how many lags to include in a predictive regression and whether a simple AR structure is sufficient.`
+    ],
+    keyPoint: "The PACF measures direct lag dependence after controlling for intermediate lags. A sharp cut-off at lag p is the classic signature of an AR(p) process and the key to order identification."
+  },
+  {
+    num: "4.15.10",
+    icon: "XCorr",
+    tClass: "t-bid",
+    title: "Cross-Correlations Across Assets",
+    sub: "Lead–lag and contemporaneous dependence between different series — the multivariate extension of the ACF",
+    formula: "ρ_{xy}(k) = Corr(x_t, y_{t−k})",
+    tags: [["cross-correlation","bid"], ["lead-lag","bid"], ["multivariate",""], ["spillovers",""]],
+    body: [
+      `The cross-correlation function between two series x and y records their correlation at every lead and lag. A significant ρ_{xy}(k) for k > 0 indicates that past y helps predict current x; the opposite sign of k indicates the reverse lead–lag relationship. Contemporaneous correlation (k = 0) is the ordinary Pearson correlation.`,
+      `In markets, cross-correlations reveal information flow (index futures leading cash equities, or liquid names leading less liquid ones), common-factor structure, and the potential for statistical arbitrage or pairs trading. After controlling for a market factor, residual cross-correlations are the raw material of many relative-value signals.`,
+      `Estimation is complicated by non-synchronicity (especially in high-frequency data), by common volatility shocks that induce spurious correlation, and by the multiple-testing problem that arises when many pairs are examined. Pre-averaging, Hayashi–Yoshida-type estimators, and rigorous multiple-testing corrections are used in careful studies.`,
+      `Dynamic conditional-correlation (DCC) and related models allow the cross-correlation structure itself to evolve through time, capturing the well-documented increase in correlations during crises.`
+    ],
+    keyPoint: "Cross-correlations map lead–lag and contemporaneous links between assets. They identify information flow, common drivers and relative-value opportunities, but require care with non-synchronicity and multiple testing."
+  },
+  {
+    num: "4.15.11",
+    icon: "SNR",
+    tClass: "t-ask",
+    title: "Signal-to-Noise Ratio in Alpha Research",
+    sub: "Quantifying how much predictable structure exists relative to the irreducible randomness of returns",
+    formula: "SNR ≈ Var(signal) / Var(noise)",
+    tags: [["signal-to-noise","ask"], ["alpha research","ask"], ["predictability",""], ["overfitting",""]],
+    formulaBox: {
+      main: "SNR = σ²_{predictable} / σ²_{residual}",
+      note: "In-sample R² ≈ SNR / (1 + SNR)\nLow SNR ⇒ need more data, stronger regularisation, or better features\nMultiple testing multiplies the effective noise"
+    },
+    body: [
+      `Most financial forecasting problems are characterised by a very low signal-to-noise ratio: the predictable component of returns is small relative to the unpredictable residual. A strategy that looks strong in-sample can easily be pure noise that has been over-fit.`,
+      `The in-sample R² of a predictive regression is a direct (if optimistic) function of the SNR. With daily equity returns an R² of a few percent is already economically meaningful; higher figures often signal leakage or over-fitting. Out-of-sample R², deflated by the number of trials, is the more honest metric.`,
+      `Improving the SNR is the central task of alpha research. It can be pursued by better features (new data, non-linear transformations, multi-scale filters), by better targets (horizon matching, volatility scaling), by regularisation and ensemble methods that control over-fitting, and by rigorous multiple-testing discipline that prevents false discoveries.`,
+      `Signal-processing tools—filtering, wavelet denoising, Kalman extraction of latent factors—enter precisely because they attempt to raise the effective SNR by removing components that are unlikely to contain predictive information. The same tools can destroy signal if applied too aggressively; the trade-off is evaluated out-of-sample.`
+    ],
+    keyPoint: "Financial prediction operates at low signal-to-noise ratios. Every filter, feature and model choice is ultimately judged by whether it raises the usable SNR without manufacturing spurious in-sample fit."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

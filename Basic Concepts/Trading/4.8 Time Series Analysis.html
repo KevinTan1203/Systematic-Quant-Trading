@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.8 Time Series Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 260px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 10px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.8 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Time Series<br><em>Analysis</em></h1>
+        <div class="hdr-sub">Modelling dependence through time — stationarity, ARMA, GARCH, cointegration, regimes and the tools that detect them</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Core Building Blocks</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">ARIMA</div>
+            <div class="sw-price">AR + I + MA</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">GARCH</div>
+            <div class="sw-price">σₜ² dynamics</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Cointegration</div>
+          <div class="sw-spread-val">I(1) → I(0)</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Stationarity</div>
+          <div class="sw-mid-val">ADF / KPSS</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">14 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.8 Time Series Analysis</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.8.01",
+    icon: "S",
+    tClass: "t-mid",
+    title: "Stationarity (ADF & KPSS Tests)",
+    sub: "Constant mean, variance and autocovariance structure — the prerequisite for most classical time-series methods",
+    formula: "ADF: H₀ = unit root  |  KPSS: H₀ = stationary",
+    tags: [["stationarity","mid"], ["adf","mid"], ["kpss",""], ["unit root",""]],
+    formulaBox: {
+      main: "ADF: Δy<sub>t</sub> = α + βt + γ y<sub>t−1</sub> + Σ δᵢ Δy<sub>t−i</sub> + εₜ",
+      note: "Reject H₀ (γ=0) ⇒ evidence of stationarity\nKPSS reverses the null: stationarity vs unit root\nUse both for a confirmatory picture"
+    },
+    body: [
+      `A weakly (second-order) stationary series has time-invariant mean, variance and autocovariance function that depends only on the lag. Strict stationarity requires the entire joint distribution to be time-invariant. Most linear time-series methods assume at least weak stationarity.`,
+      `The Augmented Dickey–Fuller (ADF) test examines the null of a unit root (non-stationarity) against the alternative of stationarity. The test regression includes lagged differences to soak up serial correlation. Rejection of the null is evidence that the series is stationary.`,
+      `The KPSS test reverses the hypotheses: the null is stationarity (around a level or trend) and the alternative is a unit root. Using ADF and KPSS together yields four possible outcomes and helps distinguish trend-stationary from difference-stationary behaviour.`,
+      `In finance, prices and cumulative returns are typically non-stationary; log-returns and differences of yields or spreads are usually stationary. Confirming stationarity (or transforming to stationarity) is the first practical step before fitting ARMA, GARCH or regression models.`
+    ],
+    keyPoint: "Stationarity means the statistical properties do not drift with time. ADF and KPSS are complementary tests that together decide whether a series can be modelled as stationary or must be differenced (or otherwise transformed)."
+  },
+  {
+    num: "4.8.02",
+    icon: "AR",
+    tClass: "t-spread",
+    title: "AR (Autoregressive) Models",
+    sub: "Current value as a linear function of its own past values plus noise",
+    formula: "yₜ = c + φ₁ yₜ₋₁ + \ldots + φₚ yₜ₋ₚ + εₜ",
+    tags: [["ar","spread"], ["autoregressive","spread"], ["lags",""], ["pacf",""]],
+    formulaBox: {
+      main: "yₜ = c + Σ<sub>i=1</sub><sup>p</sup> φᵢ yₜ₋ᵢ + εₜ",
+      note: "Stationarity: roots of φ(z)=0 outside unit circle\nACF decays gradually; PACF cuts off after lag p\nAR(1): |φ| < 1 for stationarity"
+    },
+    body: [
+      `An autoregressive model of order p expresses the current observation as a linear combination of the previous p observations plus a white-noise shock. It is the discrete-time analogue of a linear stochastic differential equation and the natural model when serial dependence is believed to arise from feedback of the level onto itself.`,
+      `Stationarity requires that the roots of the characteristic polynomial lie outside the unit circle. For the AR(1) this reduces to |φ| < 1. The autocorrelation function of a stationary AR decays exponentially (or sinusoidally); the partial autocorrelation function truncates after lag p, which supplies a practical identification tool.`,
+      `AR models are estimated by ordinary least squares (conditional) or by exact maximum likelihood. Model order is chosen by information criteria (AIC, BIC) or by inspecting the PACF. Forecasting is recursive and optimal (in the linear MSE sense) once parameters are known.`,
+      `In finance pure AR models are used for returns only after confirming that residual autocorrelation is present; more often they appear as the mean equation inside a GARCH specification or as the building block of ARMA and VAR systems.`
+    ],
+    keyPoint: "An AR model lets the past of the series itself predict the present. The PACF identifies the order; the stationarity condition keeps the process from exploding."
+  },
+  {
+    num: "4.8.03",
+    icon: "MA",
+    tClass: "t-spread",
+    title: "MA (Moving Average) Models",
+    sub: "Current value as a linear combination of current and past white-noise shocks",
+    formula: "yₜ = μ + εₜ + θ₁ εₜ₋₁ + \ldots + θ_q εₜ₋q",
+    tags: [["ma","spread"], ["moving average","spread"], ["shocks",""], ["acf",""]],
+    formulaBox: {
+      main: "yₜ = μ + εₜ + Σ<sub>j=1</sub><sup>q</sup> θⱼ εₜ₋ⱼ",
+      note: "Always stationary (finite MA)\nInvertibility: roots of θ(z)=0 outside unit circle\nACF cuts off after lag q; PACF decays"
+    },
+    body: [
+      `A moving-average model of order q writes the observation as a constant plus a weighted sum of the most recent q+1 white-noise innovations. Because the dependence on the past is only through a finite number of shocks, every finite MA process is automatically stationary.`,
+      `Invertibility (the ability to recover the shocks from past observations) requires the roots of the MA polynomial to lie outside the unit circle. The autocorrelation function of an MA(q) is exactly zero beyond lag q, while the partial autocorrelation function decays; this complementary pattern to the AR case is the classic identification signature.`,
+      `MA models are estimated by maximum likelihood (the likelihood is a non-linear function of the θ parameters). High-order MA models can approximate the ACF of many stationary processes, but pure high-order MA specifications are less common than ARMA combinations.`,
+      `In finance MA terms appear naturally when returns are measured as differences of a latent price that contains microstructure noise, or as part of an ARMA mean equation that captures short-lived autocorrelation.`
+    ],
+    keyPoint: "An MA model expresses the series as a finite echo of past shocks. It is always stationary; its ACF truncates sharply after lag q, giving a clean identification fingerprint."
+  },
+  {
+    num: "4.8.04",
+    icon: "ARIMA",
+    tClass: "t-classes",
+    title: "ARMA and ARIMA",
+    sub: "Combined autoregressive and moving-average dynamics, with optional differencing for non-stationary series",
+    formula: "ARIMA(p,d,q):  φ(B)(1−B)^d yₜ = θ(B) εₜ",
+    tags: [["arma","classes"], ["arima","classes"], ["box-jenkins",""], ["differencing",""]],
+    formulaBox: {
+      main: "φ(B)(1−B)<sup>d</sup> yₜ = c + θ(B) εₜ",
+      note: "B = backshift operator\nd = 0 → ARMA (stationary)\nd ≥ 1 → integrated (unit-root) series"
+    },
+    body: [
+      `An ARMA(p,q) process contains both autoregressive and moving-average terms. It is the workhorse parsimonious model for stationary series whose ACF and PACF both decay. The Box–Jenkins methodology identifies candidate orders from the sample ACF/PACF, estimates by maximum likelihood, and diagnoses residuals for remaining structure.`,
+      `When the original series is non-stationary but its d-th difference is stationary, one works with an ARIMA(p,d,q) model. The integration order d is usually 1 for prices or cumulative sums; higher orders are rare. After estimation, forecasts of the differenced series are cumulated back to the original scale.`,
+      `Information criteria, residual ACF tests (Ljung–Box), and out-of-sample forecast comparisons guide model selection. Over-fitting is a constant danger; BIC’s heavier penalty often prefers simpler models than AIC.`,
+      `In finance ARIMA models are applied to returns (usually d=0), to volatility proxies, to spreads, and to any series that has been rendered stationary. They supply the mean equation that is later paired with a GARCH specification for the conditional variance.`
+    ],
+    keyPoint: "ARMA combines AR and MA for stationary series; ARIMA adds differencing for unit-root non-stationarity. The Box–Jenkins cycle—identify, estimate, diagnose—remains the practical standard."
+  },
+  {
+    num: "4.8.05",
+    icon: "SAR",
+    tClass: "t-classes",
+    title: "SARIMA (Seasonal)",
+    sub: "ARIMA extended with seasonal AR, MA and differencing operators at lag s",
+    formula: "SARIMA(p,d,q)(P,D,Q)ₛ",
+    tags: [["sarima","classes"], ["seasonal","classes"], ["periodicity",""], ["calendar",""]],
+    body: [
+      `SARIMA augments the ordinary ARIMA operators with a second set of autoregressive, differencing and moving-average operators that act at the seasonal lag s (e.g., s=5 for daily data with weekly seasonality, s=12 for monthly data). The multiplicative notation (p,d,q)×(P,D,Q)ₛ keeps the parameterisation compact.`,
+      `Seasonal differencing (1−B^s)^D removes a seasonal unit root. Seasonal AR and MA terms capture remaining periodic autocorrelation. Identification still relies on the ACF and PACF, now examined at both ordinary and seasonal lags.`,
+      `In finance pure calendar seasonality is weaker than in macro or retail series, but day-of-week effects, month-of-year effects, and expiry-cycle effects in futures and options markets can justify a seasonal component. Intraday data often display a strong diurnal pattern that can be modelled by a seasonal factor or by a SARIMA-type structure on appropriate aggregates.`,
+      `Estimation and forecasting proceed exactly as for ARIMA once the seasonal operators are included; the state-space representation remains available for exact likelihood and Kalman smoothing.`
+    ],
+    keyPoint: "SARIMA adds a seasonal layer of AR, MA and differencing at lag s. It is the systematic way to capture periodic dependence that ordinary ARIMA would leave in the residuals."
+  },
+  {
+    num: "4.8.06",
+    icon: "G",
+    tClass: "t-ask",
+    title: "GARCH Family Models",
+    sub: "Conditional variance that depends on past squared shocks and past variances — the standard model of volatility clustering",
+    formula: "σₜ² = ω + α εₜ₋₁² + β σₜ₋₁²",
+    tags: [["garch","ask"], ["volatility","ask"], ["clustering",""], ["persistence",""]],
+    formulaBox: {
+      main: "σₜ² = ω + Σ αᵢ εₜ₋ᵢ² + Σ βⱼ σₜ₋ⱼ²",
+      note: "GARCH(1,1): α+β < 1 for stationarity\nEGARCH / GJR: asymmetric response to sign\nIGARCH: α+β = 1 (persistent)"
+    },
+    body: [
+      `GARCH models the conditional variance of a series as a linear function of past squared residuals and past conditional variances. The basic GARCH(1,1) already captures the two central stylised facts of financial returns: volatility clustering and excess kurtosis (unconditionally).`,
+      `The sum α+β measures persistence; values close to one imply that volatility shocks die out slowly. Stationarity of the variance process requires α+β < 1 (together with positivity constraints). Maximum-likelihood estimation under a Gaussian or Student-t innovation is standard.`,
+      `Asymmetric extensions (EGARCH, GJR-GARCH, TGARCH) allow negative returns to increase future variance more than positive returns of the same size — the leverage effect. Component GARCH, IGARCH and FIGARCH accommodate longer-memory behaviour in variance.`,
+      `In practice a GARCH specification is almost always paired with a mean equation (constant, ARMA, or factor model). The fitted conditional volatility series is used for risk measurement, option pricing, position sizing and as an input to multivariate models.`
+    ],
+    keyPoint: "GARCH turns volatility into a predictable, mean-reverting process driven by past shocks. It is the default parametric description of the clustering and persistence that dominate financial return series."
+  },
+  {
+    num: "4.8.07",
+    icon: "VAR",
+    tClass: "t-dynamics",
+    title: "VAR (Vector Autoregression)",
+    sub: "A system of equations in which every variable is regressed on lags of itself and of all other variables",
+    formula: "Yₜ = c + A₁ Yₜ₋₁ + \ldots + Aₚ Yₜ₋ₚ + εₜ",
+    tags: [["var","dynamics"], ["multivariate","dynamics"], ["granger",""], ["irf",""]],
+    body: [
+      `A vector autoregression of order p is the natural multivariate extension of the univariate AR. Each component series is expressed as a linear function of p lags of all components plus a contemporaneous innovation. The model captures cross-series dynamics and contemporaneous residual correlation.`,
+      `Estimation is equation-by-equation OLS (or multivariate GLS / maximum likelihood). Order selection uses multivariate information criteria or sequential likelihood-ratio tests. Granger causality, impulse-response functions and forecast-error variance decompositions are the standard tools of interpretation.`,
+      `In finance VARs are used for multi-asset return systems, for the joint dynamics of yields across the curve, for macro-finance interactions, and as the reduced form of structural models. Bayesian VARs with shrinkage priors are popular when the number of variables is large relative to the sample length.`,
+      `A levels VAR on integrated series can be spurious unless the series are cointegrated; in that case a vector error-correction representation is preferred. Differencing all series loses the long-run information that cointegration would preserve.`
+    ],
+    keyPoint: "A VAR lets every series depend on the lagged history of the whole system. It is the workhorse multivariate model for forecasting, causality testing and impulse-response analysis in finance and macroeconomics."
+  },
+  {
+    num: "4.8.08",
+    icon: "CI",
+    tClass: "t-bid",
+    title: "Cointegration (Engle–Granger, Johansen)",
+    sub: "Non-stationary series that share a common stochastic trend so that a linear combination is stationary",
+    formula: "yₜ, xₜ ~ I(1)  yet  yₜ − β xₜ ~ I(0)",
+    tags: [["cointegration","bid"], ["engle-granger","bid"], ["johansen",""], ["common trend",""]],
+    formulaBox: {
+      main: "β′ Yₜ ~ I(0)  while  Yₜ ~ I(1)",
+      note: "Engle–Granger: single-equation residual ADF\nJohansen: system VECM rank test (trace / max-eigen)"
+    },
+    body: [
+      `Two or more I(1) series are cointegrated if there exists a linear combination that is I(0). The combination cancels the common stochastic trend, leaving a stationary residual (the cointegrating relation). Economically this residual is often interpreted as a long-run equilibrium error.`,
+      `The Engle–Granger two-step procedure estimates the cointegrating regression by OLS and then tests the residual for a unit root. It is simple but limited to a single cointegrating vector and suffers from finite-sample bias.`,
+      `The Johansen procedure embeds the system in a vector error-correction model and tests the rank of the long-run impact matrix via trace and maximum-eigenvalue statistics. It can detect multiple cointegrating relations and supplies maximum-likelihood estimates of the cointegrating vectors.`,
+      `In finance cointegration underpins statistical-arbitrage pairs trading, the modelling of futures-spot basis, and the joint dynamics of yields along the curve. A cointegrating residual that is mean-reverting supplies a natural trading signal.`
+    ],
+    keyPoint: "Cointegration lets non-stationary series share a common trend so that a spread between them is stationary. Engle–Granger is the simple residual test; Johansen is the system maximum-likelihood framework."
+  },
+  {
+    num: "4.8.09",
+    icon: "ECM",
+    tClass: "t-bid",
+    title: "Error Correction Models (ECM)",
+    sub: "Short-run dynamics of differences plus a correction term that pulls the system back toward long-run equilibrium",
+    formula: "Δyₜ = \ldots + α (yₜ₋₁ − β xₜ₋₁) + \ldots",
+    tags: [["ecm","bid"], ["error correction","bid"], ["vecm",""], ["equilibrium",""]],
+    body: [
+      `An error-correction model expresses the change in a variable as a function of lagged changes (short-run dynamics) and of the lagged cointegrating residual (the error-correction term). The coefficient on the error-correction term measures the speed at which the variable adjusts toward the long-run equilibrium.`,
+      `The Granger representation theorem guarantees that cointegrated series possess an error-correction representation, and conversely that an error-correction representation implies cointegration. The single-equation ECM is the natural companion of the Engle–Granger procedure; the vector error-correction model (VECM) is the companion of the Johansen procedure.`,
+      `In a VECM every equation can contain the full set of cointegrating residuals. The loading matrix α determines which variables adjust and how quickly. Restrictions on α and on the cointegrating vectors β encode economic hypotheses and improve efficiency.`,
+      `Error-correction models are the standard vehicle for forecasting cointegrated systems and for quantifying the half-life of deviations from equilibrium in pairs-trading or relative-value strategies.`
+    ],
+    keyPoint: "An ECM combines short-run differenced dynamics with a long-run equilibrium correction. The adjustment coefficient tells you how fast the system returns to the cointegrating relation after a shock."
+  },
+  {
+    num: "4.8.10",
+    icon: "ℱ",
+    tClass: "t-markets",
+    title: "Spectral Analysis (Fourier Transforms)",
+    sub: "Decomposing a series into frequency components — cycles, seasonalities and the spectrum of variance",
+    formula: "Spectrum f(ω) = variance contribution at frequency ω",
+    tags: [["spectral","markets"], ["fourier","markets"], ["frequency",""], ["periodogram",""]],
+    body: [
+      `Spectral analysis views a stationary time series as a superposition of sinusoidal components of different frequencies. The power spectrum (spectral density) describes how the total variance is distributed across frequencies. Peaks in the spectrum identify dominant periodicities.`,
+      `The periodogram is the sample estimate obtained from the squared modulus of the discrete Fourier transform of the series. Smoothing the periodogram produces a consistent estimator of the spectrum. The Fast Fourier Transform makes the computation efficient even for long series.`,
+      `In finance spectral methods are used to detect intra-day periodicities, to study the frequency-domain properties of volatility, and to construct frequency-specific betas or risk measures. Filtering in the frequency domain (band-pass filters, wavelet analogues) isolates cycles of economic interest.`,
+      `The spectrum of an ARMA process is a known rational function of frequency; matching a parametric spectrum to the periodogram is an alternative estimation route. Long-memory processes are characterised by a spectrum that diverges at the origin like ω^{1−2d}.`
+    ],
+    keyPoint: "Spectral analysis shifts attention from the time domain to the frequency domain. The spectrum shows which cycles carry the variance and is the natural language for periodicity and long-memory diagnostics."
+  },
+  {
+    num: "4.8.11",
+    icon: "K",
+    tClass: "t-dynamics",
+    title: "Kalman Filter for Time Series",
+    sub: "Optimal recursive estimation of a latent state given a linear Gaussian state-space representation",
+    formula: "Predict → Update  (mean & variance)",
+    tags: [["kalman","dynamics"], ["state space","dynamics"], ["filtering",""], ["smoothing",""]],
+    formulaBox: {
+      main: "State: αₜ = T αₜ₋₁ + R ηₜ\nObs:   yₜ = Z αₜ + εₜ",
+      note: "Kalman filter: real-time mean & variance of αₜ | y₁\ldots yₜ\nSmoother: full-sample estimates\nLikelihood from prediction-error decomposition"
+    },
+    body: [
+      `The Kalman filter is the recursive algorithm that computes the minimum-MSE estimator of a latent state vector given the observations up to the current time, when both the state transition and the observation equation are linear and Gaussian. It alternates a prediction step (using the state equation) and an update step (using the new observation).`,
+      `Any linear time-series model with unobserved components (ARMA in state-space form, local-level, local-trend, time-varying regressions, dynamic factor models) can be written in state-space form and estimated by maximum likelihood via the Kalman filter. The prediction-error decomposition supplies the exact Gaussian likelihood.`,
+      `The Kalman smoother runs a backward pass to obtain estimates that condition on the entire sample. Diffuse initialisation handles non-stationary states. Extensions include the extended and unscented Kalman filters for mild non-linearity, and particle filters for fully non-linear / non-Gaussian settings.`,
+      `In finance the Kalman filter is used for yield-curve factor extraction, for time-varying beta estimation, for pairs-trading residual filtering, and for any setting in which a latent factor must be tracked in real time.`
+    ],
+    keyPoint: "The Kalman filter recursively extracts a latent linear-Gaussian state from noisy observations. It is the standard engine for likelihood evaluation, filtering and smoothing of unobserved-component time-series models."
+  },
+  {
+    num: "4.8.12",
+    icon: "SB",
+    tClass: "t-impact",
+    title: "Structural Break Tests (Chow Test)",
+    sub: "Detecting whether the parameters of a model change at a known or unknown date",
+    formula: "Chow: F-test of equal parameters across sub-samples",
+    tags: [["structural break","impact"], ["chow","impact"], ["parameter stability",""], ["change point",""]],
+    body: [
+      `A structural break is a permanent change in the parameters of the data-generating process. Ignoring breaks produces inconsistent estimates, spurious forecasts and invalid inference. The classical Chow test splits the sample at a known candidate date and compares the residual sum of squares of the restricted (full-sample) model with those of the two unrestricted sub-sample models via an F-statistic.`,
+      `When the break date is unknown one searches over all possible dates and uses the supremum of the Chow statistics (Quandt–Andrews) or related averages (AveF, ExpF). Critical values are non-standard and are obtained by simulation or from tabulated response surfaces. Bai–Perron methods extend the framework to multiple unknown breaks.`,
+      `In finance structural-break tests are applied to mean returns, to betas, to cointegrating relations, and to GARCH parameters. Documented breaks often coincide with regulatory changes, crises, or shifts in monetary-policy regimes.`,
+      `Once a break is detected the practical responses are: split the sample, introduce dummy variables or time-varying parameters, or move to an explicitly adaptive or regime-switching model.`
+    ],
+    keyPoint: "Structural-break tests ask whether the parameters stayed constant. The Chow test is the classical known-date F-test; modern procedures search for unknown and multiple break dates and are essential for robust empirical work."
+  },
+  {
+    num: "4.8.13",
+    icon: "LM",
+    tClass: "t-cost",
+    title: "Long Memory Processes (ARFIMA)",
+    sub: "Autocorrelations that decay hyperbolically rather than exponentially — persistence that lasts for long lags",
+    formula: "(1−B)^d yₜ = ARMA,  d ∈ (−0.5, 0.5)",
+    tags: [["long memory","gold"], ["arfima","gold"], ["fractional",""], ["persistence",""]],
+    formulaBox: {
+      main: "(1−B)<sup>d</sup> Φ(B) yₜ = Θ(B) εₜ",
+      note: "d = 0 → ordinary ARMA\n0 < d < 0.5 → stationary long memory\nd ≥ 0.5 → non-stationary"
+    },
+    body: [
+      `A long-memory (fractionally integrated) process has autocovariances that decay like a power of the lag rather than exponentially. The fractional differencing parameter d controls the rate: for 0 < d < ½ the process is stationary yet the autocorrelations are not summable, and the spectrum diverges at the origin.`,
+      `ARFIMA(p,d,q) extends ARIMA by allowing d to be any real number in (−½,½) for stationarity and invertibility. Estimation can be performed in the time domain (approximate or exact maximum likelihood) or in the frequency domain (Whittle likelihood). The Geweke–Porter-Hudak log-periodogram regression is a simple semi-parametric estimator of d.`,
+      `In finance absolute or squared returns, and realised-volatility series, often display long memory. FIGARCH and related models transplant the same idea into the conditional-variance equation. Distinguishing true long memory from structural breaks or from a short-memory process with a slowly changing mean remains a delicate empirical issue.`,
+      `Forecasts of long-memory processes revert to the mean more slowly than short-memory forecasts; ignoring the long-memory component therefore understates the persistence of shocks.`
+    ],
+    keyPoint: "Long-memory processes forget the past only hyperbolically. ARFIMA lets the integration order be fractional, capturing the slow decay of autocorrelations observed in many volatility and absolute-return series."
+  },
+  {
+    num: "4.8.14",
+    icon: "MS",
+    tClass: "t-ask",
+    title: "Regime-Switching Models (Markov Switching)",
+    sub: "Parameters that jump between discrete states according to a hidden Markov chain",
+    formula: "yₜ | sₜ ~ f(θ_{sₜ}),  sₜ = Markov chain",
+    tags: [["markov switching","ask"], ["regime","ask"], ["hidden markov",""], ["hamilton",""]],
+    body: [
+      `A Markov-switching model lets the parameters of an otherwise standard time-series specification depend on an unobserved discrete state that evolves according to a Markov chain. Typical applications allow the mean, the variance, or the whole AR coefficient vector to take different values in “bull” versus “bear”, or “low-vol” versus “high-vol”, regimes.`,
+      `Hamilton’s filter (an adaptation of the Kalman idea to discrete states) delivers the filtered probability of each regime given data up to t; a smoother produces the full-sample regime probabilities. The likelihood is obtained by integrating the regime path with the filter, and parameters are estimated by maximum likelihood (or by EM / Bayesian MCMC).`,
+      `Markov-switching GARCH, switching VARs and switching cointegration models extend the idea to volatility clustering, multivariate systems and long-run relations that themselves change regime. The transition probabilities can be constant or allowed to depend on covariates (time-varying transition probabilities).`,
+      `Regime-switching models capture abrupt changes that continuous parameter variation would smooth over. They are especially useful when the data-generating process is believed to alternate between a small number of distinct environments rather than to evolve gradually.`
+    ],
+    keyPoint: "Markov-switching models let the data-generating process jump between a few discrete regimes. The hidden Markov chain supplies the timing; the Hamilton filter recovers the regime probabilities and the likelihood."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

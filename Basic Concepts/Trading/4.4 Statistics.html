@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.4 Statistics</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.4 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Statistics<br><em>&amp; Inference</em></h1>
+        <div class="hdr-sub">From describing data to testing claims — the toolkit for turning samples into decisions under uncertainty</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Core Decision Framework</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">H₀ (Null)</div>
+            <div class="sw-price">No effect<br>/ status quo</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">H₁ (Alt)</div>
+            <div class="sw-price">Effect exists<br>/ difference</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">p-value</div>
+          <div class="sw-spread-val">P(data | H₀)</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">α = 0.05</div>
+          <div class="sw-mid-val">Type I risk</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">13 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.4 Statistics</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.4.01",
+    icon: "μ",
+    tClass: "t-mid",
+    title: "Descriptive Statistics",
+    sub: "Summarising a sample without yet drawing inferences about a population",
+    formula: "Mean, Median, Mode, Range, …",
+    tags: [["descriptive","mid"], ["mean","mid"], ["median",""], ["location-scale",""]],
+    splitBox: [
+      { cls: "mid",  label: "Mean", text: "Arithmetic average. Sensitive to outliers. Natural for quantities that add (returns, P&L)." },
+      { cls: "spread", label: "Median", text: "50th percentile. Robust to extremes. Preferred when the distribution is skewed or contaminated." },
+      { cls: "gold", label: "Mode", text: "Most frequent value. Useful for discrete or strongly multimodal data; less central in continuous return series." },
+      { cls: "bid",  label: "Range / IQR", text: "Range = max − min (fragile). Inter-quartile range = Q3 − Q1 (robust scale measure)." },
+    ],
+    body: [
+      `Descriptive statistics reduce a data set to a handful of numbers that capture location, scale and shape. They make no claim about a larger population; they simply describe the sample in hand.`,
+      `The arithmetic mean is the balance point of the data and the most efficient estimator of the centre under normality. The median is the middle order statistic and remains meaningful even when variance is infinite or outliers are present. The mode is the highest point of the empirical density and is most useful for categorical or discrete data.`,
+      `Scale is commonly summarised by the standard deviation, the inter-quartile range or the median absolute deviation. Shape is summarised by sample skewness and kurtosis (covered in the distributions section). Together these numbers form the first layer of any empirical analysis of returns, spreads or risk factors.`,
+      `In finance one must decide whether to describe log-returns or simple returns, whether to weight observations equally or by economic significance, and whether to winzorise or otherwise treat extremes before computing the summaries.`
+    ],
+    keyPoint: "Descriptive statistics are the map of the sample, not yet a claim about the world. Mean and standard deviation are optimal under normality; median and IQR are safer when the data are heavy-tailed or contaminated."
+  },
+  {
+    num: "4.4.02",
+    icon: "H₀",
+    tClass: "t-spread",
+    title: "Hypothesis Testing",
+    sub: "A formal framework for deciding whether data are compatible with a claimed null model",
+    formula: "H₀ vs H₁",
+    tags: [["hypothesis test","spread"], ["null","spread"], ["alternative",""], ["decision rule",""]],
+    formulaBox: {
+      main: "H₀: status-quo claim &nbsp;&nbsp; H₁: the claim you wish to establish",
+      note: "Test statistic T under H₀ → known (or simulated) distribution\nReject H₀ if T falls in the critical region (or p < α)"
+    },
+    body: [
+      `Hypothesis testing is the classical procedure for asking whether an observed effect is compatible with a null hypothesis H₀. H₀ is usually the “no effect”, “no difference” or “parameter equals a specific value” statement. The alternative H₁ is the complementary claim the researcher hopes to support.`,
+      `A test statistic is computed from the data. Under H₀ its sampling distribution is known (analytically or by simulation). Extreme values of the statistic are declared unlikely under H₀ and lead to rejection. The decision rule is calibrated so that the probability of false rejection equals a pre-chosen significance level α.`,
+      `In finance the null is often “the alpha of this strategy is zero”, “these two means are equal”, “the coefficient is zero”, or “the series is a martingale difference”. Rejection is taken as evidence that a genuine effect exists, subject to all the usual caveats about multiple testing, data-snooping and model misspecification.`,
+      `Hypothesis testing does not prove H₁; it only shows that the data are improbable under H₀. Effect size, economic significance and robustness remain separate questions.`
+    ],
+    keyPoint: "Hypothesis testing asks: ‘Are these data surprising if the null is true?’ Rejection is evidence against H₀, not automatic proof of a useful alternative."
+  },
+  {
+    num: "4.4.03",
+    icon: "p",
+    tClass: "t-cost",
+    title: "p-values and Significance Levels",
+    sub: "The probability, under the null, of a result at least as extreme as the one observed",
+    formula: "p = P(T ≥ t_obs | H₀)",
+    tags: [["p-value","gold"], ["significance","gold"], ["α",""], ["threshold",""]],
+    formulaBox: {
+      main: "p-value = P(data at least as extreme | H₀)",
+      note: "Reject H₀ if p ≤ α\nCommon α: 0.05, 0.01, 0.001\np is not P(H₀ | data)"
+    },
+    body: [
+      `The p-value is the probability, calculated under the null hypothesis, of obtaining a test statistic at least as extreme as the one actually observed. A small p-value means the data are unlikely under H₀ and supplies evidence against the null.`,
+      `The significance level α is the pre-committed threshold for rejection. If p ≤ α one rejects H₀ at level α. Conventional choices are 5 %, 1 % and 0.1 %, but the choice should reflect the cost of Type I versus Type II errors in the specific application.`,
+      `A p-value is not the probability that H₀ is true, nor the probability that H₁ is true, nor the probability that the result will replicate. It is solely a statement about the compatibility of the data with the null sampling distribution.`,
+      `In large samples even economically trivial effects produce tiny p-values. Reporting p-values without effect sizes, confidence intervals and multiple-testing adjustments is therefore incomplete and often misleading.`
+    ],
+    keyPoint: "A p-value answers: ‘If the null were true, how often would I see a result this extreme?’ It is not the probability that the null is true, and a small p does not by itself establish practical importance."
+  },
+  {
+    num: "4.4.04",
+    icon: "I/II",
+    tClass: "t-ask",
+    title: "Type I and Type II Errors",
+    sub: "The two ways a hypothesis test can be wrong — false positive and false negative",
+    formula: "α = P(Type I)  |  β = P(Type II)",
+    tags: [["type i","ask"], ["type ii","ask"], ["false positive",""], ["false negative",""]],
+    splitBox: [
+      { cls: "ask",  label: "Type I Error", text: "Reject H₀ when H₀ is true. False positive. Probability = α (significance level). Controlled directly by the chosen threshold." },
+      { cls: "mid",  label: "Type II Error", text: "Fail to reject H₀ when H₁ is true. False negative. Probability = β. Power = 1 − β. Depends on effect size, sample size and α." },
+      { cls: "gold", label: "Trade-off", text: "Lowering α reduces Type I risk but usually increases Type II risk. Larger samples improve both. The optimal balance depends on the relative costs of the two errors." },
+      { cls: "spread", label: "Finance Context", text: "Type I: declaring a spurious strategy profitable. Type II: missing a genuinely profitable strategy. Data-mining inflates Type I; low power leaves real edges undetected." },
+    ],
+    body: [
+      `Every hypothesis test can commit two kinds of error. A Type I error is the incorrect rejection of a true null (false discovery). A Type II error is the failure to reject a false null (missed discovery). The significance level α is exactly the probability of Type I error under H₀. The probability of Type II error is denoted β; statistical power is 1 − β.`,
+      `The two error rates trade off against each other for a fixed sample size. Making the test more conservative (smaller α) reduces false positives but increases false negatives. Increasing sample size reduces both error probabilities for any fixed effect size.`,
+      `In quantitative finance the cost of Type I errors is especially visible in back-testing: every spurious strategy that survives a battery of tests can allocate capital to noise. The cost of Type II errors is the opportunity cost of discarding strategies that would have worked. Multiple-testing corrections are designed primarily to control the Type I problem that arises when many hypotheses are examined at once.`
+    ],
+    keyPoint: "Type I is crying wolf; Type II is missing the wolf. α controls the first; power (and sample size and effect size) control the second. In strategy research the wolf is often a false positive born of data-snooping."
+  },
+  {
+    num: "4.4.05",
+    icon: "t",
+    tClass: "t-classes",
+    title: "t-test (One-sample, Two-sample, Paired)",
+    sub: "The classic test for means when variance is estimated from the data",
+    formula: "t = (estimate − null) / s.e.",
+    tags: [["t-test","classes"], ["means","classes"], ["one-sample",""], ["two-sample",""], ["paired",""]],
+    body: [
+      `The t-test assesses whether a mean (or a difference of means) differs from a null value when the population variance is unknown and must be estimated. The test statistic is the difference between the sample estimate and the null value, divided by the estimated standard error. Under normality (or by the CLT in large samples) the statistic follows a Student-t distribution with appropriate degrees of freedom.`,
+      `One-sample t-test: compares a single sample mean with a hypothesised value (e.g., is average alpha zero?). Two-sample (independent) t-test: compares means of two independent groups (e.g., strategy A versus strategy B on non-overlapping periods). Paired t-test: compares means of two matched samples (e.g., before/after, or the same periods under two treatments); the test is applied to the first differences.`,
+      `Equal-variance and unequal-variance (Welch) versions exist for the two-sample case. Robust and bootstrap variants relax the normality assumption. In finance the t-statistic of a regression coefficient or of an average return is the most frequently reported single number in empirical papers.`,
+      `A statistically significant t-statistic does not imply economic significance; the magnitude of the estimated mean difference and its stability out of sample remain decisive.`
+    ],
+    keyPoint: "The t-test asks whether a mean differs from a null after accounting for sampling variability estimated from the data. It is the default tool for testing average returns, alphas and coefficient significance."
+  },
+  {
+    num: "4.4.06",
+    icon: "F",
+    tClass: "t-classes",
+    title: "ANOVA",
+    sub: "Analysis of Variance — testing equality of means across more than two groups",
+    formula: "F = MS_between / MS_within",
+    tags: [["anova","classes"], ["f-test","classes"], ["group means",""], ["regression",""]],
+    body: [
+      `Analysis of Variance (ANOVA) generalises the two-sample t-test to the simultaneous comparison of means across several groups. It partitions the total sum of squares into a between-group component and a within-group component. The test statistic is the ratio of the corresponding mean squares and, under the null of equal means (and classical assumptions), follows an F distribution.`,
+      `One-way ANOVA examines a single factor; two-way and higher designs examine multiple factors and their interactions. In regression language, ANOVA is equivalent to testing a set of linear restrictions on the coefficients of a linear model with dummy variables for groups.`,
+      `In finance ANOVA (or its regression equivalent) is used to test whether mean returns differ across categories (sectors, rating buckets, calendar months, volatility regimes, etc.). Post-hoc pairwise tests after a significant overall F require multiple-comparison adjustments.`,
+      `Assumptions include independence, normality (or large samples) and, for classical ANOVA, homogeneity of variance. Robust, rank-based and bootstrap ANOVA procedures exist when those assumptions fail.`
+    ],
+    keyPoint: "ANOVA tests whether several group means are simultaneously equal. It is the multi-group extension of the t-test and the classical gateway to studying categorical effects on returns or risk."
+  },
+  {
+    num: "4.4.07",
+    icon: "CI",
+    tClass: "t-bid",
+    title: "Confidence Intervals",
+    sub: "A range of plausible values for a parameter, calibrated to cover the true value with prescribed probability",
+    formula: "θ̂ ± c × s.e.(θ̂)",
+    tags: [["confidence interval","bid"], ["interval estimate","bid"], ["coverage",""], ["precision",""]],
+    formulaBox: {
+      main: "CI = estimate ± critical value × standard error",
+      note: "95% CI: in repeated samples, 95% of such intervals\ncontain the true parameter\nWidth reflects precision; centre reflects estimate"
+    },
+    body: [
+      `A confidence interval is an interval estimate of a parameter constructed so that, in repeated sampling, a prescribed fraction (the confidence level) of such intervals will contain the true value. The most common level is 95 %.`,
+      `For a scalar parameter the interval is typically centred at the point estimate and extends a multiple of the standard error in each direction. The multiple is taken from the appropriate quantile of the reference distribution (normal, t, etc.). Bootstrap and likelihood-based intervals provide alternatives when analytic standard errors are unreliable.`,
+      `Confidence intervals convey more information than a binary reject/do-not-reject decision: they show both the magnitude of the estimate and the precision with which it is known. A statistically significant result whose confidence interval is wide may still be practically uninformative.`,
+      `Misinterpretation is common. A 95 % CI does not mean that the probability the parameter lies inside the realised interval is 95 %; the parameter is fixed and the interval is random. The coverage statement is about the long-run frequency of the procedure.`
+    ],
+    keyPoint: "A confidence interval reports a range of parameter values compatible with the data at a chosen confidence level. It displays both the estimate and its uncertainty — superior to a lone p-value."
+  },
+  {
+    num: "4.4.08",
+    icon: "ブーツ",
+    tClass: "t-dynamics",
+    title: "Bootstrapping",
+    sub: "Resampling the observed data with replacement to approximate the sampling distribution of any statistic",
+    formula: "Resample → recompute statistic → repeat",
+    tags: [["bootstrap","dynamics"], ["resampling","dynamics"], ["nonparametric",""], ["standard error",""]],
+    body: [
+      `The bootstrap approximates the sampling distribution of a statistic by drawing repeated samples with replacement from the observed data and recomputing the statistic on each resample. The empirical distribution of the recomputed values estimates the unknown true sampling distribution.`,
+      `It yields standard errors, confidence intervals and hypothesis tests without requiring analytic formulae or strong parametric assumptions. Variants include the nonparametric bootstrap, the parametric bootstrap, the block bootstrap (for dependent time series), and the wild bootstrap (for heteroskedastic residuals).`,
+      `In finance the bootstrap is used to obtain confidence intervals for Sharpe ratios, drawdowns, alpha, and virtually any performance metric whose analytic sampling distribution is intractable. It is also the engine behind many multiple-testing adjustments and reality-check procedures.`,
+      `The ordinary i.i.d. bootstrap fails when observations are serially dependent; block or stationary bootstraps that resample contiguous blocks are then required. The quality of the approximation still depends on sample size and on the smoothness of the statistic.`
+    ],
+    keyPoint: "Bootstrapping lets the data speak about the uncertainty of any statistic by resampling themselves. It is the most versatile practical tool for standard errors and confidence intervals when analytic theory is unavailable."
+  },
+  {
+    num: "4.4.09",
+    icon: "π",
+    tClass: "t-dynamics",
+    title: "Permutation Tests",
+    sub: "Exact (or approximate) tests obtained by randomly rearranging labels or observations under the null",
+    formula: "Shuffle labels → recompute statistic → rank the observed value",
+    tags: [["permutation","dynamics"], ["exact test","dynamics"], ["randomisation",""], ["nonparametric",""]],
+    body: [
+      `A permutation test constructs the null distribution of a test statistic by randomly permuting the data in a way that would leave the statistic’s distribution unchanged if the null were true. The observed statistic is then ranked among the permuted values; the p-value is the fraction of permutations that produce a statistic at least as extreme.`,
+      `When every possible permutation can be enumerated the test is exact. When the number of permutations is huge, a large random sample of permutations yields a Monte-Carlo approximation of arbitrary accuracy.`,
+      `Permutation tests require minimal distributional assumptions and automatically respect the dependence structure that is preserved by the chosen permutation scheme. They are particularly natural for testing independence, equality of distributions, or the significance of a correlation or regression coefficient under exchangeability.`,
+      `In finance they appear in tests of technical-trading rules, in assessing whether a signal has genuine predictive power, and as a building block of White’s reality check and related data-snooping diagnostics.`
+    ],
+    keyPoint: "Permutation tests build the null distribution by shuffling the data themselves. They deliver exact or near-exact p-values with almost no parametric assumptions — ideal when exchangeability under the null is credible."
+  },
+  {
+    num: "4.4.10",
+    icon: "m",
+    tClass: "t-ask",
+    title: "Multiple Testing Problem",
+    sub: "When many hypotheses are tested, the chance of at least one false positive rises dramatically",
+    formula: "Family-wise error & False Discovery Rate",
+    tags: [["multiple testing","ask"], ["bonferroni","ask"], ["benjamini-hochberg",""], ["fdr",""]],
+    formulaBox: {
+      main: "Bonferroni: α / m &nbsp;&nbsp;|&nbsp;&nbsp; BH: control FDR",
+      note: "m = number of tests\nFamily-wise error rate (FWER) = P(at least one false positive)\nFalse discovery rate (FDR) = expected fraction of false positives among rejections"
+    },
+    splitBox: [
+      { cls: "ask",  label: "Bonferroni", text: "Replace α by α/m. Controls the family-wise error rate strongly. Simple but conservative; power falls rapidly with m." },
+      { cls: "spread", label: "Benjamini–Hochberg", text: "Orders p-values and compares them with a linear threshold. Controls the false discovery rate. More powerful than Bonferroni when many hypotheses are true." },
+      { cls: "gold", label: "FWER vs FDR", text: "FWER = probability of any false positive. FDR = expected proportion of false positives among the rejected hypotheses. FDR is usually the more relevant target when many discoveries are examined." },
+      { cls: "mid",  label: "Why it matters", text: "Testing 100 independent true nulls at α = 0.05 produces an expected 5 false positives. Without correction, ‘significant’ results appear by chance alone." },
+    ],
+    body: [
+      `When m hypothesis tests are performed, each with Type I error rate α, the probability of at least one false rejection grows with m. Even if every null is true, the expected number of false positives is mα. This is the multiple-testing problem.`,
+      `Classical corrections control the family-wise error rate (FWER) — the probability of one or more false positives. The Bonferroni correction divides α by m; it is simple and valid under arbitrary dependence but becomes extremely conservative for large m. Step-down and step-up procedures (Holm, Hochberg, etc.) improve power while still controlling FWER.`,
+      `The Benjamini–Hochberg procedure controls the false discovery rate (FDR) — the expected proportion of false positives among all rejected hypotheses. It is less conservative than FWER methods and is the default in many high-dimensional settings.`,
+      `Any empirical study that examines many strategies, many assets, many parameters or many subgroups without a multiple-testing adjustment is reporting an inflated rate of false discoveries.`
+    ],
+    keyPoint: "Test enough true nulls and you will obtain statistically significant results by chance. Bonferroni and Benjamini–Hochberg are the standard remedies that restore control of false positives."
+  },
+  {
+    num: "4.4.11",
+    icon: "BT",
+    tClass: "t-impact",
+    title: "Multiple Comparisons in Backtesting",
+    sub: "Data-snooping bias — the special form of multiple testing that arises when many strategies are tried on the same history",
+    formula: "Reality Check / SPA / Deflated Sharpe",
+    tags: [["backtesting","impact"], ["data-snooping","impact"], ["reality check",""], ["overfitting",""]],
+    body: [
+      `Back-testing hundreds or thousands of trading rules on a single historical sample is a massive multiple-testing exercise. The best-performing rule’s in-sample Sharpe ratio is an order statistic, not a typical realisation; its expected value under the null of no predictability is far above zero. Ignoring this selection produces severe data-snooping bias.`,
+      `White’s Reality Check, Hansen’s Superior Predictive Ability (SPA) test, and the deflated Sharpe ratio of Bailey & López de Prado are formal procedures that adjust for the universe of strategies actually examined (or a plausible upper bound on that universe). They ask whether the best observed performance remains significant once the multiple comparisons are taken into account.`,
+      `Practical safeguards include: pre-specifying the strategy universe, using genuine out-of-sample periods that were never touched during research, cross-validation schemes that respect temporal order, and reporting the number of trials alongside the headline performance.`,
+      `The problem is not merely statistical; it is cultural. A research process that keeps searching until a significant result appears will almost surely find one, even when no genuine edge exists. The multiple-comparisons lens makes that fact quantitative.`
+    ],
+    keyPoint: "Every back-test that selects the best of many tried strategies is a multiple-testing problem. Without adjustment, the published Sharpe is inflated by selection bias — often dramatically."
+  },
+  {
+    num: "4.4.12",
+    icon: "1−β",
+    tClass: "t-bid",
+    title: "Statistical Power",
+    sub: "The probability of correctly rejecting a false null — sensitivity to a real effect",
+    formula: "Power = 1 − β = P(reject H₀ | H₁ true)",
+    tags: [["power","bid"], ["sample size","bid"], ["sensitivity",""], ["design",""]],
+    body: [
+      `Statistical power is the probability that a test will reject the null when the alternative is true. High power means the test is sensitive to the effect of interest; low power means genuine effects are frequently missed.`,
+      `Power increases with sample size, with the size of the true effect, and with the significance level α; it decreases with the noise level (standard deviation) of the data. Power calculations performed before an experiment (a priori) guide sample-size planning; post-hoc power calculations are largely uninformative and discouraged.`,
+      `In finance many published studies are under-powered: the combination of noisy returns, short samples and small expected edges yields only a modest chance of detecting a true effect even when it exists. Conversely, very large samples can detect tiny effects that lack economic relevance.`,
+      `Designing a study with adequate power is as important as controlling Type I error. A low-powered test that fails to reject is inconclusive; a low-powered test that does reject may have overstated the effect (winner’s curse).`
+    ],
+    keyPoint: "Power is the chance of detecting a real effect. Under-powered studies both miss true edges and, when they do reject, tend to exaggerate them. Sample size, effect size and noise jointly determine power."
+  },
+  {
+    num: "4.4.13",
+    icon: "δ",
+    tClass: "t-gold",
+    title: "Effect Size Estimation",
+    sub: "Quantifying the magnitude of an effect, not merely its statistical significance",
+    formula: "Cohen’s d, Sharpe, R², …",
+    tags: [["effect size","gold"], ["magnitude","gold"], ["economic significance",""], ["practical",""]],
+    body: [
+      `Effect size measures how large an effect is, independently of sample size. While a p-value answers “is there evidence against the null?”, an effect-size estimate answers “how big is the difference or the relationship?”.`,
+      `Common standardised effect sizes include Cohen’s d (mean difference divided by a pooled standard deviation), Pearson’s r or R² in regression, odds ratios, and, in finance, annualised Sharpe ratios, information ratios, and alpha in percent per year. Unstandardised effect sizes (raw mean differences, basis-point returns) are often more interpretable for decision-making.`,
+      `Because statistical significance is almost automatic in sufficiently large samples, effect-size reporting is essential for distinguishing economically meaningful results from trivial ones. Confidence intervals around effect-size estimates further communicate precision.`,
+      `In strategy research the relevant effect size is usually a risk-adjusted return or a certainty-equivalent gain after costs. A result can be highly significant and still too small to survive transaction costs, slippage or capacity constraints.`
+    ],
+    keyPoint: "Statistical significance is not economic significance. Effect-size estimates (and their confidence intervals) tell you whether a detected difference is large enough to matter."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

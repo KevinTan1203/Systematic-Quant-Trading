@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.5 Linear Algebra</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.5 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Linear<br><em>Algebra</em></h1>
+        <div class="hdr-sub">The language of portfolios, risk, factors and optimisation — vectors, matrices and the decompositions that make them usable</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Portfolio Risk Identity</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Quadratic Form</div>
+            <div class="sw-price">wᵀ Σ w</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">PCA / SVD</div>
+            <div class="sw-price">Factors</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Cholesky</div>
+          <div class="sw-spread-val">Σ = L Lᵀ</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Eigen</div>
+          <div class="sw-mid-val">Σ v = λ v</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">12 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.5 Linear Algebra</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.5.01",
+    icon: "v",
+    tClass: "t-mid",
+    title: "Vectors and Matrices",
+    sub: "The basic objects — ordered lists of numbers and rectangular arrays that organise them",
+    formula: "x ∈ ℝⁿ  |  A ∈ ℝ^{m×n}",
+    tags: [["vector","mid"], ["matrix","mid"], ["dimension",""], ["linear map",""]],
+    body: [
+      `A vector is an ordered list of numbers; in finance it typically represents a portfolio of weights, a time series of returns, or a set of factor exposures. A matrix is a rectangular array of numbers that can represent a collection of vectors, a linear transformation, a covariance structure, or a data set (observations × variables).`,
+      `Dimension matters. An n-vector lives in ℝⁿ. An m × n matrix maps ℝⁿ to ℝᵐ. Square matrices (n × n) are special because they map a space to itself and can possess inverses, eigenvalues and determinants.`,
+      `Notation conventions in quant finance are fairly standard: bold lower-case for vectors (w, r), bold upper-case or Greek for matrices (Σ, A, X), and plain scalars. The transpose operator turns a column vector into a row (and vice versa) and is written wᵀ or w′.`,
+      `Almost every calculation in portfolio theory, risk management and factor modelling is an operation on vectors and matrices: dot products for portfolio returns, matrix–vector products for residual calculation, quadratic forms for variance, and decompositions for simulation and dimensionality reduction.`
+    ],
+    keyPoint: "Vectors hold quantities; matrices organise relationships among them. Portfolio weights, returns, covariances and factor loadings are all vectors or matrices — linear algebra is the native language of quantitative finance."
+  },
+  {
+    num: "4.5.02",
+    icon: "×",
+    tClass: "t-spread",
+    title: "Matrix Multiplication",
+    sub: "The fundamental operation that composes linear maps and computes portfolio quantities",
+    formula: "(AB)_{ij} = Σ_k A_{ik} B_{kj}",
+    tags: [["multiplication","spread"], ["composition","spread"], ["dot product",""], ["associative",""]],
+    formulaBox: {
+      main: "C = A B  with  c<sub>ij</sub> = Σ<sub>k</sub> a<sub>ik</sub> b<sub>kj</sub>",
+      note: "A (m×n) × B (n×p) → C (m×p)\nNot commutative: AB ≠ BA in general\nAssociative: (AB)C = A(BC)"
+    },
+    body: [
+      `Matrix multiplication is defined so that it corresponds to composition of linear transformations. The (i,j) entry of the product AB is the dot product of the i-th row of A with the j-th column of B. The inner dimensions must match; the outer dimensions become the shape of the result.`,
+      `Special cases are ubiquitous. A matrix–vector product Ax applies the linear map A to the vector x. A row vector times a matrix produces a linear combination of the rows. The product XᵀX (or X Xᵀ) appears in least squares and in covariance estimation.`,
+      `Multiplication is associative but not commutative. The order of factors matters: risk models, factor attributions and change-of-basis calculations all depend on writing the matrices in the correct sequence.`,
+      `In code and in proofs one constantly uses the distributive law A(B+C) = AB + AC and the transpose rule (AB)ᵀ = Bᵀ Aᵀ. These identities keep larger expressions manageable.`
+    ],
+    keyPoint: "Matrix multiplication composes linear maps and is the arithmetic engine behind portfolio returns, residual calculations, and almost every multi-asset formula. Order matters; AB is rarely equal to BA."
+  },
+  {
+    num: "4.5.03",
+    icon: "ᵀ",
+    tClass: "t-cost",
+    title: "Transpose, Inverse, Determinant",
+    sub: "Three fundamental matrix operations — flipping, undoing, and measuring volume scaling",
+    formula: "Aᵀ, A⁻¹, det(A)",
+    tags: [["transpose","gold"], ["inverse","gold"], ["determinant","gold"], ["invertibility",""]],
+    formulaBox: {
+      main: "(Aᵀ)_{ij} = A<sub>ji</sub> &nbsp;&nbsp;|&nbsp;&nbsp; A A⁻¹ = I &nbsp;&nbsp;|&nbsp;&nbsp; det(A)",
+      note: "A invertible ⇔ det(A) ≠ 0 ⇔ full rank\n(Aᵀ)⁻¹ = (A⁻¹)ᵀ\ndet(AB) = det(A) det(B)"
+    },
+    body: [
+      `The transpose Aᵀ is obtained by swapping rows and columns. For real matrices it is the adjoint with respect to the ordinary dot product. Symmetric matrices satisfy Aᵀ = A and are the natural objects for covariance and precision matrices.`,
+      `The inverse A⁻¹ is the unique matrix (when it exists) such that A A⁻¹ = A⁻¹ A = I. It undoes the linear map A. A matrix is invertible if and only if it is square and full rank (equivalently, its determinant is non-zero, or zero is not an eigenvalue).`,
+      `The determinant det(A) is a scalar that encodes the signed volume scaling produced by the linear map A. It is zero precisely when the matrix is singular. For 2×2 and 3×3 matrices there are simple explicit formulae; for larger matrices one uses decompositions (LU, QR, etc.) rather than the classical definition.`,
+      `In portfolio mathematics the inverse of a covariance matrix appears in mean-variance optimisation and in the precision matrix of Gaussian graphical models. Numerical inversion of large, poorly conditioned covariance matrices is a central practical problem and motivates regularisation and factor structures.`
+    ],
+    keyPoint: "Transpose flips orientation, the inverse undoes a map, and the determinant tells you whether the map collapses volume. Invertibility is equivalent to full rank — a condition that real-world covariance matrices often approach but do not safely attain."
+  },
+  {
+    num: "4.5.04",
+    icon: "λ",
+    tClass: "t-spread",
+    title: "Eigenvalues and Eigenvectors",
+    sub: "Directions that a matrix stretches or shrinks without rotating — the intrinsic axes of a linear map",
+    formula: "A v = λ v",
+    tags: [["eigenvalue","spread"], ["eigenvector","spread"], ["spectral","mid"], ["diagonalisation",""]],
+    formulaBox: {
+      main: "A v = λ v &nbsp;&nbsp;⇔&nbsp;&nbsp; (A − λ I) v = 0",
+      note: "λ = eigenvalue, v = eigenvector (v ≠ 0)\nFor symmetric A: real λ, orthogonal v’s\nΣ = V Λ Vᵀ  (spectral decomposition)"
+    },
+    body: [
+      `An eigenvector of a square matrix A is a non-zero vector that A maps to a scalar multiple of itself. The scalar is the corresponding eigenvalue. Geometrically, eigenvectors are the axes along which the linear map acts by pure scaling.`,
+      `For a real symmetric matrix (in particular any covariance matrix) all eigenvalues are real and there exists a full set of orthonormal eigenvectors. The matrix can therefore be written A = V Λ Vᵀ where Λ is diagonal and V is orthogonal. This spectral decomposition is the foundation of PCA and of many risk-model constructions.`,
+      `Eigenvalues of a covariance matrix are the variances of the data when projected onto the corresponding principal axes. Large eigenvalues identify high-variance directions (market mode, sector modes); small eigenvalues identify low-variance or noisy directions. The condition number (ratio of largest to smallest eigenvalue) measures how ill-conditioned the matrix is.`,
+      `Negative eigenvalues in an estimated covariance matrix signal a loss of positive-semidefiniteness and must be repaired (eigenvalue clipping, nearest-correlation-matrix algorithms, etc.) before the matrix can be used in optimisation or simulation.`
+    ],
+    keyPoint: "Eigenvectors are the preferred axes of a matrix; eigenvalues are the stretch factors along those axes. For covariance matrices they are the variances of the principal components and the diagnostic of matrix health."
+  },
+  {
+    num: "4.5.05",
+    icon: "PC",
+    tClass: "t-classes",
+    title: "PCA (Principal Component Analysis)",
+    sub: "Rotating data onto orthogonal axes ordered by variance — the workhorse of dimensionality reduction and factor extraction",
+    formula: "Σ = V Λ Vᵀ  →  principal components",
+    tags: [["pca","classes"], ["dimensionality","classes"], ["factors",""], ["variance explained",""]],
+    body: [
+      `Principal Component Analysis finds an orthogonal coordinate system in which successive coordinates explain the maximum remaining variance of the data. Computationally it is the spectral decomposition of the sample covariance (or correlation) matrix: the eigenvectors are the principal-component loadings and the eigenvalues are the variances along those directions.`,
+      `The first principal component is the linear combination of the original variables that has the largest variance; the second is the highest-variance combination orthogonal to the first; and so on. In equity markets the first PC is typically a market mode (all loadings positive); subsequent PCs often correspond to sector or style contrasts.`,
+      `PCA is used for dimensionality reduction (retain the first k components that explain most of the variance), for noise reduction (discard the smallest-eigenvalue directions), for constructing statistical factor models, and for visualising high-dimensional return data.`,
+      `PCA does not know about economic labels; the components are purely statistical. Interpretation requires additional work (rotation, regression on known factors, etc.). Scaling of the input variables (covariance vs correlation PCA) materially affects the result when variables have different units or volatilities.`
+    ],
+    keyPoint: "PCA re-expresses data in an orthogonal basis ordered by variance. It is the fastest way to extract the dominant statistical factors from a covariance matrix and to decide how many dimensions actually matter."
+  },
+  {
+    num: "4.5.06",
+    icon: "SVD",
+    tClass: "t-classes",
+    title: "Singular Value Decomposition (SVD)",
+    sub: "The most general matrix factorisation — works for any shape and reveals rank, range and null space",
+    formula: "A = U Σ Vᵀ",
+    tags: [["svd","classes"], ["singular values","classes"], ["rank",""], ["pseudoinverse",""]],
+    formulaBox: {
+      main: "A = U Σ Vᵀ",
+      note: "U, V orthogonal; Σ diagonal (singular values ≥ 0)\nWorks for rectangular matrices\nRank = number of positive singular values"
+    },
+    body: [
+      `The singular value decomposition expresses any real m × n matrix as the product of an orthogonal matrix U, a rectangular diagonal matrix Σ of non-negative singular values, and another orthogonal matrix Vᵀ. It is the generalisation of the spectral decomposition to non-square and non-symmetric matrices.`,
+      `Singular values measure the stretch factors of the linear map in the appropriate orthonormal bases. The number of strictly positive singular values is the rank of the matrix. The columns of U and V associated with positive singular values span the column and row spaces; those associated with zero singular values span the left and right null spaces.`,
+      `SVD is the algorithm of choice for computing the Moore–Penrose pseudoinverse, for low-rank approximation (Eckart–Young theorem), for total-least-squares problems, and for stable solutions of rank-deficient least-squares problems. In finance it appears in statistical arbitrage (cointegration / factor extraction from return matrices), in robust covariance estimation, and in the analysis of large data matrices.`,
+      `Because every matrix possesses an SVD, the decomposition is a universal diagnostic: a rapid decay of singular values signals that the matrix is effectively low-rank and that a reduced representation will capture most of the action.`
+    ],
+    keyPoint: "SVD is the Swiss-army-knife factorisation of any matrix. It reveals rank, supplies optimal low-rank approximations, and underpins the stable computation of pseudoinverses and principal components of rectangular data."
+  },
+  {
+    num: "4.5.07",
+    icon: "L",
+    tClass: "t-bid",
+    title: "Cholesky Decomposition",
+    sub: "Factoring a positive-definite matrix into a lower-triangular times its transpose — the gateway to simulation and efficient solves",
+    formula: "Σ = L Lᵀ",
+    tags: [["cholesky","bid"], ["positive definite","bid"], ["simulation",""], ["covariance",""]],
+    formulaBox: {
+      main: "Σ = L Lᵀ  (L lower-triangular)",
+      note: "Exists ⇔ Σ symmetric positive definite\nUsed for: correlated Monte Carlo, solving Σx = b\nTwice as fast as LU for SPD matrices"
+    },
+    body: [
+      `The Cholesky decomposition writes a symmetric positive-definite matrix as the product of a lower-triangular matrix L and its transpose. It is unique when the diagonal of L is required to be positive. The algorithm is approximately twice as fast as general LU factorisation and is numerically stable for positive-definite inputs.`,
+      `In risk management and Monte Carlo the Cholesky factor turns independent standard normals Z into correlated normals via X = L Z, so that Cov(X) = L Lᵀ = Σ. This is the standard way to generate correlated asset-return scenarios from a given covariance matrix.`,
+      `Cholesky is also the preferred method for solving linear systems Σx = b when Σ is a covariance or Gram matrix: one solves L y = b by forward substitution and then Lᵀ x = y by back substitution. Mean-variance optimisers and many Gaussian-process calculations rely on this pattern.`,
+      `If the input matrix is only positive semi-definite or is indefinite because of estimation noise, the classical Cholesky algorithm fails. Practitioners then use pivoted or modified Cholesky routines, eigenvalue clipping, or switch to an SVD/QR approach.`
+    ],
+    keyPoint: "Cholesky turns a covariance matrix into a triangular factor that generates correlated shocks and solves linear systems efficiently. It exists precisely when the matrix is symmetric positive definite — the algebraic definition of a usable covariance matrix."
+  },
+  {
+    num: "4.5.08",
+    icon: "Ax",
+    tClass: "t-dynamics",
+    title: "Linear Systems and Solving Ax = b",
+    sub: "The central computational problem of linear algebra — finding x that realises a prescribed image under A",
+    formula: "A x = b",
+    tags: [["linear system","dynamics"], ["solve","dynamics"], ["lu","qr",""], ["least squares",""]],
+    body: [
+      `Solving the linear system A x = b is the most common numerical task in linear algebra. When A is square and invertible there is a unique solution. When A is rectangular or rank-deficient one looks for least-squares solutions (minimise ‖A x − b‖) or minimum-norm solutions among the minimisers.`,
+      `Dense square systems are usually solved by LU factorisation with partial pivoting (Gaussian elimination). Symmetric positive-definite systems use Cholesky. Over-determined least-squares problems are solved by QR factorisation or by the normal equations (with caution about conditioning). Under-determined systems use the pseudoinverse or sparse-optimisation techniques.`,
+      `In finance linear systems appear in portfolio construction (risk-model equations, constraint projections), in the calibration of yield curves, in the solution of discrete-time Riccati equations, and in the computation of regression coefficients. Ill-conditioning is the perpetual practical enemy: a large condition number amplifies input noise into large errors in x.`,
+      `Iterative methods (conjugate gradient, GMRES, etc.) become attractive when A is large and sparse or when only matrix–vector products are available. Regularisation (ridge, truncated SVD) is added when the naïve solution is unstable.`
+    ],
+    keyPoint: "Solving Ax = b is the workhorse computation of quantitative finance. The art lies in choosing a factorisation that respects the structure and conditioning of A, and in regularising when the system is nearly singular."
+  },
+  {
+    num: "4.5.09",
+    icon: "P",
+    tClass: "t-markets",
+    title: "Projection Matrices",
+    sub: "Idempotent matrices that map every vector onto a subspace — the geometry of least squares and residualisation",
+    formula: "P² = P  |  P = X(XᵀX)⁻¹Xᵀ",
+    tags: [["projection","markets"], ["idempotent","markets"], ["residuals",""], ["hat matrix",""]],
+    formulaBox: {
+      main: "P = X (Xᵀ X)⁻¹ Xᵀ &nbsp;&nbsp;(orthogonal projection onto col(X))",
+      note: "P² = P, Pᵀ = P\nM = I − P  (residual maker)\nŷ = P y,  e = M y"
+    },
+    body: [
+      `A projection matrix satisfies P² = P. Orthogonal projections additionally satisfy Pᵀ = P and project onto a subspace along its orthogonal complement. The most important example in statistics is the hat matrix P = X(XᵀX)⁻¹Xᵀ of a linear regression, which projects the response vector onto the column space of the design matrix.`,
+      `The complementary residual-maker matrix M = I − P projects onto the orthogonal complement of the column space and produces the regression residuals. Many algebraic identities in econometrics (Frisch–Waugh–Lovell theorem, partitioned regression, etc.) are statements about these two projections.`,
+      `In portfolio construction, projections appear when one residualises returns against a set of factors, when one imposes linear constraints via projection onto the constraint null-space, and when one orthogonalises a set of signals. The geometry is always the same: drop the component that lives in a prescribed subspace.`,
+      `Rank-deficient X requires a pseudoinverse in the formula for P; the resulting matrix is still the orthogonal projection onto the column space of X.`
+    ],
+    keyPoint: "Projection matrices implement the geometric act of ‘keeping only the part that lives in a given subspace’. Residualisation, constrained optimisation and the hat matrix of regression are all projections."
+  },
+  {
+    num: "4.5.10",
+    icon: "wᵀΣw",
+    tClass: "t-bid",
+    title: "Quadratic Forms",
+    sub: "The scalar wᵀ Σ w — portfolio variance and the fundamental link between weights and risk",
+    formula: "σ_p² = wᵀ Σ w",
+    tags: [["quadratic form","bid"], ["portfolio variance","bid"], ["risk","gold"], ["optimisation",""]],
+    formulaBox: {
+      main: "σ<sub>p</sub>² = wᵀ Σ w = Σ<sub>i,j</sub> w<sub>i</sub> w<sub>j</sub> Σ<sub>ij</sub>",
+      note: "Σ positive (semi)definite ⇒ σ_p² ≥ 0\nGradient wrt w: 2 Σ w\nAppears in every mean-variance objective"
+    },
+    body: [
+      `A quadratic form in a vector w is an expression wᵀ A w for a symmetric matrix A. When A is a covariance matrix Σ the quadratic form is exactly the variance of the portfolio with weights w. Expanding the product recovers the familiar sum of weighted variances and covariances.`,
+      `Because a covariance matrix is positive semi-definite, the quadratic form is always non-negative — portfolio variance cannot be negative. The set of portfolios with variance below a given level is an ellipsoid (or a cylinder if Σ is singular) in weight space; this geometry underlies mean-variance optimisation and risk budgeting.`,
+      `The gradient of wᵀ Σ w with respect to w is 2 Σ w. Setting gradients to zero (together with constraints) produces the classic linear systems that characterise minimum-variance and mean-variance portfolios. Second-derivative (Hessian) information is simply 2 Σ, which is why Newton-type optimisers are natural for these problems.`,
+      `Quadratic forms also appear in the Mahalanobis distance, in Gaussian log-likelihoods, and in the objective functions of many regularised estimators. Understanding their definiteness and conditioning is therefore central to both risk measurement and statistical estimation.`
+    ],
+    keyPoint: "Portfolio variance is the quadratic form wᵀ Σ w. It is the single most important scalar that linear algebra supplies to finance — the bridge between a vector of weights and a number called risk."
+  },
+  {
+    num: "4.5.11",
+    icon: "⊥",
+    tClass: "t-dynamics",
+    title: "Orthogonalization (Gram-Schmidt)",
+    sub: "Building an orthonormal basis from a linearly independent set — successive residualisation",
+    formula: "q₁, q₂, … via successive projection",
+    tags: [["gram-schmidt","dynamics"], ["orthonormal","dynamics"], ["qr",""], ["residualisation",""]],
+    body: [
+      `Gram–Schmidt orthogonalisation converts a linearly independent set of vectors into an orthonormal set that spans the same subspace. At each step one subtracts from the next vector its projections onto all previously obtained orthonormal vectors, then normalises the residual.`,
+      `The process is precisely successive residualisation: each new vector is cleaned of any component that lives in the span of the earlier ones. In matrix form the same idea yields the QR factorisation A = Q R, where Q has orthonormal columns and R is upper-triangular.`,
+      `In quantitative finance Gram–Schmidt (or its numerically stable variants — modified Gram–Schmidt, Householder QR) is used to orthogonalise a set of factor returns or signals, to construct residual portfolios, and as the engine of least-squares solvers. Orthogonal factors simplify risk attribution because their covariance matrix is diagonal.`,
+      `Classical Gram–Schmidt is numerically unstable in finite precision; serious implementations use modified Gram–Schmidt or, better, Householder reflections or Givens rotations that achieve the same QR factorisation with superior stability.`
+    ],
+    keyPoint: "Gram–Schmidt builds orthonormality by successive residualisation. It is the algorithmic embodiment of ‘remove from this vector everything already explained by the previous ones’ — the same geometry that underlies residual factor models and QR solvers."
+  },
+  {
+    num: "4.5.12",
+    icon: "r",
+    tClass: "t-ask",
+    title: "Rank Deficiency Issues",
+    sub: "When a matrix does not have full rank — singularity, multicollinearity and the practical failures they cause",
+    formula: "rank(A) < min(m, n)",
+    tags: [["rank","ask"], ["singularity","ask"], ["multicollinearity",""], ["ill-conditioned",""]],
+    splitBox: [
+      { cls: "ask",  label: "Exact Rank Deficiency", text: "det(A) = 0, zero eigenvalue, non-invertible. Linear systems have either no solution or infinitely many. Covariance matrices estimated from fewer observations than assets are singular." },
+      { cls: "gold", label: "Near Rank Deficiency", text: "Tiny eigenvalues, huge condition number. Inversion amplifies noise. Optimisers return extreme, unstable weights. Multicollinear regressors produce large coefficient standard errors." },
+      { cls: "mid",  label: "Finance Manifestations", text: "Sample covariance of N assets with T < N observations. Highly correlated instruments (on-the-run vs off-the-run, futures vs cash). Factor models with redundant factors." },
+      { cls: "spread", label: "Remedies", text: "Pseudoinverse / truncated SVD. Shrinkage and factor structures. Ridge / elastic-net regularisation. Dropping or combining collinear variables. Increasing effective sample size." },
+    ],
+    body: [
+      `A matrix is rank-deficient when its columns (or rows) are linearly dependent. The rank is the dimension of the column space; anything less than the smaller of the two dimensions means information is missing and certain linear systems become singular.`,
+      `In statistics and finance the most common source is a sample covariance matrix computed from fewer time-series observations than assets: the matrix has rank at most T−1 and is therefore singular in high dimension. Multicollinearity among predictors produces the same phenomenon in regression design matrices.`,
+      `Exact singularity makes inversion impossible. Near singularity (a continuum of tiny eigenvalues) makes inversion numerically unstable: small changes in the input produce large swings in the output. Mean-variance optimisers respond by placing enormous long–short positions on the near-null directions — the classic “error-maximisation” problem.`,
+      `Practical remedies include dimensionality reduction (PCA, factor models), shrinkage toward a structured target, ridge-type regularisation, the Moore–Penrose pseudoinverse, and simply reducing the number of free variables. Diagnosing rank and condition number should be a routine step before any matrix inversion or quadratic optimisation.`
+    ],
+    keyPoint: "Rank deficiency is the algebraic expression of ‘not enough independent information’. It turns inversion into a fiction and optimisation into an error amplifier. Detecting and regularising it is a permanent practical necessity in high-dimensional finance."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

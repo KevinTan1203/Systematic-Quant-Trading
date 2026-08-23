@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.6 Optimization</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.6 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Optimization<br><em>&amp; Solvers</em></h1>
+        <div class="hdr-sub">Finding the best feasible point — from convex programmes and mean-variance to gradients, robustness and evolutionary search</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Canonical Portfolio Problem</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Objective</div>
+            <div class="sw-price">min wᵀΣw</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">or max</div>
+            <div class="sw-price">μᵀw − λ wᵀΣw</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Constraints</div>
+          <div class="sw-spread-val">1ᵀw = 1, bounds, …</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">KKT / Convex</div>
+          <div class="sw-mid-val">Global optimum</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">12 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.6 Optimization</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.6.01",
+    icon: "∪",
+    tClass: "t-bid",
+    title: "Convex Optimization",
+    sub: "The gold-standard class of problems — every local minimum is global and efficient algorithms exist",
+    formula: "min f(x)  s.t.  x ∈ C  (C convex, f convex)",
+    tags: [["convex","bid"], ["global optimum","bid"], ["tractable",""], ["cvxpy",""]],
+    formulaBox: {
+      main: "min f(x) subject to x ∈ C",
+      note: "f convex, C convex ⇒ local min = global min\nEfficient algorithms (IPM, first-order, …)\nMost portfolio problems are (or can be made) convex"
+    },
+    body: [
+      `A convex optimisation problem minimises a convex function over a convex set. The defining geometric property is that the line segment between any two feasible points lies inside the feasible set, and the function lies below its chords. Consequently every local minimum is a global minimum, and the set of minimisers is itself convex.`,
+      `Convexity is the watershed between “tractable” and “hard”. Linear programmes, convex quadratic programmes, second-order cone programmes, semidefinite programmes and many entropy-maximisation problems are convex and can be solved to high accuracy in polynomial time by interior-point or first-order methods.`,
+      `In finance the classic mean-variance problem (minimise wᵀΣw subject to linear constraints on expected return and weights) is a convex quadratic programme. Risk-parity, maximum-diversification (under suitable formulations), and many robust and regularised portfolio problems can also be cast as convex programmes. When a problem is non-convex one often seeks a convex relaxation or a disciplined convex approximation.`,
+      `Recognising convexity (or the lack of it) is therefore the first modelling decision. Modern modelling layers (CVXPY, JuMP, etc.) enforce disciplined convex programming rules so that the modeller cannot accidentally write a non-convex problem and expect a global certificate.`
+    ],
+    keyPoint: "Convexity turns optimisation from a search for needles in haystacks into a reliable, certifiable computation. If you can keep your portfolio or pricing problem convex, you inherit global optimality and mature, fast solvers."
+  },
+  {
+    num: "4.6.02",
+    icon: "LP",
+    tClass: "t-mid",
+    title: "Linear Programming",
+    sub: "Linear objective, linear constraints — the simplest and most mature class of convex programmes",
+    formula: "min cᵀx  s.t.  Ax ≤ b,  x ≥ 0",
+    tags: [["linear program","mid"], ["simplex","mid"], ["polytope",""], ["transport",""]],
+    body: [
+      `A linear programme (LP) minimises (or maximises) a linear function subject to linear equality and inequality constraints. The feasible region is a polyhedron (or polytope when bounded). Optimal solutions occur at vertices, which is the geometric reason the simplex method works by moving from vertex to vertex.`,
+      `LPs are the most thoroughly solved class of optimisation problems. The simplex algorithm, interior-point methods and modern dual simplex / barrier hybrids solve instances with millions of variables routinely. Duality is perfect: strong duality holds under mild conditions and the dual variables have a direct shadow-price interpretation.`,
+      `In finance LPs appear in cash-flow matching, immunisation, index-tracking with linear transaction costs, certain robust formulations (using polyhedral uncertainty sets), and as the sub-problems inside larger integer or quadratic programmes. Network-flow and transportation problems that arise in settlement or collateral optimisation are also LPs.`,
+      `When integrality constraints are added one obtains an integer linear programme (ILP / MIP). The problem becomes NP-hard, but branch-and-cut solvers remain practical for many realistic sizes.`
+    ],
+    keyPoint: "Linear programming is optimisation reduced to its linear skeleton. Extreme points hold the optima, duality supplies prices, and industrial solvers make even large LPs routine."
+  },
+  {
+    num: "4.6.03",
+    icon: "QP",
+    tClass: "t-spread",
+    title: "Quadratic Programming (Mean-Variance)",
+    sub: "Quadratic objective, linear constraints — the mathematical home of Markowitz portfolio selection",
+    formula: "min ½ xᵀ Q x + cᵀ x  s.t.  Ax = b,  Gx ≤ h",
+    tags: [["quadratic","spread"], ["mean-variance","spread"], ["markowitz",""], ["positive definite",""]],
+    formulaBox: {
+      main: "min<sub>w</sub> ½ wᵀ Σ w − λ μᵀ w",
+      note: "subject to 1ᵀw = 1, w_min ≤ w ≤ w_max, …\nΣ ≽ 0 ⇒ convex QP\nSolved by active-set, interior-point or OSQP-type solvers"
+    },
+    body: [
+      `A quadratic programme (QP) minimises a quadratic objective subject to linear constraints. When the quadratic term is positive semidefinite the problem is convex and inherits all the favourable properties of convex optimisation. Mean-variance portfolio selection is the archetypal convex QP: the objective is portfolio variance (or a mean-variance utility) and the constraints are linear (budget, exposures, bounds, turnover, etc.).`,
+      `Because the Hessian is (twice) the covariance matrix, factor or sparse structure in Σ can be exploited by specialised solvers. Active-set methods are effective for modest numbers of inequality constraints; interior-point and first-order operator-splitting methods (OSQP, SCS, \ldots) scale to large universes.`,
+      `Many practical enhancements remain inside the QP family: transaction-cost penalties that are quadratic or piecewise-linear, regularisation terms (ridge, shrinkage), and robust counterparts with ellipsoidal uncertainty. Once cardinality or threshold constraints appear the problem becomes a mixed-integer QP and hardness increases sharply.`,
+      `The quality of the solution is only as good as the inputs μ and Σ. Estimation error, especially in the mean, is the dominant practical limitation of classical mean-variance QPs and motivates Black–Litterman, shrinkage and robust variants.`
+    ],
+    keyPoint: "Mean-variance optimisation is a convex quadratic programme. The mathematics is solved; the remaining difficulty is statistical — supplying μ and Σ that are stable enough for the optimiser not to amplify noise."
+  },
+  {
+    num: "4.6.04",
+    icon: "ℒ",
+    tClass: "t-cost",
+    title: "Lagrangian Multipliers and Constraints",
+    sub: "Turning constrained problems into unconstrained ones by attaching a price to each constraint",
+    formula: "ℒ(x,λ,μ) = f(x) + λᵀ h(x) + μᵀ g(x)",
+    tags: [["lagrangian","gold"], ["multipliers","gold"], ["dual","mid"], ["shadow price",""]],
+    formulaBox: {
+      main: "ℒ(x, λ, μ) = f(x) + Σ λᵢ hᵢ(x) + Σ μⱼ gⱼ(x)",
+      note: "h = equality constraints, g = inequality constraints\nStationarity: ∇ₓ ℒ = 0\nλ, μ = shadow prices / sensitivities"
+    },
+    body: [
+      `The Lagrangian of a constrained problem is the original objective plus a linear combination of the constraint functions, each weighted by a multiplier. Equality constraints receive unrestricted multipliers λ; inequality constraints receive non-negative multipliers μ (for minimisation in standard form).`,
+      `At a constrained optimum the gradient of the objective must be balanced by a linear combination of the gradients of the active constraints — the multipliers supply the exact weights of that combination. Economically the multipliers are shadow prices: they tell how much the optimal value would improve if a constraint were relaxed by one unit.`,
+      `Forming the Lagrangian converts a constrained problem into a saddle-point problem: minimise with respect to the primal variables and maximise with respect to the multipliers. Dual methods and many modern first-order algorithms work directly with this saddle-point formulation.`,
+      `In portfolio optimisation the multiplier on the budget constraint is related to the marginal utility of capital; multipliers on factor-exposure constraints are the implicit factor prices that the optimiser is willing to pay. Reading the multipliers is often as informative as reading the primal solution itself.`
+    ],
+    keyPoint: "Lagrangian multipliers are the prices of constraints. They convert geometry (feasible set) into algebra (stationarity conditions) and give the sensitivity of the optimal value to each restriction."
+  },
+  {
+    num: "4.6.05",
+    icon: "KKT",
+    tClass: "t-cost",
+    title: "KKT Conditions",
+    sub: "The first-order necessary (and under convexity, sufficient) optimality conditions for constrained problems",
+    formula: "Stationarity + Primal/Dual Feasibility + Complementary Slackness",
+    tags: [["kkt","gold"], ["optimality","gold"], ["complementary slackness",""], ["certificate",""]],
+    body: [
+      `The Karush–Kuhn–Tucker (KKT) conditions are the natural generalisation of “gradient equals zero” to problems with inequality constraints. They comprise four blocks: stationarity of the Lagrangian with respect to the primal variables, primal feasibility, dual feasibility (sign restrictions on inequality multipliers), and complementary slackness (a multiplier may be positive only when its constraint is active).`,
+      `Under suitable constraint qualifications, every local optimum must satisfy the KKT conditions. When the problem is convex the KKT conditions are also sufficient: any point that satisfies them is a global optimum. Consequently a KKT point is a certificate of optimality for convex programmes.`,
+      `Complementary slackness has a direct meaning in portfolio construction: a bound constraint that is not binding must have a zero multiplier; a positive multiplier signals that the optimiser would like to move beyond the bound. Checking which constraints are active is therefore part of the economic interpretation of a solution.`,
+      `Most numerical solvers for nonlinear and quadratic programmes either solve the KKT system directly (interior-point, SQP) or maintain conditions that imply KKT satisfaction at convergence (active-set methods).`
+    ],
+    keyPoint: "KKT conditions are the first-order optimality certificate for constrained problems. For convex programmes they are necessary and sufficient — satisfying them proves you have a global solution."
+  },
+  {
+    num: "4.6.06",
+    icon: "∇",
+    tClass: "t-dynamics",
+    title: "Gradient Descent and Variants (SGD, Adam)",
+    sub: "First-order iterative methods that follow the negative gradient — scalable workhorses of modern learning and large-scale optimisation",
+    formula: "x ← x − η ∇f(x)",
+    tags: [["gradient descent","dynamics"], ["sgd","dynamics"], ["adam",""], ["first-order",""]],
+    formulaBox: {
+      main: "x<sub>k+1</sub> = x<sub>k</sub> − η ∇f(x<sub>k</sub>)",
+      note: "SGD: use noisy gradient from a mini-batch\nAdam: adaptive per-coordinate step sizes + momentum\nStep-size η is the critical hyper-parameter"
+    },
+    body: [
+      `Gradient descent iteratively moves in the direction of steepest descent of a differentiable objective. With an appropriate step-size schedule it converges to a stationary point; for smooth convex functions it converges to the global minimum at a well-understood rate.`,
+      `Stochastic gradient descent (SGD) replaces the full gradient by an unbiased estimate computed on a random mini-batch. The noise averages out and the per-iteration cost becomes independent of data-set size, which is why SGD dominates large-scale machine learning. Momentum and Nesterov acceleration improve the rate on ill-conditioned problems.`,
+      `Adam (and its relatives RMSprop, AdaGrad, \ldots) maintain per-coordinate adaptive learning rates and momentum estimates. They are robust to sparse gradients and to varying scales across parameters, which explains their popularity in deep learning and in many non-convex financial estimation tasks.`,
+      `In portfolio and risk applications first-order methods are attractive when the number of variables is huge or when only stochastic estimates of the objective (e.g., scenario-based) are available. They rarely supply the high-accuracy certificates that interior-point methods give on moderate-sized convex QPs, but they scale further.`
+    ],
+    keyPoint: "Gradient methods follow the local slope. Full-batch descent is reliable for moderate smooth problems; SGD and Adam trade exact gradients for scalability and are the default engines of large-scale and stochastic optimisation."
+  },
+  {
+    num: "4.6.07",
+    icon: "H",
+    tClass: "t-dynamics",
+    title: "Newton’s Method",
+    sub: "Second-order iteration that uses curvature — quadratic convergence when it works",
+    formula: "x ← x − H⁻¹ ∇f(x)",
+    tags: [["newton","dynamics"], ["hessian","dynamics"], ["quadratic convergence",""], ["second-order",""]],
+    formulaBox: {
+      main: "x<sub>k+1</sub> = x<sub>k</sub> − [∇²f(x<sub>k</sub>)]⁻¹ ∇f(x<sub>k</sub>)",
+      note: "Local quadratic convergence if H ≻ 0 and start is close\nRequires solving a linear system each step\nDamped / trust-region variants improve global behaviour"
+    },
+    body: [
+      `Newton’s method models the objective by its second-order Taylor expansion and minimises that quadratic model exactly. The resulting step is the inverse-Hessian times the gradient. Near a non-degenerate local minimum the method converges quadratically — the number of correct digits roughly doubles at each iteration.`,
+      `The price is the need to form and factor (or solve with) the Hessian at every step. For dense problems the cost scales cubically with dimension; structure (sparsity, low-rank updates, limited-memory approximations such as L-BFGS) is exploited whenever possible.`,
+      `Pure Newton steps can diverge if started far from the solution or if the Hessian is indefinite. Line-search (damped Newton) and trust-region safeguards restore global convergence while preserving fast local convergence. In constrained optimisation the same idea appears inside sequential quadratic programming (SQP) and interior-point methods, which solve a sequence of Newton systems on the KKT conditions.`,
+      `For smooth convex portfolio problems of moderate size, Newton or quasi-Newton methods remain among the fastest and most accurate options.`
+    ],
+    keyPoint: "Newton’s method exploits curvature to achieve quadratic convergence. When the Hessian is available and the problem is well-scaled it is the gold standard for high-accuracy unconstrained and equality-constrained optimisation."
+  },
+  {
+    num: "4.6.08",
+    icon: "IPM",
+    tClass: "t-classes",
+    title: "Interior Point Methods",
+    sub: "Path-following algorithms that stay inside the feasible region and approach the optimum along a central trajectory",
+    formula: "Barrier / primal-dual path-following",
+    tags: [["interior point","classes"], ["barrier","classes"], ["path-following",""], ["polynomial",""]],
+    body: [
+      `Interior-point methods (IPMs) approach the solution of a constrained convex problem from the strict interior of the feasible set. A logarithmic barrier (or a primal-dual equivalent) is added to the objective; as the barrier parameter tends to zero the minimisers of the perturbed problems converge to an optimum of the original problem.`,
+      `Modern primal-dual IPMs solve a sequence of Newton systems on the perturbed KKT conditions. Each system is sparse when the original data are sparse, and polynomial-time complexity guarantees exist for linear, quadratic and many conic programmes. In practice a handful of Newton steps per barrier value, with aggressive step-length heuristics, yields high accuracy in tens of iterations.`,
+      `IPMs are the dominant algorithm inside commercial and open-source solvers for LPs, QPs and second-order-cone programmes (MOSEK, Gurobi, CVXOPT, ECOS, \ldots). They handle inequality constraints without combinatorial active-set logic and are relatively insensitive to degeneracy.`,
+      `For very large-scale or stochastic problems, first-order methods may still be preferable; for the moderate-to-large dense or structured convex programmes that arise in classical portfolio construction, IPMs remain the method of choice.`
+    ],
+    keyPoint: "Interior-point methods follow a smooth central path to the optimum, solving a few dozen Newton systems along the way. They are the reliable, high-accuracy engines behind modern convex solvers for LP, QP and conic portfolio problems."
+  },
+  {
+    num: "4.6.09",
+    icon: "BL",
+    tClass: "t-spread",
+    title: "Black-Litterman Optimization",
+    sub: "Bayesian blending of market-implied equilibrium returns with investor views — stabilising the mean vector",
+    formula: "μ_BL = posterior mean of equilibrium + views",
+    tags: [["black-litterman","spread"], ["views","spread"], ["bayesian","mid"], ["equilibrium",""]],
+    formulaBox: {
+      main: "μ_BL = [(τΣ)⁻¹ + Pᵀ Ω⁻¹ P]⁻¹ [(τΣ)⁻¹ π + Pᵀ Ω⁻¹ q]",
+      note: "π = equilibrium (reverse-optimised) returns\nP, q, Ω = view matrix, view outcomes, view uncertainty\nτ = scales prior uncertainty"
+    },
+    body: [
+      `The Black–Litterman model addresses the extreme sensitivity of mean-variance optimisation to the expected-return vector. It starts from an equilibrium return vector π implied by a market-capitalisation (or benchmark) portfolio via reverse optimisation, treats π as the mean of a prior, and then incorporates subjective investor views as additional noisy observations. The posterior mean μ_BL becomes the input to a conventional mean-variance optimiser.`,
+      `Views are expressed as linear statements “portfolio P_i has expected excess return q_i with confidence Ω_i”. Absolute and relative views are both admitted. The strength of the prior versus the views is controlled by the scalar τ and by the view-covariance Ω.`,
+      `The resulting portfolios are dramatically more stable than naïve mean-variance portfolios that use historical or analyst means directly. When no views are expressed the posterior collapses to the equilibrium and the optimised portfolio recovers the market (or benchmark) portfolio — a comforting consistency property.`,
+      `Black–Litterman is itself a Bayesian updating step followed by a quadratic programme. It can be combined with shrinkage of Σ, with constraints, and with robust or multi-period extensions. Its practical success stems less from Bayesian purity than from the disciplined way it prevents the optimiser from taking extreme positions on poorly estimated means.`
+    ],
+    keyPoint: "Black–Litterman replaces a fragile return forecast with a Bayesian compromise between market equilibrium and explicit views. The optimiser then receives a mean vector that no longer drives it to pathological corner solutions."
+  },
+  {
+    num: "4.6.10",
+    icon: "R",
+    tClass: "t-ask",
+    title: "Robust Optimization under Uncertainty",
+    sub: "Optimising against the worst case inside an uncertainty set — immunising solutions to estimation error",
+    formula: "min_x  max_{u ∈ U} f(x, u)",
+    tags: [["robust","ask"], ["uncertainty set","ask"], ["worst-case",""], ["immunisation",""]],
+    body: [
+      `Robust optimisation treats uncertain parameters as belonging to a known uncertainty set U and optimises the worst-case performance over that set. The resulting problem is of the form min_x max_{u∈U} f(x,u) (or a constrained analogue). When U and f are chosen appropriately the robust counterpart remains convex and tractable.`,
+      `Common uncertainty sets are box (interval), ellipsoidal, and budgeted polyhedral sets. Ellipsoidal uncertainty on the mean vector, for example, produces a second-order-cone constraint that is easily handled by modern solvers. The size of the set is a deliberate knob that trades nominal performance for protection against estimation error.`,
+      `In portfolio construction robust formulations guard against errors in μ and Σ. They typically shrink extreme positions and improve out-of-sample stability at the cost of some in-sample optimality. Distributionally robust optimisation (DRO) enlarges the uncertainty set to a ball of probability distributions, yielding further protection and interesting connections to regularisation and coherent risk measures.`,
+      `The modelling art lies in choosing an uncertainty set that captures the dominant errors without rendering the problem so conservative that the solution becomes useless. Calibration of the set size to historical estimation variability is therefore essential.`
+    ],
+    keyPoint: "Robust optimisation plans for the worst parameter realisation inside a chosen uncertainty set. It converts statistical fragility into a controlled, still-convex, worst-case problem and is one of the cleanest antidotes to estimation error in portfolio construction."
+  },
+  {
+    num: "4.6.11",
+    icon: "E",
+    tClass: "t-impact",
+    title: "Stochastic Optimization",
+    sub: "Decision-making when the objective or constraints depend on random quantities — expectation, risk measures and scenarios",
+    formula: "min E[f(x, ξ)]  or  min ρ(f(x, ξ))",
+    tags: [["stochastic","impact"], ["expectation","impact"], ["scenarios",""], ["risk measure",""]],
+    body: [
+      `Stochastic optimisation minimises an expected cost (or a risk measure of the cost) when the cost depends on a random vector ξ. The decision x must typically be chosen before ξ is observed (here-and-now), although two-stage and multi-stage formulations allow later recourse actions.`,
+      `When the expectation can be evaluated in closed form the problem may reduce to an ordinary deterministic programme. More often the expectation is approximated by a sample-average approximation (SAA) over a finite set of scenarios, producing a large-scale but deterministic problem. Variance-reduction techniques, importance sampling and adaptive scenario generation improve the quality of the approximation.`,
+      `In finance the random element is usually a vector of asset returns, risk-factor moves or cash-flow realisations. Mean-variance is itself a simple stochastic programme (expectation of return and of squared deviation). More general stochastic programmes incorporate CVaR, drawdown constraints, multi-period rebalancing and transaction costs under uncertainty.`,
+      `Convergence theory for SAA and for stochastic-approximation algorithms supplies sample-size guidelines. The practical bottleneck is often the generation of realistic, coherent scenarios rather than the subsequent optimisation.`
+    ],
+    keyPoint: "Stochastic optimisation optimises averages or risk measures of random outcomes. Scenario-based approximations turn the problem back into a (usually large) deterministic programme that modern solvers can handle."
+  },
+  {
+    num: "4.6.12",
+    icon: "GA",
+    tClass: "t-markets",
+    title: "Evolutionary / Genetic Algorithms",
+    sub: "Population-based meta-heuristics that explore non-convex, discrete or black-box landscapes by selection, crossover and mutation",
+    formula: "Population → Select → Crossover → Mutate → Repeat",
+    tags: [["genetic","markets"], ["evolutionary","markets"], ["metaheuristic",""], ["non-convex",""]],
+    body: [
+      `Evolutionary algorithms maintain a population of candidate solutions and iteratively improve it by mechanisms inspired by natural selection: fitter individuals are more likely to reproduce, genetic material is recombined (crossover), and random mutations maintain diversity. Genetic algorithms are the best-known members of the family; particle-swarm, differential-evolution and evolution-strategy variants share the same population-based spirit.`,
+      `These methods impose almost no requirements on the objective: it may be non-convex, discontinuous, discrete, noisy or available only as a black-box simulator. Consequently they are used when the problem cannot be formulated as a disciplined convex (or even smooth non-convex) programme — for example, portfolio optimisation with complex cardinality, lot-size, or path-dependent constraints, or calibration of models whose likelihood is non-differentiable.`,
+      `The price of generality is the loss of optimality certificates and of predictable convergence rates. Performance depends heavily on the encoding of solutions, the design of crossover and mutation operators, population size, and the fitness function. Parallel evaluation of the population is straightforward and maps well onto modern hardware.`,
+      `In practice evolutionary algorithms are often hybridised with local search or with convex solvers that polish promising candidates. They are a tool of last resort for hard combinatorial layers, not a replacement for convex or smooth methods when the latter apply.`
+    ],
+    keyPoint: "Evolutionary algorithms search hard, non-convex or discrete spaces with a population of candidates and bio-inspired operators. They offer flexibility at the cost of guarantees — useful when the problem structure defeats classical optimisers."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

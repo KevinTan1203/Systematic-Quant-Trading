@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.2 Probability Theory</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 240px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.2 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Probability<br><em>Theory</em></h1>
+        <div class="hdr-sub">The formal language of uncertainty — sample spaces, expectations, dependence, limits and stochastic processes</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Core Identities (illustrative)</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">E[X]</div>
+            <div class="sw-price">Σ x P(x)</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Var(X)</div>
+            <div class="sw-price">E[(X−μ)²]</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Bayes</div>
+          <div class="sw-spread-val">P(A|B)·P(B)=P(B|A)·P(A)</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">CLT</div>
+          <div class="sw-mid-val">√n (X̄−μ) → N(0,σ²)</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">12 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.2 Probability Theory</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.2.01",
+    icon: "Ω",
+    tClass: "t-mid",
+    title: "Sample Spaces and Events",
+    sub: "The universe of possible outcomes and the subsets we care about",
+    formula: "Ω, A ⊆ Ω, P: events → [0,1]",
+    tags: [["sample space","mid"], ["events","mid"], ["sigma-algebra",""], ["measure",""]],
+    body: [
+      `A <em>sample space</em> Ω is the set of all possible outcomes of a random experiment. An <em>event</em> is a subset of Ω to which we assign a probability. In discrete settings Ω may be finite or countable (coin tosses, dice, credit-rating transitions); in continuous settings Ω is typically an interval or a function space (price paths, Brownian motion).`,
+      `Probability is a function P that assigns to each event a number in [0,1] satisfying Kolmogorov’s axioms: P(Ω) = 1, P(∅) = 0, and countable additivity for pairwise disjoint events. From these axioms the usual rules (complement, inclusion-exclusion, monotonicity) follow immediately.`,
+      `In finance the sample space is rarely written explicitly, but it is always present. The set of possible future price paths, the set of possible default times, or the set of possible interest-rate scenarios each constitutes an Ω. Risk-neutral pricing, scenario analysis and Monte Carlo simulation are all ways of placing a probability measure on that space and computing expectations under it.`,
+      `A collection of events that is closed under complementation and countable unions is a σ-algebra. Working with σ-algebras becomes essential once one moves to continuous time and filtration-based notions of information (the natural setting for martingales and stopping times).`
+    ],
+    keyPoint: "The sample space is the universe of what can happen; events are the subsets we can talk about probabilistically. Every pricing, risk and statistical statement in finance is ultimately a statement about a probability measure on some Ω."
+  },
+  {
+    num: "4.2.02",
+    icon: "P|",
+    tClass: "t-spread",
+    title: "Conditional Probability & Bayes’ Theorem",
+    sub: "Updating beliefs when new information arrives — the foundation of learning from data",
+    formula: "P(A|B) = P(B|A) P(A) / P(B)",
+    tags: [["conditional","spread"], ["bayes","spread"], ["posterior",""], ["likelihood",""]],
+    formulaBox: {
+      main: "P(A|B) = <span class='spread-part'>P(B|A) P(A)</span> / P(B)",
+      note: "Posterior ∝ Likelihood × Prior\nP(B) = Σ P(B|Aᵢ) P(Aᵢ)  (law of total probability)\nFoundation of Bayesian inference & filtering"
+    },
+    body: [
+      `Conditional probability P(A|B) is the probability of event A given that event B has occurred. It is defined as P(A ∩ B) / P(B) whenever P(B) > 0. It quantifies how knowledge of B revises the probability of A.`,
+      `Bayes’ theorem rearranges the definition to express the posterior probability of a “cause” given an “effect” in terms of the likelihood of the effect given the cause and the prior probability of the cause. In the form P(A|B) = P(B|A) P(A) / P(B), A is typically the hypothesis or state and B the observed data.`,
+      `The denominator P(B) is obtained by the law of total probability: sum (or integrate) the joint probabilities over all mutually exclusive ways B can occur. In continuous settings the same relation holds with densities replacing probabilities.`,
+      `Bayes’ theorem is the mathematical engine of Bayesian inference, Kalman and particle filters, regime-switching models, and any sequential updating of beliefs as market data arrive. In credit risk it converts observed default frequencies into posterior probabilities of hidden states; in option pricing it appears in the change from physical to risk-neutral measure via the Radon–Nikodym derivative.`
+    ],
+    keyPoint: "Conditional probability is probability after information arrives. Bayes’ theorem is the systematic way to update a prior into a posterior — the formal engine of learning under uncertainty."
+  },
+  {
+    num: "4.2.03",
+    icon: "⊥",
+    tClass: "t-dynamics",
+    title: "Independence vs. Conditional Independence",
+    sub: "When knowing one event tells you nothing about another — and when that changes once a third variable is known",
+    formula: "P(A∩B)=P(A)P(B)  |  P(A∩B|C)=P(A|C)P(B|C)",
+    tags: [["independence","dynamics"], ["conditional independence","dynamics"], ["dependence",""], ["graphical models",""]],
+    splitBox: [
+      { cls: "bid",  label: "Independence", text: "P(A ∩ B) = P(A) P(B). Knowing that B occurred does not change the probability of A. Joint distribution factors into the product of marginals." },
+      { cls: "spread", label: "Conditional Independence", text: "P(A ∩ B | C) = P(A|C) P(B|C). Once C is known, A and B are independent. They may still be dependent unconditionally." },
+      { cls: "mid",  label: "Finance Example", text: "Two stocks may be correlated because both load on the market factor. Conditional on the market return, their residuals can be nearly independent." },
+      { cls: "gold", label: "Modelling Consequence", text: "Factor models, graphical models and many risk systems rely on conditional independence to reduce dimensionality and to separate systematic from idiosyncratic risk." },
+    ],
+    body: [
+      `Two events (or random variables) are independent when the occurrence of one supplies no information about the other. Formally, the joint probability equals the product of the marginals, or equivalently the conditional probability equals the unconditional probability.`,
+      `Conditional independence is a weaker and often more useful notion: A and B are conditionally independent given C when, once the value of C is known, A and B become independent. Unconditionally they may still be dependent because they both depend on C.`,
+      `In finance the distinction is fundamental. Asset returns are typically dependent; after conditioning on a small set of common factors they are often modelled as conditionally independent. Credit defaults of different firms are dependent; conditional on a systematic credit factor they may be treated as independent. The same idea underlies many graphical models and Bayesian networks used in risk aggregation.`,
+      `Confusing independence with conditional independence (or vice versa) leads to incorrect joint distributions, mis-stated portfolio risk, and flawed stress scenarios. Always ask: “independent of what?”`
+    ],
+    keyPoint: "Independence means ‘no information flows between them’. Conditional independence means ‘no information flows between them once we know C’. Most useful dependence structures in finance are statements of conditional independence given factors or regimes."
+  },
+  {
+    num: "4.2.04",
+    icon: "E",
+    tClass: "t-bid",
+    title: "Expected Value",
+    sub: "The probability-weighted average of all possible outcomes — the centre of mass of a distribution",
+    formula: "E[X] = Σ x P(x)  or  ∫ x f(x) dx",
+    tags: [["expectation","bid"], ["mean","bid"], ["linearity",""], ["risk-neutral",""]],
+    formulaBox: {
+      main: "E[X] = Σ<sub>x</sub> x P(x) &nbsp;&nbsp;|&nbsp;&nbsp; ∫ x f(x) dx",
+      note: "Linearity: E[aX+bY] = a E[X] + b E[Y]\nalways, even when X and Y are dependent\nLaw of iterated expectations: E[E[X|Y]] = E[X]"
+    },
+    body: [
+      `The expected value (expectation, mean) of a random variable X is the probability-weighted average of the values it can take. For a discrete variable it is the sum of each outcome times its probability; for a continuous variable it is the integral of x against the density.`,
+      `Expectation is linear: E[aX + bY] = a E[X] + b E[Y] regardless of whether X and Y are independent. This single property is used constantly in pricing (linearity of the pricing operator) and in risk management (portfolio expected return is the weighted sum of asset expected returns).`,
+      `The law of iterated expectations (tower property) states that E[E[X | Y]] = E[X]. Conditioning and then taking the expectation over the conditioning variable recovers the unconditional expectation. This is the backbone of dynamic programming, filtration arguments and the martingale property.`,
+      `In asset pricing one works with expectations under different measures: the physical measure P for real-world forecasts and risk management, and a risk-neutral measure Q for pricing. Changing measure changes the probabilities, hence changes the numerical value of E[·], while the linearity and tower properties remain intact.`
+    ],
+    keyPoint: "Expectation is the centre of mass of a probability distribution. Its linearity and the tower property make it the most important operator in quantitative finance — appearing in pricing, forecasting and dynamic optimisation."
+  },
+  {
+    num: "4.2.05",
+    icon: "σ²",
+    tClass: "t-cost",
+    title: "Variance and Standard Deviation",
+    sub: "The expected squared deviation from the mean — the canonical measure of dispersion",
+    formula: "Var(X)=E[(X−μ)²]  |  σ=√Var(X)",
+    tags: [["variance","gold"], ["standard deviation","gold"], ["dispersion",""], ["second moment",""]],
+    formulaBox: {
+      main: "Var(X) = E[(X − μ)²] = E[X²] − μ²",
+      note: "σ = √Var(X)\nVar(aX+b) = a² Var(X)\nVar(X+Y) = Var(X)+Var(Y)+2Cov(X,Y)"
+    },
+    body: [
+      `Variance is the expected value of the squared deviation of a random variable from its mean. It quantifies spread: a large variance means outcomes tend to lie far from the centre; a small variance means they cluster tightly. Standard deviation is the positive square root of variance and has the same units as the original variable, making it the more interpretable dispersion measure in most applications.`,
+      `Variance is not linear. Scaling a random variable by a multiplies its variance by a² (and its standard deviation by |a|). The variance of a sum equals the sum of variances only when the variables are uncorrelated; otherwise covariance terms appear.`,
+      `In finance, standard deviation of returns is the most common definition of volatility. Annualisation of volatility relies on the scaling property of variance under independence (or weak dependence) assumptions. Portfolio variance is the quadratic form wᵀ Σ w, which expands into weighted variances and covariances.`,
+      `Variance exists only when the second moment is finite. For distributions with extremely heavy tails (certain stable laws, some empirical return distributions) the sample variance may be unstable or theoretically infinite; in those cases alternative dispersion measures (mean absolute deviation, inter-quartile range, or robust scale estimators) are preferred.`
+    ],
+    keyPoint: "Variance is expected squared distance from the mean; standard deviation is its square root. Together they are the default language of risk and volatility — powerful when second moments exist, misleading when tails are too heavy."
+  },
+  {
+    num: "4.2.06",
+    icon: "Cov",
+    tClass: "t-classes",
+    title: "Covariance and Correlation",
+    sub: "How two random variables move together — the building blocks of portfolio risk",
+    formula: "Cov(X,Y)=E[(X−μₓ)(Y−μᵧ)]  |  ρ=Cov/(σₓσᵧ)",
+    tags: [["covariance","classes"], ["correlation","classes"], ["dependence","mid"], ["portfolio",""]],
+    formulaBox: {
+      main: "ρ(X,Y) = Cov(X,Y) / (σ<sub>X</sub> σ<sub>Y</sub>)",
+      note: "ρ ∈ [−1,+1]\nCov(X,Y) = E[XY] − E[X]E[Y]\nVar(X+Y) = Var(X)+Var(Y)+2Cov(X,Y)"
+    },
+    body: [
+      `Covariance measures the expected product of deviations of two random variables from their respective means. Positive covariance means the variables tend to lie on the same side of their means together; negative covariance means they tend to lie on opposite sides. Correlation is the covariance scaled by the product of the standard deviations, forcing the result into the interval [−1, +1].`,
+      `Correlation is invariant to positive affine transformations and is therefore a pure measure of linear dependence. It does not capture non-linear dependence; two variables can be strongly related (e.g., Y = X²) yet have zero correlation. Rank correlations and copula-based measures address this limitation.`,
+      `In portfolio theory the covariance matrix is the central object: portfolio variance is completely determined by the weights and the covariances among the assets. Diversification works only to the extent that correlations are less than one. Risk models, factor models and optimisation routines all begin with an estimate of the covariance (or correlation) structure.`,
+      `Sample covariance and correlation are sensitive to outliers and to the length of the estimation window. In non-stationary markets the true covariance itself changes over time, so any single matrix is at best a local approximation.`
+    ],
+    keyPoint: "Covariance quantifies co-movement; correlation standardises it to [−1, +1]. They are the arithmetic of diversification — and the reason a portfolio’s risk is not the sum of its parts."
+  },
+  {
+    num: "4.2.07",
+    icon: "LLN",
+    tClass: "t-bid",
+    title: "Law of Large Numbers",
+    sub: "Sample averages converge to the true expectation as the number of observations grows",
+    formula: "X̄ₙ → E[X]  as n → ∞",
+    tags: [["lln","bid"], ["convergence","bid"], ["sample mean",""], ["consistency",""]],
+    body: [
+      `The law of large numbers (LLN) states that the sample average of independent, identically distributed random variables with finite expectation converges to that expectation as the sample size tends to infinity. The weak LLN asserts convergence in probability; the strong LLN asserts almost-sure convergence.`,
+      `The practical consequence is that averages become reliable. The more independent observations one collects, the closer the observed frequency approaches the true probability, and the closer the sample mean approaches the population mean. This is the justification for using historical averages as estimates of expected returns, default frequencies, or any other expectation.`,
+      `The LLN requires independence (or sufficiently weak dependence) and finite first moments. When observations are strongly dependent, or when the mean does not exist, the sample average may fail to settle. In markets, returns are neither strictly independent nor identically distributed across regimes, so the LLN applies only approximately and over horizons where the dependence is weak enough.`,
+      `Monte Carlo simulation relies on the LLN: the average of many independent simulated paths converges to the expectation under the simulation measure. The rate of convergence is governed by the central limit theorem.`
+    ],
+    keyPoint: "The law of large numbers is the reason averages work. With enough independent observations the sample mean settles at the true expectation — the statistical foundation of estimation, back-testing and Monte Carlo."
+  },
+  {
+    num: "4.2.08",
+    icon: "CLT",
+    tClass: "t-spread",
+    title: "Central Limit Theorem (CLT)",
+    sub: "Standardised sums of independent variables become Gaussian — the origin of the normal distribution’s ubiquity",
+    formula: "√n (X̄ₙ − μ) / σ  →  N(0,1)",
+    tags: [["clt","spread"], ["normal","spread"], ["asymptotic",""], ["sampling distribution",""]],
+    formulaBox: {
+      main: "√n (X̄ − μ) / σ  →ᵈ  N(0,1)",
+      note: "Requires i.i.d. with finite variance\nExplains why normals appear so often\nRate is 1/√n — slow but universal"
+    },
+    body: [
+      `The central limit theorem is the reason the normal distribution appears throughout statistics and finance. It states that the sum (or average) of a large number of independent, identically distributed random variables with finite variance, after standardisation, converges in distribution to a standard normal. No assumption is required that the original variables themselves are normal.`,
+      `The practical consequences are enormous. Sample means are approximately normal for moderate sample sizes; this justifies the usual confidence intervals and hypothesis tests. Many risk measures and estimators inherit asymptotic normality, allowing standard errors to be computed from the delta method or from the Hessian of a likelihood.`,
+      `In finance the CLT is invoked whenever one treats a portfolio of many small independent risks as approximately Gaussian, or when one uses the normal distribution as a limiting approximation for aggregated returns. It is also the theoretical reason that Brownian motion (the continuous-time limit of random walks) has Gaussian increments.`,
+      `The classical CLT fails when variance is infinite or when dependence is too strong. Heavy-tailed returns, volatility clustering and common-factor dependence all weaken the Gaussian approximation. Generalisations (stable laws, martingale CLTs, mixing CLTs) exist, but the message remains: normality is an asymptotic, not an exact, property.`
+    ],
+    keyPoint: "The central limit theorem turns sums of many small independent effects into Gaussians. It is the deepest reason the normal distribution is the default approximation in statistics and in large-portfolio risk."
+  },
+  {
+    num: "4.2.09",
+    icon: "MC",
+    tClass: "t-markets",
+    title: "Markov Chains and Processes",
+    sub: "Memoryless evolution — the future depends on the past only through the present state",
+    formula: "P(X_{t+1}|X_t,…,X_0) = P(X_{t+1}|X_t)",
+    tags: [["markov","markets"], ["memoryless","markets"], ["transition matrix",""], ["regime",""]],
+    body: [
+      `A stochastic process has the Markov property when the conditional distribution of the future, given the entire past, depends only on the present state. In discrete time and discrete state space one speaks of a Markov chain; the dynamics are completely described by a transition matrix P whose entries are the probabilities of moving from one state to another in one step.`,
+      `The Markov property is a powerful modelling assumption. Credit-rating transitions, regime-switching models of volatility or interest rates, and many queueing and inventory systems are formulated as Markov chains. Continuous-time Markov processes include Poisson processes, birth-death processes and, under suitable conditions, diffusions.`,
+      `Key objects are the transition probabilities, the stationary (invariant) distribution if it exists, and the speed of convergence to that distribution. Multi-step transitions are obtained by matrix powers (discrete time) or by the matrix exponential of the generator (continuous time).`,
+      `In finance the Markov assumption is both a blessing and a limitation. It keeps models tractable and permits dynamic programming, but real markets exhibit longer memory (volatility clustering beyond a single lag, path-dependent features, learning). Hidden Markov models and Markov-switching processes restore some of that richness while preserving analytical convenience.`
+    ],
+    keyPoint: "A Markov process remembers only where it is now, not how it got there. The assumption buys tractability and is the backbone of regime models, credit-transition matrices and many pricing algorithms."
+  },
+  {
+    num: "4.2.10",
+    icon: "M",
+    tClass: "t-bid",
+    title: "Martingales",
+    sub: "Fair games — the conditional expectation of the future value, given the past, is the present value",
+    formula: "E[X_{t+1} | F_t] = X_t",
+    tags: [["martingale","bid"], ["fair game","bid"], ["filtration",""], ["no-arbitrage",""]],
+    formulaBox: {
+      main: "E[X<sub>t+s</sub> | F<sub>t</sub>] = X<sub>t</sub>",
+      note: "F_t = information available at t\nUnder risk-neutral measure, discounted\nasset prices are martingales (FTAP)"
+    },
+    body: [
+      `A martingale is a stochastic process whose conditional expectation at any future time, given present information, equals its current value. In gambling language it is a fair game: on average you expect to have tomorrow exactly what you have today. Formally, E[X_{t+s} | F_t] = X_t almost surely, where F_t is the filtration (information set) at time t.`,
+      `Martingales are central to modern asset pricing. The First Fundamental Theorem of Asset Pricing states that a market is free of arbitrage if and only if there exists an equivalent probability measure under which discounted asset prices are martingales. Pricing an attainable claim then reduces to taking the expected discounted payoff under that measure.`,
+      `Many processes of interest are martingales after a simple transformation: a random walk is a martingale; a geometric Brownian motion becomes a martingale after discounting at the risk-free rate (under the risk-neutral measure); the innovation process of a filter is a martingale.`,
+      `Super-martingales (E[X_{t+s} | F_t] ≤ X_t) and sub-martingales (the opposite inequality) describe processes with a systematic downward or upward drift. Optional sampling and the optional stopping theorem control the behaviour of martingales at random times.`
+    ],
+    keyPoint: "A martingale is a process that has no predictable drift given current information. Under the risk-neutral measure, discounted prices are martingales — the mathematical expression of ‘no free lunch’."
+  },
+  {
+    num: "4.2.11",
+    icon: "τ",
+    tClass: "t-impact",
+    title: "Stopping Times",
+    sub: "Random times that decide whether to stop based only on information already available",
+    formula: "{τ ≤ t} ∈ F_t",
+    tags: [["stopping time","impact"], ["optional time",""], ["hitting time",""], ["exercise",""]],
+    body: [
+      `A stopping time (optional time) is a random time τ such that the decision whether τ has occurred by time t depends only on information available at t. Formally, the event {τ ≤ t} belongs to the filtration F_t for every t. You are not allowed to look into the future to decide whether to stop.`,
+      `Classic examples are hitting times (the first time a process reaches a barrier), exercise times of American options, default times in reduced-form credit models, and the first time a trading rule generates an exit signal. In each case the decision to stop is non-anticipative.`,
+      `Stopping times are the natural domain of many theorems in stochastic processes. The value of an American option is the supremum over stopping times of the expected discounted payoff at the stopping time. Optimal-exercise problems are therefore optimal-stopping problems.`,
+      `Not every random time is a stopping time. A time that depends on future information (e.g., “the day of the maximum price over the whole year”) is not a stopping time and cannot be used as an exercise strategy in an arbitrage-free market.`
+    ],
+    keyPoint: "A stopping time is a random clock that only uses information available up to now. American exercise, barrier hits and optimal trading exits are all stopping times — decisions that never require foresight."
+  },
+  {
+    num: "4.2.12",
+    icon: "OST",
+    tClass: "t-dynamics",
+    title: "Optional Stopping Theorem",
+    sub: "When you may replace a fixed time by a stopping time inside a martingale expectation",
+    formula: "E[X_τ] = E[X_0]  (under conditions)",
+    tags: [["optional stopping","dynamics"], ["martingale","bid"], ["bounded stopping",""], ["fair game",""]],
+    body: [
+      `The optional stopping theorem (optional sampling theorem) gives conditions under which a martingale evaluated at a stopping time still has the same expectation as at time zero: E[X_τ] = E[X_0]. In other words, you cannot improve your expected fortune by choosing a clever exit rule when the underlying process is a martingale.`,
+      `The theorem requires technical conditions: the stopping time must be bounded, or have finite expectation and the martingale must be uniformly integrable, or other similar restrictions. Without such conditions the result can fail — classic counter-examples involve gambling strategies that stop at a high watermark but have infinite expected stopping time and infinite expected losses on the paths that never stop.`,
+      `In finance the theorem underpins the statement that, under the risk-neutral measure, the expected discounted payoff of a European claim equals its current price, and that the same is true for American claims when the optimal stopping time is used (the American price is still the expectation under the optimal τ). It also explains why “doubling strategies” and similar schemes that appear to guarantee a profit are either not admissible or require infinite capital.`,
+      `Practically, the optional stopping theorem is a warning: if a trading rule appears to extract a positive expected gain from a martingale (or from a process that is a martingale after discounting), either the rule is not a valid stopping time, the integrability conditions are violated, or an arbitrage has been found and the modelling assumptions need revision.`
+    ],
+    keyPoint: "The optional stopping theorem says you cannot beat a fair game by choosing when to stop — provided the stopping rule is legitimate and the integrability conditions hold. It is the rigorous reason that ‘guaranteed profit’ exit strategies usually contain a hidden flaw."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

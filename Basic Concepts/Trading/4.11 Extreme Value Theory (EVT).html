@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.11 Extreme Value Theory (EVT)</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 260px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 10px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.11 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Extreme Value<br><em>Theory</em></h1>
+        <div class="hdr-sub">Modelling the far tail — maxima, threshold exceedances, tail indices and the dependence of extremes</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Core Objects</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">GEV</div>
+            <div class="sw-price">Block Maxima</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">GPD</div>
+            <div class="sw-price">Peaks over u</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Tail Index</div>
+          <div class="sw-spread-val">ξ (shape)</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Application</div>
+          <div class="sw-mid-val">VaR · CVaR · Stress</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">9 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.11 Extreme Value Theory</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.11.01",
+    icon: "τ",
+    tClass: "t-ask",
+    title: "Fat Tails and Tail Risk",
+    sub: "Returns that decay more slowly than the Gaussian — the empirical reality that makes extreme-value methods necessary",
+    formula: "P(|X| > x) ~ x^{−α}  (power law)",
+    tags: [["fat tails","ask"], ["tail risk","ask"], ["kurtosis",""], ["power law",""]],
+    body: [
+      `Financial return distributions exhibit excess kurtosis and tails that are heavier than those of the normal distribution. Extreme losses (and gains) occur far more frequently than a Gaussian model predicts. This “fat-tail” phenomenon is one of the most robust stylised facts of asset returns and is the primary motivation for Extreme Value Theory in risk management.`,
+      `Tail risk refers to the possibility of large adverse moves that lie outside the range of ordinary fluctuations. Traditional risk measures calibrated under normality systematically understate the probability and severity of such moves. EVT supplies a statistically principled way to extrapolate beyond the range of observed data by focusing exclusively on the tail.`,
+      `Power-law (Pareto-type) tails are characterised by a tail index α: the survival function behaves like x^{−α} for large x. Smaller α means heavier tails. Many equity and FX series display estimated tail indices in the range 3–5, implying finite variance but infinite higher moments.`,
+      `Ignoring fat tails produces under-estimated VaR and Expected Shortfall, under-capitalisation, and a false sense of security. EVT, heavy-tailed parametric models, and stress testing are the main quantitative responses.`
+    ],
+    keyPoint: "Fat tails mean extreme events are not as rare as the normal distribution claims. Tail risk is the practical consequence; EVT is the mathematical toolkit designed to measure it."
+  },
+  {
+    num: "4.11.02",
+    icon: "GEV",
+    tClass: "t-spread",
+    title: "Generalized Extreme Value (GEV) Distribution",
+    sub: "The limiting distribution of normalised block maxima — the fundamental theorem of extreme-value statistics",
+    formula: "G(z) = exp{ −[1 + ξ(z−μ)/σ]^{−1/ξ} }",
+    tags: [["gev","spread"], ["block maxima","spread"], ["fisher-tippett",""], ["limiting law",""]],
+    formulaBox: {
+      main: "G<sub>ξ</sub>(z) = exp{ −[1 + ξ (z−μ)/σ ]<sup>−1/ξ</sup> }",
+      note: "ξ > 0 : Fréchet (heavy tails)\nξ = 0 : Gumbel (light tails, limit)\nξ < 0 : Weibull (bounded tail)"
+    },
+    body: [
+      `The Fisher–Tippett–Gnedenko theorem states that the only possible non-degenerate limiting distributions for normalised maxima of i.i.d. random variables are members of the Generalized Extreme Value (GEV) family. After suitable centring and scaling, the distribution of the maximum converges to a GEV law characterised by a location μ, a scale σ and a shape ξ.`,
+      `The shape parameter ξ determines the tail type: positive ξ (Fréchet domain) corresponds to heavy tails with power-law decay; ξ = 0 (Gumbel domain) corresponds to light tails (e.g., normal, log-normal, exponential); negative ξ (Weibull domain) corresponds to a finite upper endpoint.`,
+      `In practice one divides the data into blocks (e.g., monthly or quarterly maxima of daily losses), fits a GEV distribution to the block maxima by maximum likelihood or probability-weighted moments, and then extrapolates to longer horizons or higher quantiles.`,
+      `The GEV approach is asymptotically justified but statistically inefficient: only one observation (the maximum) is retained from each block. The peaks-over-threshold method makes fuller use of the data and is often preferred for financial applications.`
+    ],
+    keyPoint: "The GEV distribution is the universal limit law for block maxima. Its shape parameter ξ classifies the tail as heavy, light or bounded and is the key quantity for extrapolation."
+  },
+  {
+    num: "4.11.03",
+    icon: "POT",
+    tClass: "t-mid",
+    title: "Peaks-over-Threshold (POT) Method",
+    sub: "Modelling all observations that exceed a high threshold — the more data-efficient alternative to block maxima",
+    formula: "Exceedances over u  ~  GPD",
+    tags: [["pot","mid"], ["threshold","mid"], ["exceedances",""], ["efficiency",""]],
+    body: [
+      `The peaks-over-threshold method retains every observation that exceeds a high threshold u and models the excess amounts (X − u | X > u). Under mild conditions the distribution of these excesses converges to a Generalized Pareto Distribution as u tends to the upper endpoint of the support.`,
+      `Because many exceedances can be harvested from a single sample, POT is statistically more efficient than the block-maxima approach, which keeps only one observation per block. The price is the need to choose a threshold: too low and the asymptotic approximation is poor; too high and the number of excesses becomes too small for reliable estimation.`,
+      `Practical threshold selection combines mean-excess plots, parameter-stability plots, and goodness-of-fit diagnostics. Once the threshold is fixed, the GPD parameters are estimated by maximum likelihood, and the resulting model is used to compute high quantiles and expected shortfalls.`,
+      `In finance POT is the dominant EVT technique for univariate tail modelling of returns, losses and operational-risk severities. Declustering procedures are often applied first to reduce temporal dependence among consecutive exceedances.`
+    ],
+    keyPoint: "POT keeps every exceedance above a high threshold and models the excesses with a GPD. It extracts more information from the data than block maxima and is the workhorse EVT method in risk management."
+  },
+  {
+    num: "4.11.04",
+    icon: "GPD",
+    tClass: "t-mid",
+    title: "Generalized Pareto Distribution (GPD)",
+    sub: "The limiting distribution of threshold excesses — the building block of the POT method",
+    formula: "H(y) = 1 − (1 + ξ y / β)^{−1/ξ}",
+    tags: [["gpd","mid"], ["pareto","mid"], ["excess distribution",""], ["shape",""]],
+    formulaBox: {
+      main: "H<sub>ξ,β</sub>(y) = 1 − (1 + ξ y / β)<sup>−1/ξ</sup>",
+      note: "y = x − u > 0\nξ = shape (tail index related), β = scale\nξ > 0 ⇒ heavy-tailed (ordinary Pareto-type)"
+    },
+    body: [
+      `The Generalized Pareto Distribution is the unique limiting distribution of the excesses over a high threshold. It is characterised by a shape parameter ξ (the same shape that appears in the GEV) and a scale parameter β that depends on the threshold.`,
+      `When ξ > 0 the GPD has a power-law tail and infinite moments of order greater than or equal to 1/ξ. When ξ = 0 it reduces to an exponential distribution; when ξ < 0 it has a finite upper endpoint. The mean excess function of a GPD is linear in the threshold, which supplies a useful diagnostic plot.`,
+      `Once a GPD has been fitted to the excesses, the tail of the original distribution can be reconstructed by combining the GPD with the empirical probability of exceeding the threshold. High quantiles and expected shortfalls then follow in closed form.`,
+      `The GPD is the parametric engine of modern univariate EVT. Its parsimony (only two parameters) and asymptotic motivation make it the default model for the far tail of financial loss distributions.`
+    ],
+    keyPoint: "The GPD is the limiting law of excesses over a high threshold. Fit it to the peaks above u and you obtain a parametric description of the entire far tail, including quantiles beyond the sample maximum."
+  },
+  {
+    num: "4.11.05",
+    icon: "BM",
+    tClass: "t-classes",
+    title: "Block Maxima Approach",
+    sub: "Dividing the sample into blocks, extracting the maximum of each block, and fitting a GEV",
+    formula: "M_n = max(X₁,\ldots,Xₙ)  →  GEV after normalisation",
+    tags: [["block maxima","classes"], ["gev fitting","classes"], ["periods",""], ["classic evt",""]],
+    body: [
+      `The classical block-maxima method partitions the observation period into non-overlapping blocks of equal length (e.g., calendar months or quarters), retains the maximum loss (or return) in each block, and fits a GEV distribution to the resulting series of maxima.`,
+      `Block length is a bias–variance trade-off: longer blocks improve the asymptotic approximation but reduce the number of maxima available for estimation. In finance, monthly or quarterly blocks are common; for high-frequency data shorter blocks may be feasible after careful declustering.`,
+      `Once the GEV is fitted, return levels (quantiles of the maximum over a future period of length T) are obtained by inverting the GEV distribution function. Confidence intervals follow from the delta method or from profile likelihood.`,
+      `Although less efficient than POT, the block-maxima approach remains attractive when the natural time unit of risk reporting is a block (e.g., “the worst day of each month”) or when the dependence structure makes threshold exceedances hard to decluster.`
+    ],
+    keyPoint: "Block maxima extract one extreme per time window and model them with a GEV. It is the original EVT method—simple, asymptotically justified, and still useful when the reporting period itself defines the blocks."
+  },
+  {
+    num: "4.11.06",
+    icon: "VaR",
+    tClass: "t-bid",
+    title: "Application to VaR and CVaR",
+    sub: "Extrapolating high quantiles and expected shortfalls from a fitted GEV or GPD tail model",
+    formula: "VaR_p / ES_p from the fitted tail",
+    tags: [["var","bid"], ["cvar","bid"], ["es",""], ["quantile",""]],
+    formulaBox: {
+      main: "VaR_p = u + (β/ξ) [ (n_u/(n(1−p)))^ξ − 1 ]",
+      note: "for GPD / POT (ξ ≠ 0)\nES_p = VaR_p / (1−ξ) + (β − ξ u)/(1−ξ)\n(valid for ξ < 1)"
+    },
+    body: [
+      `Once a GPD (or GEV) has been fitted to the tail, any quantile beyond the threshold (or beyond the range of the block maxima) can be computed analytically. Value-at-Risk at a high confidence level is simply the corresponding quantile of the fitted tail model; Expected Shortfall (CVaR) is the average of the loss distribution beyond that quantile and also admits a closed-form expression under the GPD.`,
+      `The decisive advantage over historical simulation is the ability to extrapolate: EVT can produce a 99.9 % VaR even when the sample contains no losses of that magnitude. The decisive advantage over a parametric normal or Student-t assumption is that the tail shape is estimated from the extreme data themselves rather than imposed globally.`,
+      `Standard errors and confidence intervals for the extrapolated quantiles are obtained from the asymptotic covariance of the GPD parameters or from bootstrap methods. Sensitivity to the threshold choice remains the principal modelling uncertainty and should be reported.`,
+      `In practice EVT-based VaR/ES is often used as a complement to, rather than a replacement for, other risk engines: it supplies an independent, tail-focused view that is especially valuable for regulatory capital and for stress-oriented risk limits.`
+    ],
+    keyPoint: "EVT turns a fitted GPD or GEV into analytic high quantiles and expected shortfalls. It extrapolates beyond the sample maximum and therefore supplies VaR and CVaR numbers that historical simulation cannot reach."
+  },
+  {
+    num: "4.11.07",
+    icon: "ξ",
+    tClass: "t-cost",
+    title: "Tail Index Estimation",
+    sub: "Measuring how heavy the tail is — Hill estimator and related methods for the shape parameter",
+    formula: "α = 1/ξ  (tail index)",
+    tags: [["tail index","gold"], ["hill","gold"], ["shape",""], ["estimation",""]],
+    formulaBox: {
+      main: "Hill: ξ̂ = (1/k) Σ<sub>i=1</sub><sup>k</sup> log(X<sub>(i)</sub>/X<sub>(k+1)</sub>)",
+      note: "X_{(1)} ≥ \ldots ≥ X_{(n)} ordered exceedances\nk = number of upper order statistics used\nBias–variance trade-off in the choice of k"
+    },
+    body: [
+      `The tail index α (or its reciprocal, the GPD/GEV shape ξ) quantifies the heaviness of the tail. Accurate estimation of ξ is the central statistical problem of univariate EVT, because all extrapolated quantiles inherit the uncertainty in ξ.`,
+      `The Hill estimator is the classic semi-parametric estimator for positive ξ: it averages the log-excesses of the k largest observations over the (k+1)-th order statistic. The choice of k is critical—too small and the variance is large; too large and bias from the non-asymptotic region contaminates the estimate. Hill plots (ξ̂ versus k) are the standard diagnostic.`,
+      `Maximum-likelihood estimation of the GPD parameters, probability-weighted moments, and more recent reduced-bias estimators offer alternatives. For the boundary case ξ ≈ 0, specialised methods that do not assume a power-law form are preferable.`,
+      `In finance a stable estimated tail index is itself a useful risk summary: portfolios or risk factors with smaller α (larger ξ) require more capital and more conservative stress scenarios. Tracking the evolution of ξ through time can signal changes in tail risk.`
+    ],
+    keyPoint: "The tail index ξ (or α = 1/ξ) is the single most important number in univariate EVT. The Hill estimator and GPD maximum likelihood are the standard tools; the choice of how many extremes to use is the perennial practical difficulty."
+  },
+  {
+    num: "4.11.08",
+    icon: "ST",
+    tClass: "t-impact",
+    title: "EVT for Stress Testing",
+    sub: "Generating extreme yet statistically grounded scenarios from the fitted tail model",
+    formula: "Simulate or set scenarios from the GPD/GEV tail",
+    tags: [["stress testing","impact"], ["scenarios","impact"], ["extrapolation",""], ["plausibility",""]],
+    body: [
+      `Stress testing requires scenarios that are severe but still plausible. EVT supplies a statistically coherent way to construct such scenarios: once a GPD or GEV has been fitted, one can draw realisations from the far tail or can set a scenario equal to a chosen high quantile (or return level) of the fitted model.`,
+      `Because the model is estimated from the extremes of the actual data, the resulting stresses are automatically calibrated to the historical tail behaviour of the risk factor. They can be made more or less severe by moving further into the tail, and confidence intervals around the scenarios quantify estimation uncertainty.`,
+      `Multivariate extensions (using tail-dependence functions or extreme-value copulas) allow the construction of joint stress scenarios that respect the observed tendency of extremes to occur together. Reverse stress testing can be implemented by searching for the most likely EVT scenario that produces a pre-defined portfolio loss.`,
+      `EVT-based stresses complement historical crisis replays and purely hypothetical expert scenarios. They add a layer of statistical discipline and make the severity of the stress an explicit, tunable parameter.`
+    ],
+    keyPoint: "EVT converts a fitted tail model into concrete stress scenarios that are extreme yet grounded in the data. Severity becomes a quantile choice rather than an arbitrary additive shock."
+  },
+  {
+    num: "4.11.09",
+    icon: "C",
+    tClass: "t-markets",
+    title: "Copulas and Tail Dependence",
+    sub: "Modelling the joint occurrence of extremes — how likely is a crash in one market given a crash in another",
+    formula: "λ_U = lim_{u→1} P(U₁ > u | U₂ > u)",
+    tags: [["tail dependence","markets"], ["copula","markets"], ["extremes",""], ["joint tail",""]],
+    formulaBox: {
+      main: "λ_U = lim<sub>q→1</sub> P(X > F<sub>X</sub><sup>−1</sup>(q) | Y > F<sub>Y</sub><sup>−1</sup>(q))",
+      note: "λ_U > 0 ⇒ asymptotic upper-tail dependence\nGaussian copula: λ_U = 0 (even with high correlation)\n t-copula / Clayton / Gumbel: can produce λ_U > 0"
+    },
+    body: [
+      `Univariate EVT describes the marginal tails; joint tail behaviour requires an additional dependence model. The tail-dependence coefficient λ measures the probability that one variable is extreme given that the other is extreme. A positive λ indicates that extremes tend to arrive together.`,
+      `Copulas separate marginal distributions from the dependence structure. The Gaussian copula, despite being able to produce high linear correlation, has zero asymptotic tail dependence: extreme events become independent in the limit. The Student-t copula, the Clayton copula (lower tail) and the Gumbel copula (upper tail) can generate positive tail dependence and are therefore more realistic for financial crashes.`,
+      `Extreme-value copulas (or the Pickands dependence function) arise as the only possible limits of component-wise maxima and provide a theoretically coherent way to model the joint distribution of extremes. Non-parametric estimators of the tail-dependence coefficient and of the spectral measure are also available.`,
+      `In risk management, ignoring tail dependence leads to under-estimation of portfolio losses in crises, when correlations appear to “jump to one”. EVT-aware dependence models are essential for realistic aggregate VaR, for multi-name credit risk, and for stress scenarios that move several markets simultaneously.`
+    ],
+    keyPoint: "Tail dependence quantifies whether extremes cluster across markets. Gaussian copulas miss it; t-copulas and extreme-value copulas capture it. Joint crash risk cannot be measured by correlation alone."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

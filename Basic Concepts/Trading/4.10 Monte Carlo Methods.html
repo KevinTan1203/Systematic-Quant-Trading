@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.10 Monte Carlo Methods</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 260px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 10px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.10 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Monte Carlo<br><em>Methods</em></h1>
+        <div class="hdr-sub">Sampling the future — simulation of paths, prices, risks and stress scenarios by the law of large numbers</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Core Estimator</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Estimate</div>
+            <div class="sw-price">E[f] ≈ (1/N) Σ f(Xᵢ)</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Error</div>
+            <div class="sw-price">~ σ / √N</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Variance Reduction</div>
+          <div class="sw-spread-val">Antithetic / IS / QMC</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Applications</div>
+          <div class="sw-mid-val">Pricing · VaR · Stress</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">10 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.10 Monte Carlo Methods</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.10.01",
+    icon: "MC",
+    tClass: "t-mid",
+    title: "Monte Carlo Simulation Basics",
+    sub: "Estimating expectations by averaging a function of random samples — the law of large numbers in action",
+    formula: "Ê[f] = (1/N) Σ f(Xᵢ)",
+    tags: [["monte carlo","mid"], ["expectation","mid"], ["lln",""], ["simulation",""]],
+    formulaBox: {
+      main: "θ̂<sub>N</sub> = (1/N) Σ<sub>i=1</sub><sup>N</sup> f(X<sub>i</sub>)",
+      note: "Xᵢ ~ target distribution (or path measure)\nθ̂<sub>N</sub> → E[f(X)] as N → ∞\nStd. error ≈ s / √N"
+    },
+    body: [
+      `Monte Carlo simulation estimates an expectation (or a probability, quantile, or other functional) by drawing independent samples from the relevant distribution and averaging the corresponding function values. The law of large numbers guarantees convergence; the central limit theorem supplies the asymptotic √N rate and confidence intervals.`,
+      `In finance the “expectation” is usually a discounted risk-neutral payoff, a loss distribution, or a risk-measure functional. The samples are typically entire paths of one or more stochastic processes. Because the method requires only the ability to simulate the underlying randomness, it extends immediately to high-dimensional, path-dependent and early-exercise problems that defeat PDE or transform methods.`,
+      `The statistical error of a plain Monte Carlo estimator scales as σ/√N, where σ is the standard deviation of the discounted payoff (or of the quantity being averaged). Reducing σ (variance reduction) or replacing pseudo-random numbers by low-discrepancy sequences (quasi-Monte Carlo) are the two principal routes to higher accuracy for a given computational budget.`,
+      `Implementation consists of three layers: a random-number generator, a discretisation scheme for the driving SDEs (Euler, Milstein, \ldots), and the evaluation of the functional of interest on each path. Parallelisation across paths is trivial and maps naturally onto modern hardware.`
+    ],
+    keyPoint: "Monte Carlo turns an expectation into an average of simulated outcomes. Convergence is guaranteed by the LLN; the error shrinks only as 1/√N unless variance-reduction or quasi-Monte Carlo techniques are applied."
+  },
+  {
+    num: "4.10.02",
+    icon: "RNG",
+    tClass: "t-cost",
+    title: "Random Number Generation",
+    sub: "Producing the uniform and non-uniform random inputs that drive every simulation",
+    formula: "U ~ Uniform(0,1)  →  X = F⁻¹(U)",
+    tags: [["rng","gold"], ["uniform","gold"], ["inverse transform",""], ["pseudo-random",""]],
+    body: [
+      `Every Monte Carlo calculation begins with a stream of uniform random numbers on (0,1). Modern generators (Mersenne Twister, PCG, Philox, counter-based generators) produce long-period, high-quality pseudo-random sequences that pass stringent statistical test suites. Reproducibility is obtained by fixing the seed; parallel streams are obtained by leap-frogging or by independent sub-streams.`,
+      `Non-uniform random variables are obtained from uniforms by inversion (X = F⁻¹(U)), by acceptance-rejection, by transformation methods (Box–Muller, Marsaglia polar for normals), or by specialised algorithms for particular distributions. For multivariate normals the standard route is to generate independent standard normals and then multiply by a Cholesky (or spectral) factor of the desired covariance.`,
+      `Quasi-random (low-discrepancy) sequences deliberately avoid the clustering that appears in ordinary pseudo-random points; they are discussed under Quasi-Monte Carlo. Cryptographic generators are unnecessary for ordinary simulation but are sometimes used when the integrity of the random stream itself must be auditable.`,
+      `A subtle but important practical point: the quality of the tail of the generated distribution matters for risk calculations that depend on extreme quantiles. Generators and transformation methods should be checked for accurate tail behaviour before they are used for VaR or expected-shortfall simulation.`
+    ],
+    keyPoint: "Uniform pseudo-random numbers are the raw material of Monte Carlo; inversion and transformation turn them into the distributions required by the model. Generator quality and reproducible seeding are non-negotiable engineering requirements."
+  },
+  {
+    num: "4.10.03",
+    icon: "VR",
+    tClass: "t-spread",
+    title: "Variance Reduction Techniques",
+    sub: "Lowering the Monte Carlo error for a fixed number of paths — antithetic variates, control variates, importance sampling",
+    formula: "Var(θ̂) ↓  without changing the expectation",
+    tags: [["variance reduction","spread"], ["antithetic","spread"], ["importance sampling",""], ["control variate",""]],
+    splitBox: [
+      { cls: "bid",  label: "Antithetic Variates", text: "Pair each path driven by Z with a path driven by −Z. Negative correlation reduces variance when the payoff is roughly monotone." },
+      { cls: "mid",  label: "Control Variates", text: "Subtract a multiple of a zero-mean quantity that is highly correlated with the payoff (e.g., a closed-form European price). Optimal coefficient is estimated from the sample." },
+      { cls: "spread", label: "Importance Sampling", text: "Sample from a distribution that over-weights the regions that contribute most to the expectation (e.g., the region where an option finishes in-the-money), then re-weight by the likelihood ratio." },
+      { cls: "gold", label: "Stratified / LHS", text: "Force the sample to cover each stratum or Latin-hypercube cell. Reduces variance especially in moderate dimension." },
+    ],
+    body: [
+      `The plain Monte Carlo standard error is σ/√N. Variance-reduction techniques attack the numerator σ without introducing bias. The most widely used methods in finance are antithetic variates, control variates and importance sampling.`,
+      `Antithetic variates replace each random draw Z by the pair (Z, −Z). When the functional of interest is monotone in Z the two payoffs are negatively correlated and their average has lower variance. The method is essentially free and is a standard first line of defence.`,
+      `Control variates exploit a related quantity whose expectation is known analytically. The difference between the Monte Carlo estimate of that quantity and its known value is used to correct the estimate of the target. The optimal control coefficient is the regression coefficient of the target on the control and is estimated from the same simulation.`,
+      `Importance sampling changes the probability measure so that rare but important events become more frequent; the likelihood ratio restores unbiasedness. It is especially powerful for deep out-of-the-money options and for tail-risk calculations. Designing a good importance distribution requires insight into the problem and is more art than the other techniques.`
+    ],
+    keyPoint: "Variance reduction leaves the expectation unchanged while shrinking the Monte Carlo error. Antithetic and control variates are the everyday tools; importance sampling is the heavy artillery for rare-event and tail problems."
+  },
+  {
+    num: "4.10.04",
+    icon: "QMC",
+    tClass: "t-classes",
+    title: "Quasi-Monte Carlo (Sobol Sequences)",
+    sub: "Replacing random points by deterministic low-discrepancy sequences that fill space more uniformly",
+    formula: "Error ~ (log N)^d / N   (instead of 1/√N)",
+    tags: [["quasi-monte carlo","classes"], ["sobol","classes"], ["low discrepancy",""], ["uniformity",""]],
+    formulaBox: {
+      main: "Sobol / Halton / Lattice points in [0,1]<sup>d</sup>",
+      note: "Discrepancy measures deviation from uniformity\nEffective dimension ≪ nominal dimension is key\nOwen scrambling restores unbiasedness & enables error estimates"
+    },
+    body: [
+      `Quasi-Monte Carlo (QMC) replaces pseudo-random points by deterministic sequences that are constructed to be more evenly distributed in the unit hypercube. The most popular constructions in finance are Sobol sequences (and their randomised / scrambled versions). The theoretical error bound improves from O(N^{−1/2}) to O((log N)^d / N) under suitable smoothness conditions.`,
+      `In practice the gain is dramatic when the effective dimension of the integrand is low — i.e., when the payoff depends mainly on a few linear combinations of the input variables. Brownian-bridge or principal-component constructions of the underlying paths deliberately push the important variation into the first coordinates, making QMC far more efficient than plain Monte Carlo.`,
+      `Because a pure QMC rule is deterministic, statistical error estimates are not immediate. Randomised QMC (Owen scrambling, random shifts) restores unbiasedness and permits ordinary sample-variance error estimates while preserving most of the convergence benefit.`,
+      `QMC is now a standard component of production pricing libraries for equity, FX and interest-rate exotics. It is less automatic for risk calculations that require genuine tail sampling, where importance sampling or plain Monte Carlo with variance reduction may remain preferable.`
+    ],
+    keyPoint: "Quasi-Monte Carlo fills the unit cube more evenly than random points. When combined with a Brownian-bridge or PCA path construction it often delivers an order-of-magnitude reduction in the number of paths needed for a given accuracy."
+  },
+  {
+    num: "4.10.05",
+    icon: "Opt",
+    tClass: "t-bid",
+    title: "Options Pricing via Monte Carlo",
+    sub: "Risk-neutral expectation of the discounted payoff, estimated by averaging simulated terminal (or path) values",
+    formula: "V = e^{−rT} E^Q [payoff(S)]",
+    tags: [["option pricing","bid"], ["risk-neutral","bid"], ["european",""], ["exotic",""]],
+    formulaBox: {
+      main: "V̂ = e^{−rT} (1/N) Σ payoff(S<sup>(i)</sup>)",
+      note: "Simulate under the risk-neutral measure Q\nFor early exercise: Longstaff–Schwartz least-squares MC\nGreeks by pathwise / likelihood-ratio / adjoint methods"
+    },
+    body: [
+      `The fundamental theorem of asset pricing expresses the value of a European claim as the discounted risk-neutral expectation of its payoff. Monte Carlo estimates that expectation by simulating the underlying under the risk-neutral dynamics, evaluating the payoff on each path, averaging, and discounting.`,
+      `For European payoffs that depend only on the terminal value the simulation can jump directly to maturity (when the transition density is known) or can use a time-stepping scheme. For path-dependent payoffs the whole trajectory must be generated. Early-exercise (American / Bermudan) features are handled by regression-based methods such as Longstaff–Schwartz, which estimate the continuation value from a cross-sectional regression on the simulated states.`,
+      `Greeks are obtained by finite differences (bump-and-revalue, preferably with common random numbers), by pathwise differentiation, by the likelihood-ratio method, or by adjoint algorithmic differentiation. The last technique yields all first-order sensitivities at a cost comparable to a single pricing run.`,
+      `Variance reduction, quasi-Monte Carlo and careful discretisation-bias control are essential for production-grade accuracy. Hybrid schemes that combine Monte Carlo with PDE solutions on a subset of factors are common for high-dimensional exotics.`
+    ],
+    keyPoint: "Monte Carlo prices an option by averaging discounted payoffs simulated under the risk-neutral measure. It is the method of choice for high-dimensional and path-dependent claims; American features require an additional regression or boundary-estimation step."
+  },
+  {
+    num: "4.10.06",
+    icon: "VaR",
+    tClass: "t-ask",
+    title: "VaR Estimation via Monte Carlo",
+    sub: "Building the full loss distribution by simulation and reading off the desired quantile",
+    formula: "VaR_α = quantile_α of simulated loss distribution",
+    tags: [["var","ask"], ["quantile","ask"], ["loss distribution",""], ["risk",""]],
+    body: [
+      `Monte Carlo VaR generates a large number of scenarios for the risk-factor moves over the chosen horizon, revalues the portfolio in each scenario, and constructs the empirical distribution of losses (or of P&L). Value-at-Risk at level α is the corresponding empirical quantile; Expected Shortfall is the average of the losses beyond that quantile.`,
+      `Full revaluation is accurate but expensive. Delta-gamma or other quadratic approximations can be used inside each scenario to accelerate the calculation, at the cost of approximation error for large moves or for portfolios with material higher-order exposures. Importance sampling and extreme-value techniques improve the estimation of far-tail quantiles.`,
+      `The same simulation engine supplies a complete loss distribution, not merely a single VaR number. This permits the calculation of any spectral risk measure, of contributions to VaR / ES by position or by risk factor, and of what-if analyses under modified positions.`,
+      `Key practical controls are the number of scenarios (especially in the tail), the quality of the joint distribution of risk-factor changes (including fat tails and dependence), and the consistency of the valuation models used for revaluation.`
+    ],
+    keyPoint: "Monte Carlo VaR builds the portfolio loss distribution by revaluing under many simulated risk-factor scenarios. The desired quantile (and Expected Shortfall) are then read directly from the empirical distribution."
+  },
+  {
+    num: "4.10.07",
+    icon: "Path",
+    tClass: "t-dynamics",
+    title: "Path-Dependent Options Simulation",
+    sub: "Payoffs that depend on the whole trajectory — barriers, Asians, lookbacks, autocallables",
+    formula: "payoff = f(S_{t1}, \ldots, S_{tn})",
+    tags: [["path dependent","dynamics"], ["barrier","dynamics"], ["asian",""], ["lookback",""]],
+    body: [
+      `Path-dependent options have payoffs that are functions of the asset values at a set of monitoring dates (or of the continuous path). Simulation is the most flexible pricing method: one generates the required time grid, evaluates the path functional, and averages the discounted results.`,
+      `Discretisation bias arises when a continuous barrier or a continuous average is approximated by a discrete grid. Bias can be reduced by finer time steps, by Brownian-bridge corrections for barrier crossings, or by exact simulation techniques when they are available. For Asian options the geometric average admits a closed-form control variate that dramatically reduces variance.`,
+      `Lookback, barrier, cliquet, autocallable and many structured-product payoffs are routinely priced by Monte Carlo. Early-termination features (autocalls, bermudan exercise) again rely on regression or on boundary-parameterisation methods.`,
+      `Because the effective dimension equals the number of time steps (or a multiple thereof), quasi-Monte Carlo with a Brownian-bridge or PCA construction is often highly effective for path-dependent pricing.`
+    ],
+    keyPoint: "Path-dependent payoffs are evaluated on simulated trajectories. The technical challenges are discretisation bias, variance reduction for the particular functional, and the handling of any early-exit decisions."
+  },
+  {
+    num: "4.10.08",
+    icon: "Multi",
+    tClass: "t-classes",
+    title: "Multi-Asset Monte Carlo",
+    sub: "Simulating correlated underlyings — baskets, spreads, rainbow options and multi-factor models",
+    formula: "dS = \ldots  with  d⟨W^i, W^j⟩ = ρ_{ij} dt",
+    tags: [["multi-asset","classes"], ["correlation","classes"], ["basket",""], ["cholesky",""]],
+    body: [
+      `Multi-asset simulation requires a joint law for the driving Brownian motions (or other noise sources). The standard construction draws independent standard normals and multiplies by a factor of the correlation (or covariance) matrix—Cholesky for speed, spectral decomposition when rank reduction is desired.`,
+      `The correlation matrix itself must be positive semidefinite; estimated matrices that violate this constraint are repaired by spectral projection or by shrinkage. For large baskets a factor model (or PCA) reduces the number of independent noises and stabilises the dependence structure.`,
+      `Payoffs that depend on several underlyings (basket options, spread options, best-of / worst-of, collateralised multi-name products) are then evaluated on the jointly simulated paths. Dimension grows linearly with the number of assets (and with the number of time steps), so variance reduction and quasi-Monte Carlo become especially valuable.`,
+      `Hybrid multi-asset / multi-factor models (equity + rates + FX + credit) follow the same pattern once the full instantaneous covariance structure of all driving processes has been specified and factorised.`
+    ],
+    keyPoint: "Multi-asset Monte Carlo generates correlated paths by transforming independent normals with a factor of the correlation matrix. The quality of that matrix and the use of dimension-reduction techniques determine both accuracy and speed."
+  },
+  {
+    num: "4.10.09",
+    icon: "Boot",
+    tClass: "t-impact",
+    title: "Bootstrapping Market Scenarios",
+    sub: "Resampling historical returns or residual vectors to generate realistic, non-parametric future paths",
+    formula: "Draw blocks / residual vectors from history",
+    tags: [["bootstrap","impact"], ["historical","impact"], ["nonparametric",""], ["residual",""]],
+    body: [
+      `Instead of specifying a parametric process and simulating from it, one can resample directly from historical return vectors (or from residuals of a fitted model). The resulting scenarios automatically inherit the empirical marginal distributions, the observed dependence structure, and any higher-order features present in the data.`,
+      `Simple i.i.d. resampling of daily return vectors ignores serial dependence and volatility clustering. Block bootstrap (resampling contiguous blocks) and residual bootstrap (fitting a model, resampling residuals, and reconstructing paths) restore a controllable amount of temporal structure. Stationary and circular-block variants improve the edge behaviour of the blocks.`,
+      `Bootstrapped scenarios are widely used for risk management, for economic-scenario generators that must stay close to history, and for stress testing that starts from real market moves rather than from stylised shocks. They can be combined with parametric overlays (e.g., scaling the residuals by a GARCH volatility forecast) to incorporate a forward-looking view of volatility.`,
+      `The principal limitation is that purely historical resampling cannot produce moves more extreme than those already observed, unless an extreme-value or parametric tail model is grafted onto the bootstrap.`
+    ],
+    keyPoint: "Bootstrapping market scenarios resamples history (or model residuals) instead of drawing from a parametric law. The scenarios automatically carry the empirical dependence and tail features of the past."
+  },
+  {
+    num: "4.10.10",
+    icon: "Stress",
+    tClass: "t-ask",
+    title: "Stress Testing via Simulation",
+    sub: "Exploring the portfolio under extreme but plausible scenarios — historical, hypothetical and reverse stress",
+    formula: "Revalue under stressed risk-factor paths / shocks",
+    tags: [["stress testing","ask"], ["scenario","ask"], ["extreme","ask"], ["reverse stress",""]],
+    body: [
+      `Stress testing asks what happens to the portfolio under severe but plausible market conditions. Monte Carlo (or scenario) simulation is the natural computational engine: one generates paths or instantaneous shocks that embody the stress, revalues the portfolio, and records the resulting P&L or capital metrics.`,
+      `Historical stress tests replay particular crisis windows (2008, 2011, 2020, \ldots) or scale historical move vectors to a chosen severity. Hypothetical stress tests design shocks from expert judgement or from regulatory prescriptions (e.g., prescribed yield-curve twists, equity crashes, credit-spread widenings). Reverse stress tests search for the scenarios that produce a pre-defined loss level, thereby revealing the portfolio’s vulnerabilities.`,
+      `Simulation-based stress testing can incorporate dynamic hedging, margin calls, liquidity feedback and other path-dependent effects that a simple instantaneous shock cannot capture. Multi-period stress scenarios with conditional dynamics (volatility spikes, correlation breaks, jumps) are constructed by modifying the simulation engine’s drift, diffusion or jump intensity under the stress measure.`,
+      `Governance requires that the chosen stresses remain relevant, that the valuation models remain valid under large moves, and that the results are translated into concrete risk-management actions rather than remaining a reporting exercise.`
+    ],
+    keyPoint: "Stress testing uses simulation to revalue the portfolio under extreme scenarios. Historical, hypothetical and reverse-stress designs each answer a different question about what could go wrong and how bad it could be."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

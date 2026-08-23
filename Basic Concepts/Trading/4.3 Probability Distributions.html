@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.3 Probability Distributions</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.3 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Probability<br><em>Distributions</em></h1>
+        <div class="hdr-sub">The shapes of uncertainty — from the Gaussian ideal to the heavy-tailed reality of financial returns</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Key Contrasts (illustrative)</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Normal</div>
+            <div class="sw-price">Thin tails<br>Kurtosis = 3</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Student-t / Returns</div>
+            <div class="sw-price">Fat tails<br>Kurtosis ≫ 3</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Log-normal</div>
+          <div class="sw-spread-val">Prices &gt; 0</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Jarque-Bera</div>
+          <div class="sw-mid-val">Test for normality</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">15 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.3 Probability Distributions</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.3.01",
+    icon: "𝒩",
+    tClass: "t-mid",
+    title: "Normal (Gaussian) Distribution",
+    sub: "The bell curve — symmetric, thin-tailed, and the default approximation via the CLT",
+    formula: "X ~ N(μ, σ²)",
+    tags: [["normal","mid"], ["gaussian","mid"], ["bell curve",""], ["thin tails",""]],
+    formulaBox: {
+      main: "f(x) = (1/σ√(2π)) exp(−(x−μ)²/(2σ²))",
+      note: "Mean = μ, Variance = σ²\nSkewness = 0, Kurtosis = 3\n~68% within 1σ, ~95% within 2σ, ~99.7% within 3σ"
+    },
+    body: [
+      `The normal (Gaussian) distribution is the most important continuous distribution in statistics and the historical starting point for almost every model in quantitative finance. It is completely characterised by two parameters: location μ (mean) and scale σ (standard deviation). Its density is the familiar symmetric bell curve.`,
+      `The normal arises as the limiting distribution of sums of many small independent effects (central limit theorem). Consequently sample means, many estimators, and the increments of Brownian motion are Gaussian. In the Black–Scholes world, log-returns are assumed normal, which makes prices log-normal.`,
+      `Key properties: it is symmetric (skewness = 0), has kurtosis exactly 3, and possesses moment-generating and characteristic functions of simple closed form. Linear combinations of jointly normal variables remain normal — a property that makes portfolio mathematics tractable under normality.`,
+      `Empirically, financial returns are not normal: they exhibit fat tails and, often, negative skewness. The normal distribution remains useful as a benchmark, as a large-sample approximation, and as the reference against which departures (especially excess kurtosis) are measured.`
+    ],
+    keyPoint: "The normal distribution is the CLT’s gift: the shape that sums of independent shocks converge to. It is the clean theoretical default — and the distribution that real returns systematically violate through their tails."
+  },
+  {
+    num: "4.3.02",
+    icon: "ln",
+    tClass: "t-spread",
+    title: "Log-normal Distribution",
+    sub: "The distribution of a variable whose logarithm is normal — the natural model for prices",
+    formula: "X ~ LogN(μ, σ²)  ⇒  ln X ~ N(μ, σ²)",
+    tags: [["log-normal","spread"], ["prices","spread"], ["positive support",""], ["black-scholes",""]],
+    formulaBox: {
+      main: "If ln X ~ N(μ, σ²) then X ~ LogN(μ, σ²)",
+      note: "Support: (0, ∞)\nE[X] = exp(μ + σ²/2)\nMedian = exp(μ)  (right-skewed)"
+    },
+    body: [
+      `A random variable is log-normal when its natural logarithm is normally distributed. Because the exponential of any real number is positive, a log-normal random variable takes only positive values. This makes it the canonical continuous distribution for prices, asset values, and other quantities that cannot be negative.`,
+      `If log-returns over a fixed horizon are normal, then the price relative (and therefore the price itself, given today’s price) is log-normal. This is exactly the assumption underlying geometric Brownian motion and the Black–Scholes formula. The mean of a log-normal exceeds its median; the distribution is right-skewed, with a long right tail and a sharp left boundary at zero.`,
+      `Parameters are usually quoted as the mean and variance of the underlying normal (the log). The expectation of the log-normal itself is exp(μ + σ²/2), which is why the forward price in Black–Scholes contains the familiar convexity term.`,
+      `Log-normality is a convenient modelling assumption, not an empirical law. Real price distributions can display heavier tails or different skewness than a pure log-normal; mixture models, stochastic volatility and jump processes are used when the fit becomes inadequate.`
+    ],
+    keyPoint: "Log-normality turns normal log-returns into positive prices. It is the distributional counterpart of geometric Brownian motion and the reason Black–Scholes prices are well-defined and positive."
+  },
+  {
+    num: "4.3.03",
+    icon: "t",
+    tClass: "t-ask",
+    title: "Student’s t-Distribution",
+    sub: "A symmetric, heavy-tailed alternative to the normal — the workhorse for fat-tailed returns",
+    formula: "t(ν)  —  ν degrees of freedom",
+    tags: [["student-t","ask"], ["fat tails","ask"], ["degrees of freedom",""], ["robust",""]],
+    formulaBox: {
+      main: "t ~ (Z) / √(V/ν)  where Z~N(0,1), V~χ²(ν)",
+      note: "As ν → ∞, t → N(0,1)\nFor ν ≤ 2 variance is infinite\nKurtosis = 3 + 6/(ν−4) for ν > 4"
+    },
+    body: [
+      `The Student’s t-distribution is symmetric about zero and has heavier tails than the normal. It is characterised by a degrees-of-freedom parameter ν: small ν produces very heavy tails; as ν → ∞ the t converges to the standard normal. For ν ≤ 2 the variance is infinite; for ν ≤ 4 the kurtosis is infinite.`,
+      `Historically the t arose as the sampling distribution of the standardised mean when the population variance is estimated from the data. In finance it is widely used as a direct model for returns precisely because empirical returns have fatter tails than a normal. Multivariate t distributions are common in risk management and portfolio construction when a single degree-of-freedom parameter controls tail dependence.`,
+      `Maximum-likelihood estimation of a t distribution on equity or FX returns typically yields ν in the range 4–8, confirming substantial excess kurtosis. The t can be viewed as a normal variance-mean mixture: a normal with a random variance that follows an inverse-gamma (or scaled inverse-χ²) law.`,
+      `Because of its heavier tails, Value-at-Risk and Expected Shortfall calculated under a t are larger than under a normal with the same variance — a more conservative and usually more realistic risk assessment.`
+    ],
+    keyPoint: "The t-distribution keeps the symmetry of the normal but fattens the tails via a single degrees-of-freedom parameter. It is the simplest widely-used parametric fix for the excess kurtosis of financial returns."
+  },
+  {
+    num: "4.3.04",
+    icon: "χ²",
+    tClass: "t-cost",
+    title: "Chi-squared Distribution",
+    sub: "The distribution of a sum of squared standard normals — central to variance estimation and goodness-of-fit",
+    formula: "χ²(k) = sum of k independent N(0,1)²",
+    tags: [["chi-squared","gold"], ["variance","gold"], ["goodness-of-fit",""], ["degrees of freedom",""]],
+    body: [
+      `A chi-squared random variable with k degrees of freedom is the sum of the squares of k independent standard normals. It is supported on [0, ∞), is right-skewed for small k, and becomes approximately normal for large k. Its mean is k and its variance is 2k.`,
+      `The chi-squared appears whenever one studies sample variances: if Xᵢ are i.i.d. normal, then (n−1)s²/σ² ~ χ²(n−1). It is also the asymptotic distribution of many likelihood-ratio and Pearson goodness-of-fit statistics. In multivariate statistics the Mahalanobis distance of a normal vector is chi-squared.`,
+      `In finance the chi-squared underlies hypothesis tests on variances, covariance matrices and factor models, and appears in the distribution of quadratic forms of returns under normality. Squared returns, under a normal assumption, are scaled chi-squared; this is one reason early ARCH models used chi-squared-type likelihoods.`,
+      `Related distributions include the non-central chi-squared (sum of squares of non-zero-mean normals) and the inverse-chi-squared, which is a common prior for variances in Bayesian work.`
+    ],
+    keyPoint: "Chi-squared is the law of summed squared Gaussians. It is the reference distribution for sample variances, quadratic forms and many classical test statistics."
+  },
+  {
+    num: "4.3.05",
+    icon: "F",
+    tClass: "t-cost",
+    title: "F-Distribution",
+    sub: "The ratio of two scaled chi-squared variables — the classic distribution for comparing variances",
+    formula: "F(d₁,d₂) = (χ²_{d₁}/d₁) / (χ²_{d₂}/d₂)",
+    tags: [["f-distribution","gold"], ["variance ratio",""], ["anova",""], ["regression",""]],
+    body: [
+      `The F-distribution arises as the ratio of two independent chi-squared random variables, each divided by its degrees of freedom. It is supported on (0, ∞) and is parametrised by a pair of degrees of freedom (d₁, d₂). It is right-skewed; the skewness decreases as the degrees of freedom increase.`,
+      `Its principal classical use is the comparison of two sample variances (or, more generally, the testing of linear restrictions in regression and ANOVA). The test statistic is constructed so that, under the null of equal variances (or of the restriction), it follows an F law.`,
+      `In finance F-tests appear in the evaluation of nested regression models, in tests of factor-model restrictions, and in some specifications of heteroskedasticity tests. Because financial returns are rarely normal, the exact F critical values are often replaced by bootstrap or asymptotic approximations, but the F still supplies the reference shape.`,
+      `The square of a t-random variable with ν degrees of freedom is exactly F(1, ν). This links the two distributions tightly.`
+    ],
+    keyPoint: "The F-distribution is the law of a ratio of scaled chi-squareds. It is the classical tool for testing equality of variances and linear restrictions — still the reference even when exact normality is doubtful."
+  },
+  {
+    num: "4.3.06",
+    icon: "Bin",
+    tClass: "t-classes",
+    title: "Binomial Distribution",
+    sub: "The number of successes in a fixed number of independent Bernoulli trials",
+    formula: "X ~ Bin(n, p)",
+    tags: [["binomial","classes"], ["bernoulli",""], ["discrete",""], ["counting",""]],
+    formulaBox: {
+      main: "P(X = k) = C(n,k) p<sup>k</sup> (1−p)<sup>n−k</sup>",
+      note: "E[X] = np, Var(X) = np(1−p)\nAs n→∞, p fixed → normal (CLT)\nAs n→∞, np=λ fixed → Poisson"
+    },
+    body: [
+      `The binomial distribution counts the number of successes in n independent trials, each having the same success probability p. It is the discrete distribution for any situation that can be framed as a sequence of yes/no experiments with constant probability.`,
+      `Mean and variance are np and np(1−p). When n is large and p is not too close to 0 or 1, the binomial is well approximated by a normal (CLT). When n is large and p is small so that np stays moderate, the Poisson limit appears.`,
+      `In finance the binomial appears in elementary option pricing (the Cox–Ross–Rubinstein tree is a recombining binomial model for the underlying), in the modelling of default counts within a portfolio under a homogeneous Bernoulli assumption, and in any counting problem with a fixed number of independent trials.`,
+      `The binomial coefficient C(n,k) grows rapidly; direct computation of probabilities for large n requires care (log-gamma functions or recursive methods) to avoid overflow.`
+    ],
+    keyPoint: "Binomial is the distribution of the number of successes in a fixed number of independent coin-flips. It is the discrete skeleton behind binomial trees and simple default-count models."
+  },
+  {
+    num: "4.3.07",
+    icon: "Pois",
+    tClass: "t-classes",
+    title: "Poisson Distribution",
+    sub: "The distribution of the number of events in a fixed interval when events occur continuously and independently at a constant rate",
+    formula: "X ~ Poisson(λ)",
+    tags: [["poisson","classes"], ["counts","classes"], ["arrivals",""], ["rare events",""]],
+    formulaBox: {
+      main: "P(X = k) = e<sup>−λ</sup> λ<sup>k</sup> / k!",
+      note: "E[X] = Var(X) = λ\nLimit of Binomial(n,p) when n→∞, np=λ\nIncrements of a Poisson process"
+    },
+    body: [
+      `The Poisson distribution gives the probability of a given number of events occurring in a fixed interval of time or space, when events happen independently at a constant average rate λ. Both its mean and its variance equal λ — a distinctive equi-dispersion property.`,
+      `It is the distribution of the increment of a Poisson process over a unit interval. The Poisson process itself is the continuous-time counting process with independent exponential inter-arrival times and is the simplest model of random arrivals.`,
+      `In finance the Poisson distribution (and process) models the arrival of jumps in jump-diffusion price models, the occurrence of defaults in a reduced-form credit setting (when intensities are constant), the number of trades in a short interval under a simple microstructure model, and operational-loss event counts.`,
+      `When the variance exceeds the mean (over-dispersion), mixtures such as the negative binomial are preferred. Time-varying intensity is handled by Cox processes (doubly stochastic Poisson processes).`
+    ],
+    keyPoint: "Poisson counts rare or randomly arriving events whose average rate is λ. It is the discrete distribution behind jump arrivals, default counts and the simplest models of market activity."
+  },
+  {
+    num: "4.3.08",
+    icon: "Exp",
+    tClass: "t-dynamics",
+    title: "Exponential Distribution",
+    sub: "The continuous distribution of waiting times between Poisson events — memoryless",
+    formula: "X ~ Exp(λ)",
+    tags: [["exponential","dynamics"], ["waiting time","dynamics"], ["memoryless",""], ["inter-arrival",""]],
+    formulaBox: {
+      main: "f(x) = λ e<sup>−λx</sup>  (x > 0)",
+      note: "E[X] = 1/λ, Var(X) = 1/λ²\nMemoryless: P(X > s+t | X > s) = P(X > t)\nInter-arrival times of a Poisson process"
+    },
+    body: [
+      `The exponential distribution describes the time until the next event in a Poisson process. Its density decays exponentially from zero; it is parametrised by a rate λ (or equivalently by a mean 1/λ). It is the unique continuous distribution with the memoryless property: the additional waiting time does not depend on how long one has already waited.`,
+      `Memorylessness makes the exponential the continuous analogue of the geometric distribution and the reason that Poisson processes have a simple Markov structure. In continuous-time Markov chains the holding time in each state is exponential.`,
+      `In finance exponential random variables appear as inter-default times when the intensity is constant, as inter-jump times in exponential-jump models, and as a building block for more flexible distributions (gamma, phase-type, Coxian) used in operational risk and credit.`,
+      `Because real waiting times often exhibit heavier tails or duration dependence, the pure exponential is frequently replaced by Weibull, gamma or log-normal alternatives, or by intensity models that let λ itself vary with time or state.`
+    ],
+    keyPoint: "The exponential is the waiting-time distribution of a constant-rate Poisson process and the unique memoryless continuous law. It is the simplest model of ‘time until the next event’."
+  },
+  {
+    num: "4.3.09",
+    icon: "U",
+    tClass: "t-mid",
+    title: "Uniform Distribution",
+    sub: "Equal probability on an interval — the distribution of maximum ignorance and of random numbers",
+    formula: "X ~ U(a, b)",
+    tags: [["uniform","mid"], ["flat","mid"], ["random numbers",""], ["prior",""]],
+    body: [
+      `The continuous uniform distribution on [a, b] assigns equal probability density to every point in the interval. Its density is the constant 1/(b−a). Mean is (a+b)/2 and variance is (b−a)²/12. The discrete uniform on a finite set is the analogous equal-probability distribution.`,
+      `Uniform random variables are the raw material of simulation: almost every method for generating non-uniform random variables begins with one or more uniforms (inverse-transform, acceptance-rejection, etc.). In that sense the uniform is the most fundamental distribution for Monte Carlo work.`,
+      `As a prior in Bayesian analysis the uniform (or a proper approximation to it) expresses the absence of preferential information over an interval. On the unit interval the uniform is also the distribution of the probability integral transform of any continuous random variable — a fact used in calibration tests and copula construction.`,
+      `In finance the uniform appears mainly as a technical tool (random-number generation, rank statistics, copula methods) rather than as a direct model of returns or prices.`
+    ],
+    keyPoint: "The uniform distribution is flat: every outcome in an interval is equally likely. It is the starting point of almost all random-number generation and the Bayesian expression of complete ignorance on a bounded set."
+  },
+  {
+    num: "4.3.10",
+    icon: "Γ",
+    tClass: "t-dynamics",
+    title: "Gamma Distribution",
+    sub: "A flexible family on the positive line — sums of exponentials and a common model for waiting times and variances",
+    formula: "X ~ Gamma(α, β)",
+    tags: [["gamma","dynamics"], ["shape-scale",""], ["waiting time",""], ["conjugate",""]],
+    formulaBox: {
+      main: "f(x) ∝ x<sup>α−1</sup> e<sup>−x/β</sup>  (x > 0)",
+      note: "E[X] = αβ, Var(X) = αβ²\nα = 1 → Exponential\nSum of i.i.d. Exp is Gamma (integer shape)"
+    },
+    body: [
+      `The gamma distribution is a two-parameter family supported on the positive reals. The shape parameter α controls the form of the density (exponential-like for α near 1, more symmetric for large α); the scale β stretches it. Mean and variance are αβ and αβ².`,
+      `Special cases include the exponential (α = 1) and the chi-squared (which is a gamma with shape k/2 and scale 2). The sum of independent gamma variables with the same scale is again gamma; in particular the sum of k independent exponentials with the same rate is gamma (Erlang).`,
+      `In Bayesian statistics the gamma is the conjugate prior for the rate of a Poisson or for the precision of a normal. In finance it appears as a model for realised variance, for operational-loss severities, for inter-arrival times more flexible than pure exponential, and as the mixing distribution that turns a normal into a variance-gamma process.`,
+      `The inverse-gamma (the distribution of the reciprocal of a gamma) is equally important: it is the conjugate prior for a normal variance and appears as the mixing distribution that produces the Student-t.`
+    ],
+    keyPoint: "Gamma is the flexible positive-line distribution that generalises the exponential and the chi-squared. It is the natural law for waiting times, variances and many positive financial quantities."
+  },
+  {
+    num: "4.3.11",
+    icon: "B",
+    tClass: "t-markets",
+    title: "Beta Distribution",
+    sub: "The flexible distribution on [0,1] — ideal for probabilities, recovery rates and mixing weights",
+    formula: "X ~ Beta(α, β)",
+    tags: [["beta","markets"], ["unit interval","markets"], ["probabilities",""], ["conjugate",""]],
+    formulaBox: {
+      main: "f(x) ∝ x<sup>α−1</sup> (1−x)<sup>β−1</sup>  (0 < x < 1)",
+      note: "E[X] = α/(α+β)\nUniform = Beta(1,1)\nConjugate prior for a Bernoulli/Binomial probability"
+    },
+    body: [
+      `The beta distribution is the standard flexible family supported on the unit interval [0,1]. Two positive shape parameters α and β control the shape: the distribution can be U-shaped, J-shaped, unimodal, symmetric or skewed. The uniform distribution is the special case Beta(1,1).`,
+      `Because its support matches the range of a probability, the beta is the conjugate prior for a Bernoulli or binomial likelihood. After observing successes and failures the posterior is again beta, with updated parameters. This makes it the default prior in Bayesian estimation of probabilities.`,
+      `In finance the beta is used for recovery-rate distributions in credit risk, for the distribution of mixing probabilities in regime models, for the random probability in Bayesian bootstrap and Dirichlet-process constructions, and occasionally as a model for bounded indicators or utilisation rates.`,
+      `The beta-binomial distribution (a binomial with a beta-distributed p) is a common over-dispersed alternative to the pure binomial for default counts or other success/failure data.`
+    ],
+    keyPoint: "Beta is the flexible distribution on the unit interval. It is the natural prior for probabilities and a convenient model for any quantity that lives strictly between 0 and 1."
+  },
+  {
+    num: "4.3.12",
+    icon: "P",
+    tClass: "t-impact",
+    title: "Pareto Distribution (Power Laws)",
+    sub: "Heavy-tailed distributions with power-law decay — the mathematics of extremes and inequality",
+    formula: "P(X > x) ∼ (xₘ / x)<sup>α</sup>",
+    tags: [["pareto","impact"], ["power law","impact"], ["heavy tails","ask"], ["extremes",""]],
+    formulaBox: {
+      main: "Survival: P(X > x) = (x<sub>m</sub> / x)<sup>α</sup>  (x ≥ x<sub>m</sub>)",
+      note: "α = tail index\nMoments of order ≥ α do not exist\nα ≤ 2 ⇒ infinite variance"
+    },
+    body: [
+      `The Pareto distribution (and more generally power-law tails) is characterised by a survival function that decays as a power of x rather than exponentially. The tail index α controls the heaviness: smaller α means slower decay and heavier tails. When α ≤ 2 the variance is infinite; when α ≤ 1 the mean itself is infinite.`,
+      `Power-law tails appear in many empirical size distributions: city sizes, firm sizes, wealth, insurance losses, and — crucially — the extreme tails of financial returns and of operational losses. Extreme-value theory and peaks-over-threshold methods often fit a generalised Pareto distribution to the exceedances over a high threshold.`,
+      `In risk management a Pareto-type tail implies that extreme losses, although rare, dominate expected shortfall and higher moments. Diversification benefits are weaker than under thin-tailed assumptions, and sample estimates of variance or kurtosis become unstable.`,
+      `Distinguishing a power-law tail from a merely heavy but still exponentially truncated tail is statistically delicate and requires large samples of extremes. Nonetheless the Pareto remains the simplest parametric description of “wild” randomness in the sense of Mandelbrot.`
+    ],
+    keyPoint: "Pareto (power-law) tails decay polynomially, not exponentially. They are the mathematical signature of extremes that refuse to be negligible — and the reason many financial risk measures are sensitive to the far tail."
+  },
+  {
+    num: "4.3.13",
+    icon: "γ₃γ₄",
+    tClass: "t-spread",
+    title: "Skewness and Kurtosis",
+    sub: "The third and fourth standardised moments — asymmetry and tail weight relative to the normal",
+    formula: "Skew = E[Z³]  |  Kurt = E[Z⁴]",
+    tags: [["skewness","spread"], ["kurtosis","spread"], ["moments",""], ["shape",""]],
+    formulaBox: {
+      main: "Skew(X) = E[((X−μ)/σ)³] &nbsp;&nbsp; Kurt(X) = E[((X−μ)/σ)⁴]",
+      note: "Normal: skew = 0, kurtosis = 3\nExcess kurtosis = kurtosis − 3\nSample versions used in Jarque-Bera"
+    },
+    body: [
+      `Skewness is the standardised third central moment. Positive skewness means a longer right tail (more extreme positive outcomes); negative skewness means a longer left tail. Equity index returns typically show mild negative skewness — large crashes are more common than equally large rallies.`,
+      `Kurtosis is the standardised fourth central moment. The normal has kurtosis 3; excess kurtosis is kurtosis minus 3. Positive excess kurtosis (leptokurtosis) indicates heavier tails and a sharper peak than the normal. Financial returns almost universally exhibit substantial positive excess kurtosis.`,
+      `These two numbers summarise the most important qualitative departures from normality. They appear in Cornish–Fisher expansions of quantiles, in the Jarque–Bera test, and as diagnostic statistics in almost every empirical study of returns.`,
+      `Sample skewness and kurtosis are sensitive to outliers and converge slowly when the true tails are heavy. For distributions with infinite fourth moments the sample kurtosis does not settle; reported kurtosis figures for returns should therefore be interpreted with caution.`
+    ],
+    keyPoint: "Skewness measures asymmetry; kurtosis measures tail weight relative to the normal. Together they are the first quantitative language for ‘returns are not normal’."
+  },
+  {
+    num: "4.3.14",
+    icon: "JB",
+    tClass: "t-gold",
+    title: "Jarque-Bera Test for Normality",
+    sub: "A formal test based on sample skewness and excess kurtosis",
+    formula: "JB = (n/6)(S² + (K−3)²/4)",
+    tags: [["jarque-bera","gold"], ["normality test","gold"], ["goodness-of-fit",""], ["asymptotic",""]],
+    formulaBox: {
+      main: "JB = (n/6) [S² + ((K−3)²)/4 ]  →ᵈ  χ²(2)",
+      note: "S = sample skewness, K = sample kurtosis\nUnder normality JB is asymptotically χ² with 2 df\nLarge JB ⇒ reject normality"
+    },
+    body: [
+      `The Jarque–Bera test is a goodness-of-fit test of the null hypothesis that a sample comes from a normal distribution. It combines the sample skewness S and sample excess kurtosis into a single statistic that, under the null, is asymptotically chi-squared with two degrees of freedom.`,
+      `The test is simple to compute and is reported by virtually every statistical package. A large value (or a small p-value) leads to rejection of normality. For financial returns the test almost invariably rejects, confirming the visual and moment-based evidence of fat tails and skewness.`,
+      `Limitations are important. The asymptotic χ² approximation can be poor in small samples; bootstrap critical values are often preferable. The test has power mainly against alternatives that affect the third and fourth moments; it can miss other forms of non-normality. When fourth moments are infinite the statistic itself does not have a standard limiting distribution.`,
+      `Despite the caveats, Jarque–Bera remains the most widely quoted formal test of normality in empirical finance and a useful automatic diagnostic in any return-series analysis.`
+    ],
+    keyPoint: "Jarque–Bera turns sample skewness and kurtosis into a χ² test of normality. For financial returns it almost always rejects — a compact statistical confirmation that the Gaussian assumption is false."
+  },
+  {
+    num: "4.3.15",
+    icon: "▅",
+    tClass: "t-ask",
+    title: "Fat Tails in Financial Returns",
+    sub: "The single most important empirical fact about return distributions — extremes happen far more often than a normal predicts",
+    formula: "P(|r| > x) ≫ Normal prediction",
+    tags: [["fat tails","ask"], ["empirical","ask"], ["risk","ask"], ["stylised fact",""]],
+    splitBox: [
+      { cls: "mid",  label: "Normal Benchmark", text: "Under N(0,σ²) a 5-σ daily move is essentially impossible (probability ~ 3×10⁻⁷). Annual occurrence should be negligible." },
+      { cls: "ask",  label: "Empirical Reality", text: "Equity indices regularly produce 5-σ (and larger) daily moves. Crash days of 1987, 2008, 2020 lie many standard deviations beyond normal quantiles." },
+      { cls: "gold", label: "Consequences", text: "VaR and ES under normality are understated. Option prices embed higher implied vols for tails (skew/smile). Portfolio stress tests must include scenarios the normal calls impossible." },
+      { cls: "spread", label: "Modelling Responses", text: "Student-t, mixture distributions, pure-jump processes, stochastic volatility with jumps, extreme-value theory, and historical / filtered historical simulation." },
+    ],
+    body: [
+      `Fat tails (heavy tails, leptokurtosis) are the most robust stylised fact of financial returns. The probability of large moves decays more slowly than the exponential tail of a normal distribution. Consequently extreme observations occur far more frequently than Gaussian models predict.`,
+      `The phenomenon is visible in every liquid market — equities, FX, commodities, credit — and at every frequency from intraday to monthly, although the degree of excess kurtosis typically declines as the horizon lengthens (consistent with a CLT effect under weak dependence). Negative skewness often accompanies the fat tails in equity indices, reflecting the greater severity of crashes relative to rallies.`,
+      `Risk-management and pricing implications are profound. Normal VaR understates capital needs; expected shortfall under normality is even more optimistic relative to reality. Option-implied distributions extract the market’s recognition of fat tails in the form of volatility smiles and skews. Stress testing and scenario analysis must deliberately include moves that a normal model would assign essentially zero probability.`,
+      `Modelling responses range from simple parametric fixes (Student-t, generalised error distribution, normal mixtures) through stochastic-volatility and jump models to non-parametric historical simulation and extreme-value techniques focused exclusively on the tail. No single model has eliminated the problem; awareness of fat tails remains a permanent discipline.`
+    ],
+    keyPoint: "Financial returns have fat tails: extreme moves are rare but orders of magnitude more common than a normal distribution allows. Every risk number, option price and stress test that ignores this fact is optimistically wrong."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

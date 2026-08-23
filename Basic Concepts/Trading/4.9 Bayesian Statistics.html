@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 4.9 Bayesian Statistics</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 260px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 10px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 4 · Section 4.9 · Quantitative Foundations</div>
+        <h1 class="hdr-title">Bayesian<br><em>Statistics</em></h1>
+        <div class="hdr-sub">Updating beliefs with data — priors, posteriors, MCMC and the Bayesian view of portfolio construction</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Core Identity</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Prior</div>
+            <div class="sw-price">p(θ)</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Likelihood</div>
+            <div class="sw-price">p(data|θ)</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Posterior</div>
+          <div class="sw-spread-val">∝ Likelihood × Prior</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Bayes</div>
+          <div class="sw-mid-val">p(θ|data)</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">12 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>4.9 Bayesian Statistics</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "4.9.01",
+    icon: "π",
+    tClass: "t-mid",
+    title: "Prior and Posterior Distributions",
+    sub: "Belief about a parameter before and after seeing the data",
+    formula: "p(θ) → p(θ | data)",
+    tags: [["prior","mid"], ["posterior","mid"], ["belief",""], ["updating",""]],
+    formulaBox: {
+      main: "p(θ | data) ∝ p(data | θ) × p(θ)",
+      note: "Prior = belief before data\nPosterior = belief after data\nNormalising constant = marginal likelihood p(data)"
+    },
+    body: [
+      `In the Bayesian framework a parameter θ is treated as a random variable. The <em>prior</em> distribution p(θ) encodes all information or beliefs about θ that are available before the current data are observed. After the data arrive, the <em>posterior</em> distribution p(θ | data) is the updated belief.`,
+      `The posterior is the primary object of Bayesian inference. Point estimates (posterior mean, median, mode), credible intervals, and predictive distributions are all derived from it. As more data accumulate the posterior typically concentrates around the true value (under regularity conditions) and the influence of the prior diminishes.`,
+      `Priors may be informative (reflecting genuine external knowledge) or weakly informative / reference (designed to let the data dominate). Improper priors (not integrable) are sometimes used for convenience; the resulting posterior must still be proper.`,
+      `In finance the prior is the natural place to inject equilibrium views, analyst forecasts, or shrinkage targets. The posterior then becomes the input to portfolio construction, risk forecasting or signal combination.`
+    ],
+    keyPoint: "The prior is what you believe before the data; the posterior is what you believe after. Bayesian inference is the coherent conversion of one into the other."
+  },
+  {
+    num: "4.9.02",
+    icon: "L",
+    tClass: "t-spread",
+    title: "Likelihood Function",
+    sub: "The probability of the observed data viewed as a function of the unknown parameter",
+    formula: "L(θ | data) = p(data | θ)",
+    tags: [["likelihood","spread"], ["sampling model","spread"], ["evidence",""], ["mle",""]],
+    body: [
+      `The likelihood function is the joint probability (or density) of the observed data, regarded as a function of the parameter θ. It quantifies how well each candidate value of θ would have predicted the data that were actually seen.`,
+      `Under independent observations the likelihood factors into a product of individual densities. For time-series or hierarchical models the factorisation follows the appropriate conditional structure. The maximum-likelihood estimator is the value of θ that maximises L; Bayesian inference multiplies L by the prior instead of maximising it.`,
+      `The shape of the likelihood determines how strongly the data speak. A sharply peaked likelihood dominates even a moderately informative prior; a flat likelihood leaves the posterior close to the prior. In large samples the likelihood typically becomes concentrated and approximately Gaussian (Bernstein–von Mises).`,
+      `In quantitative finance the likelihood is supplied by the assumed return distribution, the option-pricing model, the credit-migration model, or any other probabilistic description of the observables. Misspecification of the likelihood is as damaging in Bayesian work as it is in classical work.`
+    ],
+    keyPoint: "The likelihood is the data’s report on the parameter. Bayesian analysis multiplies it by the prior; classical analysis maximises it. Both start from the same sampling model."
+  },
+  {
+    num: "4.9.03",
+    icon: "B",
+    tClass: "t-spread",
+    title: "Bayes’ Theorem Application",
+    sub: "The formal rule that turns prior and likelihood into posterior",
+    formula: "p(θ|data) = p(data|θ) p(θ) / p(data)",
+    tags: [["bayes theorem","spread"], ["updating","spread"], ["normalisation",""], ["odds",""]],
+    formulaBox: {
+      main: "posterior = likelihood × prior / evidence",
+      note: "p(data) = ∫ p(data|θ) p(θ) dθ\nIn odds form: posterior odds = Bayes factor × prior odds"
+    },
+    body: [
+      `Bayes’ theorem is the unique coherent rule for updating a probability distribution in the light of new evidence. Written for densities it states that the posterior is proportional to the product of the likelihood and the prior; the constant of proportionality is the marginal likelihood (evidence) that makes the posterior integrate to one.`,
+      `In discrete settings the same relation is often expressed in terms of odds: the posterior odds equal the prior odds multiplied by the Bayes factor (the ratio of marginal likelihoods under two competing hypotheses). The Bayes factor is the Bayesian alternative to the classical likelihood-ratio statistic.`,
+      `When the parameter is high-dimensional the marginal likelihood integral is usually intractable and is avoided by working with un-normalised posteriors inside MCMC algorithms. For model comparison, however, the evidence (or an approximation such as BIC) remains central.`,
+      `Every sequential Bayesian update—filtering, online learning, recursive portfolio re-estimation—is an application of Bayes’ theorem. The theorem guarantees that the order of information arrival does not matter when all information is eventually conditioned upon.`
+    ],
+    keyPoint: "Bayes’ theorem is the multiplication rule for beliefs. Prior times likelihood, properly normalised, yields the posterior—the only coherent way to learn from data inside a probabilistic model."
+  },
+  {
+    num: "4.9.04",
+    icon: "C",
+    tClass: "t-cost",
+    title: "Conjugate Priors",
+    sub: "Priors that produce posteriors of the same family — analytic updating and closed-form posteriors",
+    formula: "Prior family closed under multiplication by likelihood",
+    tags: [["conjugate","gold"], ["closed form","gold"], ["beta-binomial",""], ["normal-normal",""]],
+    splitBox: [
+      { cls: "mid",  label: "Beta–Binomial", text: "Beta prior on a probability + binomial likelihood → Beta posterior. Classic for default rates or win probabilities." },
+      { cls: "spread", label: "Normal–Normal", text: "Normal prior on a mean + normal likelihood with known variance → Normal posterior. The prototype of Bayesian shrinkage." },
+      { cls: "gold", label: "Gamma–Poisson / Inverse-Gamma", text: "Conjugate for Poisson rates and for normal variances. Widely used in volatility and intensity modelling." },
+      { cls: "bid",  label: "Practical Value", text: "Closed-form posteriors avoid MCMC, make sequential updating trivial, and supply analytic predictive distributions." },
+    ],
+    body: [
+      `A prior is conjugate for a given likelihood when the posterior belongs to the same parametric family as the prior. The hyperparameters of the posterior are simple functions of the prior hyperparameters and of the sufficient statistics of the data.`,
+      `Conjugacy yields analytic posteriors, closed-form predictive distributions, and trivial sequential updating. It is therefore the first modelling choice whenever a conjugate family is flexible enough for the problem at hand.`,
+      `Classic pairs include Beta–Binomial, Normal–Normal (known variance), Normal–Inverse-Gamma (unknown mean and variance), Gamma–Poisson, and Dirichlet–Multinomial. Many of these appear inside hierarchical models and as building blocks of more elaborate Bayesian procedures.`,
+      `When no convenient conjugate prior exists, or when the prior must encode constraints that break conjugacy, one turns to numerical methods—Laplace approximation, variational inference, or MCMC.`
+    ],
+    keyPoint: "Conjugate priors keep the posterior inside the same family as the prior. They deliver analytic updates and are the computational foundation of many practical Bayesian workflows in finance."
+  },
+  {
+    num: "4.9.05",
+    icon: "MC",
+    tClass: "t-dynamics",
+    title: "MCMC (Markov Chain Monte Carlo)",
+    sub: "Simulating from the posterior by constructing a Markov chain whose stationary distribution is the target",
+    formula: "Chain → stationary distribution = posterior",
+    tags: [["mcmc","dynamics"], ["simulation","dynamics"], ["posterior sampling",""], ["bayesian computation",""]],
+    body: [
+      `Markov Chain Monte Carlo is a family of algorithms that generate dependent samples from a target distribution (almost always a posterior) by running a Markov chain designed so that its unique stationary distribution equals the target. Once the chain has converged, the samples can be used to estimate any posterior expectation, quantile or predictive quantity.`,
+      `The great advantage is that one only needs to evaluate the un-normalised posterior (likelihood × prior). The normalising constant cancels in the acceptance ratios and never has to be computed. This makes MCMC feasible for high-dimensional and non-conjugate models that are analytically intractable.`,
+      `Practical MCMC requires attention to burn-in (discarding initial transient samples), thinning, convergence diagnostics (trace plots, Gelman–Rubin, effective sample size), and the design of efficient proposal mechanisms. Parallel chains and adaptive proposals are standard tools.`,
+      `In quantitative finance MCMC is used for Bayesian estimation of GARCH and stochastic-volatility models, for latent-factor extraction, for option-pricing models with many parameters, and for any hierarchical or non-linear specification whose posterior cannot be written in closed form.`
+    ],
+    keyPoint: "MCMC turns posterior inference into the simulation of a carefully constructed Markov chain. It is the workhorse that makes modern high-dimensional Bayesian analysis possible."
+  },
+  {
+    num: "4.9.06",
+    icon: "MH",
+    tClass: "t-dynamics",
+    title: "Metropolis–Hastings Algorithm",
+    sub: "The general-purpose MCMC method that accepts or rejects proposals according to an acceptance probability",
+    formula: "α = min(1,  [target(θ′) q(θ|θ′)] / [target(θ) q(θ′|θ)] )",
+    tags: [["metropolis-hastings","dynamics"], ["proposal","dynamics"], ["acceptance",""], ["mcmc",""]],
+    formulaBox: {
+      main: "Accept θ′ with probability α = min(1, ratio)",
+      note: "ratio = [π(θ′) q(θ|θ′)] / [π(θ) q(θ′|θ)]\nπ = target (un-normalised posterior)\nq = proposal density"
+    },
+    body: [
+      `The Metropolis–Hastings (MH) algorithm generates a new candidate θ′ from a proposal distribution q(·|θ) that may depend on the current state. The candidate is accepted with probability α that depends on the target density ratio and the proposal density ratio; otherwise the chain stays at θ. The resulting chain is guaranteed to have the target as its stationary distribution.`,
+      `When the proposal is symmetric (q(θ′|θ) = q(θ|θ′)) the algorithm reduces to the original Metropolis rule: accept with probability min(1, π(θ′)/π(θ)). Random-walk Metropolis (Gaussian proposals centred at the current point) is the simplest practical implementation.`,
+      `Efficiency hinges on the proposal. Too small a step size produces high acceptance but slow exploration; too large a step size produces frequent rejections. Adaptive MH, Hamiltonian Monte Carlo and other advanced proposals improve mixing in high dimensions.`,
+      `Metropolis–Hastings is the foundation of almost every subsequent MCMC method. Understanding its acceptance step is the key to understanding why MCMC works and how to diagnose it when it fails.`
+    ],
+    keyPoint: "Metropolis–Hastings proposes a move and then accepts or rejects it so that the chain’s stationary distribution equals the desired posterior. It is the universal constructive engine of MCMC."
+  },
+  {
+    num: "4.9.07",
+    icon: "G",
+    tClass: "t-dynamics",
+    title: "Gibbs Sampling",
+    sub: "MCMC by successive draws from full conditional distributions — especially powerful for hierarchical models",
+    formula: "θᵢ ~ p(θᵢ | θ₋ᵢ, data)  (cycle through i)",
+    tags: [["gibbs","dynamics"], ["full conditional","dynamics"], ["hierarchical",""], ["blocking",""]],
+    body: [
+      `Gibbs sampling is a special case of Metropolis–Hastings in which the proposal for each block of parameters is exactly the full conditional posterior of that block given all the others. The acceptance probability is then identically one, so every draw is accepted.`,
+      `The algorithm cycles through the parameters (or blocks of parameters), drawing each from its complete conditional distribution. When the full conditionals are standard distributions the draws are cheap and the sampler is easy to implement. Hierarchical models with conjugate structure are particularly well suited to Gibbs sampling.`,
+      `Blocking (updating several parameters together) and marginalisation (integrating out some parameters analytically) often improve mixing dramatically. Collapsed Gibbs samplers exploit such marginalisations.`,
+      `In finance Gibbs sampling appears in Bayesian VARs, in latent-variable credit models, in stochastic-volatility models with data augmentation, and in any setting where the joint posterior factors into tractable full conditionals.`
+    ],
+    keyPoint: "Gibbs sampling updates each parameter (or block) by drawing from its full conditional posterior. When those conditionals are available in closed form it is the simplest and often the most efficient MCMC algorithm."
+  },
+  {
+    num: "4.9.08",
+    icon: "α",
+    tClass: "t-bid",
+    title: "Bayesian Updating for Alpha Signals",
+    sub: "Treating forecast skill or expected return as a parameter and updating it with realised performance",
+    formula: "α_post = weighted average of prior α and realised α",
+    tags: [["alpha","bid"], ["signal updating","bid"], ["shrinkage",""], ["forecast",""]],
+    body: [
+      `Alpha signals (expected excess returns, forecast scores, manager skill) are never known with certainty. A Bayesian approach places a prior on the true alpha (or on the information coefficient of a signal) and updates that prior as new realisations arrive. The posterior mean is a precision-weighted average of the prior mean and the sample estimate.`,
+      `When both prior and likelihood are Gaussian the update has an especially transparent form: the posterior mean shrinks the sample alpha toward the prior mean with weights proportional to the respective precisions. This is exactly the James–Stein / empirical-Bayes shrinkage that stabilises estimated means.`,
+      `Sequential updating is natural: today’s posterior becomes tomorrow’s prior. In a live trading or allocation system the alpha estimate therefore evolves continuously, automatically reducing confidence after a run of poor realisations and increasing it after a run of good ones.`,
+      `The same framework applies to the combination of multiple signals: each signal is given a prior reliability, the joint likelihood updates the reliabilities, and the posterior expected return is the reliability-weighted combination of the individual forecasts.`
+    ],
+    keyPoint: "Bayesian updating of alpha treats skill as an uncertain parameter. The posterior mean automatically shrinks noisy sample estimates toward a prior, giving a more stable and decision-ready forecast."
+  },
+  {
+    num: "4.9.09",
+    icon: "BIC",
+    tClass: "t-cost",
+    title: "Bayesian Information Criterion (BIC)",
+    sub: "A large-sample approximation to the marginal likelihood used for model comparison and selection",
+    formula: "BIC = −2 log L̂ + k log n",
+    tags: [["bic","gold"], ["model selection","gold"], ["marginal likelihood",""], ["penalty",""]],
+    formulaBox: {
+      main: "BIC = −2 ℓ(θ̂) + k log n",
+      note: "ℓ = maximised log-likelihood\nk = number of parameters, n = sample size\nLower BIC preferred; approximates −2 log evidence"
+    },
+    body: [
+      `The Bayesian Information Criterion is derived as a Laplace approximation to the log marginal likelihood (evidence) of a model. It equals the maximised log-likelihood penalised by a term that grows with the number of parameters and with the log of the sample size. Models with lower BIC are preferred.`,
+      `Because the penalty is stronger than that of AIC (which uses 2k), BIC tends to select more parsimonious models. Under regularity conditions BIC is consistent for the true model when the true model is among the candidates; AIC is not.`,
+      `BIC is widely used for order selection in ARMA and GARCH models, for choosing the number of factors, and for comparing non-nested specifications. It requires only the maximised likelihood and the parameter count, so it is available even when a full Bayesian analysis is not performed.`,
+      `Caveats remain: the asymptotic derivation assumes regularity and a large sample; for small samples or highly non-regular models (change-point, mixture) the approximation can be poor and more accurate evidence estimates (bridge sampling, thermodynamic integration, \ldots) are preferable.`
+    ],
+    keyPoint: "BIC approximates the marginal likelihood with a simple penalty on the number of parameters. It is the practical Bayesian tool for model selection when a full posterior computation is unnecessary or infeasible."
+  },
+  {
+    num: "4.9.10",
+    icon: "EB",
+    tClass: "t-classes",
+    title: "Empirical Bayes Methods",
+    sub: "Estimating the prior from the data itself — a pragmatic compromise between pure Bayes and pure frequentist",
+    formula: "Hyperparameters of prior fitted by marginal maximum likelihood",
+    tags: [["empirical bayes","classes"], ["hyperparameters","classes"], ["shrinkage",""], ["stein",""]],
+    body: [
+      `Empirical Bayes estimates the hyperparameters of the prior from the marginal distribution of the observed data, then proceeds with an ordinary Bayesian analysis that treats those hyperparameters as known. The approach is “empirical” because the prior is learned from the same data that are later used for posterior inference.`,
+      `The classic success story is the James–Stein estimator and its empirical-Bayes interpretation: the grand mean and the variance of a collection of related means are estimated from the ensemble, and each individual mean is then shrunk toward the grand mean. The resulting estimator dominates the ordinary MLE under squared-error loss.`,
+      `In finance empirical Bayes is the natural justification for many shrinkage estimators of the mean vector and of the covariance matrix. It also underlies hierarchical models in which fund-manager alphas, stock-level expected returns, or factor loadings are treated as draws from a common population distribution whose parameters are estimated from the cross-section.`,
+      `Because the uncertainty in the hyperparameter estimates is ignored, empirical-Bayes credible intervals are typically too narrow. Fully hierarchical Bayesian analysis (placing hyperpriors and integrating) corrects the understatement of uncertainty at a higher computational cost.`
+    ],
+    keyPoint: "Empirical Bayes lets the data estimate the prior’s hyperparameters. It delivers the practical benefits of shrinkage while remaining computationally lighter than a fully hierarchical Bayesian treatment."
+  },
+  {
+    num: "4.9.11",
+    icon: "P",
+    tClass: "t-bid",
+    title: "Bayesian Portfolio Optimization",
+    sub: "Integrating parameter uncertainty directly into the allocation decision rather than plugging in point estimates",
+    formula: "max_w  E[U(w′r) | data]  (predictive)",
+    tags: [["bayesian portfolio","bid"], ["parameter uncertainty","bid"], ["predictive",""], ["allocation",""]],
+    body: [
+      `Classical mean-variance optimisation treats the estimated mean and covariance as if they were known. Bayesian portfolio optimisation replaces those point estimates by the posterior (or predictive) distribution of returns and maximises expected utility under that distribution. Parameter uncertainty is therefore automatically penalised.`,
+      `When returns are i.i.d. normal and the prior is conjugate, the predictive distribution is a multivariate Student-t. The resulting optimal portfolios shrink positions relative to the classical solution, especially in directions where estimation error is large. The degree of shrinkage is controlled by the strength of the prior and by the amount of data.`,
+      `More elaborate implementations use MCMC to sample from the posterior of a realistic return model (with GARCH, factors, regime switches, \ldots) and then optimise a Monte-Carlo estimate of expected utility. Computational cost rises, but the framework can accommodate virtually any return dynamics and any utility function.`,
+      `The practical message is that estimation risk is an additional source of risk. Bayesian methods fold that risk into the objective instead of ignoring it, producing more stable and typically better out-of-sample allocations.`
+    ],
+    keyPoint: "Bayesian portfolio optimisation maximises expected utility under the predictive distribution of returns. Parameter uncertainty is no longer ignored; it automatically shrinks positions toward more robust allocations."
+  },
+  {
+    num: "4.9.12",
+    icon: "BL",
+    tClass: "t-spread",
+    title: "Black–Litterman as Bayesian Framework",
+    sub: "Equilibrium returns as prior, investor views as likelihood — the most widely used Bayesian portfolio model",
+    formula: "μ_BL = posterior mean of equilibrium + views",
+    tags: [["black-litterman","spread"], ["views","spread"], ["equilibrium","mid"], ["bayesian",""]],
+    formulaBox: {
+      main: "μ_BL = [(τΣ)⁻¹ + PᵀΩ⁻¹P]⁻¹ [(τΣ)⁻¹π + PᵀΩ⁻¹q]",
+      note: "π = equilibrium (reverse-optimised) prior mean\nP, q, Ω = view matrix, view values, view uncertainty\nτ scales prior confidence"
+    },
+    body: [
+      `The Black–Litterman model is a direct application of Bayesian updating to the expected-return vector. The prior is centred at the equilibrium excess-return vector π implied by a market (or benchmark) portfolio via reverse optimisation; the prior covariance is taken to be proportional to the asset covariance matrix Σ. Investor views are expressed as a linear “likelihood” Pμ = q + noise, with noise covariance Ω reflecting view confidence.`,
+      `The posterior mean μ_BL is the precision-weighted average of the equilibrium prior and the views. When no views are supplied the posterior collapses to the equilibrium and the optimised portfolio recovers the market portfolio—a highly desirable consistency property. When views are supplied they tilt the portfolio in the direction of the views, with the size of the tilt controlled by the relative confidences τ and Ω.`,
+      `Because the prior is anchored at a sensible equilibrium, the extreme corner solutions that plague naïve mean-variance optimisation largely disappear. The model can be combined with shrinkage of Σ, with constraints, and with more elaborate view formulations (including absolute and relative views, and factor views).`,
+      `Black–Litterman remains the most successful practical vehicle for introducing Bayesian ideas into institutional portfolio construction. Its transparency—prior = equilibrium, likelihood = views, posterior = blended mean—makes the Bayesian logic accessible to investment committees and risk managers.`
+    ],
+    keyPoint: "Black–Litterman is Bayesian updating applied to expected returns: the market equilibrium is the prior, the investor’s views are the likelihood, and the posterior mean is the input to a conventional optimiser. It is the most widely adopted Bayesian portfolio framework in practice."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>
