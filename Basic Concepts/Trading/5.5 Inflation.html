@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 5.5 Inflation</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 240px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 5 · Section 5.5 · Macroeconomic Policy</div>
+        <h1 class="hdr-title">Inflation</h1>
+        <div class="hdr-sub">Price indices, core vs headline, drivers, expectations, and the extremes of hyperinflation, deflation and stagflation</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Key Measures (illustrative)</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Fed Focus</div>
+            <div class="sw-price">PCE</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Public Focus</div>
+            <div class="sw-price">CPI</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Core</div>
+          <div class="sw-spread-val">ex food &amp; energy</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Breakeven</div>
+          <div class="sw-mid-val">Nominal − TIPS</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">12 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>5.5 Inflation</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "5.5.01",
+    icon: "CPI",
+    tClass: "t-mid",
+    title: "CPI (Consumer Price Index) Components",
+    sub: "The fixed-basket measure of urban consumer prices — construction, weights and what the public watches",
+    formula: "CPI = Σ w_i (P_i,t / P_i,0)",
+    tags: [["cpi","mid"], ["basket","mid"], ["weights",""], ["bls",""]],
+    formulaBox: {
+      main: "CPI = cost of fixed basket<sub>t</sub> / cost of basket<sub>base</sub>",
+      note: "BLS · urban consumers (CPI-U)\nMajor groups: food, energy, shelter, goods, services\nWeights from Consumer Expenditure Survey"
+    },
+    body: [
+      `The Consumer Price Index measures the average change over time in the prices paid by urban consumers for a market basket of goods and services. In the United States it is produced by the Bureau of Labor Statistics (BLS). The headline CPI-U is the figure most often cited in media and wage negotiations.`,
+      `The basket is built from expenditure weights (housing, food, transportation, medical care, education, recreation, apparel, etc.). Shelter — owners’ equivalent rent and rent of primary residence — is the largest single component and dominates month-to-month persistence. Food and energy are volatile and often stripped out for “core” analysis.`,
+      `CPI is a fixed-basket (Laspeyres-style) index: quantities are held at base-period patterns and prices are updated. That makes it intuitive but subject to substitution bias — consumers shift away from goods that become relatively expensive, so a fixed basket can overstate the true cost-of-living increase. Periodic weight updates and the chained CPI (C-CPI-U) mitigate this.`,
+      `Markets watch the monthly CPI release for headline and core, plus detail on shelter, used cars, airfare, medical and other categories that signal breadth versus one-off shocks. CPI enters TIPS indexation, Social Security COLAs and many contracts, so it has direct cash-flow as well as policy relevance.`
+    ],
+    keyPoint: "CPI tracks a fixed consumer basket; shelter dominates the weight and the persistence. It is the public’s inflation gauge and feeds contracts and entitlements — but substitution bias and volatile categories require careful reading of the details."
+  },
+  {
+    num: "5.5.02",
+    icon: "PCE",
+    tClass: "t-spread",
+    title: "PCE (Personal Consumption Expenditures) — Fed Preferred",
+    sub: "The chain-weighted consumption deflator that anchors the Federal Reserve’s 2% goal",
+    formula: "PCE price index",
+    tags: [["pce","spread"], ["fed","spread"], ["chain weight",""], ["2% target",""]],
+    formulaBox: {
+      main: "FOMC goal: 2% PCE inflation (longer run)",
+      note: "BEA · covers full personal consumption\nChain-weighted · broader than CPI\nCore PCE ex food & energy is the key policy gauge"
+    },
+    body: [
+      `The Personal Consumption Expenditures price index, published by the Bureau of Economic Analysis (BEA), measures prices of goods and services in the national accounts’ consumption aggregate. The FOMC has explicitly defined its longer-run inflation goal in terms of PCE, not CPI.`,
+      `PCE differs from CPI in scope, weights and formula. It covers a broader set of expenditures (including those paid by employers and government on behalf of consumers, such as medical care). Weights update continuously with actual spending (chain weighting), reducing substitution bias relative to fixed-basket CPI. As a result, PCE inflation typically runs a few tenths below CPI over long samples.`,
+      `Core PCE — excluding food and energy — is the Fed’s preferred read on underlying inflation trend. Headline PCE still matters for real income and for the public’s experience of prices, but policy reaction functions place heavy weight on core and on supercore (e.g. services ex housing) measures when diagnosing persistence.`,
+      `Markets map CPI surprises into PCE implications using known category mappings and historical wedges. Because the dual mandate is stated in PCE space, medium-term rate pricing ultimately cares about where core PCE settles relative to 2%.`
+    ],
+    keyPoint: "PCE is the Fed’s official inflation gauge: broader, chain-weighted and usually softer than CPI. Core PCE near 2% is the operational definition of price stability for US monetary policy."
+  },
+  {
+    num: "5.5.03",
+    icon: "PPI",
+    tClass: "t-dynamics",
+    title: "PPI (Producer Price Index)",
+    sub: "Prices received by domestic producers — an upstream signal for pipeline cost pressure",
+    formula: "PPI by stage / industry",
+    tags: [["ppi","dynamics"], ["pipeline","dynamics"], ["producer",""], ["upstream",""]],
+    formulaBox: {
+      main: "PPI = prices received by producers",
+      note: "Final demand · intermediate demand · commodities\nLeading signal for goods CPI with lags and incomplete pass-through\nServices PPI increasingly important"
+    },
+    body: [
+      `The Producer Price Index measures the average change in prices received by domestic producers for their output. Unlike CPI (buyer prices at retail), PPI is a seller-side concept. BLS publishes PPI by final demand, intermediate demand, industry and commodity.`,
+      `Final-demand PPI is the closest producer counterpart to consumer inflation; intermediate and crude stages capture earlier pipeline pressures. Large moves in energy, metals, chemicals or logistics often show up in PPI before — and sometimes more sharply than in — consumer goods prices.`,
+      `Pass-through from PPI to CPI is incomplete and lagged. Retailers may absorb cost shocks in margins; services and shelter in CPI have weaker links to goods PPI; and imported consumer goods sit outside domestic PPI. Still, sustained PPI acceleration raises the odds of later CPI goods inflation.`,
+      `Traders use PPI as a secondary release after CPI, focusing on core final demand, services, and any category that might revise the near-term CPI path. For supply-chain and commodity-sensitive portfolios, intermediate PPI and industry detail can be the more actionable signal.`
+    ],
+    keyPoint: "PPI tracks producer selling prices and is an upstream pipeline indicator. It leads goods CPI imperfectly; margin absorption, imports and the services/shelter weight in CPI limit one-for-one pass-through."
+  },
+  {
+    num: "5.5.04",
+    icon: "C/H",
+    tClass: "t-bid",
+    title: "Core vs. Headline Inflation",
+    sub: "Stripping food and energy to read the trend — why both measures matter for policy and markets",
+    formula: "Core = Headline − food − energy",
+    tags: [["core","bid"], ["headline","bid"], ["trend",""], ["volatility",""]],
+    formulaBox: {
+      main: "Core = all items less food and energy",
+      note: "Headline: what households feel\nCore: better signal of persistent inflation\nSupercore / trimmed mean / median as alternatives"
+    },
+    splitBox: [
+      { cls: "ask",  label: "Headline", text: "Full index including food and energy. Volatile month to month; drives real disposable income, consumer sentiment and political pressure on central banks." },
+      { cls: "bid",  label: "Core", text: "Excludes food and energy. Designed to filter transient commodity shocks and reveal underlying demand-driven or persistent inflation." },
+      { cls: "mid",  label: "Why Exclude?", text: "Food and energy prices are noisy, often supply-driven, and mean-reverting. Reacting mechanically to every spike would induce excess policy volatility." },
+      { cls: "gold", label: "Caveats", text: "Energy and food can signal broader pressure; sustained commodity inflation eventually seeps into core via costs and wages. Never ignore headline entirely." },
+    ],
+    body: [
+      `Headline inflation is the full price index. Core inflation removes food and energy — historically the most volatile components — to provide a clearer read on the underlying trend that monetary policy can influence over the medium term.`,
+      `Central banks emphasise core (and related measures such as trimmed mean, median, or services ex-housing) when assessing whether inflation is sticky. A one-month energy spike that leaves core stable is treated differently from a broad rise in core services that suggests overheating or unanchored expectations.`,
+      `Households and politicians experience headline prices: petrol, groceries and electricity bills. Large headline–core gaps create communication challenges when the central bank holds rates steady while food and energy dominate public perception.`,
+      `Alternative core measures (supercore, sticky CPI, median CPI) exist because “ex food and energy” is a blunt filter. During atypical shocks — pandemics, wars, supply-chain ruptures — category-level forensics matter more than any single core print.`
+    ],
+    keyPoint: "Headline is what people pay; core is what policymakers use to judge trend persistence. Use both: core for the reaction function, headline for real incomes and political constraints."
+  },
+  {
+    num: "5.5.05",
+    icon: "🏠",
+    tClass: "t-cost",
+    title: "Shelter Inflation Mechanics",
+    sub: "How rent and owners’ equivalent rent enter CPI — lags, measurement and why shelter dominates persistence",
+    formula: "OER + Rent of primary residence",
+    tags: [["shelter","gold"], ["oer","gold"], ["rent",""], ["lags",""]],
+    formulaBox: {
+      main: "Shelter ≈ OER + Rent (largest CPI weight)",
+      note: "OER: imputed rent of owner-occupied housing\nNew-tenant rents lead; CPI shelter lags market rents\nSticky · slow to turn"
+    },
+    body: [
+      `Shelter is the largest component of US CPI, combining rent of primary residence and owners’ equivalent rent (OER) — the imputed rent that owner-occupiers would pay for their homes. Together they often account for roughly one-third of the CPI basket, so shelter arithmetic dominates the inflation path once goods shocks fade.`,
+      `OER is not a transaction price for buying a house; it is a rental-equivalent concept. BLS surveys rents and applies them to the owner-occupied stock. House prices and mortgage rates affect shelter inflation only indirectly and with long lags, mainly through the rental market and new leases.`,
+      `Market rents (especially new-tenant rents) lead official shelter CPI by many months because the index mixes new and existing leases and updates slowly. After a housing boom or bust, CPI shelter can keep rising (or stay elevated) long after private rent indices have turned — a critical lag for forecasting core inflation.`,
+      `For policy and markets, the shelter lag means that “peak inflation” in headline or goods does not automatically deliver a quick decline in core. Models that track market rents, vacancy and migration improve the shelter outlook relative to naïve AR extrapolation of CPI shelter alone.`
+    ],
+    keyPoint: "Shelter (rent + OER) is the biggest CPI weight and the stickiest major component. Official shelter lags market rents; that lag often determines how long core inflation stays elevated after goods prices cool."
+  },
+  {
+    num: "5.5.06",
+    icon: "FX",
+    tClass: "t-impact",
+    title: "Import Prices and FX Pass-Through",
+    sub: "How exchange-rate moves and foreign costs feed into domestic consumer prices",
+    formula: "ΔP_import ≈ β × ΔFX + ΔP*",
+    tags: [["import prices","impact"], ["pass-through","impact"], ["fx",""], ["open economy",""]],
+    formulaBox: {
+      main: "Pass-through: fraction of ΔFX that hits local prices",
+      note: "Incomplete · delayed · state-dependent\nHigher for commodities and small open economies\nLower when retailers absorb in margins"
+    },
+    body: [
+      `Import price indices measure prices of goods (and sometimes services) as they enter the domestic economy. They respond to foreign producer costs, global commodity prices and the exchange rate. A depreciation of the domestic currency raises the local-currency cost of foreign goods; an appreciation does the opposite.`,
+      `Exchange-rate pass-through is the share of an FX move that appears in import prices and, further downstream, in consumer prices. Pass-through is typically incomplete: foreign exporters may price to market, and domestic distributors may squeeze margins. It is also lagged and often asymmetric.`,
+      `Pass-through tends to be higher for homogeneous commodities and in small open economies, and lower for differentiated manufactures and in large economies with retail market power. After long periods of low inflation, pass-through coefficients can fall; after large, persistent FX moves they can rise.`,
+      `For inflation forecasting, combine the import-price pipeline with the exchange-rate outlook and commodity curve. A sharp depreciation is a near-term upside risk to goods CPI; a strong currency is a disinflationary impulse that can offset domestic heat in the goods sector.`
+    ],
+    keyPoint: "Import prices transmit foreign costs and FX moves into the domestic pipeline. Pass-through to CPI is partial and lagged — larger for commodities and open economies, smaller when margins absorb the shock."
+  },
+  {
+    num: "5.5.07",
+    icon: "W",
+    tClass: "t-classes",
+    title: "Wage Inflation",
+    sub: "Labour-cost growth as both a symptom of tight markets and a driver of persistent services inflation",
+    formula: "Δw ≈ π<sup>e</sup> + Δprod + slack term",
+    tags: [["wages","classes"], ["unit labour cost",""], ["phillips",""], ["services",""]],
+    formulaBox: {
+      main: "Unit labour cost ≈ wages − productivity",
+      note: "Wage growth feeds services inflation\nPhillips curve: tighter slack → higher wage pressure\nExpectations and indexation amplify persistence"
+    },
+    body: [
+      `Wage inflation is the rate of increase in labour compensation — hourly earnings, compensation per hour, or negotiated settlements depending on the series. It is central to the inflation process because labour is the dominant cost in services, and services dominate modern consumption baskets.`,
+      `A simple organising identity is that unit labour costs rise with wages and fall with productivity. When wage growth exceeds productivity growth for long, firms face pressure to raise prices, especially where labour shares are high and competition is imperfect. The Phillips curve links wage (and price) inflation to labour-market slack: lower unemployment or higher vacancy rates tend to raise wage pressure.`,
+      `Wage-price spirals become a risk when expectations are unanchored or contracts are indexed: higher prices lead workers to demand higher wages, which lead firms to raise prices again. Anchored expectations and credible policy break that feedback. Composition effects (who is employed) can also distort headline wage measures over the cycle.`,
+      `Markets track average hourly earnings, ECI, unit labour costs and unemployment/vacancies. Sticky wage inflation is a primary reason central banks may keep policy tight even after goods prices have normalised.`
+    ],
+    keyPoint: "Wage growth minus productivity sets unit labour cost pressure — the key bridge from tight labour markets to persistent services inflation. Anchored expectations limit spiral risk; tight slack raises it."
+  },
+  {
+    num: "5.5.08",
+    icon: "🛢",
+    tClass: "t-ask",
+    title: "Commodity-Driven Inflation",
+    sub: "Food, energy and industrial raw materials as volatile, supply-sensitive drivers of headline prices",
+    formula: "Headline ← commodities + core",
+    tags: [["commodities","ask"], ["energy","ask"], ["food",""], ["supply shock",""]],
+    formulaBox: {
+      main: "Commodity shock → headline CPI (fast) → core (slow/partial)",
+      note: "Oil, gas, grains, metals\nSupply disruptions · geopolitics · weather\nSecond-round effects via wages and expectations"
+    },
+    body: [
+      `Commodity prices — crude oil, natural gas, refined products, grains, edible oils, industrial metals — are among the most volatile inputs to consumer inflation. Energy enters CPI directly (petrol, electricity, heating) and indirectly through transport and production costs. Food commodities feed into grocery prices with processing and retail lags.`,
+      `Commodity-driven inflation is often supply-side in origin: wars, embargoes, OPEC decisions, droughts, floods or pipeline outages. Demand shocks (global industrial booms) also matter, especially for metals and oil. Because these prices are set in global markets, domestic monetary policy has limited short-run control over them.`,
+      `The policy dilemma is whether a commodity spike is transient or triggers second-round effects — broader price-setting changes and wage demands. If expectations remain anchored, central banks may “look through” a pure terms-of-trade shock; if core and wages accelerate, they cannot.`,
+      `For portfolio construction, commodity inflation regimes favour certain real assets, short-duration nominal bonds less so, and can support currencies of commodity exporters. Curve and breakeven pricing embed the expected path of energy and food as much as domestic slack.`
+    ],
+    keyPoint: "Commodities drive headline volatility and can seed broader inflation if second-round effects take hold. Policy can look through one-off supply spikes only while core, wages and expectations stay stable."
+  },
+  {
+    num: "5.5.09",
+    icon: "πᵉ",
+    tClass: "t-spread",
+    title: "Inflation Expectations (TIPS Breakeven, Surveys)",
+    sub: "Market- and survey-based measures of expected inflation — the anchor of the nominal system",
+    formula: "BE ≈ y_nominal − y_TIPS",
+    tags: [["expectations","spread"], ["breakeven","spread"], ["tips",""], ["surveys",""]],
+    formulaBox: {
+      main: "Breakeven = nominal yield − TIPS real yield",
+      note: "Also: inflation swaps (ZCIS)\nSurveys: Michigan, SPF, household vs professional\nAnchoring = long-run π<sup>e</sup> stable near target"
+    },
+    splitBox: [
+      { cls: "spread", label: "TIPS Breakevens", text: "Difference between nominal Treasury and TIPS yields of the same maturity. Market-implied average inflation (plus liquidity and risk premia). 5y5y forward is a standard Fed watch item." },
+      { cls: "mid",  label: "Inflation Swaps", text: "Zero-coupon inflation swaps quote a direct fixed inflation rate versus realised CPI. Cleaner in some dimensions than breakevens but still embeds risk premia." },
+      { cls: "bid",  label: "Surveys", text: "Household (e.g. Michigan), professional (SPF), and business surveys. Short-run expectations move with petrol prices; long-run expectations test the credibility of the target." },
+      { cls: "gold", label: "Anchoring", text: "When long-run expectations stay near 2%, transient shocks fade. When they drift, the central bank faces a steeper trade-off and must work harder to re-anchor." },
+    ],
+    body: [
+      `Inflation expectations are the rates of future price change that households, firms and investors believe will occur. They affect wage bargaining, price setting and real interest rates. A credible inflation target aims to anchor long-run expectations so that shocks do not become self-sustaining.`,
+      `Market-based measures include TIPS breakevens (nominal yield minus TIPS real yield) and inflation-linked swap rates. These embed expected average inflation over a horizon plus inflation risk and liquidity premia; they are not pure expectation quotes. The 5-year, 5-year forward breakeven is widely used as a gauge of longer-term anchoring.`,
+      `Survey measures capture household and professional forecasts. Household short-term expectations often track petrol and food; professional long-term forecasts are typically tighter around the official target. Disagreement and uncertainty in surveys rise in high-inflation regimes.`,
+      `For markets, a re-anchoring or de-anchoring of expectations reprices the entire nominal curve, real rates and risk assets. Central-bank communication is largely about keeping long-run π<sup>e</sup> stable even when near-term inflation is not.`
+    ],
+    keyPoint: "Expectations are measured by breakevens, inflation swaps and surveys. Anchored long-run expectations near target make inflation shocks temporary; drift in those expectations is the red flag for policy and markets."
+  },
+  {
+    num: "5.5.10",
+    icon: "∞",
+    tClass: "t-ask",
+    title: "Hyperinflation Case Studies (Zimbabwe, Venezuela, Weimar)",
+    sub: "Extreme price-level collapses of the currency — common mechanisms and political-economy roots",
+    formula: "π → extreme",
+    tags: [["hyperinflation","ask"], ["weimar","ask"], ["zimbabwe",""], ["venezuela",""]],
+    formulaBox: {
+      main: "Hyperinflation ≈ monthly π very high (classic threshold ~50%/month)",
+      note: "Fiscal dominance · money printing · confidence collapse\nDollarisation / new currency often ends the episode\nReal balances → 0 · velocity spikes"
+    },
+    splitBox: [
+      { cls: "ask",  label: "Weimar Germany (1922–23)", text: "Reparations, fiscal deficits and money-financed support after Ruhr occupation. Prices doubled in days at the peak; ended with the Rentenmark stabilisation and fiscal reform." },
+      { cls: "ask",  label: "Zimbabwe (2000s)", text: "Land reform shock, output collapse, large deficits and rapid money growth. Peak monthly inflation in the hundreds of millions percent; multiple currency reforms and eventual dollarisation." },
+      { cls: "ask",  label: "Venezuela (2010s–)", text: "Oil-revenue collapse, fiscal deficits, monetary financing and institutional breakdown. Multi-year hyperinflation, mass emigration and repeated currency re-denominations." },
+      { cls: "gold", label: "Common Thread", text: "Unsustainable fiscal position + loss of monetary restraint + collapsing confidence. Real demand for money implodes; prices and exchange rates spiral until a credible fiscal-monetary regime is restored." },
+    ],
+    body: [
+      `Hyperinflation is inflation at an extreme rate — classically illustrated by Cagan’s threshold of about 50% per month, though usage varies. It destroys the unit-of-account and store-of-value functions of money, drives agents into foreign currency or real assets, and collapses real tax revenue (Tanzi effect), worsening the fiscal hole.`,
+      `Weimar Germany, Zimbabwe and Venezuela differ in detail but share a pattern: large fiscal deficits, direct or indirect monetary financing, a negative shock to real output or external receipts, and a breakdown of policy credibility. Once expectations unanchor, velocity rises and the inflation tax base shrinks, requiring ever-faster money growth to fund the same real deficit.`,
+      `Stabilisation historically requires a credible fiscal consolidation, a new nominal anchor (new currency, exchange-rate peg, or hard restraint on the central bank), and often external support. Partial measures that do not close the fiscal gap tend to fail.`,
+      `For investors, hyperinflation regimes are about capital preservation in hard assets and foreign currency, not local-currency duration. The relevant risk for major markets is milder: fiscal dominance and unanchored expectations, not literal Weimar-style arithmetic — but the mechanism is the same continuum.`
+    ],
+    keyPoint: "Hyperinflation is fiscal dominance plus a collapse in money demand: Weimar, Zimbabwe and Venezuela all combined deficits, money financing and lost credibility. Stabilisation requires a hard fiscal and monetary reset."
+  },
+  {
+    num: "5.5.11",
+    icon: "↓",
+    tClass: "t-bid",
+    title: "Deflation Risks",
+    sub: "Sustained declines in the price level — debt burden, expectations and the effective lower bound",
+    formula: "π &lt; 0",
+    tags: [["deflation","bid"], ["lower bound","bid"], ["debt deflation",""], ["japan",""]],
+    formulaBox: {
+      main: "Deflation raises real debt and real rates at the ELB",
+      note: "Debt-deflation (Fisher)\nExpectations of falling prices delay demand\nPolicy: QE, forward guidance, fiscal support"
+    },
+    body: [
+      `Deflation is a sustained decline in the general price level. Mild, productivity-driven price declines in specific sectors are common and benign; economy-wide deflation accompanied by weak demand is dangerous because it raises the real value of nominal debt and can push real interest rates up when nominal rates are stuck at the effective lower bound.`,
+      `Irving Fisher’s debt-deflation mechanism: falling prices increase real debt burdens, force deleveraging and asset sales, further depress demand and prices, and amplify the downturn. Japan’s experience from the 1990s illustrated how low inflation or mild deflation, combined with a balance-sheet recession, can trap an economy near zero rates for years.`,
+      `Expectations matter. If agents expect prices to fall, they postpone consumption and investment; wage negotiation becomes harder; and the central bank’s real-rate instrument is impaired. That is why modern frameworks target a low positive inflation rate (e.g. 2%) rather than zero — to keep a buffer above deflation territory.`,
+      `Policy responses include aggressive balance-sheet expansion, forward guidance, yield-curve control, and coordinated fiscal expansion. Preventing deflation is generally easier than curing it once expectations have adapted to falling prices.`
+    ],
+    keyPoint: "Deflation raises real debt and can lock real rates too high at the lower bound. A 2% inflation buffer exists partly to avoid that trap; escape requires credible monetary and often fiscal stimulus."
+  },
+  {
+    num: "5.5.12",
+    icon: "1970s",
+    tClass: "t-markets",
+    title: "Stagflation (1970s Case Study)",
+    sub: "The coincidence of high inflation and weak growth — supply shocks, policy errors and the Volcker disinflation",
+    formula: "High π + High u",
+    tags: [["stagflation","markets"], ["1970s","markets"], ["volcker",""], ["oil shock",""]],
+    formulaBox: {
+      main: "Stagflation = inflation ↑ + growth ↓ / unemployment ↑",
+      note: "1970s: oil shocks + unanchored expectations + stop-go policy\nEnded by sharp monetary tightening (Volcker)\nPhillips curve appears to shift up"
+    },
+    body: [
+      `Stagflation is the combination of elevated inflation with stagnant output or high unemployment — a breakdown of the simple 1960s Phillips-curve trade-off. The 1970s in the US and much of the advanced world are the canonical case: two major oil shocks, productivity slowdown, rising unit labour costs and a ratcheting up of inflation expectations.`,
+      `Policy initially struggled. Accommodating oil shocks to protect employment allowed inflation expectations to de-anchor; periodic tightening then produced recessions without fully restoring price stability (“stop-go”). The apparent Phillips curve shifted upward: any given unemployment rate became associated with higher inflation.`,
+      `The resolution in the early 1980s was a deliberate, costly disinflation under Federal Reserve Chair Paul Volcker: policy rates were driven to double digits, deep recession followed, and inflation and expectations were broken lower. The episode re-established the primacy of a nominal anchor and informed the later independent, inflation-targeting central-bank consensus.`,
+      `For today’s markets, stagflation risk means simultaneous pressure on bonds (via inflation) and equities (via growth and discount rates). Supply shocks, geopolitical energy risk and unanchored expectations are the classic ingredients; credible policy and flexible labour/product markets are the classic antidotes.`
+    ],
+    keyPoint: "1970s stagflation mixed oil supply shocks with unanchored expectations and inconsistent policy. It ended only with a sharp, recession-inducing monetary tightening — a lasting lesson on the cost of losing the inflation anchor."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 5.10 Recession Indicators</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 5 · Section 5.10 · Macro & Cycle Foundations</div>
+        <h1 class="hdr-title">Recession<br><em>Indicators</em></h1>
+        <div class="hdr-sub">The signals that flag rising recession risk — labour thresholds, curve inversion, leading indexes, earnings, credit and formal dating rules</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Key Recession Signals</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Sahm Rule</div>
+            <div class="sw-price">ΔU ≥ 0.50</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">2s10s</div>
+            <div class="sw-price">Inverted</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">LEI / ISM</div>
+          <div class="sw-spread-val">Leading soft</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">NBER</div>
+          <div class="sw-mid-val">Official dating</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">9 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>5.10 Recession Indicators</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "5.10.01",
+    icon: "📉",
+    tClass: "t-ask",
+    title: "Sahm Rule",
+    sub: "The unemployment-based threshold that has reliably flagged the onset of US recessions in real time",
+    formula: "Sahm ≥ 0.50 pp",
+    tags: [["Sahm Rule","ask"], ["unemployment","mid"], ["real-time","gold"], ["recession trigger",""]],
+    formulaBox: {
+      main: "Sahm = U<sub>3m avg</sub> − min(U<sub>12m</sub>)",
+      note: "Triggers when 3-month average unemployment rate\nrises ≥ 0.50 percentage points above its\nlow of the prior 12 months\nDesigned for real-time use with minimal revision"
+    },
+    body: [
+      `The Sahm Rule, proposed by economist Claudia Sahm, states that a recession is likely underway when the three-month moving average of the US unemployment rate rises by 0.50 percentage points or more relative to its low over the previous twelve months. It was constructed to be usable in real time with data that are only lightly revised.`,
+      `Historically the rule has triggered near the beginning of every US recession since the 1970s, with very few false positives in the modern era. Because unemployment is a lagging indicator of the cycle, the Sahm Rule is better understood as a coincident-to-slightly-lagging confirmation that a downturn has begun rather than a long-lead predictor.`,
+      `The 0.50 percentage-point threshold is an empirical regularity, not a structural constant. In labour markets with different dynamics (or after major structural shifts in participation) the optimal threshold could differ. Still, the rule’s simplicity and track record have made it a widely cited benchmark among policymakers and market participants.`,
+      `When the Sahm Rule triggers, the policy and market implication is that the economy has likely entered recession and that further deterioration in the labour market is probable. It does not, by itself, indicate the depth or duration of the downturn.`
+    ],
+    keyPoint: "The Sahm Rule converts a rise in unemployment into a binary recession signal that has worked in real time. It confirms that a downturn is underway; it does not forecast one far in advance."
+  },
+  {
+    num: "5.10.02",
+    icon: "📊",
+    tClass: "t-spread",
+    title: "Yield Curve Inversion (2s10s)",
+    sub: "The term-structure signal that has preceded every modern US recession — a leading indicator with variable lag",
+    formula: "2s10s < 0",
+    tags: [["2s10s","spread"], ["yield curve","mid"], ["inversion","ask"], ["leading indicator","gold"]],
+    body: [
+      `An inversion of the 2s10s Treasury spread (10-year yield below 2-year yield) has preceded every US recession in recent decades. The market is pricing a future path of policy rates that is lower than the current short rate — typically because it anticipates weaker growth and eventual easing by the Federal Reserve.`,
+      `The lead time is long and variable, often ranging from about 6 to 24 months. Inversion is therefore a regime signal rather than a precise timing tool. The curve can remain inverted for extended periods while growth stays positive; the actual recession has often arrived closer to the subsequent re-steepening (especially a bull steepener driven by front-end cuts).`,
+      `Other spreads (3-month/10-year, near-term forward spreads) are also monitored. Some research suggests that measures focused on the near-term policy path have had cleaner predictive records in certain samples. Regardless of the exact tenors, the economic content is the same: the bond market is forecasting a material slowing that will require easier policy.`,
+      `Inversion is a necessary but not sufficient condition in popular narrative; false positives are rare but the lag means that policy and positioning must account for the possibility of a long wait between signal and realisation.`
+    ],
+    keyPoint: "2s10s inversion is one of the most reliable long-lead recession indicators available. It raises the probability of recession substantially; it does not tell you the month it will begin."
+  },
+  {
+    num: "5.10.03",
+    icon: "📈",
+    tClass: "t-dynamics",
+    title: "Leading Economic Index (LEI)",
+    sub: "The Conference Board’s composite of ten leading indicators — designed to turn before the broad economy",
+    formula: "LEI = composite of 10",
+    tags: [["LEI","dynamics"], ["Conference Board","mid"], ["leading index","gold"], ["turning points",""]],
+    body: [
+      `The Conference Board Leading Economic Index is a weighted composite of ten indicators that historically turn before the overall economy: average weekly hours, initial jobless claims, new orders, ISM new orders, building permits, stock prices, the yield curve, the leading credit index, consumer expectations, and average consumer expectations for business conditions (composition has evolved over time).`,
+      `Sustained declines in the LEI — particularly a drop of several percent from a peak or a string of consecutive monthly declines — have typically preceded US recessions. The index is intended to provide an early warning rather than a coincident reading.`,
+      `Because it embeds the yield curve, claims, orders and sentiment, the LEI summarises information that many market participants already watch individually. Its value lies in the disciplined aggregation and in the historical thresholds that have been associated with downturns.`,
+      `False signals can occur, and the lead time varies. The LEI is best used as one element of a broader dashboard rather than as a standalone trigger. Revisions and the evolving composition of the index also require care when comparing across long historical periods.`
+    ],
+    keyPoint: "The LEI aggregates the most important leading indicators into a single index. Persistent declines raise recession odds; the signal is useful but not infallible and should be read alongside curve, labour and credit data."
+  },
+  {
+    num: "5.10.04",
+    icon: "🏭",
+    tClass: "t-classes",
+    title: "ISM Below 50",
+    sub: "Manufacturing (and services) PMI in contraction territory — a soft-data marker of weakening activity",
+    formula: "ISM < 50",
+    tags: [["ISM","classes"], ["PMI","mid"], ["contraction","ask"], ["manufacturing",""]],
+    body: [
+      `An ISM Manufacturing PMI reading below 50 indicates that a majority of surveyed purchasing managers are reporting contraction relative to the prior month. Sustained sub-50 readings have historically aligned with periods of industrial weakness and have often preceded or coincided with broader economic slowdowns.`,
+      `Manufacturing is a smaller share of US GDP than in the past, so a manufacturing recession does not automatically equal a full economic recession. Services PMI and the broader labour market must be assessed in parallel. Nonetheless, deep or prolonged manufacturing contraction tends to spill over into employment, capital spending and sentiment.`,
+      `New orders, the employment component, and the prices-paid index provide additional colour. A sub-50 headline driven by falling new orders is more concerning for the forward path than one driven by inventory correction alone.`,
+      `ISM is timely soft data. It can reverse quickly if demand re-accelerates. A single month below 50 is a warning; a string of months below 50, especially with deteriorating new orders and employment components, is a stronger recession-risk signal.`
+    ],
+    keyPoint: "ISM below 50 flags contracting manufacturing activity. It is a useful and timely signal, but manufacturing weakness alone does not define a full recession — confirmation from services, labour and spending is required."
+  },
+  {
+    num: "5.10.05",
+    icon: "💹",
+    tClass: "t-cost",
+    title: "Declining Corporate Earnings",
+    sub: "Falling aggregate profits — both a symptom of weakening demand and a driver of subsequent investment and hiring cuts",
+    formula: "EPS ↓ → recession risk ↑",
+    tags: [["corporate earnings","cost"], ["EPS","mid"], ["profits","gold"], ["investment",""]],
+    body: [
+      `Corporate earnings are a coincident-to-slightly-leading indicator of the business cycle. When aggregate profits (or S&P 500 trailing and forward EPS) begin to decline in a sustained way, it usually reflects weakening final demand, margin pressure, or both. Firms respond by cutting costs, delaying investment and, eventually, reducing headcount — which feeds back into household income and spending.`,
+      `Earnings recessions can occur without full GDP recessions (and vice versa), but the overlap is high. Deep or prolonged earnings declines raise the probability that the weakness will spread to the labour market and to capital expenditure.`,
+      `Analyst estimate revisions, the breadth of earnings declines across sectors, and the behaviour of forward multiples provide context. A narrow decline concentrated in one or two sectors is less systemic than a broad-based contraction accompanied by downward revisions to future years.`,
+      `Because equity markets are forward-looking, much of the earnings deterioration is often priced before it appears in reported numbers. The combination of falling estimates, widening credit spreads and softening labour data is more powerful than earnings alone.`
+    ],
+    keyPoint: "Sustained declines in corporate earnings signal that demand or margins are under pressure and that firms will likely retrench. Earnings recessions frequently precede or coincide with full economic recessions."
+  },
+  {
+    num: "5.10.06",
+    icon: "⚠️",
+    tClass: "t-ask",
+    title: "Credit Spreads Widening",
+    sub: "Rising compensation for default risk — a market-based signal that financial conditions are tightening and stress is rising",
+    formula: "HY/IG OAS ↑",
+    tags: [["credit spreads","ask"], ["HY OAS","gold"], ["financial conditions","mid"], ["risk-off",""]],
+    body: [
+      `Widening credit spreads (especially high-yield OAS and CDS indices) indicate that investors are demanding more compensation for bearing corporate default risk. This can reflect deteriorating fundamentals, rising risk aversion, forced selling, or a combination. Because credit is both a price of risk and a determinant of financing conditions, spread widening is both a symptom and a potential amplifier of recession risk.`,
+      `Historically, sharp and sustained widening of HY spreads has preceded or coincided with US recessions. Moderate widening can occur in growth scares that do not become recessions; the magnitude, speed and accompanying behaviour of issuance and lending standards help discriminate.`,
+      `Credit spreads are more timely than many hard economic indicators and often move before official labour or GDP data fully reflect a downturn. They are also closely tied to the equity risk premium and to broader financial-conditions indices.`,
+      `As with other market prices, spreads can overshoot and reverse. The signal is strongest when widening is accompanied by tighter bank lending standards, weaker issuance, rising delinquencies and confirming softness in activity data.`
+    ],
+    keyPoint: "Credit-spread widening is a real-time market verdict that risk and default concerns are rising. Large, persistent moves raise recession probability and tighten financial conditions for borrowers."
+  },
+  {
+    num: "5.10.07",
+    icon: "📜",
+    tClass: "t-mid",
+    title: "NBER Recession Dating Methodology",
+    sub: "The official US business-cycle chronology — a committee judgment based on depth, diffusion and duration",
+    formula: "NBER = committee call",
+    tags: [["NBER","mid"], ["business cycle","gold"], ["official dating","spread"], ["recession definition",""]],
+    body: [
+      `The National Bureau of Economic Research (NBER) Business Cycle Dating Committee is the accepted arbiter of US recession start and end dates. A recession is defined as a significant decline in economic activity that is spread across the economy and lasts more than a few months. The Committee looks at real personal income less transfers, nonfarm payroll employment, real personal consumption expenditures, wholesale-retail sales, and industrial production, among other indicators.`,
+      `There is no fixed rule such as “two consecutive quarters of negative GDP.” The Committee uses judgment on depth, diffusion and duration. Announcements are made well after the fact — often 6–12 months or more after a peak or trough — because the Committee waits for data to be sufficiently complete and revised.`,
+      `NBER dates are therefore the historical standard for classifying past recessions, but they are not a real-time tool. Market participants and policymakers must rely on other indicators (Sahm, curve, LEI, credit, labour) to assess recession risk as it develops.`,
+      `The lag in official dating means that policy and markets often treat a recession as underway (or over) before the NBER formally declares it. The Committee’s eventual call still anchors the historical record and the evaluation of forecasting rules.`
+    ],
+    keyPoint: "NBER recession dates are the official historical standard, based on a broad judgment of depth, diffusion and duration. They are deliberately retrospective and cannot be used for real-time detection."
+  },
+  {
+    num: "5.10.08",
+    icon: "🔮",
+    tClass: "t-dynamics",
+    title: "Real-Time Recession Probability Models",
+    sub: "Statistical and machine-learning frameworks that convert incoming data into a continuous probability of recession",
+    formula: "P(recession | data)",
+    tags: [["recession probability","dynamics"], ["real-time models","mid"], ["nowcasting","gold"], ["Bayesian",""]],
+    body: [
+      `Real-time recession probability models estimate the likelihood that the economy is currently in recession (or will be within a defined horizon) conditional on the latest available data. Approaches range from simple indicator thresholds and probit models using the yield curve to dynamic factor models, Markov-switching models, and machine-learning classifiers that combine labour, activity, survey and financial variables.`,
+      `Well-known public examples include the New York Fed’s yield-curve-based probability, various nowcasting platforms, and academic Markov-switching implementations. Private-sector versions incorporate higher-frequency data and a wider information set.`,
+      `The output is a continuous probability rather than a binary call, which is more useful for risk management and position sizing. Calibration matters: a model that frequently assigns 40–60 % probabilities may be less actionable than one that reaches extreme readings only when the data are decisive.`,
+      `All such models are only as good as their inputs and their historical training sample. Structural change, unprecedented shocks and data revisions can degrade performance. They are best treated as disciplined summaries of the data rather than as oracles.`
+    ],
+    keyPoint: "Real-time recession probability models translate the flow of economic and financial data into a continuous risk estimate. They improve on binary rules by quantifying uncertainty — but they remain fallible and data-dependent."
+  },
+  {
+    num: "5.10.09",
+    icon: "🏦",
+    tClass: "t-markets",
+    title: "Goldman Sachs Recession Probability Tracker",
+    sub: "A widely followed private-sector synthesis of leading indicators into a single near-term recession probability",
+    formula: "GS P(recession)",
+    tags: [["Goldman Sachs","markets"], ["recession tracker","mid"], ["probability","gold"], ["sell-side model",""]],
+    body: [
+      `Goldman Sachs (and several other major sell-side institutions) maintain proprietary recession-probability models that combine a range of leading and coincident indicators — typically including the yield curve, labour-market variables, financial conditions, surveys and activity data — into a single estimated probability of recession over a forward window (often 12 months).`,
+      `These trackers are influential because they are updated frequently, communicated clearly to clients, and embedded in the broader market narrative. A rise in the GS (or similar) probability is often cited in macro research and media coverage as evidence that recession risk is increasing.`,
+      `Methodologies differ across firms and evolve over time. Common elements include probit or logit specifications, weighted averages of individual indicator signals, and sometimes regime-switching components. The exact weights and variable lists are proprietary.`,
+      `As with any model-based probability, the number should be interpreted as a summary of the institution’s current reading of the data, not as an objective truth. Cross-checking against the underlying indicators (Sahm, curve, LEI, credit, ISM, earnings) remains essential. Divergences between different institutions’ probabilities can themselves be informative about which data are driving the disagreement.`
+    ],
+    keyPoint: "Sell-side recession probability trackers (including Goldman’s) compress a wide information set into a single, frequently updated number that shapes the market conversation. They are useful summaries, not substitutes for examining the underlying signals."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

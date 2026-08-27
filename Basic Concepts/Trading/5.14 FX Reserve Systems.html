@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 5.14 FX Reserve Systems</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 5 · Section 5.14 · Macro & Monetary Foundations</div>
+        <h1 class="hdr-title">FX Reserve<br><em>Systems</em></h1>
+        <div class="hdr-sub">The architecture of global money — dollar dominance, payment rails, multipolar challenges, gold and the slow search for alternatives</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Reserve Landscape</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Dominant</div>
+            <div class="sw-price">USD<br>~58%+</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Challengers</div>
+            <div class="sw-price">EUR · RMB<br>Gold</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Rails</div>
+          <div class="sw-spread-val">SWIFT · CIPS</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Trend</div>
+          <div class="sw-mid-val">Slow multipolar</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">9 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>5.14 FX Reserve Systems</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "5.14.01",
+    icon: "💵",
+    tClass: "t-mid",
+    title: "USD as Global Reserve Currency",
+    sub: "The dollar’s dominant share of official reserves, trade invoicing, cross-border credit and safe-asset supply",
+    formula: "USD ≈ 58%+ of reserves",
+    tags: [["USD reserves","mid"], ["reserve currency","gold"], ["dollar dominance","spread"], ["safe asset",""]],
+    formulaBox: {
+      main: "USD share of allocated reserves ≈ 58%+",
+      note: "Also dominant in trade invoicing, FX turnover,\ncross-border bank claims and international debt\nNetwork effects and deep US markets sustain the role"
+    },
+    body: [
+      `The US dollar remains the world’s primary reserve currency. Official foreign-exchange reserves held by central banks are still majority-denominated in dollars; a large share of global trade is invoiced and settled in dollars; and the bulk of cross-border bank claims and international debt securities are dollar-denominated.`,
+      `This status rests on several reinforcing pillars: the size and openness of the US economy, the depth and liquidity of US Treasury and financial markets, the rule of law and institutional credibility, and powerful network effects — everyone uses the dollar because everyone else uses the dollar.`,
+      `Reserve-currency status confers the “exorbitant privilege”: the United States can borrow in its own currency at scale, run persistent current-account deficits with less immediate pressure, and project financial power through sanctions and payment-system access. The corresponding responsibility is to supply safe assets and maintain confidence in the unit.`,
+      `Challenges exist — rising US debt, political polarisation, the weaponisation of the dollar, and the growth of alternative systems — but displacement of an incumbent reserve currency has historically been slow. The dollar’s share has declined gradually from higher levels, yet no single rival has approached parity.`
+    ],
+    keyPoint: "The dollar’s reserve role is the central fact of the international monetary system. It is sustained by network effects and US market depth; erosion, if it occurs, will be gradual rather than sudden."
+  },
+  {
+    num: "5.14.02",
+    icon: "🛢️",
+    tClass: "t-cost",
+    title: "Petrodollar Recycling",
+    sub: "How oil exporters’ dollar revenues are channelled back into global financial markets and US assets",
+    formula: "Oil $ → Reserve recycling",
+    tags: [["petrodollar","cost"], ["recycling","mid"], ["oil exporters","gold"], ["capital flows",""]],
+    body: [
+      `Petrodollar recycling describes the process by which oil-exporting countries convert their dollar-denominated export revenues into holdings of financial assets — historically large purchases of US Treasuries and other dollar assets, as well as deposits in the international banking system.`,
+      `Because oil has long been priced and settled primarily in dollars, producers accumulate dollar claims. When these claims are invested in US or dollar-denominated assets, they finance the US current-account deficit and support demand for Treasuries and other safe assets. The recycling loop therefore links energy markets, reserve accumulation and global fixed-income markets.`,
+      `The scale of recycling rises and falls with oil prices and the current-account surpluses of major producers. In high-price regimes the flows are large and systemically important; in low-price regimes they shrink. Over time some producers have diversified reserve composition and investment destinations, but the dollar core of the system has remained.`,
+      `Geopolitical tensions and sanctions have encouraged some exporters to explore non-dollar settlement and alternative reserve assets. Any material shift in the currency of oil invoicing or in the destination of recycled surpluses would affect dollar demand and the financing of US deficits.`
+    ],
+    keyPoint: "Petrodollar recycling is the energy-market counterpart of dollar reserve demand. Oil priced in dollars generates dollar surpluses that, when invested in US assets, reinforce the dollar’s central role."
+  },
+  {
+    num: "5.14.03",
+    icon: "🔗",
+    tClass: "t-spread",
+    title: "SWIFT & Dollar Payment Dominance",
+    sub: "The messaging and correspondent-banking infrastructure that makes the dollar the default cross-border payment currency",
+    formula: "SWIFT + correspondent $",
+    tags: [["SWIFT","spread"], ["payment system","mid"], ["correspondent banking","gold"], ["sanctions tool",""]],
+    body: [
+      `SWIFT (Society for Worldwide Interbank Financial Telecommunication) is the dominant secure messaging network through which banks send payment instructions. It is not itself a settlement system, but it is the primary language of cross-border payments. Most international transfers that ultimately settle in dollars rely on SWIFT messages and on correspondent banking relationships that clear through US or dollar-clearing institutions.`,
+      `Dollar payment dominance therefore rests on two layers: the messaging layer (SWIFT and alternatives) and the settlement layer (correspondent accounts at US banks and dollar clearing systems). Access to this infrastructure is a form of financial power; exclusion from it is a potent sanctions tool.`,
+      `Efforts to build parallel systems (China’s CIPS, various bilateral payment arrangements, and experiments with CBDCs and blockchain rails) aim to reduce dependence on SWIFT and on dollar clearing. Adoption has grown from a low base but remains far smaller than the incumbent network.`,
+      `For markets the implication is that dollar payment dominance is both a source of convenience and a geopolitical chokepoint. Any credible, scalable alternative would gradually erode the dollar’s transactional hegemony even if reserve shares moved more slowly.`
+    ],
+    keyPoint: "SWIFT and dollar correspondent banking form the operating system of cross-border payments. Control over access to that system is a central instrument of financial statecraft and a key reason the dollar remains hard to displace."
+  },
+  {
+    num: "5.14.04",
+    icon: "🌐",
+    tClass: "t-classes",
+    title: "SDRs (Special Drawing Rights)",
+    sub: "The IMF’s quasi-currency reserve asset — a weighted basket designed as a supplement to existing reserves",
+    formula: "SDR = basket (USD, EUR, CNY, JPY, GBP)",
+    tags: [["SDR","classes"], ["IMF","mid"], ["reserve asset","gold"], ["basket currency",""]],
+    formulaBox: {
+      main: "SDR basket: USD · EUR · CNY · JPY · GBP",
+      note: "Weights reviewed periodically\nAllocated by IMF to members\nNot a freely traded currency; limited private use"
+    },
+    body: [
+      `Special Drawing Rights are an international reserve asset created by the IMF. The SDR’s value is defined by a basket of major currencies (currently the US dollar, euro, Chinese renminbi, Japanese yen and pound sterling). SDRs can be exchanged among member countries for freely usable currencies and count as official reserves.`,
+      `SDRs were designed to supplement existing reserve assets and to provide liquidity when global reserves are judged insufficient. Large general allocations (notably in 2009 and 2021) have been used as a form of global liquidity support. Holdings are distributed according to IMF quotas.`,
+      `In practice SDRs remain a modest share of total global reserves. They are not a private transaction currency, have limited market depth, and depend on the willingness of members to accept them in exchange for hard currency. Proposals to expand the SDR’s role — as a more central reserve asset or as a unit for commodity pricing — have repeatedly surfaced but have not transformed the system.`,
+      `The inclusion of the renminbi in the SDR basket in 2016 was symbolically important for China’s internationalisation efforts. It did not, by itself, create deep private demand for RMB assets.`
+    ],
+    keyPoint: "SDRs are a politically designed supplement to national reserve currencies, not a rival to the dollar. Their role expands mainly through IMF allocations rather than through organic market adoption."
+  },
+  {
+    num: "5.14.05",
+    icon: "🌍",
+    tClass: "t-dynamics",
+    title: "Trend Toward a Multipolar Reserve System",
+    sub: "The gradual diversification of reserve portfolios and the slow emergence of a less dollar-centric architecture",
+    formula: "Unipolar → Multipolar?",
+    tags: [["multipolar","dynamics"], ["reserve diversification","mid"], ["currency competition","gold"], ["slow transition",""]],
+    body: [
+      `A multipolar reserve system would feature several currencies (and possibly gold or other assets) sharing significant roles in official reserves, trade invoicing and international finance, rather than one overwhelmingly dominant currency. Elements of multipolarity already exist: the euro is a clear second, the renminbi is rising from a low base, and gold has regained reserve share in some portfolios.`,
+      `Drivers of diversification include the desire to reduce concentration risk, the political desire to limit exposure to US sanctions, the growth of non-US economies, and deliberate internationalisation policies by other issuers. Counter-forces include the unmatched liquidity of US markets, inertia in invoicing and funding practices, and the absence of a fully comparable alternative safe-asset supply.`,
+      `Empirically the dollar’s share of allocated reserves has declined modestly over two decades but remains dominant. Most of the shift has gone to a mix of other currencies and to gold rather than to a single challenger. Trade invoicing and cross-border credit remain heavily dollar-centric.`,
+      `The realistic near-term outcome is not a sudden dethroning of the dollar but a slow, uneven multipolarisation at the margin — more diversification, more regional arrangements, and a slightly less asymmetric system.`
+    ],
+    keyPoint: "Multipolarity in reserves is a process, not an event. Diversification is real and ongoing, but network effects and US market depth mean the dollar’s central role erodes only gradually."
+  },
+  {
+    num: "5.14.06",
+    icon: "🇨🇳",
+    tClass: "t-impact",
+    title: "China’s RMB Internationalization",
+    sub: "The deliberate policy effort to expand the renminbi’s role in trade, finance and reserves — progress and constraints",
+    formula: "RMB share ↑ (from low base)",
+    tags: [["RMB","impact"], ["internationalization","mid"], ["CIPS","spread"], ["capital account",""]],
+    body: [
+      `China has pursued renminbi internationalisation through trade-settlement schemes, offshore RMB centres, bilateral currency swaps, inclusion in the SDR basket, the development of CIPS (Cross-Border Interbank Payment System), and gradual opening of onshore bond and equity markets to foreign investors.`,
+      `Progress is visible: RMB trade settlement has grown, the currency appears in a rising (still small) share of global payments and reserves, and Chinese government bonds have entered major global indices. Offshore RMB liquidity and dim-sum markets provide additional channels.`,
+      `Constraints remain binding. Full internationalisation typically requires an open capital account, deep and freely accessible domestic financial markets, and high confidence in the legal and policy framework. China maintains significant capital controls and a managed exchange-rate regime, which limit the RMB’s attractiveness as a pure reserve and funding currency compared with the dollar or euro.`,
+      `The strategic objective is clear: reduce dependence on the dollar, support Chinese firms abroad, and gain financial influence commensurate with China’s economic weight. The path is incremental; a rapid leap to peer status with the dollar is not the base case.`
+    ],
+    keyPoint: "RMB internationalisation is a long-term state project with measurable gains and structural limits. Capital-account openness and market depth remain the binding constraints on reserve-currency status."
+  },
+  {
+    num: "5.14.07",
+    icon: "🥇",
+    tClass: "t-gold",
+    title: "Gold as Reserve Asset",
+    sub: "The only major reserve asset that is no one’s liability — and its renewed role in official portfolios",
+    formula: "Gold = non-liability reserve",
+    tags: [["gold reserves","gold"], ["central bank buying","mid"], ["safe asset","spread"], ["monetary metal",""]],
+    body: [
+      `Gold is unique among major reserve assets in that it is not the liability of any government or central bank. It carries no default or sanctions-channel risk of the kind that attaches to foreign-currency deposits and securities. That property has always given it a role in official reserves; in recent years that role has expanded.`,
+      `Central banks, particularly in emerging markets, have been net buyers of gold on a sustained basis. Motivations include diversification away from dollar (and other fiat) concentration, geopolitical hedging, and the desire for an asset that can be held outside the Western financial system. Gold’s share of global reserves has risen from post-1990s lows.`,
+      `Gold does not pay yield, is costly to store, and can be volatile in the short run. Its opportunity cost rises when real interest rates are high. These features limit the share that most reserve managers will allocate, but they do not eliminate the strategic case for a non-zero holding.`,
+      `In a fragmented geopolitical environment, gold functions as a neutral reserve asset and a form of monetary insurance. Its price and official demand are therefore sensitive to real rates, inflation expectations, and the intensity of sanctions and bloc rivalry.`
+    ],
+    keyPoint: "Gold is the reserve asset that cannot be frozen or defaulted on by a foreign sovereign. Official demand for that property has risen with geopolitical fragmentation and sanctions risk."
+  },
+  {
+    num: "5.14.08",
+    icon: "📉",
+    tClass: "t-ask",
+    title: "Dedollarization Trends",
+    sub: "The active effort by some states and firms to reduce reliance on the dollar for trade, reserves and financing",
+    formula: "Dedollarize = reduce $ exposure",
+    tags: [["dedollarization","ask"], ["diversification","mid"], ["sanctions hedge","gold"], ["local currency",""]],
+    body: [
+      `Dedollarization refers to deliberate policies and market practices aimed at reducing the use of the US dollar in trade settlement, reserve holdings, cross-border borrowing and payment systems. It is driven by a mix of economic diversification motives and geopolitical desire to limit exposure to US financial power.`,
+      `Observable forms include bilateral local-currency trade agreements, increased invoicing in euros, renminbi or other units, central-bank reserve diversification into non-dollar assets and gold, development of alternative payment rails, and efforts to deepen local-currency bond markets so that borrowers need less dollar debt.`,
+      `The scale of dedollarization so far is meaningful at the margin but modest relative to the dollar’s overall role. Many “non-dollar” trades still involve the dollar at some stage of the transaction chain, and deep, liquid alternatives for reserves and funding remain limited. Progress is faster in some bilateral corridors (e.g., certain commodity trades) than in the global system as a whole.`,
+      `For markets the relevant questions are the pace of the shift, the assets that absorb diversified reserve demand, and the implications for US funding costs and for the currencies and gold that gain share.`
+    ],
+    keyPoint: "Dedollarization is real as a trend and limited as a present-day fact. It raises demand for alternatives (other currencies, gold, local markets) without yet overturning dollar centrality."
+  },
+  {
+    num: "5.14.09",
+    icon: "🧱",
+    tClass: "t-markets",
+    title: "BRICS Payment System Attempts",
+    sub: "Collective efforts by BRICS and aligned economies to build non-Western payment and settlement infrastructure",
+    formula: "BRICS rails ≠ SWIFT scale",
+    tags: [["BRICS","markets"], ["payment systems","spread"], ["CIPS","mid"], ["alternative rails","gold"]],
+    body: [
+      `BRICS (and expanded BRICS+) countries have discussed and, in varying degrees, advanced initiatives to reduce dependence on Western-dominated payment systems. These include greater use of local currencies in intra-group trade, bilateral central-bank arrangements, support for systems such as China’s CIPS, and periodic proposals for a common BRICS payment unit or platform.`,
+      `The strategic logic is clear: payment infrastructure is a chokepoint; diversification reduces sanctions vulnerability and increases financial autonomy. Implementation, however, confronts the same obstacles that face any challenger to SWIFT and dollar clearing — liquidity, standardisation, legal certainty, trust, and the willingness of private banks and firms to adopt new rails at scale.`,
+      `Progress has been incremental. Local-currency settlement shares have risen in some bilateral relationships; CIPS membership and volumes have grown; and political commitment to alternatives has strengthened. A full-fledged, liquid, widely trusted BRICS payment system that rivals SWIFT in reach and convenience does not yet exist.`,
+      `For the international monetary system these efforts are part of the broader multipolarisation story. They matter more as a direction of travel and as a geopolitical signal than as a near-term replacement for existing infrastructure.`
+    ],
+    keyPoint: "BRICS payment initiatives are the institutional expression of dedollarization ambitions. They are advancing from a low base; network effects and trust still heavily favour the incumbent global rails."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

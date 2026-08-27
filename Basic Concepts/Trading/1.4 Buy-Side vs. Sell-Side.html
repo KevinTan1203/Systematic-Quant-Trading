@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 1.4 Buy-Side vs. Sell-Side</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;   /* bid = green — buyers */
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;   /* ask = red — sellers */
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;   /* spread = purple */
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;   /* mid-price = blue */
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  /* micro dot texture */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  /* ── HEADER ── */
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  /* live correlation display widget */
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 240px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  /* header border */
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── ENTRY ── */
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  /* topic-colour left bars */
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  /* colour badge */
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  /* formula pill */
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  /* ── BODY ── */
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  /* formula display */
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  /* visual ladder */
+  .price-ladder {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .ladder-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ladder-row {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+  }
+
+  .ladder-row:last-child { border-bottom: none; }
+
+  .lr-price {
+    padding: 7px 16px;
+    min-width: 90px;
+    font-weight: 600;
+    border-right: 1px solid var(--border);
+  }
+
+  .lr-size {
+    padding: 7px 12px;
+    min-width: 80px;
+    color: var(--muted);
+    border-right: 1px solid var(--border);
+    text-align: right;
+  }
+
+  .lr-bar-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 4px 12px;
+  }
+
+  .lr-bar {
+    height: 10px;
+    border-radius: 2px;
+    opacity: 0.7;
+  }
+
+  .lr-label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    color: var(--muted);
+    text-align: right;
+    min-width: 80px;
+  }
+
+  .ask-row { background: var(--ask-light); }
+  .ask-row .lr-price { color: var(--ask); }
+  .ask-row .lr-bar   { background: var(--ask); }
+  .ask-row .lr-label { color: var(--ask); }
+
+  .bid-row { background: var(--bid-light); }
+  .bid-row .lr-price { color: var(--bid); }
+  .bid-row .lr-bar   { background: var(--bid); }
+  .bid-row .lr-label { color: var(--bid); }
+
+  .spread-row { background: var(--spread-light); }
+  .spread-row .lr-price { color: var(--spread); font-weight: 700; }
+  .spread-row .lr-label { color: var(--spread); font-weight: 700; }
+
+  .mid-row-style { background: var(--mid-light); }
+  .mid-row-style .lr-price { color: var(--mid); font-weight: 700; }
+  .mid-row-style .lr-label { color: var(--mid); font-weight: 700; }
+
+  /* data comparison table */
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  /* split box */
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* key insight */
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  /* tags */
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  /* foot */
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 1 · Section 1.4 · Core Market Structure</div>
+        <h1 class="hdr-title">Buy-Side<br><em>vs. Sell-Side</em></h1>
+        <div class="hdr-sub">The fundamental division of labour in capital markets — who manages money, who intermedates it, and how the flows, incentives and conflicts between them shape execution and research</div>
+      </div>
+
+      <!-- live widget -->
+      <div class="spread-widget">
+        <div class="sw-title">Illustrative Roles</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Buy-Side</div>
+            <div class="sw-price">Asset<br>Owners</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Sell-Side</div>
+            <div class="sw-price">Inter-<br>mediaries</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Core Flow</div>
+          <div class="sw-spread-val">Orders → Liquidity</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Key Tension</div>
+          <div class="sw-mid-val">Agency vs Principal</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">10 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>1.4 Buy-Side vs. Sell-Side</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "1.4.01",
+    icon: "🏦",
+    tClass: "t-bid",
+    title: "Buy-Side Definition & Role",
+    sub: "Institutions that manage capital on behalf of clients or themselves — the ultimate demand for securities and liquidity",
+    formula: "Buy = Asset Owners",
+    tags: [["buy-side","bid"], ["asset owners","bid"], ["portfolio management","mid"], ["fiduciary",""]],
+    body: [
+      `The <em>buy-side</em> comprises all institutions whose primary business is to invest capital — either their own or that entrusted to them by clients — with the goal of generating returns. They are the ultimate buyers (and sellers) of securities, derivatives and other financial instruments. Their core function is portfolio construction, risk management and performance generation, not the intermediation of trades or the provision of market-making services.`,
+      `Buy-side firms are typically measured by assets under management (AUM), investment performance relative to benchmarks or absolute return targets, and the quality of their fiduciary processes. They consume research, execution services, prime brokerage, custody and data; they produce investment decisions and order flow. Because they act as agents for end-investors (or for their own balance sheet in the case of proprietary capital), their regulatory and cultural orientation is heavily fiduciary.`,
+      `The buy-side sits at one end of the market’s value chain: it decides <em>what</em> to buy or sell and <em>when</em>. The sell-side then helps determine <em>how</em> those decisions are implemented in the market. This separation of investment decision from trade execution is one of the defining architectural features of modern capital markets.`,
+      `In practice the boundary is not always sharp — some large buy-side firms have internal trading desks that provide significant liquidity, and some sell-side firms manage client assets — but the economic identity remains clear: the buy-side’s P&L is driven primarily by investment returns and fees on AUM, not by spreads, commissions or underwriting revenue.`
+    ],
+    keyPoint: "The buy-side exists to allocate and manage capital. Everything else — research consumption, order routing, soft-dollar arrangements — is downstream of that core mandate."
+  },
+  {
+    num: "1.4.02",
+    icon: "📈",
+    tClass: "t-bid",
+    title: "Buy-Side Participants",
+    sub: "Asset managers, hedge funds, pension funds and insurers — the main institutional capital allocators",
+    formula: "AM · HF · Pension · Insurance",
+    tags: [["asset managers","bid"], ["hedge funds","bid"], ["pensions","mid"], ["insurance","gold"]],
+    splitBox: [
+      { cls: "bid",  label: "Asset Managers", text: "Long-only and multi-asset firms managing mutual funds, ETFs, SMAs and institutional mandates. Revenue from management and performance fees. Highly regulated fiduciary agents." },
+      { cls: "spread", label: "Hedge Funds", text: "Absolute-return vehicles using leverage, shorting and derivatives. Typically 2-and-20 fee structures. More flexible mandates and higher turnover; heavy users of prime brokerage." },
+      { cls: "mid",  label: "Pension Funds", text: "Defined-benefit and defined-contribution schemes investing for long-horizon liabilities. Often outsource to external managers; large, patient capital with strong governance focus." },
+      { cls: "gold", label: "Insurance Companies", text: "Balance-sheet investors matching assets to long-duration liabilities (life) or shorter-duration claims (P&C). Significant fixed-income focus and regulatory capital constraints." }
+    ],
+    body: [
+      `Traditional <strong>asset managers</strong> (BlackRock, Vanguard, Fidelity, Amundi, etc.) form the largest segment by AUM. They run mutual funds, ETFs, separate accounts and alternative strategies for retail and institutional clients. Their economics are fee-based; their constraints are benchmarks, investment guidelines and fiduciary duty.`,
+      `<strong>Hedge funds</strong> pursue absolute or relative returns with fewer constraints on shorting, leverage and instrument choice. They are intensive users of sell-side balance sheet (prime brokerage), research and capital-introduction services. Their higher turnover and more complex strategies generate both significant commission flow and more demanding execution requirements.`,
+      `<strong>Pension funds</strong> (public and corporate) and <strong>sovereign wealth funds</strong> are the ultimate asset owners for large pools of retirement and national capital. Many allocate to external managers rather than managing everything in-house; their long horizons and liability-driven investment (LDI) frameworks shape demand for duration, inflation protection and alternative assets.`,
+      `<strong>Insurance companies</strong> invest premiums to meet future claims and policyholder obligations. Regulatory capital regimes (Solvency II, RBC) heavily influence their asset allocation, favouring high-quality fixed income and, increasingly, private credit and infrastructure. Together these four groups constitute the overwhelming majority of institutional order flow in global markets.`
+    ],
+    keyPoint: "Buy-side is not monolithic. A passive ETF manager, a multi-strategy hedge fund, a public pension and a life insurer have radically different time horizons, constraints and interaction patterns with the sell-side."
+  },
+  {
+    num: "1.4.03",
+    icon: "🏛️",
+    tClass: "t-ask",
+    title: "Sell-Side Definition & Role",
+    sub: "Intermediaries that facilitate issuance, trading, research and market-making — the supply side of capital-markets services",
+    formula: "Sell = Intermediaries",
+    tags: [["sell-side","ask"], ["intermediation","ask"], ["market making","mid"], ["investment banking",""]],
+    body: [
+      `The <em>sell-side</em> consists of firms whose primary business is to intermediate between issuers and investors, and between buyers and sellers of securities. They underwrite new issues, make markets, execute client orders, provide research and advice, and extend balance-sheet and financing services. Their revenue comes from spreads, commissions, underwriting fees, advisory fees and financing income rather than from long-term investment performance.`,
+      `Historically the sell-side was dominated by full-service investment banks that combined origination, sales & trading, research and advisory under one roof. Post-crisis regulation (Volcker Rule, Basel III, MiFID II) and the rise of electronic trading have forced greater specialisation and reduced the willingness of many firms to deploy large amounts of proprietary risk capital.`,
+      `The sell-side’s economic function is to reduce search and information costs, provide immediacy (liquidity), and absorb or redistribute risk so that buy-side investors can implement decisions efficiently. In doing so it also creates agency problems: the same firm may be advising a corporate client, making markets in that client’s securities, publishing research, and executing buy-side orders — roles that can conflict.`,
+      `Modern sell-side organisations range from global bulge-bracket banks to pure electronic market-makers, independent research boutiques and specialised broker-dealers. What unites them is that their P&L is driven by facilitating activity rather than by owning the economic exposure over multi-year horizons.`
+    ],
+    keyPoint: "The sell-side exists to intermediate. Its success is measured by volume, spread capture, fee income and balance-sheet efficiency — not by the long-term performance of the assets it helps others buy and sell."
+  },
+  {
+    num: "1.4.04",
+    icon: "🤝",
+    tClass: "t-ask",
+    title: "Sell-Side Participants",
+    sub: "Investment banks, broker-dealers, market makers and research providers — the specialised service layers",
+    formula: "IB · BD · MM · Research",
+    tags: [["investment banks","ask"], ["broker-dealers","ask"], ["market makers","mid"], ["research","spread"]],
+    splitBox: [
+      { cls: "ask",  label: "Investment Banks", text: "Full-service firms combining ECM/DCM origination, M&A advisory, sales & trading and research. Primary relationship banks for large corporates and institutions." },
+      { cls: "spread", label: "Broker-Dealers", text: "Firms licensed to execute and clear trades for clients and/or their own account. Range from full-service to execution-only and electronic specialists." },
+      { cls: "mid",  label: "Market Makers", text: "Liquidity providers that continuously quote two-sided markets. Includes bank desks, electronic market-makers (Citadel Securities, Virtu) and designated specialists." },
+      { cls: "gold", label: "Research Providers", text: "Sell-side equity/credit research teams plus independent research houses. Produce fundamental analysis, models and investment ideas consumed by the buy-side." }
+    ],
+    body: [
+      `<strong>Investment banks</strong> remain the central nodes for capital raising and complex advisory work. Their sales & trading divisions still intermediate large blocks and provide capital-commitment services, although the scale of proprietary risk-taking has declined.`,
+      `<strong>Broker-dealers</strong> focus on the agency and principal execution of secondary-market trades. In the US they are regulated under the Exchange Act; many also act as introducing or clearing brokers. The category overlaps heavily with investment banks but also includes pure-play electronic brokers and regional firms.`,
+      `<strong>Market makers</strong> (both bank and non-bank) supply continuous liquidity. Electronic market-makers have captured a large share of equity and ETF volume by combining low-latency technology with inventory and hedging sophistication. Their business model is tightly linked to order-flow arrangements and exchange fee structures.`,
+      `<strong>Research providers</strong> — whether housed inside banks or independent — produce the fundamental and quantitative analysis that influences buy-side decisions. The economics of research have been transformed by unbundling rules (especially MiFID II), forcing clearer pricing and reducing the cross-subsidy from trading commissions.`
+    ],
+    keyPoint: "Sell-side participants specialise along the value chain: origination, liquidity provision, pure agency execution and information production. The same legal entity may perform several of these roles, creating both synergies and conflicts."
+  },
+  {
+    num: "1.4.05",
+    icon: "🔄",
+    tClass: "t-dynamics",
+    title: "Flow Dynamics Between Buy-Side & Sell-Side",
+    sub: "How order flow, information, capital and services move between the two sides of the market",
+    formula: "Orders ↔ Liquidity + Research",
+    tags: [["order flow","dynamics"], ["liquidity provision","mid"], ["information exchange",""], ["prime brokerage","gold"]],
+    body: [
+      `The fundamental flow is straightforward: the buy-side generates investment decisions and therefore order flow; the sell-side supplies liquidity, execution services, research and financing. In return the buy-side pays commissions, spreads, financing rates and, historically, soft-dollar considerations.`,
+      `Information flows in both directions. Sell-side research and sales commentary travel to the buy-side; buy-side order flow and “axes” (indications of interest) travel back to the sell-side, giving market-makers and sales desks valuable signals about demand and supply. Large buy-side firms are themselves important sources of colour and, increasingly, of proprietary data products.`,
+      `Capital and balance-sheet services complete the picture. Prime brokers (almost always sell-side) provide leverage, short-locate, custody and capital introduction to hedge funds. Corporate issuers interact with the sell-side for underwriting; the resulting new-issue supply is then distributed to buy-side accounts.`,
+      `These flows create a dense web of relationships. A single large asset manager may maintain dozens of broker relationships ranked by research quality, execution performance, capital commitment and coverage. League tables, broker-vote processes and transaction-cost analysis (TCA) formalise the allocation of commission wallets and trading flow.`
+    ],
+    keyPoint: "Buy-side and sell-side are symbiotic. Order flow is the raw material the sell-side needs; liquidity, research and balance sheet are the services the buy-side needs. The terms of that exchange — commissions, spreads, soft dollars, PFOF — are the subject of continuous negotiation and regulation."
+  },
+  {
+    num: "1.4.06",
+    icon: "💵",
+    tClass: "t-cost",
+    title: "Soft Dollar Arrangements",
+    sub: "Using commission dollars to pay for research and other services — the classic bundled payment mechanism",
+    formula: "Commission → Research + Execution",
+    tags: [["soft dollars","gold"], ["bundled research","gold"], ["Section 28(e)","mid"], ["conflicts",""]],
+    body: [
+      `Soft dollars (or soft commissions) arise when a buy-side firm pays a broker a commission that exceeds the pure cost of execution; the excess is used by the broker to provide, or to pay third parties for, research and other services that benefit the manager. In the United States, Section 28(e) of the Securities Exchange Act provides a safe harbour that protects managers from claims of breach of fiduciary duty when they pay higher commissions for “brokerage and research services.”`,
+      `The economic rationale was that research is a legitimate cost of managing money and that bundling it with execution simplified procurement. In practice soft dollars created opacity: clients (the ultimate asset owners) paid for research through higher transaction costs rather than through explicit management-fee deductions, and the link between research quality and payment became difficult to audit.`,
+      `Typical soft-dollar products included sell-side research reports, access to analysts, proprietary data feeds, portfolio analytics and even, in earlier eras, hardware and software. Regulators and asset owners progressively tightened the definition of eligible research and required greater disclosure.`,
+      `Although pure soft-dollar practices have declined — especially after MiFID II in Europe — residual forms persist in some jurisdictions and through commission-sharing arrangements. The core tension remains: when the manager’s research budget is funded by client trading commissions, incentives can diverge from pure best-execution and cost-minimisation objectives.`
+    ],
+    keyPoint: "Soft dollars convert an explicit research cost into an implicit transaction cost. They simplify procurement for the manager but reduce transparency for the end client and can distort broker selection away from pure execution quality."
+  },
+  {
+    num: "1.4.07",
+    icon: "📑",
+    tClass: "t-spread",
+    title: "Commission Sharing Agreements (CSAs)",
+    sub: "Formal mechanisms that separate execution from research payment while retaining commission as the funding source",
+    formula: "CSA = Exec Broker + Research Credits",
+    tags: [["CSA","spread"], ["commission sharing","spread"], ["research payment","gold"], ["unbundling path",""]],
+    body: [
+      `A Commission Sharing Agreement (CSA) is a contractual arrangement under which a buy-side firm executes trades with one or more brokers and instructs those brokers to set aside a portion of the commission into a pool. That pool can then be used to pay other brokers or independent research providers for research services. The executing broker still clears and settles the trade; the research provider receives a credit without necessarily handling the order.`,
+      `CSAs emerged as a cleaner alternative to traditional soft dollars. They preserve the ability to fund research from commission dollars while allowing the manager to choose the best execution venue independently of the research relationship. They also create an audit trail: research payments are explicit credits rather than opaque mark-ups.`,
+      `In practice a manager maintains a panel of executing brokers under CSAs and a separate list of research providers who receive payments from the CSA pool. Broker-vote processes determine how the research budget is allocated across providers. The arrangement is particularly useful when the highest-quality research comes from boutiques or independent houses that do not offer competitive execution.`,
+      `CSAs were an important transitional technology on the road to full unbundling. They improved transparency relative to classic soft dollars but still left research costs embedded in transaction expenses rather than in the management fee. Regulatory pressure, especially in Europe, subsequently pushed many firms further toward explicit research payment accounts funded from the manager’s own P&L.`
+    ],
+    keyPoint: "CSAs decouple the choice of execution broker from the choice of research provider while still using commissions as the funding mechanism. They are a transparency upgrade on soft dollars, not yet full unbundling."
+  },
+  {
+    num: "1.4.08",
+    icon: "⚖️",
+    tClass: "t-impact",
+    title: "Research Unbundling & MiFID II Impact",
+    sub: "The regulatory separation of research payments from execution commissions — and its consequences for the industry",
+    formula: "Research ≠ Commission",
+    tags: [["MiFID II","impact"], ["unbundling","impact"], ["research pricing","gold"], ["inducements",""]],
+    body: [
+      `MiFID II (effective January 2018 in the EU/UK) required investment firms to unbundle research from execution. Research could no longer be paid for via commissions; it had to be paid either from the manager’s own resources or from a dedicated Research Payment Account (RPA) funded with client consent and subject to strict budgeting and disclosure rules. The goal was to eliminate inducements that could compromise best execution and to force a transparent market price for research.`,
+      `The immediate effects were dramatic. Sell-side research budgets were cut, coverage of mid- and small-cap stocks declined in many markets, and independent research providers faced both opportunity (new buyers) and pressure (lower willingness to pay). Many asset managers chose to pay for research from their own P&L rather than pass the cost explicitly to clients, effectively absorbing what had previously been a client-borne expense.`,
+      `Pricing experiments proliferated: per-report fees, subscription models, analyst-access retainers and “freemium” structures. Valuation of research became an explicit procurement process rather than an implicit allocation of commission wallet. Broker-vote systems evolved into formal research-evaluation frameworks.`,
+      `Outside Europe the impact was partial. US managers remained under the Section 28(e) soft-dollar regime, but global firms with European clients often adopted unbundled practices firm-wide for consistency. The long-term result has been a smaller, more specialised research industry and a clearer (if still imperfect) price signal for the value of sell-side analysis.`
+    ],
+    keyPoint: "MiFID II converted research from a bundled, commission-funded service into an explicitly priced good. The industry is still adjusting to the resulting reduction in research supply and the shift of cost from clients’ transaction expenses onto managers’ own P&L."
+  },
+  {
+    num: "1.4.09",
+    icon: "🔀",
+    tClass: "t-mid",
+    title: "Agency vs. Principal Trading",
+    sub: "Acting purely as agent for the client versus committing capital and taking risk on the firm’s own book",
+    formula: "Agency ≠ Principal",
+    tags: [["agency trading","mid"], ["principal trading","ask"], ["risk commitment","gold"], ["best execution",""]],
+    splitBox: [
+      { cls: "mid",  label: "Agency", text: "Broker acts solely as agent, matching or routing the client order without taking proprietary risk. Revenue = commission. Duty of best execution is paramount; conflicts are lower." },
+      { cls: "ask",  label: "Principal", text: "Dealer commits capital, takes the other side of the client trade onto its own book, and manages the resulting inventory risk. Revenue = spread + inventory P&L. Potential conflict with client interest." },
+      { cls: "gold", label: "Hybrid Reality", text: "Many trades blend both: riskless principal, facilitated agency with limited capital commitment, or ‘capital commitment’ desks that step in when natural liquidity is insufficient." },
+      { cls: "spread", label: "Client Perspective", text: "Agency offers transparency and alignment; principal offers immediacy and size. Choice depends on urgency, order size, and the client’s tolerance for information leakage versus market impact." }
+    ],
+    body: [
+      `In <strong>agency</strong> trading the broker’s sole role is to represent the client’s interest in the market. The firm does not take the other side of the trade for its own account (except perhaps momentarily in a riskless-principal capacity). Compensation is a commission. The regulatory and fiduciary focus is best execution: obtaining the most favourable terms reasonably available under the circumstances.`,
+      `In <strong>principal</strong> (or dealer) trading the firm buys from or sells to the client as principal, committing its own capital. The client receives immediacy; the dealer receives a spread and assumes inventory risk that it will later hedge or unwind. This model is natural for market-making in OTC markets, block trading and situations where displayed liquidity is insufficient.`,
+      `The distinction is fundamental to conflict analysis. An agent’s incentive is to maximise the client’s outcome (subject to its own commission). A principal’s incentive includes the profitability of its own inventory. Disclosure, information barriers and regulatory conduct rules attempt to manage the resulting tensions, but they cannot eliminate them.`,
+      `Modern equity markets often blur the line: “electronic liquidity providers” may act as principal while appearing as just another participant in an agency auction; bank “facilitation” desks may commit capital selectively. Understanding whether a given interaction is agency or principal remains essential for assessing both cost and conflict.`
+    ],
+    keyPoint: "Agency trading aligns the intermediary with the client; principal trading aligns the intermediary with its own inventory P&L. Both are legitimate; the client must know which role is being played."
+  },
+  {
+    num: "1.4.10",
+    icon: "📥",
+    tClass: "t-markets",
+    title: "Internalization & Payments for Order Flow",
+    sub: "Sell-side capture of retail and institutional flow — when the intermediary becomes the venue",
+    formula: "PFOF · Internalization",
+    tags: [["internalization","markets"], ["PFOF","ask"], ["order flow","dynamics"], ["best execution","gold"]],
+    body: [
+      `<strong>Internalization</strong> occurs when a broker-dealer executes a client order against its own inventory or against another client order without sending the order to an exchange or external venue. In the US equity market a large fraction of retail marketable orders is internalized by wholesale market-makers. The broker receives payment (or other non-monetary consideration) for directing the flow; the market-maker earns the spread and any subsequent inventory profit.`,
+      `<strong>Payments for Order Flow (PFOF)</strong> are the explicit or implicit payments made by market-makers to brokers in exchange for the right to execute that order flow. PFOF has been a central feature of US retail equity and options markets for decades. Proponents argue it subsidises commission-free trading and that competition among wholesalers produces price improvement relative to the NBBO. Critics argue it creates a conflict of interest, reduces displayed liquidity, and may deliver inferior execution quality on a trade-by-trade basis once opportunity cost and adverse selection are considered.`,
+      `Institutional internalization takes different forms: broker crossing networks, dark pools operated by banks, and systematic internalisers under European rules. The common theme is that the sell-side firm captures the spread or the trading fee that would otherwise have gone to an external venue.`,
+      `Regulatory scrutiny of both practices is intense. Best-execution obligations, disclosure requirements (Rule 606 in the US), and ongoing debates about a potential PFOF ban or auction-based alternatives continue to reshape the economics of retail and institutional order handling. For the buy-side the practical questions remain: am I receiving genuine price improvement, and is the routing decision driven by my interest or by the intermediary’s revenue arrangements?`
+    ],
+    keyPoint: "Internalization and PFOF turn the sell-side intermediary into a competing venue. They can lower explicit costs for the end investor while raising questions about transparency, adverse selection and whether ‘best execution’ is truly being achieved."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    // formula box
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    // price ladder (none used in this section)
+    const ladderHtml = e.ladder ? `` : '';
+
+    // split box
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    // data table
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + ladderHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 5.11 Macro Cycles</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 5 · Section 5.11 · Macro & Cycle Foundations</div>
+        <h1 class="hdr-title">Macro<br><em>Cycles</em></h1>
+        <div class="hdr-sub">The recurring rhythms of growth, credit, inventories, politics, debt and commodities that shape regimes and returns across decades</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Cycle Map</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Short</div>
+            <div class="sw-price">Business<br>Inventory</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Long</div>
+            <div class="sw-price">Debt<br>Kondratieff</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Credit</div>
+          <div class="sw-spread-val">Expansion → Bust</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Other</div>
+          <div class="sw-mid-val">Political · EM · Commodity</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">8 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>5.11 Macro Cycles</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "5.11.01",
+    icon: "🔄",
+    tClass: "t-mid",
+    title: "Business Cycle Phases",
+    sub: "The classic four-phase rhythm of economic activity — expansion, peak, contraction and trough",
+    formula: "Expansion → Peak → Contraction → Trough",
+    tags: [["business cycle","mid"], ["expansion","bid"], ["recession","ask"], ["NBER","gold"]],
+    splitBox: [
+      { cls: "bid",  label: "Expansion", text: "Rising output, employment, incomes and spending. Capacity utilisation increases, credit grows, and risk appetite typically improves. The longest phase in modern cycles." },
+      { cls: "gold", label: "Peak", text: "Activity reaches its maximum. Growth slows, imbalances (inflation, leverage, tight capacity) become visible. Turning point is clear only in hindsight." },
+      { cls: "ask",  label: "Contraction", text: "Output, employment and spending decline. Credit conditions tighten, defaults rise, and sentiment deteriorates. Officially a recession when broad and persistent." },
+      { cls: "spread", label: "Trough", text: "Activity bottoms. Policy stimulus, inventory correction and forced de-leveraging set the stage for the next expansion. Often the point of maximum pessimism." }
+    ],
+    body: [
+      `The business cycle describes the recurrent but irregular fluctuations in aggregate economic activity around a long-term trend. The four canonical phases — expansion, peak, contraction (recession) and trough — provide the basic vocabulary for macro and market analysis.`,
+      `Expansions are characterised by rising real GDP, falling unemployment, growing corporate profits and generally supportive financial conditions. Peaks are identified only after the fact by the NBER and similar bodies; at the time they often feel like a “soft patch” or a mid-cycle slowdown. Contractions involve broad declines in output and employment; their depth and duration vary widely. Troughs mark the transition back to expansion and are frequently accompanied by aggressive policy easing.`,
+      `Modern business cycles are influenced by monetary and fiscal policy, financial conditions, external shocks and the endogenous dynamics of credit and inventories. No two cycles are identical in length, amplitude or sectoral composition, but the phase sequence itself has remained a robust organising framework.`,
+      `Asset-class performance differs systematically across phases: equities and credit tend to lead the cycle, while defensive assets and duration often outperform in contractions. Identifying the current phase — and the probability of transition — is therefore central to tactical allocation.`
+    ],
+    keyPoint: "The business cycle’s four phases organise the rhythm of growth, policy and risk appetite. Markets are forward-looking, so asset prices often turn before the official peak or trough is declared."
+  },
+  {
+    num: "5.11.02",
+    icon: "🌊",
+    tClass: "t-dynamics",
+    title: "Kondratieff Long Waves",
+    sub: "Multi-decade cycles of innovation, investment and price levels — the longest rhythm in economic history",
+    formula: "≈ 40–60 year waves",
+    tags: [["Kondratieff","dynamics"], ["long waves","spread"], ["innovation","mid"], ["secular",""]],
+    body: [
+      `Kondratieff waves (or K-waves), associated with the work of Nikolai Kondratieff, describe hypothesized long cycles of roughly 40–60 years in prices, production and innovation. Each wave is often characterised by a long upswing driven by the diffusion of a major technological cluster (steam, railways, electricity, automobiles, information technology) followed by a downswing of slower growth, excess capacity and price pressure.`,
+      `The empirical regularity of K-waves is debated. Price and interest-rate series show long swings; the precise dating and causal mechanism remain contested. Schumpeter and later writers linked the waves to clusters of radical innovation and the associated investment booms and busts.`,
+      `For practical macro work, the Kondratieff framework is less a precise forecasting tool than a reminder that structural forces — demography, technology, debt overhangs and institutional change — operate on timescales far longer than the ordinary business cycle. Secular bull and bear markets in equities, bonds and commodities often span decades and align loosely with these longer rhythms.`,
+      `Contemporary discussions sometimes map the post-1980s disinflation and the more recent inflationary turn onto a late-Kondratieff or new-wave narrative. Whether or not the wave metaphor is accepted, the underlying point stands: some of the most important macro regimes last far longer than a single business cycle.`
+    ],
+    keyPoint: "Kondratieff waves point to multi-decade swings driven by technology, investment and prices. They are a conceptual lens for secular regimes, not a high-frequency timing device."
+  },
+  {
+    num: "5.11.03",
+    icon: "💳",
+    tClass: "t-ask",
+    title: "Credit Cycle",
+    sub: "The endogenous rhythm of credit expansion, speculative excess, crisis and repair that amplifies the business cycle",
+    formula: "Expansion → Bubble → Bust → Repair",
+    tags: [["credit cycle","ask"], ["leverage","gold"], ["bubble","ask"], ["defaults","mid"]],
+    body: [
+      `The credit cycle describes the self-reinforcing fluctuation in the availability and price of credit. In the expansion phase, strong growth and low defaults encourage more lending, tighter spreads and weaker underwriting standards. Leverage rises. As optimism peaks, credit is extended to marginal borrowers and for speculative purposes — the bubble phase.`,
+      `When a shock arrives (rising rates, falling collateral values, or simply exhausted demand), confidence reverses. Spreads widen, issuance stalls, defaults rise and lenders retrench. The bust phase features forced de-leveraging, asset-price declines and often a feedback loop into the real economy. The subsequent repair phase rebuilds capital, clears bad debts and gradually restores the capacity and willingness to lend.`,
+      `Credit cycles are not identical to business cycles, but they are tightly linked. The most severe recessions are typically those in which a credit boom has gone furthest and the subsequent contraction in credit supply is most abrupt. Minsky’s financial-instability hypothesis and various leverage-cycle models formalise these dynamics.`,
+      `Monitoring the credit cycle — via aggregate leverage, credit growth, lending surveys, covenant quality and spread levels — is essential for assessing systemic vulnerability and the likely amplitude of the next downturn.`
+    ],
+    keyPoint: "The credit cycle turns the availability of leverage into a pro-cyclical force. Expansion breeds fragility; the bust forces repair. The deepest recessions are usually credit-driven."
+  },
+  {
+    num: "5.11.04",
+    icon: "📦",
+    tClass: "t-classes",
+    title: "Inventory Cycle",
+    sub: "The short, sharp rhythm of inventory build and liquidation that drives swings in industrial production and GDP",
+    formula: "Build → Liquidation → Restock",
+    tags: [["inventory cycle","classes"], ["stockbuilding","mid"], ["industrial production","gold"], ["short cycle",""]],
+    body: [
+      `The inventory cycle (or Kitchin cycle) is one of the shortest and most mechanical of the macro rhythms. Firms form expectations of demand and adjust production and inventories accordingly. When demand surprises to the upside, inventories are drawn down and production is ramped up — often overshooting. When demand disappoints, firms cut production sharply to liquidate excess stocks.`,
+      `Because inventory investment is a small but highly volatile component of GDP, swings in stockbuilding can dominate quarter-to-quarter growth numbers even when final demand is relatively stable. Manufacturing output, industrial production and related PMIs are particularly sensitive to the inventory cycle.`,
+      `Inventory cycles often last roughly 2–4 years and can run semi-independently of the broader business cycle, although they interact with it. A simultaneous inventory liquidation and final-demand slowdown produces a deeper industrial contraction; a restocking phase can temporarily boost growth even if underlying demand is only modest.`,
+      `Real-time indicators include inventory-to-sales ratios, ISM customer-inventories and supplier-deliveries components, and sector-level inventory data. Understanding whether growth is being driven by final demand or by inventory adjustment is critical for forecasting the next few quarters.`
+    ],
+    keyPoint: "The inventory cycle generates short, sharp swings in production and GDP. Distinguishing stockbuilding from final demand prevents misreading the underlying strength of the economy."
+  },
+  {
+    num: "5.11.05",
+    icon: "🗳️",
+    tClass: "t-impact",
+    title: "Political & Electoral Cycle Effects",
+    sub: "How elections, policy uncertainty and partisan calendars influence markets and the macro outlook",
+    formula: "Election → Policy uncertainty",
+    tags: [["political cycle","impact"], ["electoral","mid"], ["policy uncertainty","gold"], ["fiscal",""]],
+    body: [
+      `Political and electoral cycles introduce predictable and unpredictable variation into fiscal policy, regulation and risk premia. In many democracies, pre-election periods are associated with fiscal expansion or the avoidance of painful reforms; post-election periods can bring consolidation or sharp policy shifts depending on the winner.`,
+      `Markets typically respond to the probability-weighted policy platform of the leading candidates, to the degree of polarisation, and to the risk of institutional or geopolitical disruption. Equity sectors, currencies and rates can re-price materially as election odds change. Policy-uncertainty indices often rise in the run-up to contested elections and fall once the outcome is clear.`,
+      `Empirical patterns (e.g., average equity returns in different years of a presidential term) exist but are noisy and sample-dependent. The more robust channel is the concrete policy content — tax rates, spending paths, trade stance, regulatory direction — rather than the calendar itself.`,
+      `For global markets the US electoral cycle carries special weight because of the dollar’s role and the scale of US fiscal and regulatory decisions. Other major elections (Europe, key EMs) matter primarily through their impact on regional growth, fiscal trajectories and geopolitical risk.`
+    ],
+    keyPoint: "Electoral cycles inject policy uncertainty and the prospect of regime shifts into markets. The calendar creates windows of elevated risk premia; the eventual policy content determines the lasting macro impact."
+  },
+  {
+    num: "5.11.06",
+    icon: "📉",
+    tClass: "t-cost",
+    title: "Debt Supercycle (Ray Dalio Framework)",
+    sub: "The long-term accumulation and eventual deleveraging of debt — the multi-decade arc that frames shorter cycles",
+    formula: "Leverage ↑ → Deleveraging",
+    tags: [["debt supercycle","cost"], ["Ray Dalio","mid"], ["deleveraging","ask"], ["long-term debt",""]],
+    body: [
+      `Ray Dalio’s debt-cycle framework distinguishes the short-term business/credit cycle from a long-term debt supercycle. In the supercycle, debt rises faster than incomes for decades, supported by falling interest rates, rising asset values and the willingness of lenders to extend credit. The process continues until debt-service burdens become unsustainable or a shock forces recognition of the over-leverage.`,
+      `The endgame is a deleveraging. Dalio describes several paths: austerity (painful and often politically difficult), debt restructuring/defaults, wealth redistribution, and monetisation (printing money to ease the burden). Beautiful deleveragings combine enough of these elements to reduce debt-to-income ratios without catastrophic depression or runaway inflation; ugly ones do not.`,
+      `The framework emphasises the interaction of the economic machine (productivity, short-term cycle, long-term debt cycle) with psychology and policy. It has been used to interpret the post-2008 period as a classic deleveraging managed through low rates, QE and gradual balance-sheet repair.`,
+      `Whether or not one adopts the full Dalio taxonomy, the central insight is robust: economies can sustain rising leverage for a very long time, and the eventual adjustment is a dominant driver of growth, inflation and asset returns for years afterward.`
+    ],
+    keyPoint: "The debt supercycle is the multi-decade rise and eventual reduction of leverage. It sets the boundary conditions for ordinary business cycles and determines how painful the next major adjustment will be."
+  },
+  {
+    num: "5.11.07",
+    icon: "🌍",
+    tClass: "t-markets",
+    title: "Emerging Market Cycles",
+    sub: "The distinctive boom–bust rhythm of EM growth, capital flows and external vulnerability",
+    formula: "Inflow → Boom → Sudden stop",
+    tags: [["EM cycles","markets"], ["capital flows","mid"], ["sudden stop","ask"], ["external debt","gold"]],
+    body: [
+      `Emerging-market economies exhibit cycles that are tightly linked to global liquidity, commodity prices and domestic policy credibility. Easy global financial conditions and strong commodity demand typically produce capital inflows, currency appreciation, credit expansion and above-trend growth — the boom phase.`,
+      `The bust often arrives via a “sudden stop”: a reversal of capital flows triggered by tighter US rates, a stronger dollar, a commodity-price collapse, or a domestic political or policy shock. Currencies depreciate, external debt burdens jump in local-currency terms, credit contracts and growth slows sharply. The adjustment can be violent because many EM balance sheets are currency-mismatched.`,
+      `EM cycles are therefore more frequent and, in the external accounts, more abrupt than advanced-economy business cycles. Countries with flexible exchange rates, adequate reserves, low short-term external debt and credible policy frameworks tend to experience milder versions; those with rigid regimes and large imbalances experience deeper crises.`,
+      `For global investors, EM cycles are a primary transmission channel of dollar-liquidity conditions. The state of the EM cycle is both a reflection of global risk appetite and a driver of commodity demand, global growth and cross-border credit performance.`
+    ],
+    keyPoint: "EM cycles are capital-flow and commodity cycles as much as domestic demand cycles. Sudden stops turn gradual vulnerability into rapid crisis; the global liquidity regime is the usual trigger."
+  },
+  {
+    num: "5.11.08",
+    icon: "🛢️",
+    tClass: "t-spread",
+    title: "Commodity Supercycles",
+    sub: "Multi-year to multi-decade swings in real commodity prices driven by structural demand and supply lags",
+    formula: "Demand boom → Supply response → Glut",
+    tags: [["commodity supercycle","spread"], ["real prices","mid"], ["capex cycle","gold"], ["structural demand",""]],
+    body: [
+      `Commodity supercycles are prolonged periods in which real commodity prices trend well above or below their long-term averages. They are driven by persistent shifts in demand (industrialisation, urbanisation, energy transition) interacting with slow-moving supply (long lead times for mines, fields and infrastructure).`,
+      `A classic upswing begins when demand accelerates faster than supply can respond. Prices rise, incentivising a wave of investment. Because of long gestation periods, the supply response arrives with a lag — often just as demand growth is slowing — producing a subsequent glut and a multi-year downswing in real prices.`,
+      `Historical episodes include the post-WWII reconstruction boom, the 1970s oil and commodity shock period, the 1990s–early 2000s bear market, and the China-driven supercycle of the 2000s. Debate continues over whether the energy transition and geopolitical fragmentation are seeding a new upswing.`,
+      `Commodity supercycles matter for inflation regimes, terms-of-trade of producers and consumers, EM external balances, and the profitability of resource equities and currencies. They operate on a longer frequency than the ordinary business cycle and can dominate returns in commodity-linked assets for a decade or more.`
+    ],
+    keyPoint: "Commodity supercycles are structural demand–supply imbalances played out over years or decades. They set the inflation and terms-of-trade backdrop against which ordinary business cycles unfold."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

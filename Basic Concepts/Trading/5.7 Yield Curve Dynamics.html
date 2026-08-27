@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 5.7 Yield Curve Dynamics</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 5 · Section 5.7 · Macro & Rates Foundations</div>
+        <h1 class="hdr-title">Yield Curve<br><em>Dynamics</em></h1>
+        <div class="hdr-sub">The term structure as a map of policy, growth, inflation and risk premia — how the curve moves, what it signals, and how it is traded</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Curve Snapshot (illustrative)</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">2s10s</div>
+            <div class="sw-price">−0.45%</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Regime</div>
+            <div class="sw-price">Inverted</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Short End</div>
+          <div class="sw-spread-val">Fed-driven</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Long End</div>
+          <div class="sw-mid-val">Growth + TP</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">9 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>5.7 Yield Curve Dynamics</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "5.7.01",
+    icon: "📉",
+    tClass: "t-ask",
+    title: "2s10s Inversion as Recession Predictor",
+    sub: "When the 10-year yield falls below the 2-year — one of the most reliable leading indicators of US recession",
+    formula: "2s10s < 0",
+    tags: [["2s10s","ask"], ["inversion","ask"], ["recession signal","gold"], ["leading indicator","mid"]],
+    formulaBox: {
+      main: "2s10s = y<sub>10y</sub> − y<sub>2y</sub>",
+      note: "Negative = inverted\nHistorically precedes US recessions by 6–24 months\nNot a timing tool — a regime signal"
+    },
+    body: [
+      `The 2s10s spread (10-year Treasury yield minus 2-year Treasury yield) is the most widely watched segment of the US yield curve. When it turns negative — an inversion — the market is pricing lower policy rates in the future than at present, typically because it anticipates an economic slowdown that will force the Federal Reserve to ease.`,
+      `Empirically, every modern US recession has been preceded by a 2s10s inversion, with leads ranging from roughly half a year to two years. False positives are rare but not zero; the signal is therefore highly specific yet imprecise on timing. Other spreads (3m10y, 5s30s, near-term forward spreads) are also monitored and sometimes give cleaner or earlier readings.`,
+      `Inversion itself does not cause recession. It is a market-implied forecast of the policy path required by future growth and inflation. The mechanism that often follows includes tighter bank lending standards, weaker credit creation, and a slowdown in rate-sensitive sectors. The lag exists because monetary policy operates with long and variable lags.`,
+      `Once inverted, the curve can remain inverted for extended periods while growth stays positive. The recession signal is therefore best treated as a change in regime probability rather than a countdown clock. Re-steepening after inversion (especially a bull steepener as the Fed cuts) has historically been closer to the actual onset of recession.`
+    ],
+    keyPoint: "2s10s inversion is one of the strongest historical recession predictors available, but it is a probability shift, not a calendar. The curve can stay inverted for a long time before the downturn arrives."
+  },
+  {
+    num: "5.7.02",
+    icon: "🏦",
+    tClass: "t-cost",
+    title: "Yield Curve and Bank Profitability",
+    sub: "Net interest margin lives on the curve — steepness supports traditional banking, inversion compresses it",
+    formula: "NIM ≈ f(curve slope)",
+    tags: [["bank profitability","gold"], ["NIM","mid"], ["maturity transformation","spread"], ["lending margins",""]],
+    body: [
+      `Traditional banks engage in maturity transformation: they borrow short (deposits, wholesale funding) and lend long (mortgages, commercial loans, securities). A positively sloping yield curve therefore generates a natural net interest margin (NIM). When the curve flattens or inverts, that structural advantage shrinks or disappears.`,
+      `In an inverted-curve environment, funding costs rise faster than asset yields can be repriced, especially for banks with large holdings of fixed-rate longer-duration assets. The result is margin compression, lower earnings, and, in severe cases, pressure on capital and lending capacity. The 2022–2023 experience illustrated how rapidly rising short rates and an inverted curve could stress even well-capitalised institutions.`,
+      `Asset-sensitive banks (those whose assets reprice faster than liabilities) can benefit from rising short rates in the early phase of a tightening cycle. Liability-sensitive or duration-heavy banks suffer more. The shape and level of the curve therefore redistribute profitability across the banking system as well as determining the aggregate level of NIM.`,
+      `Beyond direct margin effects, an inverted curve is often associated with tighter credit standards and slower loan growth, which further weighs on bank revenue. Supervisors and investors therefore watch the curve both as a macro signal and as a direct input to bank earnings models.`
+    ],
+    keyPoint: "Banks are structurally long the curve. A steep curve is a tailwind for net interest income; a flat or inverted curve is a headwind that eventually feeds into credit supply and the broader cycle."
+  },
+  {
+    num: "5.7.03",
+    icon: "📐",
+    tClass: "t-dynamics",
+    title: "Flattening & Steepening Trades",
+    sub: "Expressing a view on the slope of the curve by taking offsetting positions across maturities",
+    formula: "Long short-end / Short long-end",
+    tags: [["flattening","dynamics"], ["steepening","dynamics"], ["curve trade","mid"], ["duration-neutral",""]],
+    body: [
+      `A flattener is a trade that profits when the yield curve slope decreases (long-end yields fall relative to short-end yields, or short-end yields rise relative to long-end yields). A steepener profits from the opposite movement. These are typically constructed to be roughly duration-neutral so that the primary exposure is to the slope rather than to the overall level of rates.`,
+      `Common implementations use cash Treasuries, futures, or swaps. A classic 2s10s flattener involves receiving (or buying) the 2-year and paying (or shorting) the 10-year in duration-weighted amounts. The trade can be structured on a yield-spread basis or on a DV01-neutral basis depending on the desired risk profile.`,
+      `Flatteners are often put on when the market expects the central bank to hike aggressively (raising the short end) or when growth/inflation expectations are deteriorating (lowering the long end). Steepeners are favoured when the market anticipates policy easing or a re-acceleration of growth and inflation that will lift term premia and long rates.`,
+      `Curve trades are relative-value expressions. They can remain underwater for long periods if the anticipated macro regime fails to materialise, and they carry rolldown, carry, and convexity considerations that must be managed actively.`
+    ],
+    keyPoint: "Flattening and steepening trades isolate the slope of the curve from the level. They are the primary way rates desks and macro funds express views on the path of policy versus growth and inflation."
+  },
+  {
+    num: "5.7.04",
+    icon: "🔄",
+    tClass: "t-spread",
+    title: "Bear Steepener vs. Bull Flattener",
+    sub: "The four regime combinations of level and slope — which rates are moving and why",
+    formula: "Bull/Bear × Flat/Steep",
+    tags: [["bear steepener","spread"], ["bull flattener","mid"], ["curve regimes","gold"], ["rate direction",""]],
+    splitBox: [
+      { cls: "ask",  label: "Bear Steepener", text: "Long rates rise more than short rates (or short rates fall less). Typical of rising growth/inflation expectations or expanding term premium while policy is on hold or lagging." },
+      { cls: "bid",  label: "Bull Flattener", text: "Long rates fall more than short rates (or short rates rise less). Classic late-cycle or early-easing pattern: growth fears pull the long end down while the front end is still anchored by policy." },
+      { cls: "gold", label: "Bear Flattener", text: "Short rates rise more than long rates. The hallmark of a hiking cycle: the central bank lifts the front end while the long end is capped by eventual-easing expectations." },
+      { cls: "spread", label: "Bull Steepener", text: "Short rates fall more than long rates. Typical of the onset of an easing cycle: the front end rallies hard on cuts while the long end is supported by recovery hopes or higher term premium." }
+    ],
+    body: [
+      `Curve moves are rarely pure slope changes; they almost always involve a change in the overall level as well. Market convention therefore classifies the four combinations: bear steepener, bull steepener, bear flattener, and bull flattener.`,
+      `A <strong>bear steepener</strong> (yields up, curve steeper) often reflects improving growth or rising inflation expectations that lift the long end while the short end is constrained by current policy. A <strong>bull flattener</strong> (yields down, curve flatter) is common when recession fears intensify: the long end rallies on safe-haven flows and lower growth/inflation expectations while the short end is still held up by a reluctant central bank.`,
+      `A <strong>bear flattener</strong> is the typical signature of a tightening cycle — the front end is dragged higher by hikes or hike expectations, and the long end rises less because the market already prices an eventual peak. A <strong>bull steepener</strong> usually appears when the central bank begins cutting: the short end falls sharply and the curve re-steepens.`,
+      `Identifying which of the four regimes is in force is essential for positioning, for interpreting the macro narrative, and for understanding the implications for risk assets and bank profitability.`
+    ],
+    keyPoint: "Every curve move has both a level and a slope dimension. Naming the regime (bear steepener, bull flattener, etc.) immediately conveys which part of the curve is driving the move and what macro story the market is telling."
+  },
+  {
+    num: "5.7.05",
+    icon: "🏛️",
+    tClass: "t-mid",
+    title: "Short End Driven by Fed Policy",
+    sub: "Front-end yields are anchored by the expected path of the policy rate and the market’s confidence in that path",
+    formula: "y_short ≈ E[path of r*]",
+    tags: [["short end","mid"], ["Fed policy","mid"], ["OIS","gold"], ["rate expectations",""]],
+    body: [
+      `Yields on short-maturity instruments (Fed funds, SOFR, 2-year Treasuries, Eurodollar/SOFR futures) are dominated by expectations of the central bank’s policy rate over the relevant horizon. In a credible inflation-targeting regime, the front end is essentially a discounted path of the policy rate plus a modest risk premium.`,
+      `The market’s pricing is visible in overnight index swaps (OIS), federal-funds futures, and the short end of the Treasury curve. Changes in these instruments are the purest high-frequency read on shifts in the anticipated policy path — whether driven by data, central-bank communication, or risk-sentiment shocks that alter the reaction function.`,
+      `Because the short end is tightly linked to policy, it is relatively insensitive to long-run growth and inflation views and to term-premium fluctuations. It is, however, extremely sensitive to the timing and terminal rate of the hiking or cutting cycle, and to any reassessment of the neutral rate.`,
+      `When the central bank is at the effective lower bound or is engaged in forward guidance or yield-curve control, the short end can become even more tightly pinned, transferring volatility further out the curve.`
+    ],
+    keyPoint: "The short end is a policy-expectations market. Its level and volatility are determined by the central bank’s reaction function and the data that feed it — not by long-run growth or term premia."
+  },
+  {
+    num: "5.7.06",
+    icon: "🔭",
+    tClass: "t-classes",
+    title: "Long End: Growth, Inflation & Term Premium",
+    sub: "Longer yields embed expectations of future short rates plus a risk premium for duration and uncertainty",
+    formula: "y_long = E[r] + TP",
+    tags: [["long end","classes"], ["term premium","spread"], ["growth expectations","mid"], ["inflation","gold"]],
+    formulaBox: {
+      main: "y<sub>n</sub> ≈ average expected short rates + term premium",
+      note: "Term premium compensates for interest-rate risk,\ninflation uncertainty, and supply/demand imbalances\nCan be positive or negative; estimated, not observed"
+    },
+    body: [
+      `Long-term yields can be decomposed, under the expectations hypothesis plus risk premia, into the average expected short-term rate over the life of the bond plus a term premium. The expected-rate component is driven by the market’s view of the future path of growth, inflation and the policy reaction function. The term premium compensates investors for bearing duration risk, inflation uncertainty, and any supply or demand imbalances in the long-end market.`,
+      `When growth or inflation expectations rise, the expected path of future short rates rises and long yields tend to increase. When term premia expand (for example because of heavier government issuance, reduced central-bank holdings, or greater macro uncertainty), long yields also rise even if the expected path of policy is unchanged.`,
+      `Term premia are not directly observable; they are estimated with affine term-structure models or other statistical techniques. Estimates have varied widely over time — substantially positive in earlier decades, compressed or negative during the post-GFC period of large central-bank balance sheets and low inflation volatility.`,
+      `This dual driver is why the long end can decouple from the short end. A central bank can pin the front end while the long end still sells off on fiscal concerns or inflation fears, producing a bear steepener. Conversely, aggressive quantitative easing can compress term premia and pull long yields down independently of the policy-rate path.`
+    ],
+    keyPoint: "The long end is not a pure policy-expectations market. It is the sum of expected future short rates and a fluctuating term premium — the latter driven by risk, supply, and institutional demand."
+  },
+  {
+    num: "5.7.07",
+    icon: "🎛️",
+    tClass: "t-impact",
+    title: "Yield Curve Control (YCC) Distortions",
+    sub: "When the central bank targets a specific yield or spread — suppressing volatility and altering information content",
+    formula: "YCC → pinned yields",
+    tags: [["YCC","impact"], ["curve control","ask"], ["BoJ","mid"], ["policy distortion","gold"]],
+    body: [
+      `Yield curve control is a monetary-policy framework in which the central bank commits to keep a particular yield (or a segment of the curve) near an announced target, typically by standing ready to buy or sell unlimited quantities of the relevant securities. The Bank of Japan’s targeting of the 10-year JGB yield is the modern archetype; the RBA’s earlier targeting of the 3-year yield is another example.`,
+      `While YCC is in force, the targeted yield ceases to be a market price and becomes a policy variable. Volatility is suppressed, the information normally embedded in that yield is lost, and private-sector positioning and hedging behaviour adapt to the presence of a large, inelastic buyer (or seller). Spillovers appear in other markets: basis trades, cross-currency positions, and relative-value relationships all adjust to the artificial level.`,
+      `Exit from YCC is often disorderly. Once the commitment is relaxed or abandoned, the previously pinned yield can gap sharply as the market re-discovers a clearing price and as positions that relied on the pin are unwound. The 2022–2024 Japanese experience illustrated both the power of YCC to anchor a long end and the volatility that accompanies its gradual dismantling.`,
+      `YCC also interacts with quantitative-easing stock effects. Large central-bank holdings accumulated under YCC continue to influence term premia and liquidity even after the formal target is removed.`
+    ],
+    keyPoint: "YCC replaces a market price with a policy price. It succeeds in anchoring the targeted yield but at the cost of information loss, distorted positioning, and potentially abrupt adjustments when the policy is eventually changed."
+  },
+  {
+    num: "5.7.08",
+    icon: "🌐",
+    tClass: "t-markets",
+    title: "Global Yield Curves & Spillover Effects",
+    sub: "Term structures are linked across currencies through policy, risk appetite, and cross-border capital flows",
+    formula: "Δy_global ≈ f(US, risk, FX)",
+    tags: [["global curves","markets"], ["spillovers","mid"], ["US dominance","gold"], ["cross-border flows",""]],
+    body: [
+      `National yield curves are not independent. The US Treasury curve exerts a gravitational pull on other sovereign curves because of the dollar’s reserve status, the depth of the US market, and the role of US rates in global valuation and risk models. A sharp rise in US long yields typically lifts yields elsewhere, even when local fundamentals are unchanged.`,
+      `Spillovers operate through several channels: (1) common global growth and inflation shocks; (2) risk-appetite shifts that reprice term premia everywhere; (3) cross-border portfolio flows seeking relative value or duration; and (4) the FX and hedging decisions of international investors. Covered and uncovered interest-parity relationships further link short ends across currencies.`,
+      `Emerging-market local-currency curves are particularly sensitive to US rate moves and to global risk sentiment. Developed-market curves of smaller open economies often trade as a spread over the US or German curve, with the spread reflecting local policy differentials, fiscal credibility and liquidity.`,
+      `Central banks outside the US therefore cannot ignore the global rates backdrop. Domestic policy may be constrained by the need to manage capital flows, currency pressure, or imported financial conditions that originate in the US or euro-area curve.`
+    ],
+    keyPoint: "Yield curves form a global system. US rate shocks, risk-sentiment shifts and cross-border flows transmit across borders, so that domestic curve analysis is incomplete without the international context."
+  },
+  {
+    num: "5.7.09",
+    icon: "💳",
+    tClass: "t-bid",
+    title: "Yield Curve in Credit Markets",
+    sub: "Corporate and other credit curves embed the sovereign curve plus a credit-spread term structure of their own",
+    formula: "y_credit = y_gov + spread(t)",
+    tags: [["credit curve","bid"], ["spread term structure","mid"], ["corporate bonds","gold"], ["credit risk",""]],
+    body: [
+      `Every credit instrument’s yield can be viewed as the corresponding government (or swap) yield plus a credit spread. The credit curve is therefore the term structure of those spreads across maturities for a given issuer or rating cohort. It is shaped by expected default risk, recovery assumptions, risk premia, and supply/demand technicals at each tenor.`,
+      `Credit curves are typically upward-sloping: longer-maturity credit carries greater cumulative default risk and greater uncertainty, so investors demand higher spreads. In times of stress, however, credit curves can invert — short-dated spreads blow out because near-term default or liquidity risk dominates, while longer-dated spreads are buffered by the option value of survival and recovery.`,
+      `The shape of the credit curve interacts with the government curve. A steeper government curve raises the all-in yield of longer credit and can affect issuance patterns and investor demand. Changes in the government curve also reprice existing credit portfolios through both the risk-free component and any correlation between rates and spreads.`,
+      `Relative-value traders actively position across the credit curve (and between credit and rates) via cash bonds, CDS term structures, and curve steepeners/flatteners in spread space. Understanding whether a move originates in the risk-free curve or in the spread curve is essential for attribution and hedging.`
+    ],
+    keyPoint: "The credit curve is the sovereign curve plus a term structure of spreads. Its shape embeds default expectations, risk premia and liquidity — and it can invert under stress even when the government curve does not."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

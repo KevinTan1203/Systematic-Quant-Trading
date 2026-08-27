@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 5.4 Interest Rates</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 240px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 5 · Section 5.4 · Macroeconomic Policy</div>
+        <h1 class="hdr-title">Interest<br><em>Rates</em></h1>
+        <div class="hdr-sub">Nominal and real rates, benchmarks, term-structure theories and the sensitivity of asset prices to rate moves</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Core Relations (illustrative)</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Fisher</div>
+            <div class="sw-price">1+i = (1+r)(1+π)</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Approx</div>
+            <div class="sw-price">i ≈ r + π</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Benchmarks</div>
+          <div class="sw-spread-val">SOFR · SONIA · €STR</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">Duration</div>
+          <div class="sw-mid-val">ΔP ≈ −D × Δy</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">12 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>5.4 Interest Rates</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "5.4.01",
+    icon: "i/r",
+    tClass: "t-mid",
+    title: "Nominal vs. Real Interest Rates",
+    sub: "The quoted rate versus the inflation-adjusted rate that measures true purchasing-power return",
+    formula: "r ≈ i − π",
+    tags: [["nominal","mid"], ["real","mid"], ["inflation",""], ["purchasing power",""]],
+    formulaBox: {
+      main: "r<sub>real</sub> ≈ i<sub>nominal</sub> − π<sup>e</sup>",
+      note: "Ex-ante real rate uses expected inflation\nEx-post real rate uses realised inflation\nTIPS / inflation swaps give market-implied real rates"
+    },
+    splitBox: [
+      { cls: "mid",  label: "Nominal Rate", text: "The contractual or quoted interest rate in money terms. A deposit paying 5% returns 5 currency units per 100 invested, regardless of what those units buy." },
+      { cls: "bid",  label: "Real Rate", text: "The nominal rate adjusted for inflation — the change in purchasing power. Positive real rates reward saving; negative real rates penalise cash and deposits." },
+      { cls: "spread", label: "Ex-Ante vs Ex-Post", text: "Ex-ante uses expected inflation (the rate that guides decisions). Ex-post uses realised inflation (the rate that describes what actually happened)." },
+      { cls: "gold", label: "Market Measures", text: "Breakevens (nominal yield − TIPS yield) and inflation swaps provide market-implied inflation; real yields are directly observable in index-linked markets." },
+    ],
+    body: [
+      `The nominal interest rate is the rate stated in loan contracts, deposits and bond coupons — the percentage increase in the money amount of the claim. The real interest rate is the nominal rate adjusted for the change in purchasing power of money, i.e. for inflation.`,
+      `Decision-makers care about the expected (ex-ante) real rate when they save, invest or borrow. The realised (ex-post) real rate is known only after inflation is observed and can differ sharply from what was expected if inflation surprises. Central banks monitor real rates as a measure of the true stance of monetary policy: a given nominal rate is tighter when inflation is low than when inflation is high.`,
+      `In markets, real rates can be read from inflation-linked bonds (e.g. TIPS) or inferred by subtracting a measure of expected inflation from nominal yields. The gap between nominal and real yields is the breakeven inflation rate — a key pricing input for rates, FX and risk assets.`,
+      `Negative real rates compress the reward to saving, support asset valuations and ease the burden of existing nominal debt. Persistently negative real rates can also encourage leverage and search-for-yield behaviour that builds financial-stability risk.`
+    ],
+    keyPoint: "Nominal rates are in money terms; real rates are in purchasing-power terms. Policy stance and valuation ultimately depend on real rates — approximate as nominal minus expected inflation, or read them from inflation-linked markets."
+  },
+  {
+    num: "5.4.02",
+    icon: "Fi",
+    tClass: "t-spread",
+    title: "Fisher Equation",
+    sub: "The exact and approximate links between nominal rates, real rates and inflation",
+    formula: "(1+i)=(1+r)(1+π)",
+    tags: [["fisher","spread"], ["decomposition","spread"], ["approximation",""], ["identity",""]],
+    formulaBox: {
+      main: "(1 + i) = (1 + r)(1 + π)",
+      note: "Exact Fisher relation\nApproximation: i ≈ r + π  (when r and π are small)\nπ may be expected (ex-ante) or realised (ex-post)"
+    },
+    body: [
+      `The Fisher equation states that one plus the nominal interest rate equals the product of one plus the real rate and one plus the inflation rate: (1 + i) = (1 + r)(1 + π). Rearrangement gives the exact real rate: r = (1 + i)/(1 + π) − 1.`,
+      `When rates and inflation are modest, the cross term r·π is small and the linear approximation i ≈ r + π is serviceable for back-of-the-envelope work. At high inflation the approximation deteriorates and the exact form should be used.`,
+      `In finance the equation is applied both as an accounting identity (ex-post) and as an expectations relationship (ex-ante, with π<sup>e</sup>). The latter underpins the interpretation of the nominal yield curve as the sum of a real curve and an inflation component (plus risk premia).`,
+      `Fisher’s insight also clarifies monetary transmission: if inflation expectations rise one-for-one with nominal rates, real rates — and therefore real spending incentives — may not tighten. Anchored inflation expectations make nominal rate hikes more effective at raising real rates.`
+    ],
+    keyPoint: "The Fisher equation decomposes the nominal rate into real and inflation components. Use the exact product form when precision matters; the sum approximation is fine for small rates."
+  },
+  {
+    num: "5.4.03",
+    icon: "RF",
+    tClass: "t-bid",
+    title: "Risk-Free Rate",
+    sub: "The theoretical return on a default-free investment — the foundation of discounting and excess-return measurement",
+    formula: "r_f",
+    tags: [["risk-free","bid"], ["discount rate","bid"], ["sovereign",""], ["collateral",""]],
+    formulaBox: {
+      main: "r_f ≈ yield on default-free, liquid sovereign debt",
+      note: "In practice: OIS, government bills/bonds, or secured overnight rates\nCurrency-specific · term-specific\nNo single universal r_f"
+    },
+    body: [
+      `The risk-free rate is the rate of return on an investment with no credit risk, no liquidity risk and (for a given horizon) no reinvestment uncertainty. In asset pricing it is the baseline against which risky payoffs are discounted and excess returns are measured.`,
+      `In practice there is no perfect risk-free asset. Market conventions use yields on highly rated sovereign debt (e.g. US Treasuries, German Bunds) or risk-free overnight benchmark rates and the OIS curves built from them. The choice depends on currency, horizon, collateral practice and whether the application is valuation, risk or performance.`,
+      `Post-crisis reforms elevated secured overnight rates and OIS as the cleanest proxies for the risk-free curve in derivatives discounting. Government bond yields embed some convenience yield, regulatory value and, at longer tenors, duration risk — so they are “near risk-free” rather than pure r_f.`,
+      `Every major pricing formula — CAPM, discounted cash flow, option pricing under risk-neutral measure — needs a risk-free input. Inconsistency in the choice of r_f (e.g. mixing LIBOR discounting with Treasury curves) was a historical source of valuation error and has largely been cleaned up under multi-curve and OIS-discounting standards.`
+    ],
+    keyPoint: "The risk-free rate is the default-free baseline for discounting and excess returns. In modern markets it is best proxied by OIS / secured overnight curves; sovereign yields are close substitutes with small convenience and credit nuances."
+  },
+  {
+    num: "5.4.04",
+    icon: "→",
+    tClass: "t-impact",
+    title: "LIBOR Transition to SOFR",
+    sub: "The global shift from panel-bank interbank offered rates to transaction-based risk-free benchmarks",
+    formula: "LIBOR → RFR (+ spread)",
+    tags: [["libor","impact"], ["sofr","impact"], ["fallback",""], ["ibors",""]],
+    formulaBox: {
+      main: "Legacy LIBOR → SOFR / SONIA / €STR + fallback spread",
+      note: "LIBOR: unsecured interbank, expert judgment\nRFR: transaction-based, near risk-free overnight\nTerm structures via compounding or term RFRs"
+    },
+    body: [
+      `LIBOR (London Interbank Offered Rate) was for decades the dominant floating-rate benchmark: a trimmed average of panel banks’ estimated unsecured interbank funding costs across currencies and tenors. Manipulation scandals, post-crisis shrinkage of the underlying interbank market, and regulatory pressure led to a planned cessation and transition to alternative reference rates.`,
+      `In the United States the designated replacement for USD LIBOR is SOFR (Secured Overnight Financing Rate). Other currencies adopted their own risk-free rates (RFRs): SONIA (GBP), €STR (EUR), TONA (JPY), SARON (CHF), and so on. Unlike LIBOR, these RFRs are grounded in large volumes of actual transactions and are overnight and nearly risk-free.`,
+      `Transition required new fallback language in contracts, ISDA protocols, legislation for tough legacy contracts, and operational changes to systems and curve construction. Many products moved to overnight RFR compounded in arrears; some markets developed forward-looking term RFR settings for cash products that need a rate known at the start of the period.`,
+      `A fixed spread adjustment (based on historical LIBOR–RFR median differences) was embedded in standard fallbacks to limit value transfer at transition. Residual basis risk, curve construction differences and the loss of the LIBOR credit/liquidity component remain relevant for risk management.`
+    ],
+    keyPoint: "LIBOR was replaced by transaction-based overnight RFRs (SOFR and peers) after integrity and market-structure failures. Fallbacks, compounding conventions and spread adjustments define the modern floating-rate landscape."
+  },
+  {
+    num: "5.4.05",
+    icon: "FF",
+    tClass: "t-classes",
+    title: "EFFR (Effective Federal Funds Rate)",
+    sub: "The volume-weighted median rate on overnight unsecured interbank lending in the US federal funds market",
+    formula: "EFFR = VWM(fed funds trades)",
+    tags: [["effr","classes"], ["fed funds","classes"], ["policy rate",""], ["iorb",""]],
+    formulaBox: {
+      main: "EFFR ≈ policy target (set by FOMC)",
+      note: "Published by NY Fed · volume-weighted median\nImplementation: IORB, ON RRP, reserve supply\nTarget range (e.g. 25 bp wide) rather than a single point"
+    },
+    body: [
+      `The Effective Federal Funds Rate is the volume-weighted median interest rate of overnight unsecured transactions in the federal funds market, as reported by the Federal Reserve Bank of New York. It is the operational counterpart of the FOMC’s target range for the federal funds rate.`,
+      `Banks and certain other institutions lend reserves to one another overnight; the resulting market rate is EFFR. Since the financial crisis the Fed has implemented policy in an “ample reserves” framework: interest on reserve balances (IORB) sets a floor-like anchor for wholesale rates, and the overnight reverse repo (ON RRP) facility provides a soft floor for a broader set of lenders. Open-market operations fine-tune the system when needed.`,
+      `EFFR is the headline US policy rate that markets compare to futures-implied paths (fed funds futures, OIS). Spreads of other short rates (SOFR, commercial paper, repo) to EFFR convey information about funding stress, balance-sheet constraints and arbitrage frictions.`,
+      `Because EFFR is unsecured and limited to a specific set of counterparties, it can diverge modestly from secured overnight rates. Those divergences are usually small in calm markets and widen in stress — a useful real-time indicator for funding desks and macro traders.`
+    ],
+    keyPoint: "EFFR is the realised overnight unsecured rate in the fed funds market and the Fed’s primary policy operating target. IORB and ON RRP keep it within the FOMC’s target range under the ample-reserves regime."
+  },
+  {
+    num: "5.4.06",
+    icon: "SF",
+    tClass: "t-bid",
+    title: "SOFR (Secured Overnight Financing Rate)",
+    sub: "The US secured overnight repo benchmark — transaction-based, broad and the successor to USD LIBOR",
+    formula: "SOFR = broad repo aggregate",
+    tags: [["sofr","bid"], ["repo","bid"], ["rfr",""], ["secured",""]],
+    formulaBox: {
+      main: "SOFR = volume-weighted median of eligible repo trades",
+      note: "Tri-party + GCF + bilateral Treasury repo\nPublished by NY Fed · nearly risk-free\nCompounded in arrears for most derivatives"
+    },
+    body: [
+      `SOFR is a broad measure of the cost of borrowing cash overnight collateralised by US Treasury securities. It is calculated as a volume-weighted median of transaction-level data from tri-party repo, GCF repo and bilateral Treasury repo cleared through the Fixed Income Clearing Corporation. The New York Fed publishes it daily.`,
+      `Because it is secured by Treasuries and drawn from a deep market, SOFR is considered a near risk-free rate. It replaced USD LIBOR as the primary floating-rate benchmark for derivatives and is increasingly used in loans, floating-rate notes and other cash products. Term SOFR settings (forward-looking) exist for markets that require a rate set in advance.`,
+      `SOFR can print with more day-to-day volatility than fed funds around period-ends, Treasury settlement dates and tax dates, reflecting collateral and balance-sheet dynamics in repo. Averages and compounds smooth this for coupon calculation. Basis between SOFR and EFFR is a standard watch item for US money markets.`,
+      `Derivatives markets quote SOFR swaps, futures and options; discounting and price alignment interest for USD cleared derivatives are SOFR-based. Understanding compounding conventions (lookback, observation shift, payment delay) is essential for accurate accrued interest and risk.`
+    ],
+    keyPoint: "SOFR is the transaction-based secured overnight Treasury repo rate and the core USD risk-free benchmark post-LIBOR. It underpins swaps, loans and discounting; compounding conventions define how overnight prints become period rates."
+  },
+  {
+    num: "5.4.07",
+    icon: "🌍",
+    tClass: "t-markets",
+    title: "EURIBOR, SONIA, TONAR",
+    sub: "Key regional benchmarks — European unsecured term rates and UK/Japanese overnight risk-free rates",
+    formula: "€STR · SONIA · TONA",
+    tags: [["euribor","markets"], ["sonia","markets"], ["tonar","markets"], ["benchmarks",""]],
+    formulaBox: {
+      main: "EURIBOR (term) · SONIA (GBP RFR) · TONA (JPY RFR)",
+      note: "EURIBOR: panel-based unsecured term rate (reformed)\nSONIA: Sterling Overnight Index Average\nTONA / TONAR: Tokyo Overnight Average Rate"
+    },
+    splitBox: [
+      { cls: "spread", label: "EURIBOR", text: "Euro unsecured term benchmark from a panel of banks, reformed to a hybrid methodology. Still widely used in euro loans and mortgages; €STR is the euro RFR for derivatives discounting and overnight indexing." },
+      { cls: "bid",  label: "SONIA", text: "Sterling Overnight Index Average — the GBP risk-free rate based on actual unsecured overnight transactions. Successor to GBP LIBOR; compounded SONIA is standard in sterling swaps and bonds." },
+      { cls: "mid",  label: "TONA / TONAR", text: "Tokyo Overnight Average Rate — the JPY uncollateralised overnight call rate average, Japan’s RFR. Used for TONA compounding in JPY derivatives after the TIBOR/LIBOR transition path." },
+      { cls: "gold", label: "Practical Point", text: "Know which curve discounts and which index floats in each currency. Multi-curve construction (RFR discount + separate forward/projection) is the post-crisis norm." },
+    ],
+    body: [
+      `Beyond SOFR, each major currency has its own benchmark complex. In the euro area, EURIBOR remains a panel-based unsecured term rate (with a reformed hybrid methodology) used extensively in cash products, while €STR (euro short-term rate) is the overnight RFR used for discounting and overnight-indexed products.`,
+      `SONIA is the sterling risk-free rate: a volume-weighted measure of overnight unsecured sterling deposits. It replaced GBP LIBOR and is the standard floating index for sterling OIS, swaps and many floating-rate notes, typically compounded in arrears.`,
+      `TONA (often referred to via TONAR, the published average) is the Japanese yen uncollateralised overnight call rate average and the designated JPY RFR. JPY derivatives have transitioned toward TONA compounding, alongside remaining TIBOR usage in some cash markets.`,
+      `Cross-currency bases, fallback spreads and curve-building conventions differ by currency. A global rates book must track each benchmark’s definition, administrator, publication time and compounding rules to avoid settlement and valuation errors.`
+    ],
+    keyPoint: "EURIBOR (term euro), SONIA (GBP RFR) and TONA (JPY RFR) are core regional benchmarks. Pair each currency’s RFR discount curve with the correct projection index — multi-curve is the standard."
+  },
+  {
+    num: "5.4.08",
+    icon: "↗",
+    tClass: "t-dynamics",
+    title: "Term Structure of Interest Rates",
+    sub: "The relationship between yield and maturity — the yield curve as the market’s condensed rate map",
+    formula: "y(τ) for τ > 0",
+    tags: [["term structure","dynamics"], ["yield curve","dynamics"], ["spot","forward",""]],
+    formulaBox: {
+      main: "Spot curve · Forward curve · Par curve",
+      note: "Spot y(τ): zero-coupon yield to maturity τ\nForward: future one-period rates implied by spots\nPar: coupon rate that prices a bond at par"
+    },
+    body: [
+      `The term structure of interest rates is the set of interest rates for different maturities at a point in time — most often visualised as the yield curve. It encodes the market’s pricing of money across horizons and is the backbone of fixed-income valuation, risk and macro inference.`,
+      `Three related curves are used daily: the spot (zero-coupon) curve, the instantaneous or discrete forward curve implied by those spots, and the par curve of coupon rates that price bonds at par. Bootstrapping and interpolation from liquid instruments (deposits, futures, swaps, bonds) produce the working curves for each currency.`,
+      `Curve shape — upward-sloping, flat, inverted, humped — is informative. Inversions (short rates above long rates) have historically preceded recessions in some economies, though timing and reliability vary. Steepening and flattening trades are standard expressions of views on growth, inflation and the policy path.`,
+      `The term structure is not a single object: government, OIS, LIBOR/RFR projection, and credit curves can differ by collateral, credit and regulatory treatment. Specifying which curve is used for discounting versus projection is mandatory in modern pricing.`
+    ],
+    keyPoint: "The term structure maps yield against maturity. Spot, forward and par curves are transforms of one another; shape and level drive valuation, macro signals and relative-value trading."
+  },
+  {
+    num: "5.4.09",
+    icon: "E[r]",
+    tClass: "t-spread",
+    title: "Expectations Theory of Term Structure",
+    sub: "Long rates as the average of expected future short rates — the pure expectations benchmark",
+    formula: "(1+y_n)^n = Π (1+E[r_t])",
+    tags: [["expectations","spread"], ["pure expectations","spread"], ["forwards",""], ["no premium",""]],
+    formulaBox: {
+      main: "(1 + y<sub>n</sub>)<sup>n</sup> = Π<sub>t=1…n</sub> (1 + E[r<sub>t</sub>])",
+      note: "Long yield ≈ average of expected future short rates\nForward rate = expected future short rate (under pure expectations)\nNo risk or term premium"
+    },
+    body: [
+      `The pure expectations theory asserts that the n-period interest rate is determined solely by the market’s expectations of future one-period (short) rates. Investing for n periods at the long rate should match, in expectation, rolling over one-period investments at the successive short rates.`,
+      `Under this theory, the implied forward rate equals the expected future short rate. An upward-sloping curve means the market expects short rates to rise; an inverted curve means short rates are expected to fall. There is no extra compensation for bearing interest-rate risk.`,
+      `Empirically, pure expectations is an incomplete description: forward rates are biased predictors of future spot rates, and the bias varies with the level of rates and the business cycle. That bias is interpreted as a time-varying term premium — the subject of liquidity-preference and affine term-structure models.`,
+      `Even so, expectations remain the first building block. Policy guidance, macro forecasts and path surprises are transmitted to the curve largely by revising expected short rates; term-premium changes are the residual layer.`
+    ],
+    keyPoint: "Expectations theory sets long yields equal to average expected future short rates, with forwards as unbiased predictors. It is the clean benchmark; real-world curves also embed term premia."
+  },
+  {
+    num: "5.4.10",
+    icon: "LP",
+    tClass: "t-cost",
+    title: "Liquidity Preference Theory",
+    sub: "Investors demand a premium for holding longer-duration bonds — an upward bias to the curve",
+    formula: "y_n = E[r̄] + LPP_n",
+    tags: [["liquidity preference","gold"], ["term premium","gold"], ["duration risk",""], ["premium",""]],
+    formulaBox: {
+      main: "Long rate = expected path of short rates + term premium",
+      note: "Term premium ≥ 0 under classic liquidity preference\nCompensates for interest-rate / inflation risk\nCan vary over time and turn negative"
+    },
+    body: [
+      `Liquidity preference theory (in the Hicks–Keynes tradition applied to the yield curve) argues that risk-averse investors prefer shorter maturities, all else equal, because longer bonds have greater price volatility for a given rate move. To induce them to hold long bonds, the market must offer a positive term (or liquidity) premium.`,
+      `As a result, the yield curve has an upward bias relative to the pure expectations path. Forward rates equal expected short rates plus a term premium, not expected short rates alone. This helps explain why curves are more often upward-sloping than pure rate-expectation stories would suggest.`,
+      `Modern evidence shows the term premium is time-varying and can be negative — for example when long bonds are scarce, when central banks buy duration (QE), or when long bonds act as hedges against growth shocks. Affine term-structure models and survey-based decompositions are used to estimate the split between expectations and premia.`,
+      `For traders and policymakers the distinction matters: a rise in long yields driven by higher expected short rates has different macro and portfolio implications from a rise driven by a higher term premium.`
+    ],
+    keyPoint: "Liquidity preference adds a term premium to the expectations path, compensating holders of long-duration bonds for rate risk. The premium is usually positive but can shrink or turn negative under QE, scarcity or hedging demand."
+  },
+  {
+    num: "5.4.11",
+    icon: "Seg",
+    tClass: "t-classes",
+    title: "Market Segmentation Theory",
+    sub: "Preferred habitats — supply and demand in separate maturity buckets determine local yields",
+    formula: "y(τ) set in segment τ",
+    tags: [["segmentation","classes"], ["preferred habitat","classes"], ["supply demand",""], ["habitat",""]],
+    formulaBox: {
+      main: "Segmented markets → local supply/demand sets y(τ)",
+      note: "Limited arbitrage across maturities\nPreferred-habitat investors (pensions, banks, MMF)\nExplains supply-driven curve distortions"
+    },
+    body: [
+      `Market segmentation theory holds that different investor groups are confined — by mandate, regulation or preference — to particular maturity segments. Short-term yields are set by money-market funds and banks; long-term yields by pensions and insurers. If capital does not flow freely across segments, supply and demand within each bucket determine that segment’s yield.`,
+      `The related preferred-habitat theory allows some arbitrageurs to move between segments but not costlessly. Large changes in supply (e.g. heavy long-end government issuance) or demand (e.g. QE, LDI hedging) can therefore bend the curve in ways that pure expectations-plus-constant-premium models miss.`,
+      `Empirical support appears in episodes of pension-driven long-end bid, bill shortages that pin down front-end yields, and central-bank purchase programmes that compress term premia most where they buy. Regulatory constraints (liquidity coverage, capital, accounting) reinforce habitat behaviour.`,
+      `Segmentation is a reminder that flow and stock effects — who must buy or sell which maturity — can matter as much as the macro outlook for the shape of the curve on any given day.`
+    ],
+    keyPoint: "Segmentation and preferred-habitat theories attribute curve shape partly to supply and demand within maturity buckets. When arbitrage is limited, issuance and institutional flows move local yields independently of pure rate expectations."
+  },
+  {
+    num: "5.4.12",
+    icon: "ΔP",
+    tClass: "t-ask",
+    title: "Rate Sensitivity of Asset Prices",
+    sub: "How bond, equity and other asset prices respond to changes in interest rates — duration and beyond",
+    formula: "ΔP ≈ −D × Δy × P",
+    tags: [["duration","ask"], ["convexity","ask"], ["valuation",""], ["sensitivity",""]],
+    formulaBox: {
+      main: "ΔP/P ≈ −D<sub>mod</sub> × Δy + ½ C × (Δy)²",
+      note: "D = modified duration · C = convexity\nEquities: via discount rates and growth expectations\nHigher duration → larger price response"
+    },
+    splitBox: [
+      { cls: "ask",  label: "Fixed Income", text: "Price and yield move inversely. Modified duration scales the percentage price change; convexity adds a positive second-order term. Long zero-coupon bonds are the most sensitive." },
+      { cls: "mid",  label: "Equities", text: "Higher rates raise the discount rate on future cash flows and can compress multiples. Growth and long-duration equities are typically more rate-sensitive than value or short-duration cash-flow stocks." },
+      { cls: "spread", label: "FX & Credit", text: "Rate differentials drive carry and capital flows in FX. Credit spreads can tighten or widen with rates depending on growth and risk appetite — the beta is state-dependent." },
+      { cls: "gold", label: "Portfolios", text: "Aggregate rate sensitivity is the value-weighted duration (plus effective duration of options and floaters). Hedging uses futures, swaps and options to target a desired DV01." },
+    ],
+    body: [
+      `Interest-rate sensitivity is the response of an asset’s price to a change in yields. For option-free fixed-income instruments the first-order measure is modified duration: the approximate percentage price change equals minus modified duration times the yield change. Convexity improves the approximation for larger moves and is always non-negative for standard fixed-coupon bonds.`,
+      `DV01 (dollar value of one basis point) translates duration into currency P&L per basis point, the practical unit for hedging and limit management. Portfolio DV01 aggregates across positions; key-rate or partial DV01s measure sensitivity to specific points on the curve.`,
+      `Equities, real estate and private assets are also rate-sensitive through the discount-rate channel and through macro effects on earnings and risk premia. The longer the duration of the expected cash flows, the larger the typical response to a persistent rate shock. Options and structured products add nonlinear (effective duration and convexity) effects.`,
+      `Understanding rate sensitivity is essential for asset allocation, liability-driven investment, and trading. A parallel 100 bp shock is a standard stress; non-parallel curve shifts require bucketed or key-rate views of risk.`
+    ],
+    keyPoint: "Asset prices fall when yields rise, with magnitude governed by duration (and convexity). Fixed income makes this explicit; equities and other assets embed the same discount-rate logic with additional cash-flow effects."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>

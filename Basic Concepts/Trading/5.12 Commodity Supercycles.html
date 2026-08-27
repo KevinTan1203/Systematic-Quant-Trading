@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Markets — 5.12 Commodity Supercycles</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400;1,9..144,700&family=Overpass+Mono:wght@300;400;500;600&family=Overpass:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:          #f7f4ee;
+    --bg2:         #ede9df;
+    --bg3:         #e2ddd0;
+    --surface:     #ffffff;
+    --border:      #cec8b8;
+    --border2:     #b8b0a0;
+    --ink:         #1a1710;
+    --ink2:        #3d3828;
+    --muted:       #7a7260;
+    --faint:       #b0a890;
+
+    --bid:         #1a6b40;
+    --bid-mid:     #0f4028;
+    --bid-light:   #e6f4ec;
+    --bid-border:  #8fcfaa;
+
+    --ask:         #b03020;
+    --ask-mid:     #7a1a10;
+    --ask-light:   #faeee8;
+    --ask-border:  #d89080;
+
+    --spread:      #6040c0;
+    --spread-light:#ede8fa;
+    --spread-border:#a090d8;
+
+    --mid:         #206080;
+    --mid-light:   #e4f0f8;
+    --mid-border:  #7ab4d0;
+
+    --gold:        #9a7010;
+    --gold-light:  #f8f0d8;
+    --gold-border: #d0b870;
+
+    --accent:      #8b3010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Overpass', sans-serif;
+    font-size: 14.5px;
+    line-height: 1.72;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: 0.22;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 54px 38px 100px;
+  }
+
+  .hdr { margin-bottom: 44px; }
+
+  .hdr-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .hdr-kicker {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hdr-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 900;
+    color: var(--ink);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+
+  .hdr-title em { font-style: italic; color: var(--accent); }
+
+  .hdr-sub {
+    font-family: 'Overpass', sans-serif;
+    font-size: 12.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  .spread-widget {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    padding: 0;
+    overflow: hidden;
+    min-width: 250px;
+    flex-shrink: 0;
+  }
+
+  .sw-title {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg2);
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sw-prices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sw-side {
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .sw-side.bid { background: var(--bid-light); border-right: 1px solid var(--bid-border); }
+  .sw-side.ask { background: var(--ask-light); }
+
+  .sw-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sw-side.bid .sw-label { color: var(--bid); }
+  .sw-side.ask .sw-label { color: var(--ask); }
+
+  .sw-price {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .sw-side.bid .sw-price { color: var(--bid); }
+  .sw-side.ask .sw-price { color: var(--ask); }
+
+  .sw-spread-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--spread-light);
+  }
+
+  .sw-spread-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--spread);
+  }
+
+  .sw-spread-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--spread);
+  }
+
+  .sw-mid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--mid-light);
+  }
+
+  .sw-mid-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mid);
+  }
+
+  .sw-mid-val {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mid);
+  }
+
+  .hdr-rule {
+    height: 2px;
+    background: linear-gradient(to right, var(--bid), var(--spread), var(--ask));
+    margin-top: 20px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .entry {
+    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--border2);
+    transition: background 0.18s;
+  }
+
+  .t-bid::before        { background: var(--bid-border); }
+  .t-ask::before        { background: var(--ask-border); }
+  .t-spread::before     { background: var(--spread-border); }
+  .t-mid::before        { background: var(--mid-border); }
+  .t-cost::before       { background: var(--gold-border); }
+  .t-dynamics::before   { background: var(--border2); }
+  .t-impact::before     { background: #c07030; }
+  .t-classes::before    { background: #4080c0; }
+  .t-markets::before    { background: #806080; }
+
+  .entry.open::before { width: 5px; }
+  .t-bid.open::before        { background: var(--bid); }
+  .t-ask.open::before        { background: var(--ask); }
+  .t-spread.open::before     { background: var(--spread); }
+  .t-mid.open::before        { background: var(--mid); }
+  .t-cost.open::before       { background: var(--gold); }
+  .t-dynamics.open::before   { background: var(--muted); }
+  .t-impact.open::before     { background: #b06020; }
+  .t-classes.open::before    { background: #2060b0; }
+  .t-markets.open::before    { background: #604070; }
+
+  .entry:hover { border-color: var(--border2); box-shadow: 2px 2px 0 var(--bg2); }
+
+  .e-hdr {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    min-height: 54px;
+    transition: background 0.14s;
+  }
+
+  .e-hdr:hover { background: var(--bg); }
+
+  .e-num {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--faint);
+    width: 46px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .e-badge {
+    width: 34px;
+    flex-shrink: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    font-size: 15px;
+    margin-right: 2px;
+  }
+
+  .e-titles { flex: 1; padding: 12px 16px; }
+
+  .e-title {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .e-sub {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .e-formula {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink2);
+    padding: 4px 12px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    margin-right: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .e-toggle {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    width: 44px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: transform 0.24s, color 0.15s;
+  }
+
+  .entry.open .e-toggle { transform: rotate(90deg); color: var(--accent); }
+
+  .e-content {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 22px 24px 80px;
+    animation: bIn 0.2s ease;
+  }
+
+  .entry.open .e-content { display: block; }
+
+  @keyframes bIn {
+    from { opacity:0; transform:translateY(-4px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .e-content p {
+    font-family: 'Overpass', sans-serif;
+    font-size: 13.5px;
+    font-weight: 300;
+    line-height: 1.86;
+    color: var(--ink2);
+    margin-bottom: 13px;
+  }
+
+  .e-content p:last-of-type { margin-bottom: 0; }
+  .e-content p em     { font-style: italic; color: var(--ink); font-weight: 400; }
+  .e-content p strong { font-weight: 600; color: var(--ink); }
+
+  .formula-box {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 4px solid var(--spread);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .formula-main {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .formula-main .bid-part { color: var(--bid); }
+  .formula-main .ask-part { color: var(--ask); }
+  .formula-main .spread-part { color: var(--spread); }
+  .formula-main .mid-part { color: var(--mid); }
+
+  .formula-note {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .dt-row {
+    display: grid;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dt-row:last-child { border-bottom: none; }
+
+  .dt-row.hdr .dt-cell {
+    background: var(--bg2);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .dt-cell {
+    padding: 9px 13px;
+    border-right: 1px solid var(--border);
+    font-family: 'Overpass Mono', monospace;
+    font-size: 11px;
+    color: var(--ink2);
+    line-height: 1.45;
+  }
+
+  .dt-cell:last-child { border-right: none; }
+
+  .dt-cell.good  { color: var(--bid); }
+  .dt-cell.bad   { color: var(--ask); }
+  .dt-cell.mid   { color: var(--mid); }
+  .dt-cell.label { color: var(--ink); font-weight: 500; }
+
+  .split-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .split-cell {
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .split-cell.bid  { background: var(--bid-light);    border-color: var(--bid-border); }
+  .split-cell.ask  { background: var(--ask-light);    border-color: var(--ask-border); }
+  .split-cell.spread { background: var(--spread-light); border-color: var(--spread-border); }
+  .split-cell.mid  { background: var(--mid-light);    border-color: var(--mid-border); }
+  .split-cell.gold { background: var(--gold-light);   border-color: var(--gold-border); }
+
+  .split-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .split-cell.bid .split-label    { color: var(--bid); }
+  .split-cell.ask .split-label    { color: var(--ask); }
+  .split-cell.spread .split-label { color: var(--spread); }
+  .split-cell.mid .split-label    { color: var(--mid); }
+  .split-cell.gold .split-label   { color: var(--gold); }
+
+  .split-cell p {
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .key-insight {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ki-label {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    padding: 4px 0;
+    border-right: 2px solid var(--accent);
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+
+  .ki-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.62;
+  }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .tag.bid    { border-color: var(--bid-border);    color: var(--bid); }
+  .tag.ask    { border-color: var(--ask-border);    color: var(--ask); }
+  .tag.spread { border-color: var(--spread-border); color: var(--spread); }
+  .tag.mid    { border-color: var(--mid-border);    color: var(--mid); }
+  .tag.gold   { border-color: var(--gold-border);   color: var(--gold); }
+
+  .foot {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .foot span {
+    font-family: 'Overpass Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 28px 16px 60px; }
+    .e-content { padding-left: 16px; }
+    .hdr-top { flex-direction: column; }
+    .split-box { grid-template-columns: 1fr; }
+    .e-formula { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="hdr-kicker">Chapter 5 · Section 5.12 · Macro & Commodity Foundations</div>
+        <h1 class="hdr-title">Commodity<br><em>Supercycles</em></h1>
+        <div class="hdr-sub">Multi-year to multi-decade swings in real commodity prices — driven by structural demand, slow supply response, underinvestment and financial flows</div>
+      </div>
+
+      <div class="spread-widget">
+        <div class="sw-title">Supercycle Drivers</div>
+        <div class="sw-prices">
+          <div class="sw-side bid">
+            <div class="sw-label">Demand</div>
+            <div class="sw-price">Industrial<br>Green energy</div>
+          </div>
+          <div class="sw-side ask">
+            <div class="sw-label">Supply</div>
+            <div class="sw-price">CapEx lag<br>OPEC</div>
+          </div>
+        </div>
+        <div class="sw-spread-row">
+          <div class="sw-spread-label">Metals</div>
+          <div class="sw-spread-val">Cu · Li · Ni</div>
+        </div>
+        <div class="sw-mid-row">
+          <div class="sw-mid-label">History</div>
+          <div class="sw-mid-val">1900s · 1970s · 2000s</div>
+        </div>
+      </div>
+    </div>
+    <div class="hdr-rule"></div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">7 concepts · click any entry to expand</div>
+  </div>
+
+  <div id="root"></div>
+
+  <footer class="foot">
+    <span>Financial Markets · Revision Notes</span>
+    <span>5.12 Commodity Supercycles</span>
+  </footer>
+</div>
+
+<script>
+const entries = [
+  {
+    num: "5.12.01",
+    icon: "📜",
+    tClass: "t-mid",
+    title: "Historical Commodity Supercycles",
+    sub: "The major multi-decade upswings of the 20th and early 21st centuries — 1900s, 1970s and 2000s",
+    formula: "1900s · 1970s · 2000s",
+    tags: [["historical cycles","mid"], ["1900s","gold"], ["1970s","ask"], ["2000s China","bid"]],
+    splitBox: [
+      { cls: "gold", label: "Early 1900s", text: "Industrialisation, urbanisation and World War I demand lifted real commodity prices. Supply eventually caught up in the interwar period, contributing to later weakness." },
+      { cls: "ask",  label: "1970s", text: "Oil shocks, strong global growth earlier in the decade, and broad-based commodity inflation. Real prices peaked and then entered a long bear market through the 1980s–90s." },
+      { cls: "bid",  label: "2000s", text: "China’s industrialisation and urbanisation created a massive, persistent demand shock for energy, metals and bulk commodities. Prices surged until the mid-2010s correction." },
+      { cls: "spread", label: "Common Pattern", text: "Structural demand acceleration → lagged supply response → price spike → heavy investment → eventual surplus and multi-year real-price decline." }
+    ],
+    body: [
+      `Commodity supercycles are prolonged periods in which real (inflation-adjusted) commodity prices trend significantly above or below long-term averages. Three episodes dominate modern discussion: the early-20th-century industrialisation wave, the 1970s stagflation-era spike, and the China-driven supercycle of the 2000s.`,
+      `Each was characterised by a persistent demand shock that outran the ability of the resource sector to bring on new supply. Because mines, oil fields and infrastructure have long lead times, prices rose for years, triggering a wave of investment that eventually produced surplus capacity and a subsequent long downswing in real prices.`,
+      `The 2000s cycle was distinctive in its breadth (oil, copper, iron ore, coal, agricultural commodities) and in the scale of the Chinese demand impulse. The post-2014 correction and the more recent debate over a possible new supercycle linked to the energy transition are direct descendants of that episode.`,
+      `Understanding these historical analogues helps frame whether current price strength is cyclical or structural, and how long supply responses are likely to take.`
+    ],
+    keyPoint: "The great supercycles of the 1900s, 1970s and 2000s all followed the same template: structural demand surge, lagged supply, price spike, investment boom, and eventual real-price mean reversion."
+  },
+  {
+    num: "5.12.02",
+    icon: "⚖️",
+    tClass: "t-dynamics",
+    title: "Supply–Demand Drivers",
+    sub: "The fundamental imbalance between persistent demand growth and inelastic, long-lead-time supply",
+    formula: "Demand > Supply → Price ↑",
+    tags: [["supply-demand","dynamics"], ["inelastic supply","mid"], ["demand shock","gold"], ["price discovery",""]],
+    body: [
+      `Commodity prices clear the market by balancing supply and demand. In the short run both curves are relatively inelastic: production capacity is fixed, and consumption habits and industrial processes change slowly. Small imbalances therefore produce large price moves.`,
+      `Supercycles arise when demand shifts persistently outward (industrialisation, population growth, technology-driven intensity of use, or policy-driven transitions) while supply can respond only with multi-year lags. The result is a prolonged period of elevated prices that simultaneously rations demand and incentivises new supply.`,
+      `On the demand side, the key variables are global growth, the commodity intensity of that growth (especially in EM industrialisation), substitution, and efficiency. On the supply side, the critical factors are the existing project pipeline, permitting and geopolitical constraints, ore grades, and the cost of capital.`,
+      `Secondary dynamics — inventory builds and draws, strategic stockpiling, and speculative positioning — amplify short-term moves but do not create the multi-year supercycle itself. The cycle is fundamentally a story of structural demand meeting slow-moving supply.`
+    ],
+    keyPoint: "Supercycles are born when demand grows faster than the resource sector can expand capacity. Price is the rationing mechanism that eventually restores balance — after a long lag."
+  },
+  {
+    num: "5.12.03",
+    icon: "🏗️",
+    tClass: "t-cost",
+    title: "CapEx Underinvestment Cycles",
+    sub: "The boom–bust rhythm of resource-sector capital expenditure that locks in future tightness or glut",
+    formula: "Low CapEx → Future tightness",
+    tags: [["CapEx cycle","cost"], ["underinvestment","ask"], ["project pipeline","mid"], ["supply lag","gold"]],
+    body: [
+      `Resource extraction is capital-intensive and long-cycle. When prices are low and balance sheets are stressed, companies slash exploration and development spending. The project pipeline thins. Years later, when demand recovers, the missing supply becomes visible as tightness and rising prices.`,
+      `Conversely, high prices trigger a surge in CapEx. Because of multi-year lead times, the new production often arrives after demand growth has already slowed, producing a period of oversupply and falling prices that then restarts the underinvestment phase.`,
+      `This CapEx cycle is one of the most reliable amplifiers of commodity price swings. The post-2014 collapse in oil and mining investment, for example, left the industry with a leaner project pipeline just as energy-transition and post-pandemic demand began to recover — a classic underinvestment setup.`,
+      `Monitoring aggregate upstream CapEx, discovery rates, reserve replacement ratios and the sanctioning of major projects therefore provides an early read on the supply side of the next cycle. Chronic underinvestment raises the probability of future price spikes; chronic overinvestment raises the probability of prolonged gluts.`
+    ],
+    keyPoint: "Today’s CapEx decides tomorrow’s supply. Multi-year underinvestment is the most common precursor of the next period of commodity tightness and elevated real prices."
+  },
+  {
+    num: "5.12.04",
+    icon: "⚡",
+    tClass: "t-bid",
+    title: "Electrification & Green Energy Demand",
+    sub: "The structural demand impulse from the energy transition — grids, EVs, renewables and storage",
+    formula: "Green demand = new intensity",
+    tags: [["electrification","bid"], ["energy transition","mid"], ["EV demand","gold"], ["grid investment",""]],
+    body: [
+      `The global push to electrify transport, heat and industry, and to expand renewable generation and storage, is creating a multi-decade demand impulse for a specific set of commodities. Copper for wiring and grids, lithium, nickel and cobalt for batteries, silver for photovoltaics, and various bulk materials for infrastructure are all seeing intensity-of-use increases linked to the transition.`,
+      `Unlike a pure cyclical recovery, this demand is policy-supported and relatively price-inelastic in the medium term: governments and corporates have committed capital to net-zero pathways. The result is a potential structural bid that can underpin a new supercycle even if traditional industrial demand is only moderate.`,
+      `The scale is material. Multiple studies project that copper and battery-metal demand could rise by tens of percent over the coming decades relative to a no-transition baseline. Whether supply can keep pace — given permitting delays, resource nationalism and ESG constraints on new mines — is the central open question.`,
+      `Green demand does not affect all commodities equally. Thermal coal faces structural decline in many markets; oil demand peaks are debated; gas may serve as a transition fuel. The supercycle, if it materialises, will be selective rather than universal.`
+    ],
+    keyPoint: "Electrification and the energy transition are the most important new structural demand drivers for metals and materials. They raise the odds of a selective, multi-year commodity upswing centred on copper and battery metals."
+  },
+  {
+    num: "5.12.05",
+    icon: "🔩",
+    tClass: "t-spread",
+    title: "Copper, Lithium, Nickel — Strategic Metals",
+    sub: "The critical materials at the centre of electrification, whose supply–demand balances will shape the next cycle",
+    formula: "Cu · Li · Ni",
+    tags: [["copper","spread"], ["lithium","mid"], ["nickel","gold"], ["critical minerals",""]],
+    splitBox: [
+      { cls: "spread", label: "Copper", text: "The metal of electrification. Essential for power grids, EVs, renewables and data centres. Long mine lead times and declining ore grades make new supply slow and expensive." },
+      { cls: "mid",  label: "Lithium", text: "Core to lithium-ion batteries. Demand is rising rapidly with EV adoption. Supply is concentrated and has shown extreme price volatility as the market swings between shortage and surplus." },
+      { cls: "gold", label: "Nickel", text: "Key cathode material for high-energy-density batteries (alongside stainless-steel demand). Class-1 nickel suitable for batteries is a tighter market than bulk nickel." },
+      { cls: "bid",  label: "Strategic Status", text: "All three are on major critical-minerals lists. Resource nationalism, ESG permitting hurdles and geopolitical concentration of processing amplify supply risk." }
+    ],
+    body: [
+      `Copper, lithium and nickel have moved from ordinary industrial commodities to strategic materials because of their central role in electrification and battery chemistry. Their long-term demand trajectories are now tied as much to climate policy and technology adoption as to traditional GDP growth.`,
+      `Copper is the broadest play: every electric vehicle, charging station, wind turbine and grid upgrade increases copper intensity. Mine development timelines of 10–15+ years and falling average ore grades mean that today’s investment decisions determine mid-2030s supply.`,
+      `Lithium and nickel are more battery-specific. Their markets are smaller, more concentrated and more prone to violent boom–bust price swings as new capacity comes online in waves. Processing capacity (especially refining and chemical conversion) is as important as raw-mine supply and is geographically concentrated.`,
+      `For investors and policymakers, these metals are the purest expression of the green-demand thesis. Their price paths will reveal whether the energy transition is running into physical bottlenecks or whether supply is responding in time.`
+    ],
+    keyPoint: "Copper, lithium and nickel are the strategic choke points of electrification. Their supply–demand balances over the next decade will determine whether the energy transition is inflationary for materials and how severe any scarcity premia become."
+  },
+  {
+    num: "5.12.06",
+    icon: "🛢️",
+    tClass: "t-ask",
+    title: "OPEC Supply Management",
+    sub: "The producer cartel’s ability to restrain or release oil supply — the most important non-market supply lever in energy",
+    formula: "OPEC+ quotas",
+    tags: [["OPEC","ask"], ["supply management","mid"], ["oil cartel","gold"], ["spare capacity",""]],
+    body: [
+      `OPEC (and the broader OPEC+ alliance) coordinates production quotas among major oil exporters in an attempt to stabilise or influence prices. By withholding spare capacity or increasing output, the group can materially alter the global oil balance in the short to medium term.`,
+      `The effectiveness of OPEC supply management depends on compliance, the level of spare capacity, the behaviour of non-OPEC producers (especially US shale), and the credibility of the group’s commitments. When cohesion is high and spare capacity is limited, OPEC can defend a price floor; when cohesion frays or shale responds aggressively, the cartel’s power diminishes.`,
+      `OPEC decisions interact with the longer CapEx cycle. Years of restrained investment leave the market more dependent on OPEC spare capacity; a decision to withhold that capacity then has amplified price effects. Conversely, a surge in non-OPEC supply can force OPEC into deeper cuts to prevent a price collapse.`,
+      `For the broader commodity complex, oil remains the single most important price setter for energy and a major input to inflation and terms-of-trade. OPEC’s reaction function is therefore a first-order variable in any commodity and macro forecast.`
+    ],
+    keyPoint: "OPEC supply management is the dominant discretionary lever on global oil balances. Its cohesion, spare capacity and interaction with non-OPEC supply determine how tightly the oil market is controlled in any given cycle."
+  },
+  {
+    num: "5.12.07",
+    icon: "💹",
+    tClass: "t-markets",
+    title: "Financialization of Commodities",
+    sub: "The growing role of financial investors, passive vehicles and derivatives in commodity price discovery and volatility",
+    formula: "Physical + Paper = Price",
+    tags: [["financialization","markets"], ["commodity index","mid"], ["futures","spread"], ["speculation","gold"]],
+    body: [
+      `Over recent decades, commodities have become a recognised financial asset class. Index funds, ETFs, hedge funds and other institutional investors now hold substantial notional exposure via futures, swaps and physical-backed products. This “financialization” has changed both the level and the dynamics of prices.`,
+      `On the positive side, deeper financial markets improve liquidity, facilitate hedging for producers and consumers, and allow risk transfer. On the contentious side, large financial flows can amplify price moves, increase correlation with other risk assets, and occasionally disconnect prices from immediate physical fundamentals — especially in contracts that are financially settled or lightly linked to delivery.`,
+      `Empirical research on whether financialization has systematically raised the level of prices or only their volatility remains mixed. What is clearer is that commodity returns have become more correlated with equities and credit during risk-on/risk-off episodes, and that positioning data (COT reports, ETF flows) are now essential inputs for short-term price analysis.`,
+      `For supercycle analysis the implication is twofold: structural supply–demand imbalances still set the multi-year trend, but the path is noisier and more prone to overshoot because of financial flows. Ignoring the paper market is no longer viable for either physical or financial participants.`
+    ],
+    keyPoint: "Financialization has made commodities a dual market — physical and paper. Long-term supercycles are still driven by supply and demand, but short- and medium-term price paths are heavily influenced by investor flows and risk appetite."
+  }
+];
+
+let cnt = 0;
+
+function render() {
+  const root = document.getElementById('root');
+  entries.forEach((e, i) => {
+    const idx = cnt++;
+    const tagsHtml = (e.tags||[]).map(([l,s])=>`<span class="tag ${s}">${l}</span>`).join('');
+
+    const fmlaHtml = e.formulaBox ? `
+      <div class="formula-box">
+        <div class="formula-main">${e.formulaBox.main}</div>
+        <pre class="formula-note">${e.formulaBox.note}</pre>
+      </div>` : '';
+
+    const splitHtml = e.splitBox ? `
+      <div class="split-box">
+        ${e.splitBox.map(s=>`
+          <div class="split-cell ${s.cls}">
+            <div class="split-label">${s.label}</div>
+            <p>${s.text}</p>
+          </div>`).join('')}
+      </div>` : '';
+
+    const tableHtml = e.table ? `
+      <div class="data-table">
+        <div class="dt-row hdr" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+          ${e.table.cols.map(c=>`<div class="dt-cell">${c}</div>`).join('')}
+        </div>
+        ${e.table.rows.map(row=>`
+          <div class="dt-row" style="grid-template-columns:repeat(${e.table.cols.length},1fr)">
+            ${row.map((c,ci)=>`<div class="dt-cell ${ci===0?'label':''}">${c}</div>`).join('')}
+          </div>`).join('')}
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p=>`<p>${p}</p>`).join('') +
+      fmlaHtml + splitHtml + tableHtml +
+      `<div class="key-insight">
+        <div class="ki-label">Key Insight</div>
+        <div class="ki-text">${e.keyPoint}</div>
+      </div>` +
+      `<div class="tags">${tagsHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = `entry ${e.tClass}`;
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="e-hdr" onclick="toggle(${idx})">
+        <span class="e-num">${e.num}</span>
+        <div class="e-badge">${e.icon}</div>
+        <div class="e-titles">
+          <div class="e-title">${e.title}</div>
+          <div class="e-sub">${e.sub}</div>
+        </div>
+        ${e.formula ? `<div class="e-formula">${e.formula}</div>` : ''}
+        <span class="e-toggle">▶</span>
+      </div>
+      <div class="e-content">${bodyHtml}</div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for(let i=0;i<cnt;i++){
+    const el=document.getElementById(`e-${i}`);
+    if(el) open?el.classList.add('open'):el.classList.remove('open');
+  }
+}
+
+render();
+</script>
+</body>
+</html>
