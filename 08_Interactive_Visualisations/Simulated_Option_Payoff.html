@@ -1,0 +1,2075 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Options Strategy Analytics Terminal</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+      :root {
+        --bg: #0a0c10;
+        --panel: #12161c;
+        --panel2: #1a1f28;
+        --border: #2a3140;
+        --text: #e0e6ed;
+        --muted: #8b95a8;
+        --green: #00c853;
+        --red: #ff5252;
+        --cyan: #00bcd4;
+        --blue: #448aff;
+        --yellow: #ffc107;
+        --orange: #ff9800;
+        --purple: #b388ff;
+        --mono: "SF Mono", "Cascadia Code", "Consolas", monospace;
+        --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 12px;
+      }
+      #app {
+        height: 100vh;
+        width: 100vw;
+        position: relative;
+        overflow: hidden;
+      }
+      .dash-grid {
+        display: grid;
+        grid-template-rows: 34px 26px 1fr 22px;
+        height: 100%;
+        width: 100%;
+        gap: 3px;
+        padding: 4px;
+      }
+      #btnGuide {
+        margin-left: 10px;
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--purple);
+        padding: 2px 9px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 10px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      #btnGuide:hover {
+        border-color: var(--purple);
+      }
+      #guidePage {
+        display: none;
+        height: 100%;
+        width: 100%;
+        overflow-y: auto;
+        background: var(--bg);
+        padding: 16px 22px 40px;
+      }
+      .guide-wrap {
+        max-width: 980px;
+        margin: 0 auto;
+      }
+      .guide-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+      .guide-top h1 {
+        font-size: 16px;
+        color: var(--cyan);
+        letter-spacing: 0.3px;
+      }
+      #btnBackToDash {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 4px 11px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      #btnBackToDash:hover {
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+      .guide-sub {
+        color: var(--muted);
+        font-size: 11px;
+        margin-bottom: 18px;
+        line-height: 1.5;
+      }
+      .guide-section {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        margin-bottom: 12px;
+        overflow: hidden;
+      }
+      .guide-section h2 {
+        font-size: 12px;
+        color: var(--purple);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel2);
+      }
+      .guide-section .body {
+        padding: 12px 14px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--text);
+      }
+      .guide-section .body p {
+        margin-bottom: 8px;
+      }
+      .glist {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 5px 12px;
+        font-size: 11.5px;
+      }
+      .glist b {
+        color: var(--cyan);
+        font-family: var(--mono);
+      }
+      .gcols2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      @media (max-width: 820px) {
+        .gcols2 {
+          grid-template-columns: 1fr;
+        }
+      }
+      .guide-example {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 10px 12px;
+        margin-bottom: 10px;
+      }
+      .guide-example h3 {
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      .guide-example ol {
+        margin: 6px 0 6px 18px;
+        font-size: 11.5px;
+        line-height: 1.7;
+      }
+      .guide-example .watch {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--muted);
+        border-top: 1px dashed var(--border);
+        padding-top: 6px;
+      }
+      .tag-volatile {
+        color: var(--orange);
+      }
+      .tag-safe {
+        color: var(--green);
+      }
+      .tag-directional {
+        color: var(--cyan);
+      }
+      code.k {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        padding: 0 4px;
+        font-family: var(--mono);
+        color: var(--yellow);
+        font-size: 11px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        padding: 0 10px;
+        border-radius: 3px;
+      }
+      header .logo {
+        font-weight: 700;
+        color: var(--cyan);
+        font-size: 13px;
+        letter-spacing: 0.4px;
+      }
+      header .kpi {
+        display: flex;
+        gap: 12px;
+        margin-left: auto;
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+      header .kpi span {
+        color: var(--muted);
+      }
+      header .kpi b {
+        color: var(--text);
+      }
+      header .kpi .pos {
+        color: var(--green);
+      }
+      header .kpi .neg {
+        color: var(--red);
+      }
+      .params {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        padding: 0 8px;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .params label {
+        color: var(--muted);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      .params input,
+      .params select {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 2px 4px;
+        border-radius: 2px;
+        font-family: var(--mono);
+        font-size: 11px;
+        width: 64px;
+      }
+      .params select {
+        width: auto;
+        max-width: 150px;
+      }
+      .params button {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 2px 7px;
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 10px;
+      }
+      .params button:hover {
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+      .params button.active {
+        background: #1e3a4c;
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+      .main {
+        display: grid;
+        grid-template-columns: 260px 1fr 250px;
+        grid-template-rows: 1fr;
+        gap: 3px;
+        min-height: 0;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .panel-h {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--muted);
+        padding: 2px 8px;
+        border-bottom: 1px solid var(--border);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .panel-b {
+        flex: 1;
+        min-height: 0;
+        padding: 3px;
+        overflow: hidden;
+        position: relative;
+      }
+      .legs-wrap {
+        overflow-y: auto;
+        max-height: 100%;
+      }
+      table.legs {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      table.legs th {
+        text-align: left;
+        color: var(--muted);
+        font-weight: 500;
+        padding: 2px 3px;
+        border-bottom: 1px solid var(--border);
+      }
+      table.legs td {
+        padding: 2px 3px;
+        border-bottom: 1px solid #1a1f28;
+      }
+      table.legs .buy {
+        color: var(--green);
+      }
+      table.legs .sell {
+        color: var(--red);
+      }
+      /* ---- simulation data log (growing table + CSV export) ---- */
+      .datalog-wrap {
+        overflow: auto;
+        max-height: 100%;
+        padding: 0;
+      }
+      table.datalog {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--mono);
+        font-size: 9px;
+        white-space: nowrap;
+      }
+      table.datalog th {
+        position: sticky;
+        top: 0;
+        text-align: right;
+        color: var(--muted);
+        font-weight: 500;
+        padding: 2px 4px;
+        background: var(--panel2);
+        border-bottom: 1px solid var(--border);
+        z-index: 1;
+      }
+      table.datalog th:first-child,
+      table.datalog td:first-child {
+        text-align: left;
+      }
+      table.datalog td {
+        text-align: right;
+        padding: 1px 4px;
+        border-bottom: 1px solid #1a1f28;
+        color: var(--text);
+      }
+      table.datalog tr.cur-row td {
+        background: rgba(255, 152, 0, 0.14);
+        color: var(--orange);
+        font-weight: 600;
+      }
+      table.datalog td.pos {
+        color: var(--green);
+      }
+      table.datalog td.neg {
+        color: var(--red);
+      }
+      .btn-csv {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--cyan);
+        font-size: 9px;
+        padding: 1px 6px;
+        border-radius: 2px;
+        cursor: pointer;
+        font-family: var(--mono);
+      }
+      .btn-csv:hover {
+        border-color: var(--cyan);
+      }
+      .snap {
+        font-family: var(--mono);
+        font-size: 11px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px 8px;
+      }
+      .snap .full {
+        grid-column: 1/-1;
+      }
+      .snap .lbl {
+        color: var(--muted);
+      }
+      .snap .val {
+        text-align: right;
+      }
+      .snap .pos {
+        color: var(--green);
+      }
+      .snap .neg {
+        color: var(--red);
+      }
+      .snap .cyan {
+        color: var(--cyan);
+      }
+      .snap .yellow {
+        color: var(--yellow);
+      }
+      .greeks-bar {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        padding: 3px;
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      .greeks-bar .g {
+        flex: 1;
+        min-width: 60px;
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        padding: 2px 4px;
+        text-align: center;
+      }
+      .greeks-bar .g .n {
+        color: var(--muted);
+        font-size: 8px;
+      }
+      .greeks-bar .g .v {
+        font-weight: 600;
+      }
+      .charts-mid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 3px;
+        min-height: 0;
+      }
+      .chart-box {
+        position: relative;
+        height: 100%;
+      }
+      .chart-box canvas {
+        width: 100% !important;
+        height: 100% !important;
+      }
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        padding: 0 8px;
+        border-radius: 3px;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .footer .caveat {
+        flex: 1;
+      }
+      .pb-controls {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .pb-controls button {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        width: 26px;
+        height: 18px;
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 10px;
+      }
+      .pb-controls input[type="range"] {
+        width: 160px;
+        accent-color: var(--cyan);
+      }
+      .desc {
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1.3;
+        padding: 4px;
+        max-height: 64px;
+        overflow: hidden;
+      }
+      .btn-sm {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 1px 5px;
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 9px;
+      }
+      .btn-sm:hover,
+      .btn-sm.active {
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+      #legEditor {
+        display: none;
+      }
+      #legEditor.open {
+        display: block;
+      }
+      input.tiny {
+        width: 44px !important;
+      }
+      select.tiny {
+        width: 54px !important;
+      }
+      #volSurface {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .cur-marker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: var(--orange);
+        pointer-events: none;
+        z-index: 5;
+        opacity: 0.85;
+      }
+      /* ---- playback controls (icons must always render something visible) ---- */
+      .pb-controls button {
+        font-size: 12px !important;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #pbPlay {
+        width: 30px !important;
+        font-size: 13px !important;
+      }
+      /* ---- greek small-multiples ---- */
+      .greeks-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 2px;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+      }
+      .chart-box.mini {
+        position: relative;
+        background: var(--panel2);
+        border: 1px solid #1a1f28;
+        border-radius: 2px;
+        min-height: 0;
+      }
+      .mini-lbl {
+        position: absolute;
+        top: 2px;
+        left: 5px;
+        font-size: 8px;
+        font-weight: 600;
+        color: var(--muted);
+        z-index: 2;
+        pointer-events: none;
+        letter-spacing: 0.3px;
+      }
+      .mini-lbl b {
+        color: var(--text);
+      }
+      /* ---- left column: BSM explorer / term structure ---- */
+      .field-mini {
+        display: flex;
+        flex-direction: column;
+        font-size: 9px;
+        color: var(--muted);
+        gap: 1px;
+      }
+      .field-mini select,
+      .field-mini input {
+        font-family: var(--mono);
+      }
+      .bsm-fields {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 4px 4px 3px;
+      }
+      #volSurface {
+        cursor: grab;
+      }
+      #volSurface:active {
+        cursor: grabbing;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+    <div id="dashPage" class="dash-grid">
+      <header>
+        <div class="logo">OPTSTRAT · TERMINAL</div>
+        <div class="kpi" id="kpiBar">
+          <div><span>STRAT</span> <b id="kStrat">—</b></div>
+          <div><span>SPOT</span> <b id="kSpot">—</b></div>
+          <div><span>DTE</span> <b id="kDte">—</b></div>
+          <div><span>VALUE</span> <b id="kVal">—</b></div>
+          <div><span>P&L</span> <b id="kPnl">—</b></div>
+          <div><span>Δ</span> <b id="kDelta">—</b></div>
+          <div><span>Γ</span> <b id="kGamma">—</b></div>
+          <div><span>Θ</span> <b id="kTheta">—</b></div>
+          <div><span>ν</span> <b id="kVega">—</b></div>
+        </div>
+        <button id="btnGuide" title="Learn how to use this dashboard">❓ How to Use</button>
+      </header>
+
+      <div class="params">
+        <label>Strategy</label>
+        <select id="stratSelect"></select>
+        <label>S₀</label
+        ><input type="number" id="pSpot" value="100" step="0.5" />
+        <label>μ%</label
+        ><input type="number" id="pDrift" value="8" step="0.5" />
+        <label>σ%</label><input type="number" id="pVol" value="25" step="1" />
+        <label>r%</label
+        ><input type="number" id="pRate" value="4.5" step="0.1" />
+        <label>q%</label><input type="number" id="pDiv" value="0" step="0.1" />
+        <label>DTE</label><input type="number" id="pDte" value="90" step="1" />
+        <label>Mult</label
+        ><input type="number" id="pMult" value="100" step="1" />
+        <label>Seed</label
+        ><input type="number" id="pSeed" value="42" step="1" />
+        <button id="btnResim">Resim</button>
+        <button id="btnReset">Reset</button>
+        <label>IV</label>
+        <button id="ivM">−1%</button>
+        <span
+          id="ivVal"
+          style="font-family: var(--mono); min-width: 36px; text-align: center"
+          >25%</span
+        >
+        <button id="ivP">+1%</button>
+        <label style="margin-left: 6px"
+          ><input type="checkbox" id="chkProgressive" checked /> Progressive
+          charts</label
+        >
+      </div>
+
+      <div class="main">
+        <div
+          style="
+            display: grid;
+            grid-template-rows: minmax(48px, 108px) 1fr auto auto auto;
+            gap: 3px;
+            min-height: 0;
+          "
+        >
+          <div class="panel">
+            <div class="panel-h">
+              Strategy Legs <button class="btn-sm" id="btnAddLeg">+ Leg</button>
+            </div>
+            <div class="panel-b legs-wrap">
+              <table class="legs">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Side</th>
+                    <th>Type</th>
+                    <th>Qty</th>
+                    <th>K</th>
+                    <th>Exp</th>
+                    <th>Prem</th>
+                    <th>Val</th>
+                    <th>Δ</th>
+                  </tr>
+                </thead>
+                <tbody id="legBody"></tbody>
+              </table>
+              <div
+                id="legEditor"
+                style="padding: 4px; border-top: 1px solid var(--border)"
+              >
+                <select id="eSide" class="tiny">
+                  <option>BUY</option>
+                  <option>SELL</option>
+                </select>
+                <select id="eType" class="tiny">
+                  <option>CALL</option>
+                  <option>PUT</option>
+                  <option>STOCK</option>
+                </select>
+                <input id="eQty" class="tiny" type="number" value="1" />
+                <input id="eStrike" class="tiny" type="number" value="100" />
+                <input
+                  id="eDte"
+                  class="tiny"
+                  type="number"
+                  value="90"
+                  title="DTE"
+                />
+                <button class="btn-sm" id="btnConfirmLeg">Add</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-h">
+              Simulation Data Log
+              <span>
+                <span
+                  id="logCount"
+                  style="color: var(--muted); font-weight: 400; margin-right: 6px"
+                  >0 rows</span
+                >
+                <button class="btn-csv" id="btnExportCSV" title="Download logged rows as CSV">⬇ CSV</button>
+              </span>
+            </div>
+            <div class="panel-b datalog-wrap" id="dataLogWrap">
+              <table class="datalog">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Spot</th>
+                    <th>Value</th>
+                    <th>PnL</th>
+                    <th>Δ</th>
+                    <th>Γ</th>
+                    <th>Θ</th>
+                    <th>ν</th>
+                    <th>Volga</th>
+                    <th>ρ</th>
+                  </tr>
+                </thead>
+                <tbody id="dataLogBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel" style="height: 140px">
+            <div class="panel-h">
+              Black-Scholes Explorer
+              <button class="btn-sm" id="bsmSync">Sync live</button>
+            </div>
+            <div class="panel-b" style="overflow-y: auto">
+              <div class="bsm-fields">
+                <label class="field-mini"
+                  >S<input id="bS" class="tiny" type="number" value="100" step="0.5"
+                /></label>
+                <label class="field-mini"
+                  >K<input id="bK" class="tiny" type="number" value="100" step="0.5"
+                /></label>
+                <label class="field-mini"
+                  >T (d)<input id="bT" class="tiny" type="number" value="30" step="1"
+                /></label>
+                <label class="field-mini"
+                  >σ%<input id="bSig" class="tiny" type="number" value="25" step="1"
+                /></label>
+                <label class="field-mini"
+                  >r%<input id="bR" class="tiny" type="number" value="4.5" step="0.1"
+                /></label>
+                <label class="field-mini"
+                  >Type
+                  <select id="bType" class="tiny">
+                    <option>CALL</option>
+                    <option>PUT</option>
+                  </select>
+                </label>
+              </div>
+              <div class="snap" id="bsmOut" style="padding: 1px 5px"></div>
+            </div>
+          </div>
+
+          <div class="panel" style="height: 110px">
+            <div class="panel-h">Price Decay to Expiry (BSM)</div>
+            <div class="panel-b chart-box">
+              <canvas id="bsmMiniChart"></canvas>
+            </div>
+          </div>
+
+          <div class="panel" style="max-height: 70px">
+            <div class="panel-h">Description</div>
+            <div class="desc" id="stratDesc">—</div>
+          </div>
+        </div>
+
+        <div class="charts-mid">
+          <div class="panel">
+            <div class="panel-h">Strategy Value / P&L (evolves with time)</div>
+            <div class="panel-b chart-box"><canvas id="cValue"></canvas></div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">Underlying Path + Strikes</div>
+            <div class="panel-b chart-box"><canvas id="cSpot"></canvas></div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">
+              Volatility Surface (3D · Strike × Tenor × IV)
+              <span style="font-size: 9px; color: var(--purple)"
+                >drag to rotate</span
+              >
+            </div>
+            <div class="panel-b chart-box">
+              <canvas id="volSurface"></canvas>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">
+              Expiration Payoff
+              <span>
+                <button class="btn-sm active" data-payoff="exp">Exp</button>
+                <button class="btn-sm" data-payoff="30">30d</button>
+                <button class="btn-sm" data-payoff="60">60d</button>
+              </span>
+            </div>
+            <div class="panel-b chart-box"><canvas id="cPayoff"></canvas></div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">Greeks Over Time (all, always on)</div>
+            <div class="panel-b">
+              <div class="greeks-grid">
+                <div class="chart-box mini">
+                  <div class="mini-lbl"><b>Δ</b> Delta</div>
+                  <canvas id="cGkDelta"></canvas>
+                </div>
+                <div class="chart-box mini">
+                  <div class="mini-lbl"><b>Γ</b> Gamma</div>
+                  <canvas id="cGkGamma"></canvas>
+                </div>
+                <div class="chart-box mini">
+                  <div class="mini-lbl"><b>Θ</b> Theta</div>
+                  <canvas id="cGkTheta"></canvas>
+                </div>
+                <div class="chart-box mini">
+                  <div class="mini-lbl"><b>ν</b> Vega</div>
+                  <canvas id="cGkVega"></canvas>
+                </div>
+                <div class="chart-box mini">
+                  <div class="mini-lbl"><b>Volga</b></div>
+                  <canvas id="cGkVolga"></canvas>
+                </div>
+                <div class="chart-box mini">
+                  <div class="mini-lbl"><b>ρ</b> Rho</div>
+                  <canvas id="cGkRho"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">Value vs Spot (multi-DTE)</div>
+            <div class="panel-b chart-box"><canvas id="cSens"></canvas></div>
+          </div>
+        </div>
+
+        <div
+          style="
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 3px;
+            min-height: 0;
+          "
+        >
+          <div class="panel">
+            <div class="panel-h">Current Snapshot</div>
+            <div class="panel-b"><div class="snap" id="snapshot"></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">Leg P&L Attribution</div>
+            <div class="panel-b chart-box"><canvas id="cAttr"></canvas></div>
+          </div>
+          <div class="panel" style="max-height: 95px">
+            <div class="panel-h">Aggregate Greeks</div>
+            <div class="greeks-bar" id="greeksBar"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="pb-controls">
+          <button id="pbBack" title="Step back">◀</button>
+          <button id="pbPlay" title="Play / Pause">▶</button>
+          <button id="pbFwd" title="Step forward">▶|</button>
+          <input type="range" id="pbSlider" min="0" max="100" value="0" />
+          <select id="pbSpeed">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="5">5×</option>
+            <option value="10">10×</option>
+          </select>
+          <span id="pbLabel" style="font-family: var(--mono); min-width: 90px"
+            >t=0 / 90d</span
+          >
+        </div>
+        <div class="caveat">
+          THEORETICAL BSM · SIMULATED PATH — NOT A FORECAST · Vol surface =
+          parametric smile (sticky-delta style) that rolls with calendar time ·
+          European · No tx costs
+        </div>
+      </div>
+    </div>
+
+    <div id="guidePage">
+      <div class="guide-wrap">
+        <div class="guide-top">
+          <h1>How to Use OPTSTRAT · TERMINAL</h1>
+          <button id="btnBackToDash">← Back to Dashboard</button>
+        </div>
+        <div class="guide-sub">
+          This tool simulates how an options strategy's price, P&amp;L and Greeks evolve over a
+          random stock path through expiry, so you can build intuition for how time, volatility
+          and the underlying's movement interact — without risking real money. Everything below
+          is a <b>theoretical Black-Scholes simulation</b>, not a forecast.
+        </div>
+
+        <div class="guide-section">
+          <h2>1 · The Setup Bar (configure before you run)</h2>
+          <div class="body">
+            <p>These controls sit at the top of the dashboard. Set them, then click
+              <code class="k">Resim</code> to generate a fresh simulated price path with those settings.</p>
+            <div class="glist">
+              <b>Strategy</b><span>Pick a pre-built options strategy (grouped by Bullish / Bearish / Neutral-Income / Volatility / Time-Custom). Loading a strategy auto-builds its legs around the current spot price.</span>
+              <b>S₀ (Spot)</b><span>The starting stock price on day 0. Strikes for the loaded strategy are built relative to this.</span>
+              <b>μ% (Drift)</b><span>The stock's expected annual return used in the random walk. Higher = the simulated path tends to trend upward faster on average (it's still random each run).</span>
+              <b>σ% (Vol)</b><span>Annualized volatility of the underlying <i>and</i> the base implied volatility used to price the options. This is the single biggest lever for "how wild" a simulated path looks.</span>
+              <b>r% / q%</b><span>Risk-free rate and dividend yield used in the Black-Scholes pricing formula.</span>
+              <b>DTE</b><span>Days to expiry — the length of the simulated horizon and the option legs' default expiration.</span>
+              <b>Mult</b><span>Contract multiplier (e.g. 100 shares/contract) applied to P&amp;L.</span>
+              <b>Seed</b><span>Random seed for the simulated path. Same seed + same params = same path every time, useful for repeatable comparisons.</span>
+              <b>Resim</b><span>Re-runs the simulation from day 0 using the current field values. <u>Always click this after changing S₀, μ, σ, r, q, DTE, Mult or Seed</u> — the chart axes are locked to the new horizon at this moment.</span>
+              <b>Reset</b><span>Reloads the currently selected strategy's default legs without regenerating a new price path.</span>
+              <b>IV −1% / +1%</b><span>Nudges the base implied volatility up or down and instantly re-marks option values — a quick way to see vega risk without a full resim.</span>
+              <b>Progressive charts</b><span>When checked, the time-series charts only draw up to the current playback step (a "reveal" effect). Unchecked shows the whole simulated path immediately.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h2>2 · Playback Controls (bottom bar)</h2>
+          <div class="body">
+            <div class="glist">
+              <b>◀ / ▶|</b><span>Step one day backward / forward.</span>
+              <b>▶ / ❚❚</b><span>Play or pause automatic playback through the simulated path.</span>
+              <b>Slider</b><span>Drag to scrub directly to any day in the simulation.</span>
+              <b>Speed</b><span>How fast automatic playback advances (0.5× to 10×).</span>
+            </div>
+            <p style="margin-top:8px">Note: chart axes are fixed to the full horizon the moment you click <code class="k">Resim</code> — during playback only the lines/markers move left-to-right, the frame itself won't jump around.</p>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h2>3 · Reading Each Panel</h2>
+          <div class="body">
+            <div class="gcols2">
+              <div>
+                <p><b style="color:var(--cyan)">Strategy Legs</b> — every option/stock leg in the current strategy: side, type, quantity, strike, expiry, entry premium, live value and delta contribution. Click <code class="k">+ Leg</code> to add a custom leg.</p>
+                <p><b style="color:var(--cyan)">Simulation Data Log</b> — a table that grows one row per simulated day as you play or step forward (and shrinks if you step back), logging spot, value, P&amp;L and every Greek. Click <code class="k">⬇ CSV</code> to download everything logged so far.</p>
+                <p><b style="color:var(--cyan)">Black-Scholes Explorer</b> — a standalone pricer: type in any Spot/Strike/Days/Vol/Rate/Type and see the theoretical price and Greeks instantly. Click <code class="k">Sync live</code> to pull in the dashboard's current market state.</p>
+                <p><b style="color:var(--cyan)">Price Decay to Expiry</b> — shows how the BSM Explorer's option value erodes purely from time passing, with everything else held constant — a clean way to see theta decay in isolation.</p>
+              </div>
+              <div>
+                <p><b style="color:var(--cyan)">Strategy Value / P&amp;L</b> — the strategy's live value, P&amp;L, and intrinsic/extrinsic split over time.</p>
+                <p><b style="color:var(--cyan)">Underlying Path + Strikes</b> — the simulated stock price against each leg's strike, so you can see when spot crosses a strike.</p>
+                <p><b style="color:var(--cyan)">Volatility Surface (3D)</b> — implied vol across strike × tenor as a rotatable 3D surface (drag to spin it). Higher IV renders higher on the surface. The dashed orange line marks the at-the-money column.</p>
+                <p><b style="color:var(--cyan)">Expiration Payoff</b> — the strategy's P&amp;L across a range of spot prices, at expiry or at 30/60 days left (toggle buttons in the panel header).</p>
+                <p><b style="color:var(--cyan)">Greeks Over Time</b> — six small charts (Δ Γ Θ ν Volga ρ), all always visible, each showing that Greek's value evolving with the simulation.</p>
+                <p><b style="color:var(--cyan)">Value vs Spot (multi-DTE)</b> — several P&amp;L-vs-spot curves at different days-remaining, to see how the payoff shape changes as expiry approaches.</p>
+                <p><b style="color:var(--cyan)">Current Snapshot / Leg P&amp;L Attribution / Aggregate Greeks</b> (right column) — a live readout of key numbers, which leg is contributing how much P&amp;L, and the strategy's combined Greeks.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h2>4 · Greeks Cheat-Sheet</h2>
+          <div class="body">
+            <div class="glist">
+              <b>Δ Delta</b><span>How much the position's value changes per $1 move in the stock. Near 0 = market-neutral; near ±1 = behaves like stock.</span>
+              <b>Γ Gamma</b><span>How fast delta itself changes as the stock moves. High gamma = delta can flip quickly (common near expiry, near the strike).</span>
+              <b>Θ Theta</b><span>Value change per day from time passing alone. Negative = the position loses value to time decay (typical for option buyers); positive = it benefits (typical for option sellers).</span>
+              <b>ν Vega</b><span>Sensitivity to a 1-point change in implied volatility. Long options = positive vega (benefits from rising IV); short options = negative vega.</span>
+              <b>Volga</b><span>The rate of change of vega itself — "vega of vega." Matters most for strategies with convex volatility exposure (e.g. long straddles/strangles).</span>
+              <b>ρ Rho</b><span>Sensitivity to interest rates. Usually the smallest driver of short-dated option value.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h2>5 · Example Walkthroughs</h2>
+          <div class="body">
+            <div class="guide-example">
+              <h3 class="tag-volatile">⚡ Simulating a volatile / high-risk strategy — Long Straddle</h3>
+              <ol>
+                <li>Set <b>Strategy</b> to <code class="k">Long Straddle</code> (under Volatility).</li>
+                <li>Raise <b>σ%</b> to around <code class="k">45–60</code> to simulate a genuinely turbulent underlying.</li>
+                <li>Set <b>DTE</b> to something short, e.g. <code class="k">30–45</code>, so the effect of time decay is visible within the run.</li>
+                <li>Click <code class="k">Resim</code>, then <code class="k">▶ Play</code> (try 2×–5× speed).</li>
+              </ol>
+              <div class="watch">Watch for: Delta starting near 0 and swinging strongly toward ±1 as the path moves away from the strike; Gamma and Vega both large near the strike; Theta staying negative the whole time (long options bleed value daily); the Expiration Payoff chart's classic "V" shape meaning you profit from a big move in <i>either</i> direction, but lose steadily if the stock sits still.</div>
+            </div>
+
+            <div class="guide-example">
+              <h3 class="tag-safe">🛡 Simulating a lower-risk / income strategy — Iron Condor</h3>
+              <ol>
+                <li>Set <b>Strategy</b> to <code class="k">Iron Condor</code> (under Neutral / Income).</li>
+                <li>Lower <b>σ%</b> to around <code class="k">15–20</code> to simulate a calmer, range-bound underlying.</li>
+                <li>Keep <b>DTE</b> moderate, e.g. <code class="k">45–60</code>, so theta has time to work in your favor.</li>
+                <li>Click <code class="k">Resim</code>, then <code class="k">▶ Play</code>.</li>
+              </ol>
+              <div class="watch">Watch for: Theta staying positive (you collect value from time decay as long as spot stays between the short strikes); the Expiration Payoff chart showing a flat-topped plateau with strictly defined max profit and max loss — no unlimited downside; Value vs Spot curves flattening out as DTE shrinks toward expiry.</div>
+            </div>
+
+            <div class="guide-example">
+              <h3 class="tag-directional">📈 Testing a directional view with defined risk — Bull Call Spread</h3>
+              <ol>
+                <li>Set <b>Strategy</b> to <code class="k">Bull Call Spread</code> (under Bullish).</li>
+                <li>Set <b>μ%</b> (drift) to a positive value like <code class="k">10–15</code> to bias the simulated path upward, and <b>σ%</b> to a moderate <code class="k">20–25</code>.</li>
+                <li>Click <code class="k">Resim</code>, then step through with <code class="k">▶|</code> or play it back.</li>
+              </ol>
+              <div class="watch">Watch for: Delta starting positive and shrinking as spot rises past the short (upper) strike, since the spread's profit is capped; the Underlying Path chart crossing each strike line; P&amp;L capping out once spot clears the upper strike, illustrating the defined-risk, defined-reward nature of vertical spreads.</div>
+            </div>
+
+            <p style="margin-top:4px">Tip: change one or two parameters at a time (e.g. just σ%, or just the strategy) and re-run, so you can attribute what changed in the charts to the specific input you adjusted.</p>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h2>6 · Important Caveats</h2>
+          <div class="body">
+            <p>This is a theoretical Black-Scholes model over one simulated (not historical or live) price path. Real markets have volatility that changes over time, jumps, transaction costs, bid/ask spreads, early-exercise risk on American options, and implied vol surfaces that move independently of this tool's simplified smile model. Use this to build intuition about how strategies <i>behave</i>, not to predict real returns.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <script>
+      /* ===================== MATH / BSM ===================== */
+      const SQRT2PI = Math.sqrt(2*Math.PI);
+      function ncdf(x){
+        const a1=.254829592,a2=-.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=.3275911;
+        const sign=x<0?-1:1; x=Math.abs(x)/Math.SQRT2;
+        const t=1/(1+p*x);
+        const y=1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+        return .5*(1+sign*y);
+      }
+      function npdf(x){return Math.exp(-.5*x*x)/SQRT2PI}
+      function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+      function bsm(S,K,T,r,q,sigma,type){
+        if(T<=1e-8||sigma<=1e-8){
+          const intrinsic=type==='CALL'?Math.max(S-K,0):Math.max(K-S,0);
+          return{value:intrinsic,intrinsic,extrinsic:0,delta:type==='CALL'?(S>K?1:0):(S<K?-1:0),gamma:0,theta:0,vega:0,volga:0,rho:0};
+        }
+        const sqrtT=Math.sqrt(T);
+        const d1=(Math.log(S/K)+(r-q+.5*sigma*sigma)*T)/(sigma*sqrtT);
+        const d2=d1-sigma*sqrtT;
+        const discS=Math.exp(-q*T),discK=Math.exp(-r*T);
+        let value,delta,theta,rho;
+        if(type==='CALL'){
+          value=S*discS*ncdf(d1)-K*discK*ncdf(d2);
+          delta=discS*ncdf(d1);
+          theta=(-S*discS*npdf(d1)*sigma/(2*sqrtT)-r*K*discK*ncdf(d2)+q*S*discS*ncdf(d1))/365;
+          rho=K*T*discK*ncdf(d2)/100;
+        }else{
+          value=K*discK*ncdf(-d2)-S*discS*ncdf(-d1);
+          delta=discS*(ncdf(d1)-1);
+          theta=(-S*discS*npdf(d1)*sigma/(2*sqrtT)+r*K*discK*ncdf(-d2)-q*S*discS*ncdf(-d1))/365;
+          rho=-K*T*discK*ncdf(-d2)/100;
+        }
+        const gamma=discS*npdf(d1)/(S*sigma*sqrtT);
+        const vega=S*discS*npdf(d1)*sqrtT/100;
+        const volga=vega*d1*d2/sigma;
+        const intrinsic=type==='CALL'?Math.max(S-K,0):Math.max(K-S,0);
+        const extrinsic=Math.max(value-intrinsic,0);
+        return{value,intrinsic,extrinsic,delta,gamma,theta,vega,volga,rho};
+      }
+
+      /* Parametric IV smile: ATM vol + skew + smile, term structure, rolls with calendar day */
+      function ivSurface(K, Tyears, S, baseIV, day, maxDTE){
+        if(Tyears<=1e-6) return baseIV;
+        const m = Math.log(K/S); // log-moneyness
+        const skew = -0.08;      // put skew
+        const smile = 0.12;
+        // term structure: short-dated higher vol slightly
+        const term = 1 + 0.15*Math.exp(-Tyears*4);
+        // mild evolution: as we approach global expiry, realized path stress lifts short-end a bit
+        const progress = day/Math.max(maxDTE,1);
+        const timeLift = 1 + 0.06*progress*(1/(1+5*Tyears));
+        let iv = baseIV * term * timeLift * (1 + skew*m + smile*m*m);
+        return clamp(iv, 0.05, 1.5);
+      }
+
+      /* ===================== STRATEGIES ===================== */
+      const DESCS={
+        'Long Call':{view:'Bullish',struct:'Long Call',risk:'Premium',reward:'Unlimited',vol:'+',theta:'−'},
+        'Short Put':{view:'Mild bullish',struct:'Short Put',risk:'Large down',reward:'Premium',vol:'−',theta:'+'},
+        'Bull Call Spread':{view:'Mod bullish',struct:'Long low Call / Short high Call',risk:'Limited',reward:'Limited',vol:'mild+',theta:'mild−'},
+        'Bull Put Spread':{view:'Mod bullish',struct:'Short high Put / Long low Put',risk:'Limited',reward:'Limited',vol:'mild−',theta:'mild+'},
+        'Call Ratio Backspread':{view:'Strong bull / vol',struct:'Short 1 low / Long 2 high Calls',risk:'Limited',reward:'Unlimited',vol:'+',theta:'mixed'},
+        'Long Put':{view:'Bearish',struct:'Long Put',risk:'Premium',reward:'Large down',vol:'+',theta:'−'},
+        'Short Call':{view:'Mild bearish',struct:'Short Call',risk:'Unlimited up',reward:'Premium',vol:'−',theta:'+'},
+        'Bear Put Spread':{view:'Mod bearish',struct:'Long high Put / Short low Put',risk:'Limited',reward:'Limited',vol:'mild+',theta:'mild−'},
+        'Bear Call Spread':{view:'Mod bearish',struct:'Short low Call / Long high Call',risk:'Limited',reward:'Limited',vol:'mild−',theta:'mild+'},
+        'Put Ratio Backspread':{view:'Strong bear / vol',struct:'Short 1 high / Long 2 low Puts',risk:'Limited',reward:'Large down',vol:'+',theta:'mixed'},
+        'Covered Call':{view:'Neutral mild bull',struct:'Long Stock + Short Call',risk:'Stock down',reward:'Limited',vol:'−',theta:'+'},
+        'Cash-Secured Put':{view:'Neutral mild bull',struct:'Short Put',risk:'Downside',reward:'Premium',vol:'−',theta:'+'},
+        'Short Straddle':{view:'Neutral low-vol',struct:'Short ATM Call+Put',risk:'Unlimited',reward:'Premium',vol:'−',theta:'+'},
+        'Short Strangle':{view:'Neutral low-vol',struct:'Short OTM Call+Put',risk:'Unlimited',reward:'Premium',vol:'−',theta:'+'},
+        'Iron Condor':{view:'Range',struct:'Short put spread + short call spread',risk:'Limited',reward:'Limited',vol:'−',theta:'+'},
+        'Iron Butterfly':{view:'Pin',struct:'Short ATM straddle + wings',risk:'Limited',reward:'Limited',vol:'−',theta:'+'},
+        'Long Straddle':{view:'High vol',struct:'Long ATM Call+Put',risk:'Premium',reward:'Unlimited',vol:'+',theta:'−'},
+        'Long Strangle':{view:'High vol',struct:'Long OTM Call+Put',risk:'Premium',reward:'Unlimited',vol:'+',theta:'−'},
+        'Reverse Iron Condor':{view:'Breakout',struct:'Long inner / Short outer',risk:'Limited',reward:'Limited',vol:'+',theta:'−'},
+        'Calendar Spread':{view:'Time/vol',struct:'Short near / Long far same K',risk:'Limited',reward:'Limited',vol:'complex',theta:'complex'},
+        'Diagonal Spread':{view:'Dir+time',struct:'Short near / Long far diff K',risk:'Limited',reward:'Limited',vol:'complex',theta:'complex'},
+        'Collar':{view:'Protected',struct:'Stock + Put + Short Call',risk:'Limited',reward:'Limited',vol:'~0',theta:'~0'},
+        'Married Put':{view:'Bull protected',struct:'Stock + Long Put',risk:'Premium',reward:'Unlimited up',vol:'+',theta:'−'},
+        'Custom Strategy':{view:'Custom',struct:'User legs',risk:'Depends',reward:'Depends',vol:'?',theta:'?'}
+      };
+      function roundStrike(S,pct){return Math.round(S*(1+pct)/.5)*.5}
+      function buildLegs(name,S,dte,iv){
+        const expNear=dte, expFar=Math.max(dte+30,60), atm=Math.round(S), legs=[];
+        const L=(side,type,qty,strike,exp)=>{
+          legs.push({side,instrument:type==='STOCK'?'STOCK':'OPTION',type,quantity:qty,
+            strike:type==='STOCK'?null:strike,expirationDays:type==='STOCK'?null:exp,premium:null,volatility:iv});
+        };
+        switch(name){
+          case 'Long Call':L('BUY','CALL',1,atm,expNear);break;
+          case 'Short Put':L('SELL','PUT',1,atm,expNear);break;
+          case 'Bull Call Spread':L('BUY','CALL',1,atm,expNear);L('SELL','CALL',1,roundStrike(S,.10),expNear);break;
+          case 'Bull Put Spread':L('SELL','PUT',1,atm,expNear);L('BUY','PUT',1,roundStrike(S,-.10),expNear);break;
+          case 'Call Ratio Backspread':L('SELL','CALL',1,atm,expNear);L('BUY','CALL',2,roundStrike(S,.10),expNear);break;
+          case 'Long Put':L('BUY','PUT',1,atm,expNear);break;
+          case 'Short Call':L('SELL','CALL',1,atm,expNear);break;
+          case 'Bear Put Spread':L('BUY','PUT',1,atm,expNear);L('SELL','PUT',1,roundStrike(S,-.10),expNear);break;
+          case 'Bear Call Spread':L('SELL','CALL',1,atm,expNear);L('BUY','CALL',1,roundStrike(S,.10),expNear);break;
+          case 'Put Ratio Backspread':L('SELL','PUT',1,atm,expNear);L('BUY','PUT',2,roundStrike(S,-.10),expNear);break;
+          case 'Covered Call':L('BUY','STOCK',1,null,null);L('SELL','CALL',1,roundStrike(S,.05),expNear);break;
+          case 'Cash-Secured Put':L('SELL','PUT',1,atm,expNear);break;
+          case 'Short Straddle':L('SELL','CALL',1,atm,expNear);L('SELL','PUT',1,atm,expNear);break;
+          case 'Short Strangle':L('SELL','CALL',1,roundStrike(S,.08),expNear);L('SELL','PUT',1,roundStrike(S,-.08),expNear);break;
+          case 'Iron Condor':
+            L('BUY','PUT',1,roundStrike(S,-.12),expNear);L('SELL','PUT',1,roundStrike(S,-.05),expNear);
+            L('SELL','CALL',1,roundStrike(S,.05),expNear);L('BUY','CALL',1,roundStrike(S,.12),expNear);break;
+          case 'Iron Butterfly':
+            L('BUY','PUT',1,roundStrike(S,-.10),expNear);L('SELL','PUT',1,atm,expNear);
+            L('SELL','CALL',1,atm,expNear);L('BUY','CALL',1,roundStrike(S,.10),expNear);break;
+          case 'Long Straddle':L('BUY','CALL',1,atm,expNear);L('BUY','PUT',1,atm,expNear);break;
+          case 'Long Strangle':L('BUY','CALL',1,roundStrike(S,.08),expNear);L('BUY','PUT',1,roundStrike(S,-.08),expNear);break;
+          case 'Reverse Iron Condor':
+            L('SELL','PUT',1,roundStrike(S,-.12),expNear);L('BUY','PUT',1,roundStrike(S,-.05),expNear);
+            L('BUY','CALL',1,roundStrike(S,.05),expNear);L('SELL','CALL',1,roundStrike(S,.12),expNear);break;
+          case 'Calendar Spread':L('SELL','CALL',1,atm,Math.min(30,expNear));L('BUY','CALL',1,atm,expFar);break;
+          case 'Diagonal Spread':L('SELL','CALL',1,roundStrike(S,.05),Math.min(30,expNear));L('BUY','CALL',1,atm,expFar);break;
+          case 'Collar':L('BUY','STOCK',1,null,null);L('BUY','PUT',1,roundStrike(S,-.05),expNear);L('SELL','CALL',1,roundStrike(S,.05),expNear);break;
+          case 'Married Put':L('BUY','STOCK',1,null,null);L('BUY','PUT',1,atm,expNear);break;
+          default:L('BUY','CALL',1,atm,expNear);
+        }
+        return legs;
+      }
+      const STRAT_GROUPS={
+        'BULLISH':['Long Call','Short Put','Bull Call Spread','Bull Put Spread','Call Ratio Backspread'],
+        'BEARISH':['Long Put','Short Call','Bear Put Spread','Bear Call Spread','Put Ratio Backspread'],
+        'NEUTRAL / INCOME':['Covered Call','Cash-Secured Put','Short Straddle','Short Strangle','Iron Condor','Iron Butterfly'],
+        'VOLATILITY':['Long Straddle','Long Strangle','Reverse Iron Condor'],
+        'TIME / CUSTOM':['Calendar Spread','Diagonal Spread','Collar','Married Put','Custom Strategy']
+      };
+
+      /* ===================== STATE ===================== */
+      const state={
+        name:'Bull Call Spread', legs:[],
+        S0:100, mu:.08, sigma:.25, r:.045, q:0, mult:100, baseIV:.25, seed:42,
+        path:[], steps:90, maxDTE:90, tIdx:0, playing:false, speed:1,
+        entryCost:0, history:[], payoffMode:'exp', greekMode:'delta',
+        progressive:true, charts:{}
+      };
+
+      function signQty(leg){return (leg.side==='BUY'||leg.side==='LONG'?1:-1)*leg.quantity}
+
+      function priceLeg(leg,S,day,r,q){
+        if(leg.instrument==='STOCK'||leg.type==='STOCK'){
+          return{value:S,intrinsic:S,extrinsic:0,delta:1,gamma:0,theta:0,vega:0,volga:0,rho:0,signedQty:signQty(leg),isStock:true};
+        }
+        const Tdays=Math.max(0,(leg.expirationDays||0)-day);
+        const T=Tdays/365;
+        // use surface IV for this strike/tenor at this calendar day (or leg.volatility)
+        const sigma = ivSurface(leg.strike, T, S, leg.volatility||state.baseIV, day, state.maxDTE);
+        const res=bsm(S,leg.strike,T,r,q,sigma,leg.type);
+        return{...res,premium:leg.premium,signedQty:signQty(leg),Tdays,isStock:false,sigma};
+      }
+
+      function aggregateAt(S,day){
+        const r=state.r,q=state.q;
+        let value=0,intrinsic=0,extrinsic=0,delta=0,gamma=0,theta=0,vega=0,volga=0,rho=0;
+        const legResults=[];
+        for(const leg of state.legs){
+          const p=priceLeg(leg,S,day,r,q);
+          const sq=p.signedQty;
+          if(p.isStock){
+            value+=sq*S; delta+=sq;
+            legResults.push({leg,p,contribValue:sq*S,contribPnl:sq*(S-state.S0)});
+          }else{
+            value+=sq*p.value; intrinsic+=sq*p.intrinsic; extrinsic+=sq*p.extrinsic;
+            delta+=sq*p.delta; gamma+=sq*p.gamma; theta+=sq*p.theta;
+            vega+=sq*p.vega; volga+=sq*p.volga; rho+=sq*p.rho;
+            legResults.push({leg,p,contribValue:sq*p.value,contribPnl:sq*(p.value-(leg.premium||p.value))});
+          }
+        }
+        return{value,intrinsic,extrinsic,pnl:value-state.entryCost,delta,gamma,theta,vega,volga,rho,legResults,S,day};
+      }
+
+      function computeEntryCost(){
+        let cost=0;
+        for(const leg of state.legs){
+          if(leg.instrument==='STOCK'||leg.type==='STOCK'){cost+=signQty(leg)*state.S0;continue}
+          if(leg.premium==null){
+            const T=(leg.expirationDays||0)/365;
+            const sig=ivSurface(leg.strike,T,state.S0,leg.volatility||state.baseIV,0,state.maxDTE);
+            leg.premium=+bsm(state.S0,leg.strike,T,state.r,state.q,sig,leg.type).value.toFixed(4);
+          }
+          cost+=signQty(leg)*leg.premium;
+        }
+        state.entryCost=cost;
+      }
+
+      function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+      function randn(rng){let u=0,v=0;while(!u)u=rng();while(!v)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+
+      function simulatePath(){
+        const steps=state.maxDTE; state.steps=steps;
+        const dt=1/365, rng=mulberry32(state.seed|0);
+        const path=[{t:0,day:0,S:state.S0}];
+        let S=state.S0; const mu=state.mu,sig=state.sigma;
+        for(let i=1;i<=steps;i++){
+          S=S*Math.exp((mu-.5*sig*sig)*dt+sig*Math.sqrt(dt)*randn(rng));
+          S=Math.max(S,.01);
+          path.push({t:i/365,day:i,S:+S.toFixed(4)});
+        }
+        state.path=path;
+        state.history=path.map(p=>aggregateAt(p.S,p.day));
+        state.tIdx=0;
+        fitAxes();
+        resetDataLog();
+      }
+
+      /* Lock y-ranges (with padding) to the FULL simulated horizon right after a
+         (re)simulation, so during playback only the line moves — the chart frame
+         (both axes) stays exactly as sized at resim time. */
+      function niceRange(arr){
+        let mn=Math.min(...arr), mx=Math.max(...arr);
+        if(!isFinite(mn)||!isFinite(mx)) return [0,1];
+        if(mn===mx){mn-=1;mx+=1}
+        const pad=(mx-mn)*0.12;
+        return [mn-pad, mx+pad];
+      }
+      function fitAxes(){
+        const hist=state.history; if(!hist||!hist.length||!state.charts.value) return;
+        const [vMin,vMax]=niceRange(hist.flatMap(h=>[h.value,h.pnl,h.intrinsic,h.extrinsic]));
+        state.charts.value.options.scales.y.min=vMin; state.charts.value.options.scales.y.max=vMax;
+
+        const strikeVals=state.legs.filter(l=>l.strike!=null).map(l=>l.strike);
+        const [sMin,sMax]=niceRange(hist.map(h=>h.S).concat(strikeVals));
+        state.charts.spot.options.scales.y.min=sMin; state.charts.spot.options.scales.y.max=sMax;
+
+        if(state.charts.gk){
+          ['delta','gamma','theta','vega','volga','rho'].forEach(gk=>{
+            const ch=state.charts.gk[gk]; if(!ch) return;
+            const [mn,mx]=niceRange(hist.map(h=>h[gk]));
+            ch.options.scales.y.min=mn; ch.options.scales.y.max=mx;
+          });
+        }
+      }
+
+      /* ===================== SIMULATION DATA LOG ===================== */
+      // Grows one row per simulated day as playback advances; shrinks back if the
+      // user steps backward; fully rebuilt on resim/load. Appends only the rows
+      // that are newly revealed (rather than re-rendering the whole table each
+      // tick) so this stays cheap even over long horizons.
+      state.logRenderedIdx = -1;
+      function resetDataLog(){
+        state.logRenderedIdx = -1;
+        const tbody = document.getElementById('dataLogBody');
+        if(tbody) tbody.innerHTML = '';
+        const cnt = document.getElementById('logCount');
+        if(cnt) cnt.textContent = '0 rows';
+      }
+      function logRowHTML(h){
+        const cls = v => v>0 ? 'pos' : v<0 ? 'neg' : '';
+        return `<td>${h.day}</td><td>${h.S.toFixed(2)}</td><td>${h.value.toFixed(2)}</td>`+
+          `<td class="${cls(h.pnl)}">${h.pnl.toFixed(2)}</td>`+
+          `<td>${h.delta.toFixed(3)}</td><td>${h.gamma.toFixed(4)}</td>`+
+          `<td>${h.theta.toFixed(3)}</td><td>${h.vega.toFixed(3)}</td>`+
+          `<td>${h.volga.toFixed(3)}</td><td>${h.rho.toFixed(3)}</td>`;
+      }
+      function updateDataLog(){
+        const hist=state.history; if(!hist.length) return;
+        const tbody=document.getElementById('dataLogBody'); if(!tbody) return;
+        const idx=state.tIdx;
+
+        // stepped backward (or resim already cleared it) — trim excess rows
+        while(tbody.rows.length > idx+1){
+          tbody.deleteRow(tbody.rows.length-1);
+        }
+        // append newly revealed rows
+        for(let i=Math.max(0,tbody.rows.length); i<=idx; i++){
+          const tr=document.createElement('tr');
+          tr.innerHTML=logRowHTML(hist[i]);
+          tbody.appendChild(tr);
+        }
+        state.logRenderedIdx=idx;
+
+        // highlight + autoscroll to the current row
+        for(let i=0;i<tbody.rows.length;i++){
+          tbody.rows[i].classList.toggle('cur-row', i===idx);
+        }
+        const curRow=tbody.rows[idx];
+        if(curRow) curRow.scrollIntoView({block:'nearest'});
+
+        const cnt=document.getElementById('logCount');
+        if(cnt) cnt.textContent=(idx+1)+' row'+(idx===0?'':'s');
+      }
+      document.getElementById('btnExportCSV').addEventListener('click',()=>{
+        const hist=state.history.slice(0, state.tIdx+1);
+        if(!hist.length) return;
+        const headers=['Day','Spot','Value','PnL','Delta','Gamma','Theta','Vega','Volga','Rho','Intrinsic','Extrinsic'];
+        const lines=[headers.join(',')];
+        hist.forEach(h=>{
+          lines.push([h.day,h.S,h.value,h.pnl,h.delta,h.gamma,h.theta,h.vega,h.volga,h.rho,h.intrinsic,h.extrinsic]
+            .map(v=>Number.isFinite(v)?+v.toFixed(6):v).join(','));
+        });
+        const csv=lines.join('\n');
+        const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+        a.href=url; a.download=`${(state.name||'strategy').replace(/\s+/g,'_')}_sim_${stamp}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      function payoffAtExpiry(S){
+        let pnl=0;
+        for(const leg of state.legs){
+          const sq=signQty(leg);
+          if(leg.instrument==='STOCK'||leg.type==='STOCK') pnl+=sq*(S-state.S0);
+          else{
+            const pay=leg.type==='CALL'?Math.max(S-leg.strike,0):Math.max(leg.strike-S,0);
+            pnl+=sq*(pay-(leg.premium||0));
+          }
+        }
+        return pnl;
+      }
+      function theoreticalValueAt(S,day){return aggregateAt(S,day).value-state.entryCost}
+
+      function scanRisk(){
+        const strikes=state.legs.filter(l=>l.strike!=null).map(l=>l.strike);
+        const lo=Math.min(state.S0*.5,...(strikes.length?strikes:[state.S0]),1);
+        const hi=Math.max(state.S0*1.5,...(strikes.length?strikes:[state.S0]));
+        const n=400; let maxP=-Infinity,minP=Infinity; const bes=[]; let prev=null;
+        for(let i=0;i<=n;i++){
+          const S=lo+(hi-lo)*i/n, p=payoffAtExpiry(S);
+          if(p>maxP)maxP=p; if(p<minP)minP=p;
+          if(prev&&((prev.p<0&&p>=0)||(prev.p>0&&p<=0)))
+            bes.push(+(prev.S+(S-prev.S)*(-prev.p)/(p-prev.p+1e-12)).toFixed(2));
+          prev={S,p};
+        }
+        const left=payoffAtExpiry(lo*.5), right=payoffAtExpiry(hi*1.5);
+        let maxProfit=maxP, maxLoss=minP;
+        if(right>maxP+5||left>maxP+5) maxProfit='UNLIMITED';
+        if(right<minP-5||left<minP-5) maxLoss='UNLIMITED';
+        return{maxProfit,maxLoss,breakevens:bes,netPremium:state.entryCost};
+      }
+
+      /* ===================== UI ===================== */
+      function fillStratSelect(){
+        const sel=document.getElementById('stratSelect'); sel.innerHTML='';
+        for(const[g,names] of Object.entries(STRAT_GROUPS)){
+          const og=document.createElement('optgroup'); og.label=g;
+          names.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;if(n===state.name)o.selected=true;og.appendChild(o)});
+          sel.appendChild(og);
+        }
+      }
+      function loadStrategy(name){
+        state.name=name;
+        state.baseIV=(+document.getElementById('pVol').value||25)/100;
+        state.S0=+document.getElementById('pSpot').value||100;
+        state.maxDTE=+document.getElementById('pDte').value||90;
+        state.legs=buildLegs(name,state.S0,state.maxDTE,state.baseIV);
+        computeEntryCost();
+        const d=DESCS[name]||DESCS['Custom Strategy'];
+        document.getElementById('stratDesc').innerHTML=`<b style="color:var(--text)">${name}</b>
+      View: ${d.view} · ${d.struct}
+      Risk: ${d.risk} · Reward: ${d.reward} · Vol: ${d.vol} · Θ: ${d.theta}`;
+        simulatePath();
+        updateAll();
+      }
+      function renderLegs(agg){
+        const tbody=document.getElementById('legBody'); tbody.innerHTML='';
+        (agg?agg.legResults:[]).forEach((row,i)=>{
+          const leg=row.leg,p=row.p;
+          const sideCls=(leg.side==='BUY'||leg.side==='LONG')?'buy':'sell';
+          const tr=document.createElement('tr');
+          tr.innerHTML=`<td>${i+1}</td><td class="${sideCls}">${leg.side}</td><td>${leg.type}</td><td>${leg.quantity}</td>
+            <td>${leg.strike!=null?leg.strike:'—'}</td><td>${leg.expirationDays!=null?leg.expirationDays+'D':'—'}</td>
+            <td>${leg.premium!=null?leg.premium.toFixed(2):'—'}</td>
+            <td>${p?(p.isStock?p.value:p.value).toFixed(2):'—'}</td>
+            <td>${p?(signQty(leg)*(p.isStock?1:p.delta)).toFixed(3):'—'}</td>`;
+          tbody.appendChild(tr);
+        });
+      }
+      function renderSnapshot(agg,risk){
+        const el=document.getElementById('snapshot');
+        const fmt=(v,d=2)=>typeof v==='number'?v.toFixed(d):v;
+        const cls=v=>v>0?'pos':v<0?'neg':'';
+        const be=risk.breakevens.length?risk.breakevens.join(', '):'—';
+        el.innerHTML=`
+          <div class="lbl">Strategy</div><div class="val cyan">${state.name}</div>
+          <div class="lbl">Underlying</div><div class="val">${fmt(agg.S)}</div>
+          <div class="lbl">Day / DTE</div><div class="val">${agg.day} / ${Math.max(0,state.maxDTE-agg.day)}</div>
+          <div class="lbl">Strat Value</div><div class="val">${fmt(agg.value)}</div>
+          <div class="lbl">Initial Cost</div><div class="val">${fmt(state.entryCost)}</div>
+          <div class="lbl">P&L</div><div class="val ${cls(agg.pnl)}">${agg.pnl>=0?'+':''}${fmt(agg.pnl)}</div>
+          <div class="lbl">Intrinsic</div><div class="val">${fmt(agg.intrinsic)}</div>
+          <div class="lbl">Extrinsic</div><div class="val yellow">${fmt(agg.extrinsic)}</div>
+          <div class="lbl">Max Profit</div><div class="val pos">${typeof risk.maxProfit==='number'?fmt(risk.maxProfit):risk.maxProfit}</div>
+          <div class="lbl">Max Loss</div><div class="val neg">${typeof risk.maxLoss==='number'?fmt(risk.maxLoss):risk.maxLoss}</div>
+          <div class="lbl full">Breakeven(s)</div><div class="val full">${be}</div>`;
+        const gb=document.getElementById('greeksBar');
+        const items=[['DELTA',agg.delta,3],['GAMMA',agg.gamma,4],['THETA',agg.theta,3],['VEGA',agg.vega,3],['VOLGA',agg.volga,3],['RHO',agg.rho,3]];
+        gb.innerHTML=items.map(([n,v,d])=>`<div class="g"><div class="n">${n}</div><div class="v ${cls(v)}">${v>=0?'+':''}${v.toFixed(d)}</div></div>`).join('');
+      }
+      function updateKPI(agg){
+        const cls=v=>v>0?'pos':v<0?'neg':'';
+        document.getElementById('kStrat').textContent=state.name.split(' ')[0];
+        document.getElementById('kSpot').textContent=agg.S.toFixed(2);
+        document.getElementById('kDte').textContent=Math.max(0,state.maxDTE-agg.day);
+        document.getElementById('kVal').textContent=agg.value.toFixed(2);
+        const pnlEl=document.getElementById('kPnl');
+        pnlEl.textContent=(agg.pnl>=0?'+':'')+agg.pnl.toFixed(2); pnlEl.className=cls(agg.pnl);
+        document.getElementById('kDelta').textContent=(agg.delta>=0?'+':'')+agg.delta.toFixed(3);
+        document.getElementById('kGamma').textContent=(agg.gamma>=0?'+':'')+agg.gamma.toFixed(4);
+        document.getElementById('kTheta').textContent=(agg.theta>=0?'+':'')+agg.theta.toFixed(3);
+        document.getElementById('kVega').textContent=(agg.vega>=0?'+':'')+agg.vega.toFixed(3);
+      }
+
+      /* ===================== CHARTS ===================== */
+      function chartDefaults(){
+        Chart.defaults.color='#8b95a8'; Chart.defaults.borderColor='#2a3140';
+        Chart.defaults.font.size=10; Chart.defaults.font.family="'SF Mono',Consolas,monospace";
+        Chart.defaults.plugins.legend.labels.boxWidth=8; Chart.defaults.plugins.legend.labels.padding=4;
+      }
+      function destroyChart(key){if(state.charts[key]){state.charts[key].destroy();state.charts[key]=null}}
+
+      function buildCharts(){
+        chartDefaults();
+        function makeOpts(){
+          return {
+            responsive:true,maintainAspectRatio:false,animation:false,
+            interaction:{mode:'index',intersect:false},
+            plugins:{legend:{display:true,position:'top'},tooltip:{enabled:true}},
+            scales:{x:{ticks:{maxTicksLimit:7},grid:{color:'#1a1f28'}},y:{grid:{color:'#1a1f28'}}}
+          };
+        }
+        destroyChart('value');
+        state.charts.value=new Chart(document.getElementById('cValue'),{type:'line',data:{labels:[],datasets:[
+          {label:'Value',data:[],borderColor:'#00bcd4',borderWidth:1.5,pointRadius:0,tension:.15},
+          {label:'P&L',data:[],borderColor:'#00c853',borderWidth:1.5,pointRadius:0,tension:.15},
+          {label:'Intrinsic',data:[],borderColor:'#448aff',borderWidth:1,pointRadius:0,borderDash:[3,2]},
+          {label:'Extrinsic',data:[],borderColor:'#ffc107',borderWidth:1,pointRadius:0,borderDash:[3,2]},
+          {label:'Now',data:[],borderColor:'#ff9800',backgroundColor:'#ff9800',pointRadius:4,pointHoverRadius:5,showLine:false}
+        ]},options:makeOpts()});
+
+        destroyChart('spot');
+        state.charts.spot=new Chart(document.getElementById('cSpot'),{type:'line',data:{labels:[],datasets:[
+          {label:'Spot',data:[],borderColor:'#e0e6ed',borderWidth:1.5,pointRadius:0,tension:.15},
+          {label:'Now',data:[],borderColor:'#ff9800',backgroundColor:'#ff9800',pointRadius:4,showLine:false}
+        ]},options:makeOpts()});
+
+        destroyChart('payoff');
+        state.charts.payoff=new Chart(document.getElementById('cPayoff'),{type:'line',data:{labels:[],datasets:[
+          {label:'P&L',data:[],borderColor:'#b388ff',borderWidth:1.5,pointRadius:0},
+          {label:'Spot now',data:[],borderColor:'#ff9800',backgroundColor:'#ff9800',pointRadius:5,showLine:false}
+        ]},options:makeOpts()});
+
+        function makeMiniOpts(){
+          return {
+            responsive:true,maintainAspectRatio:false,animation:false,
+            interaction:{mode:'index',intersect:false},
+            layout:{padding:{top:11,right:2,left:0,bottom:0}},
+            plugins:{legend:{display:false},tooltip:{enabled:true}},
+            scales:{
+              x:{ticks:{maxTicksLimit:4,font:{size:7}},grid:{color:'#1a1f28'}},
+              y:{ticks:{maxTicksLimit:4,font:{size:7}},grid:{color:'#1a1f28'}}
+            }
+          };
+        }
+        const gcolors={delta:'#00bcd4',gamma:'#448aff',theta:'#ffc107',vega:'#b388ff',volga:'#ff9800',rho:'#00c853'};
+        state.charts.gk={};
+        ['delta','gamma','theta','vega','volga','rho'].forEach(gk=>{
+          const key='gk_'+gk;
+          destroyChart(key);
+          const canvasId={delta:'cGkDelta',gamma:'cGkGamma',theta:'cGkTheta',vega:'cGkVega',volga:'cGkVolga',rho:'cGkRho'}[gk];
+          const ch=new Chart(document.getElementById(canvasId),{type:'line',data:{labels:[],datasets:[
+            {data:[],borderColor:gcolors[gk],borderWidth:1.3,pointRadius:0,tension:.15},
+            {data:[],borderColor:'#ff9800',backgroundColor:'#ff9800',pointRadius:2.5,showLine:false}
+          ]},options:makeMiniOpts()});
+          state.charts[key]=ch;
+          state.charts.gk[gk]=ch;
+        });
+
+        destroyChart('sens');
+        state.charts.sens=new Chart(document.getElementById('cSens'),{type:'line',data:{labels:[],datasets:[]},options:makeOpts()});
+
+        destroyChart('attr');
+        state.charts.attr=new Chart(document.getElementById('cAttr'),{type:'bar',data:{labels:[],datasets:[
+          {label:'Leg P&L',data:[],backgroundColor:[]}
+        ]},options:{...makeOpts(),plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:45,minRotation:0,font:{size:8}}}}}});
+      }
+
+      /* Fixed-length labels (full horizon) so the x-axis is set once at resim/load
+         and never grows during playback. Progressive mode masks future points
+         with null so only the drawn line advances left→right; the axis stays put. */
+      function maskProgressive(values, idx){
+        if(!state.progressive) return values;
+        return values.map((v,i)=> i<=idx ? v : null);
+      }
+
+      function updateCharts(){
+        const hist=state.history; if(!hist.length) return;
+        const idx=state.tIdx;
+        const labels=hist.map(h=>h.day); // fixed full-length axis
+        const cur=hist[idx];
+
+        // VALUE — fixed axis, progressive trail + current point
+        const cv=state.charts.value;
+        cv.data.labels=labels;
+        cv.data.datasets[0].data=maskProgressive(hist.map(h=>h.value),idx);
+        cv.data.datasets[1].data=maskProgressive(hist.map(h=>h.pnl),idx);
+        cv.data.datasets[2].data=maskProgressive(hist.map(h=>h.intrinsic),idx);
+        cv.data.datasets[3].data=maskProgressive(hist.map(h=>h.extrinsic),idx);
+        // "Now" marker exactly at current index
+        cv.data.datasets[4].data=labels.map((_,i)=> i===idx ? cur.value : null);
+        cv.update('none');
+
+        // SPOT — fixed axis
+        const cs=state.charts.spot;
+        const strikes=[...new Set(state.legs.filter(l=>l.strike!=null).map(l=>l.strike))];
+        const colors=['#ff5252','#00c853','#ffc107','#448aff','#b388ff','#ff9800'];
+        cs.data.labels=labels;
+        cs.data.datasets=[{label:'Spot',data:maskProgressive(hist.map(h=>h.S),idx),borderColor:'#e0e6ed',borderWidth:1.5,pointRadius:0,tension:.15}];
+        strikes.forEach((k,i)=>{
+          cs.data.datasets.push({label:'K'+k,data:labels.map(()=>k),borderColor:colors[i%colors.length],borderWidth:1,borderDash:[4,3],pointRadius:0});
+        });
+        cs.data.datasets.push({label:'Now',data:labels.map((_,i)=>i===idx?cur.S:null),borderColor:'#ff9800',backgroundColor:'#ff9800',pointRadius:4,showLine:false});
+        cs.update('none');
+
+        // PAYOFF (full curve) + marker at current spot
+        const riskStrikes=strikes.length?strikes:[state.S0];
+        const lo=Math.min(...riskStrikes,state.S0)*.7;
+        const hi=Math.max(...riskStrikes,state.S0)*1.3;
+        const xs=[],ys=[]; const n=100;
+        const dayForPay=state.payoffMode==='exp'?state.maxDTE:state.payoffMode==='30'?Math.max(0,state.maxDTE-30):Math.max(0,state.maxDTE-60);
+        for(let i=0;i<=n;i++){
+          const S=lo+(hi-lo)*i/n; xs.push(+S.toFixed(1));
+          ys.push(state.payoffMode==='exp'?payoffAtExpiry(S):theoreticalValueAt(S,dayForPay));
+        }
+        const cp=state.charts.payoff;
+        cp.data.labels=xs;
+        cp.data.datasets[0].data=ys;
+        cp.data.datasets[0].label=state.payoffMode==='exp'?'Expiry P&L':`Theo (${state.payoffMode}d left)`;
+        // find nearest x for current spot
+        const spotY=state.payoffMode==='exp'?payoffAtExpiry(cur.S):theoreticalValueAt(cur.S,cur.day);
+        cp.data.datasets[1].data=xs.map((x,i)=>{
+          // only mark closest
+          const mid=xs.reduce((best,v,j)=>Math.abs(v-cur.S)<Math.abs(xs[best]-cur.S)?j:best,0);
+          return i===mid?spotY:null;
+        });
+        cp.update('none');
+
+        // GREEKS — all six, always visible, fixed axis
+        ['delta','gamma','theta','vega','volga','rho'].forEach(gk=>{
+          const ch=state.charts.gk[gk]; if(!ch) return;
+          ch.data.labels=labels;
+          ch.data.datasets[0].data=maskProgressive(hist.map(h=>h[gk]),idx);
+          ch.data.datasets[1].data=labels.map((_,i)=>i===idx?cur[gk]:null);
+          ch.update('none');
+        });
+
+        // SENSITIVITY multi-DTE (recalc from *current* calendar day remaining)
+        const remain=Math.max(0,state.maxDTE-cur.day);
+        const dtes=[remain, Math.max(0,Math.floor(remain*2/3)), Math.max(0,Math.floor(remain/3)), Math.min(5,remain), 0].filter((v,i,a)=>a.indexOf(v)===i);
+        const sLabels=[]; for(let i=0;i<=60;i++) sLabels.push(+(lo+(hi-lo)*i/60).toFixed(1));
+        const csens=state.charts.sens;
+        csens.data.labels=sLabels;
+        const cols=['#00bcd4','#448aff','#b388ff','#ffc107','#ff5252'];
+        csens.data.datasets=dtes.map((dteLeft,idx)=>{
+          const day=Math.max(0,state.maxDTE-dteLeft);
+          return{label:dteLeft+'D left',data:sLabels.map(S=>aggregateAt(+S,day).value-state.entryCost),borderColor:cols[idx%cols.length],borderWidth:1.2,pointRadius:0};
+        });
+        csens.update('none');
+
+        // ATTRIBUTION bars
+        const ca=state.charts.attr;
+        ca.data.labels=cur.legResults.map((r,i)=>`${r.leg.side[0]}${r.leg.type[0]}${r.leg.strike!=null?r.leg.strike:''}`);
+        ca.data.datasets[0].data=cur.legResults.map(r=>r.contribPnl);
+        ca.data.datasets[0].backgroundColor=cur.legResults.map(r=>r.contribPnl>=0?'#00c85388':'#ff525288');
+        ca.update('none');
+
+        // VOL SURFACE heatmap
+        drawVolSurface(cur.S, cur.day);
+      }
+
+      /* ===================== VOL SURFACE — 3D CANVAS ===================== */
+      // Rotatable 3D surface: X=strike, Y=tenor, Z=IV (height). Manual rotate+
+      // orthographic project + painter's algorithm (no extra libs needed).
+      state.volView = { theta: -0.65, phi: 1.05 }; // yaw, pitch (radians)
+
+      function project3D(X, Y, Z, theta, phi){
+        // yaw around vertical (Z) axis
+        const X1 = X*Math.cos(theta) - Y*Math.sin(theta);
+        const Y1 = X*Math.sin(theta) + Y*Math.cos(theta);
+        // pitch (tilt) around X axis — Z (height/IV) must push the point UP on
+        // screen as it increases, so its contribution to Y2 is subtracted here
+        // (sy=-Y2 below, so a larger Z needs to make Y2 larger to make sy smaller/higher)
+        const Y2 = Y1*Math.cos(phi) + Z*Math.sin(phi);
+        const Z2 = Y1*Math.sin(phi) + Z*Math.cos(phi);
+        return { sx:X1, sy:-Y2, depth:Z2 };
+      }
+
+      function drawVolSurface(S, day){
+        const canvas=document.getElementById('volSurface');
+        const parent=canvas.parentElement;
+        const w=parent.clientWidth, h=parent.clientHeight;
+        if(w<10||h<10) return;
+        const dpr=window.devicePixelRatio||1;
+        canvas.width=w*dpr; canvas.height=h*dpr;
+        canvas.style.width=w+'px'; canvas.style.height=h+'px';
+        const ctx=canvas.getContext('2d');
+        ctx.setTransform(dpr,0,0,dpr,0,0);
+        ctx.fillStyle='#12161c'; ctx.fillRect(0,0,w,h);
+
+        // grid: strikes × remaining tenors
+        const nK=22, nT=14;
+        const kMin=S*0.75, kMax=S*1.25;
+        const maxRemain=Math.max(1, state.maxDTE-day);
+        const grid=[];
+        let ivMin=Infinity, ivMax=-Infinity;
+        for(let j=0;j<nT;j++){
+          const tDays=Math.max(1, maxRemain*(j+1)/nT);
+          const T=tDays/365;
+          const row=[];
+          for(let i=0;i<nK;i++){
+            const K=kMin+(kMax-kMin)*i/(nK-1);
+            const iv=ivSurface(K,T,S,state.baseIV,day,state.maxDTE);
+            row.push({K,tDays,iv});
+            if(iv<ivMin)ivMin=iv; if(iv>ivMax)ivMax=iv;
+          }
+          grid.push(row);
+        }
+        const span=Math.max(ivMax-ivMin,0.01);
+        const HZ=0.62; // height exaggeration so magnitude differences read clearly
+
+        function colorIV(iv){
+          const t=(iv-ivMin)/span;
+          if(t<.25){const u=t/.25;return `rgb(${Math.floor(20+u*20)},${Math.floor(40+u*80)},${Math.floor(100+u*80)})`}
+          if(t<.5){const u=(t-.25)/.25;return `rgb(${Math.floor(40+u*0)},${Math.floor(120+u*80)},${Math.floor(180-u*40)})`}
+          if(t<.75){const u=(t-.5)/.25;return `rgb(${Math.floor(40+u*180)},${Math.floor(200)},${Math.floor(140-u*100)})`}
+          const u=(t-.75)/.25;return `rgb(${Math.floor(220)},${Math.floor(200-u*120)},${Math.floor(40-u*20)})`;
+        }
+
+        const {theta,phi}=state.volView;
+        // project every grid point
+        const pts=[];
+        for(let j=0;j<nT;j++){
+          pts[j]=[];
+          for(let i=0;i<nK;i++){
+            const X=i/(nK-1)-0.5, Y=j/(nT-1)-0.5;
+            const Z=((grid[j][i].iv-ivMin)/span)*HZ;
+            pts[j][i]=Object.assign(project3D(X,Y,Z,theta,phi), {iv:grid[j][i].iv, K:grid[j][i].K, tDays:grid[j][i].tDays});
+          }
+        }
+
+        // fit projected bounds to the canvas — include the full bounding cuboid (all 8
+        // corners at Z=0/HZ), not just the surface heights, so the axis frame (whose
+        // vertical pole always reaches HZ regardless of the surface's own shape) is
+        // guaranteed to stay inside the fitted viewport at any rotation
+        let minSX=Infinity,maxSX=-Infinity,minSY=Infinity,maxSY=-Infinity;
+        for(const row of pts) for(const p of row){
+          if(p.sx<minSX)minSX=p.sx; if(p.sx>maxSX)maxSX=p.sx;
+          if(p.sy<minSY)minSY=p.sy; if(p.sy>maxSY)maxSY=p.sy;
+        }
+        for(const cx of [-0.5,0.5]) for(const cy of [-0.5,0.5]) for(const cz of [0,HZ]){
+          const cp=project3D(cx,cy,cz,theta,phi);
+          if(cp.sx<minSX)minSX=cp.sx; if(cp.sx>maxSX)maxSX=cp.sx;
+          if(cp.sy<minSY)minSY=cp.sy; if(cp.sy>maxSY)maxSY=cp.sy;
+        }
+        const pad={l:46, r:40, t:32, b:40};
+        const availW=Math.max(10,w-pad.l-pad.r), availH=Math.max(10,h-pad.t-pad.b);
+        const scale=Math.min(availW/((maxSX-minSX)||1), availH/((maxSY-minSY)||1));
+        const originX=pad.l+(availW-(maxSX-minSX)*scale)/2 - minSX*scale;
+        const originY=pad.t+(availH-(maxSY-minSY)*scale)/2 - minSY*scale;
+        const toPix=p=>[originX+p.sx*scale, originY+p.sy*scale];
+
+        // build quads and sort back-to-front (painter's algorithm using camera depth)
+        const quads=[];
+        for(let j=0;j<nT-1;j++){
+          for(let i=0;i<nK-1;i++){
+            const p00=pts[j][i], p10=pts[j][i+1], p11=pts[j+1][i+1], p01=pts[j+1][i];
+            quads.push({p00,p10,p11,p01,
+              depth:(p00.depth+p10.depth+p11.depth+p01.depth)/4,
+              ivAvg:(p00.iv+p10.iv+p11.iv+p01.iv)/4});
+          }
+        }
+        quads.sort((a,b)=>a.depth-b.depth);
+        for(const q of quads){
+          const [x0,y0]=toPix(q.p00), [x1,y1]=toPix(q.p10), [x2,y2]=toPix(q.p11), [x3,y3]=toPix(q.p01);
+          ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.closePath();
+          ctx.fillStyle=colorIV(q.ivAvg);
+          ctx.fill();
+          ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=0.4; ctx.stroke();
+        }
+
+        // ATM "wall": highlight the strike column nearest current spot across all tenors
+        let atmI=0, best=Infinity;
+        for(let i=0;i<nK;i++){ const d=Math.abs(grid[0][i].K-S); if(d<best){best=d;atmI=i} }
+        ctx.beginPath();
+        for(let j=0;j<nT;j++){
+          const [px,py]=toPix(pts[j][atmI]);
+          if(j===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+        }
+        ctx.strokeStyle='#ff9800'; ctx.lineWidth=1.6; ctx.setLineDash([3,2]); ctx.stroke(); ctx.setLineDash([]);
+
+        // ===== 3D AXIS FRAME + TICK LABELS (rotates with the surface, always readable) =====
+        const axisPoint=(X,Y,Z)=>toPix(project3D(X,Y,Z,theta,phi));
+        // pick whichever bottom corner currently faces the camera (max depth) as the axis origin,
+        // so the frame is never hidden behind the surface no matter how it's rotated
+        const cornerXY=[[-0.5,-0.5],[0.5,-0.5],[0.5,0.5],[-0.5,0.5]];
+        let frontXY=cornerXY[0], bestDepth=-Infinity;
+        for(const c of cornerXY){ const d=project3D(c[0],c[1],0,theta,phi).depth; if(d>bestDepth){bestDepth=d;frontXY=c;} }
+        const [fx,fy]=frontXY;
+        const centroidPx=toPix({sx:(minSX+maxSX)/2, sy:(minSY+maxSY)/2});
+        function outward(px,py,dist){
+          let dx=px-centroidPx[0], dy=py-centroidPx[1];
+          const len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
+          return clampPix(px+dx*dist, py+dy*dist);
+        }
+        function clampPix(px,py){
+          return [Math.min(Math.max(px,6),w-6), Math.min(Math.max(py,6),h-6)];
+        }
+
+        ctx.save();
+        ctx.strokeStyle='#6b7690'; ctx.lineWidth=1;
+        ctx.font='9px Consolas,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+
+        // -- Strike axis (sweep X at fixed Y=fy, Z=0) --
+        let [ax,ay]=axisPoint(fx,fy,0), [bx,by]=axisPoint(-fx,fy,0);
+        ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+        const nKt=5;
+        for(let t=0;t<=nKt;t++){
+          const X=fx+(-fx-fx)*(t/nKt);
+          const K=kMin+(kMax-kMin)*(X+0.5);
+          const [tx,ty]=axisPoint(X,fy,0);
+          const [ttx,tty]=outward(tx,ty,4);
+          ctx.strokeStyle='#6b7690'; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(ttx,tty); ctx.stroke();
+          const [lx,ly]=outward(tx,ty,12);
+          ctx.fillStyle='#c3cad6'; ctx.fillText(K.toFixed(0), lx, ly);
+        }
+        {
+          const [ex,ey]=outward(...axisPoint(-fx,fy,0),20);
+          ctx.fillStyle='#00d9f5'; ctx.font='bold 9px Consolas,monospace';
+          ctx.fillText('Strike (K)', ex, ey);
+          ctx.font='9px Consolas,monospace';
+        }
+
+        // -- Tenor axis (sweep Y at fixed X=fx, Z=0) --
+        [ax,ay]=axisPoint(fx,fy,0); [bx,by]=axisPoint(fx,-fy,0);
+        ctx.strokeStyle='#6b7690'; ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+        const nTt=4;
+        for(let t=0;t<=nTt;t++){
+          const Y=fy+(-fy-fy)*(t/nTt);
+          const tDays=Math.max(1, maxRemain*((Y+0.5)*nT)/nT);
+          const [tx,ty]=axisPoint(fx,Y,0);
+          const [ttx,tty]=outward(tx,ty,4);
+          ctx.strokeStyle='#6b7690'; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(ttx,tty); ctx.stroke();
+          const [lx,ly]=outward(tx,ty,13);
+          ctx.fillStyle='#c3cad6'; ctx.fillText(Math.round(tDays)+'d', lx, ly);
+        }
+        {
+          const [ex,ey]=outward(...axisPoint(fx,-fy,0),21);
+          ctx.fillStyle='#ffcf3d'; ctx.font='bold 9px Consolas,monospace';
+          ctx.fillText('Tenor (DTE)', ex, ey);
+          ctx.font='9px Consolas,monospace';
+        }
+
+        // -- IV height axis (sweep Z at fixed X=fx, Y=fy) --
+        [ax,ay]=axisPoint(fx,fy,0); [bx,by]=axisPoint(fx,fy,HZ);
+        ctx.strokeStyle='#6b7690'; ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+        const nZt=4;
+        for(let t=0;t<=nZt;t++){
+          const Z=HZ*(t/nZt);
+          const ivVal=ivMin+span*(t/nZt);
+          const [tx,ty]=axisPoint(fx,fy,Z);
+          const [ttx,tty]=[tx-4,ty];
+          ctx.strokeStyle='#6b7690'; ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(ttx,tty); ctx.stroke();
+          const [lx,ly]=clampPix(tx-6,ty);
+          ctx.fillStyle='#c3cad6'; ctx.textAlign='right';
+          ctx.fillText((ivVal*100).toFixed(0)+'%', lx, ly);
+          ctx.textAlign='center';
+        }
+        {
+          const [ex,ey]=clampPix(...axisPoint(fx,fy,HZ));
+          ctx.fillStyle='#c9a6ff'; ctx.font='bold 9px Consolas,monospace'; ctx.textAlign='right';
+          ctx.fillText('IV %', ex-6, clampPix(ex,ey-10)[1]);
+        }
+        ctx.restore();
+
+        // readout / caption
+        ctx.fillStyle='#b388ff'; ctx.font='9px Consolas,monospace'; ctx.textAlign='left';
+        ctx.fillText(`IV ${(ivMin*100).toFixed(1)}–${(ivMax*100).toFixed(1)}%  ·  S=${S.toFixed(1)}  day=${day}  remain=${maxRemain}d`, pad.l, 11);
+        ctx.fillStyle='#4a5568'; ctx.font='8px Consolas,monospace';
+        ctx.fillText('drag to rotate · orange = ATM', w-118, h-5);
+      }
+
+      /* drag-to-rotate on the vol surface canvas */
+      (function initVolDrag(){
+        const canvas=document.getElementById('volSurface');
+        let dragging=false,lastX=0,lastY=0;
+        function redraw(){ if(state.history.length) drawVolSurface(state.history[state.tIdx].S, state.history[state.tIdx].day); }
+        function down(x,y){ dragging=true; lastX=x; lastY=y; }
+        function move(x,y){
+          if(!dragging) return;
+          const dx=x-lastX, dy=y-lastY; lastX=x; lastY=y;
+          state.volView.theta += dx*0.006;
+          state.volView.phi = clamp(state.volView.phi - dy*0.006, 0.3, 1.5);
+          redraw();
+        }
+        function up(){ dragging=false; }
+        canvas.addEventListener('mousedown',e=>down(e.clientX,e.clientY));
+        window.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
+        window.addEventListener('mouseup',up);
+        canvas.addEventListener('touchstart',e=>{const t=e.touches[0];down(t.clientX,t.clientY)},{passive:true});
+        canvas.addEventListener('touchmove',e=>{const t=e.touches[0];move(t.clientX,t.clientY)},{passive:true});
+        canvas.addEventListener('touchend',up);
+      })();
+
+      /* ===================== UPDATE / PLAYBACK ===================== */
+      function updateAll(){
+        if(!state.history.length) return;
+        const idx=clamp(state.tIdx,0,state.history.length-1);
+        state.tIdx=idx;
+        const agg=state.history[idx];
+        // re-aggregate live so surface IV evolution is reflected
+        const live=aggregateAt(agg.S,agg.day);
+        state.history[idx]=live; // keep in sync
+        const risk=scanRisk();
+        renderLegs(live);
+        renderSnapshot(live,risk);
+        updateKPI(live);
+        updateCharts();
+        updateDataLog();
+        document.getElementById('pbSlider').max=state.history.length-1;
+        document.getElementById('pbSlider').value=idx;
+        document.getElementById('pbLabel').textContent=`t=${live.day} / ${state.maxDTE}d`;
+        document.getElementById('ivVal').textContent=Math.round(state.baseIV*100)+'%';
+      }
+
+      let playTimer=null;
+      function playStep(){
+        if(state.tIdx>=state.history.length-1){stopPlay();return}
+        state.tIdx++;
+        updateAll();
+      }
+      function startPlay(){
+        if(state.playing) return;
+        state.playing=true;
+        document.getElementById('pbPlay').textContent='❚❚';
+        // if at end, restart from 0 so user sees full evolution
+        if(state.tIdx>=state.history.length-1) state.tIdx=0;
+        const ms=Math.max(30, 180/state.speed);
+        playTimer=setInterval(playStep, ms);
+      }
+      function stopPlay(){
+        state.playing=false;
+        document.getElementById('pbPlay').textContent='▶';
+        if(playTimer){clearInterval(playTimer);playTimer=null}
+      }
+
+      /* ===================== BSM EXPLORER (left-column panel) ===================== */
+      function updateBSM(){
+        const S=+document.getElementById('bS').value||100;
+        const K=+document.getElementById('bK').value||100;
+        const Td=Math.max(0,+document.getElementById('bT').value||30);
+        const sig=Math.max(0.01,(+document.getElementById('bSig').value||25)/100);
+        const r=(+document.getElementById('bR').value||0)/100;
+        const type=document.getElementById('bType').value;
+        const res=bsm(S,K,Td/365,r,0,sig,type);
+        const cls=v=>v>0?'pos':v<0?'neg':'';
+        document.getElementById('bsmOut').innerHTML=`
+          <div class="lbl">Price</div><div class="val cyan">${res.value.toFixed(3)}</div>
+          <div class="lbl">Delta</div><div class="val ${cls(res.delta)}">${res.delta.toFixed(3)}</div>
+          <div class="lbl">Gamma</div><div class="val">${res.gamma.toFixed(4)}</div>
+          <div class="lbl">Theta/d</div><div class="val ${cls(res.theta)}">${res.theta.toFixed(3)}</div>
+          <div class="lbl">Vega</div><div class="val">${res.vega.toFixed(3)}</div>
+          <div class="lbl">Rho</div><div class="val">${res.rho.toFixed(3)}</div>`;
+
+        // decay curve: theoretical price as this same option moves forward in time to expiry
+        const n=30, xs=[], ys=[];
+        for(let i=0;i<=n;i++){
+          const td=Td*(1-i/n);
+          xs.push(Math.round(td));
+          ys.push(bsm(S,K,td/365,r,0,sig,type).value);
+        }
+        if(!state.charts.bsmMini){
+          state.charts.bsmMini=new Chart(document.getElementById('bsmMiniChart'),{
+            type:'line',
+            data:{labels:xs,datasets:[{data:ys,borderColor:'#00bcd4',backgroundColor:'#00bcd433',fill:true,borderWidth:1.4,pointRadius:0,tension:.2}]},
+            options:{responsive:true,maintainAspectRatio:false,animation:false,
+              plugins:{legend:{display:false},tooltip:{enabled:true}},
+              scales:{
+                x:{reverse:true,title:{display:true,text:'Days to expiry',font:{size:8}},ticks:{maxTicksLimit:5,font:{size:8}},grid:{color:'#1a1f28'}},
+                y:{title:{display:true,text:'Value',font:{size:8}},ticks:{font:{size:8}},grid:{color:'#1a1f28'}}
+              }}
+          });
+        }else{
+          state.charts.bsmMini.data.labels=xs;
+          state.charts.bsmMini.data.datasets[0].data=ys;
+          state.charts.bsmMini.update('none');
+        }
+      }
+      ['bS','bK','bT','bSig','bR','bType'].forEach(id=>{
+        document.getElementById(id).addEventListener('input',updateBSM);
+        document.getElementById(id).addEventListener('change',updateBSM);
+      });
+      document.getElementById('bsmSync').addEventListener('click',()=>{
+        if(!state.history.length) return;
+        const cur=state.history[state.tIdx];
+        document.getElementById('bS').value=cur.S.toFixed(2);
+        const leg=state.legs.find(l=>l.strike!=null);
+        document.getElementById('bK').value=leg?leg.strike:Math.round(cur.S);
+        document.getElementById('bT').value=Math.max(1,state.maxDTE-cur.day);
+        document.getElementById('bSig').value=Math.round(state.baseIV*100);
+        document.getElementById('bR').value=(state.r*100).toFixed(2);
+        if(leg&&leg.type==='PUT') document.getElementById('bType').value='PUT'; else document.getElementById('bType').value='CALL';
+        updateBSM();
+      });
+
+      /* ===================== EVENTS ===================== */
+      function readParams(){
+        state.S0=+document.getElementById('pSpot').value||100;
+        state.mu=(+document.getElementById('pDrift').value||0)/100;
+        state.sigma=(+document.getElementById('pVol').value||25)/100;
+        state.r=(+document.getElementById('pRate').value||0)/100;
+        state.q=(+document.getElementById('pDiv').value||0)/100;
+        state.maxDTE=+document.getElementById('pDte').value||90;
+        state.mult=+document.getElementById('pMult').value||100;
+        state.seed=+document.getElementById('pSeed').value||42;
+        state.baseIV=state.sigma;
+        state.progressive=document.getElementById('chkProgressive').checked;
+      }
+
+      document.getElementById('stratSelect').addEventListener('change',e=>{stopPlay();readParams();loadStrategy(e.target.value)});
+      document.getElementById('btnResim').addEventListener('click',()=>{
+        stopPlay();readParams();
+        state.legs.forEach(l=>{if(l.type!=='STOCK')l.volatility=state.baseIV});
+        // clear premiums so entry re-marks
+        state.legs.forEach(l=>{if(l.type!=='STOCK')l.premium=null});
+        computeEntryCost(); simulatePath(); updateAll();
+      });
+      document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();readParams();loadStrategy(state.name)});
+      document.getElementById('ivM').addEventListener('click',()=>{
+        state.baseIV=Math.max(.01,state.baseIV-.01);
+        state.legs.forEach(l=>{if(l.type!=='STOCK'){l.volatility=state.baseIV;l.premium=null}});
+        document.getElementById('pVol').value=Math.round(state.baseIV*100);
+        computeEntryCost();
+        state.history=state.path.map(p=>aggregateAt(p.S,p.day));
+        fitAxes();
+        updateAll();
+      });
+      document.getElementById('ivP').addEventListener('click',()=>{
+        state.baseIV=Math.min(2,state.baseIV+.01);
+        state.legs.forEach(l=>{if(l.type!=='STOCK'){l.volatility=state.baseIV;l.premium=null}});
+        document.getElementById('pVol').value=Math.round(state.baseIV*100);
+        computeEntryCost();
+        state.history=state.path.map(p=>aggregateAt(p.S,p.day));
+        fitAxes();
+        updateAll();
+      });
+      document.getElementById('chkProgressive').addEventListener('change',e=>{state.progressive=e.target.checked;updateCharts()});
+
+      document.getElementById('pbPlay').addEventListener('click',()=>{if(state.playing)stopPlay();else startPlay()});
+      document.getElementById('pbBack').addEventListener('click',()=>{stopPlay();state.tIdx=Math.max(0,state.tIdx-1);updateAll()});
+      document.getElementById('pbFwd').addEventListener('click',()=>{stopPlay();state.tIdx=Math.min(state.history.length-1,state.tIdx+1);updateAll()});
+      document.getElementById('pbSlider').addEventListener('input',e=>{stopPlay();state.tIdx=+e.target.value;updateAll()});
+      document.getElementById('pbSpeed').addEventListener('change',e=>{
+        state.speed=+e.target.value;
+        if(state.playing){stopPlay();startPlay()}
+      });
+
+      document.querySelectorAll('[data-payoff]').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          document.querySelectorAll('[data-payoff]').forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active'); state.payoffMode=btn.dataset.payoff; updateCharts();
+        });
+      });
+
+      document.getElementById('btnAddLeg').addEventListener('click',()=>document.getElementById('legEditor').classList.toggle('open'));
+      document.getElementById('btnConfirmLeg').addEventListener('click',()=>{
+        const side=document.getElementById('eSide').value;
+        const type=document.getElementById('eType').value;
+        const qty=+document.getElementById('eQty').value||1;
+        const strike=+document.getElementById('eStrike').value||state.S0;
+        const dte=+document.getElementById('eDte').value||state.maxDTE;
+        state.name='Custom Strategy'; document.getElementById('stratSelect').value='Custom Strategy';
+        state.legs.push({side,instrument:type==='STOCK'?'STOCK':'OPTION',type,quantity:qty,
+          strike:type==='STOCK'?null:strike,expirationDays:type==='STOCK'?null:dte,premium:null,volatility:state.baseIV});
+        state.maxDTE=Math.max(state.maxDTE,dte);
+        computeEntryCost(); simulatePath(); updateAll();
+        document.getElementById('legEditor').classList.remove('open');
+      });
+
+      window.addEventListener('resize',()=>{if(state.history.length)drawVolSurface(state.history[state.tIdx].S,state.history[state.tIdx].day)});
+
+      /* ===================== GUIDE / HOW-TO-USE PAGE ===================== */
+      function showGuide(){
+        stopPlay();
+        document.getElementById('dashPage').style.display='none';
+        document.getElementById('guidePage').style.display='block';
+      }
+      function showDashboard(){
+        document.getElementById('guidePage').style.display='none';
+        document.getElementById('dashPage').style.display='grid';
+        // charts/canvases were hidden (display:none) while on the guide page, so
+        // give them a tick to regain layout before redrawing/resizing
+        setTimeout(()=>{
+          Object.values(state.charts).forEach(c=>{ if(c && typeof c.resize==='function') c.resize(); });
+          if(state.charts.gk) Object.values(state.charts.gk).forEach(c=>{ if(c && typeof c.resize==='function') c.resize(); });
+          if(state.history.length) drawVolSurface(state.history[state.tIdx].S, state.history[state.tIdx].day);
+        }, 0);
+      }
+      document.getElementById('btnGuide').addEventListener('click', showGuide);
+      document.getElementById('btnBackToDash').addEventListener('click', showDashboard);
+
+      /* INIT */
+      fillStratSelect();
+      buildCharts();
+      readParams();
+      loadStrategy('Bull Call Spread');
+      document.getElementById('bsmSync').click();
+      // auto-demo: start playback so user immediately sees evolution
+      setTimeout(()=>{startPlay()}, 400);
+    </script>
+  </body>
+</html>
