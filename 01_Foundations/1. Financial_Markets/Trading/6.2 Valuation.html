@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Analysis — 6.2 Valuation</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 6 · Section 6.2</div>
+      <h1 class="book-title">Valuation<br><em>Methods</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Absolute → Relative → Asset-based · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Financial Analysis · Revision Notes</span>
+    <span>6.2 Valuation</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Absolute",
+    icon: "🧮",
+    title: "Discounted Cash Flow (DCF)",
+    desc: "The foundational intrinsic valuation method — value equals discounted future cash flows",
+    badge: { label: "Core Method", style: "teal" },
+    tags: [["DCF","teal"], ["WACC",""], ["terminal value","amber"], ["intrinsic","accent"]],
+    data: [
+      { label: "Key input", value: "Free Cash Flow", color: "teal" },
+      { label: "Discount rate", value: "WACC", color: "" },
+      { label: "Usually largest piece", value: "Terminal Value", color: "amber" },
+    ],
+    body: [
+      `A discounted cash flow model estimates the intrinsic value of a business by projecting its expected free cash flows and discounting them back to present value at a rate that reflects the riskiness of those cash flows. In the standard enterprise DCF, the cash flows are free cash flow to the firm (FCFF) and the discount rate is the weighted average cost of capital (WACC).`,
+      `The model has two main parts: an explicit forecast period (typically 5–10 years) in which revenue, margins, capital intensity and working capital are projected in detail, and a terminal value that captures all cash flows beyond the forecast horizon. Terminal value is usually calculated either with a perpetuity growth formula or by applying an exit multiple to a normalised terminal-year metric. In most DCFs the terminal value accounts for the majority of total enterprise value — a structural reality that makes long-term growth and margin assumptions critically important.`,
+      `DCF is powerful because it forces explicit assumptions about the drivers of value. It is also fragile: small changes in WACC, terminal growth rate or long-term margins can swing the output dramatically. Best practice is to run sensitivity tables and scenario analysis rather than treat any single point estimate as precise.`
+    ],
+    keyPoint: "DCF does not eliminate uncertainty — it organises it. The quality of a DCF is determined by the quality of the assumptions and the honesty with which sensitivity is examined, not by the precision of the spreadsheet."
+  },
+  {
+    era: "Absolute",
+    icon: "dividend",
+    title: "Dividend Discount Model (DDM)",
+    desc: "Valuing equity directly from expected future dividends",
+    badge: { label: "Core Method", style: "teal" },
+    tags: [["DDM","teal"], ["Gordon Growth",""], ["cost of equity","amber"], ["payout",""]],
+    data: [
+      { label: "Simplest form", value: "Gordon Growth Model", color: "teal" },
+      { label: "Discount rate", value: "Cost of Equity", color: "" },
+      { label: "Best suited for", value: "Stable dividend payers", color: "amber" },
+    ],
+    body: [
+      `The dividend discount model values a share as the present value of expected future dividends, discounted at the cost of equity. In its simplest constant-growth form (the Gordon Growth Model), Value = DPS₁ / (r – g), where DPS₁ is next year’s expected dividend, r is the required return on equity, and g is the perpetual growth rate of dividends.`,
+      `Multi-stage DDMs relax the constant-growth assumption, allowing a period of high growth followed by a transition to a stable growth rate. These models are most applicable to companies with a clear, sustainable dividend policy — mature banks, utilities, consumer staples and certain REITs.`,
+      `The practical limitation is that many high-quality growth companies pay little or no dividend, preferring to reinvest or repurchase shares. In those cases a free-cash-flow-to-equity (FCFE) model or an enterprise DCF is usually more appropriate. When dividends are the primary form of shareholder return and are reasonably predictable, however, the DDM remains a clean and theoretically consistent framework.`
+    ],
+    keyPoint: "DDM is the purest expression of the idea that a stock is worth the cash it will return to its owners. Its usefulness rises and falls with the predictability and materiality of the dividend stream."
+  },
+  {
+    era: "Relative",
+    icon: "📊",
+    title: "Relative Valuation — Multiples",
+    desc: "P/E, EV/EBITDA, P/S and the art of comparable company analysis",
+    badge: { label: "Most Used", style: "amber" },
+    tags: [["multiples","amber"], ["P/E",""], ["EV/EBITDA","teal"], ["P/S",""], ["comps","slate"]],
+    data: [
+      { label: "Equity multiple", value: "P/E, P/B, P/S", color: "" },
+      { label: "Enterprise multiple", value: "EV/EBITDA, EV/Sales", color: "teal" },
+      { label: "Key discipline", value: "Like-for-like comps", color: "amber" },
+    ],
+    body: [
+      `Relative valuation estimates value by comparing a company to similar companies (or to its own history) using standardised multiples. The most common equity multiples are price-to-earnings (P/E), price-to-book (P/B) and price-to-sales (P/S). The most common enterprise multiples are EV/EBITDA, EV/EBIT and EV/Sales. Enterprise multiples are generally preferred when capital structure differs across the peer set because they are capital-structure neutral.`,
+      `A multiple is simply a ratio of value to a financial metric. Its economic meaning depends on the relationship between that metric and expected growth, risk and cash conversion. A high P/E can be justified by high growth and low risk; a low EV/EBITDA can signal either undervaluation or structural problems. The analytical task is therefore not to apply an average multiple blindly, but to understand why multiples differ and whether the differences are already reflected in the price.`,
+      `Effective relative valuation requires a carefully chosen peer group, consistent definitions of the numerator and denominator (especially around non-recurring items, leases and stock-based compensation), and explicit adjustment for differences in growth, margins and risk.`
+    ],
+    compare: {
+      left: { label: "Strengths", text: "Fast, market-anchored, easy to communicate. Reflects current investor sentiment and relative positioning within a sector." },
+      right: { label: "Weaknesses", text: "Can embed market mispricing. Highly sensitive to peer selection and accounting differences. Says little about absolute intrinsic value." }
+    },
+    keyPoint: "Multiples are not valuation shortcuts — they are compressed expressions of growth, risk and cash-flow expectations. The work is in unpacking why one company deserves a premium or discount to another."
+  },
+  {
+    era: "Relative",
+    icon: "🧩",
+    title: "Sum-of-the-Parts (SOTP)",
+    desc: "Valuing a multi-business company by breaking it into its constituent pieces",
+    badge: { label: "Structural", style: "slate" },
+    tags: [["SOTP","slate"], ["conglomerate",""], ["sum-of-parts","teal"], ["break-up",""]],
+    data: [
+      { label: "Best for", value: "Multi-segment firms", color: "teal" },
+      { label: "Typical approach", value: "Segment multiples + DCF", color: "" },
+      { label: "Common adjustment", value: "Holdco discount", color: "amber" },
+    ],
+    body: [
+      `Sum-of-the-parts valuation recognises that different businesses inside the same company often deserve different multiples or different discount rates. Each segment is valued independently — typically with a peer multiple or a segment-level DCF — and the values are added together. Corporate net debt is then subtracted and any non-operating assets are added to arrive at equity value.`,
+      `SOTP is particularly useful for conglomerates, diversified industrials, and companies with a mix of high-growth and mature businesses. It can reveal hidden value when the market applies a single, low multiple to the entire firm, or it can highlight that a seemingly cheap company is actually expensive once the high-quality pieces are valued correctly.`,
+      `Practical challenges include allocating shared costs and net debt across segments, deciding whether a holding-company discount is appropriate, and obtaining sufficiently granular segment data. Despite these issues, SOTP remains one of the most insightful ways to analyse complex corporate structures.`
+    ],
+    keyPoint: "SOTP forces the analyst to confront the economic reality that a company is a portfolio of businesses, not a single homogeneous entity. The consolidated multiple often conceals more than it reveals."
+  },
+  {
+    era: "Asset-Based",
+    icon: "🏚️",
+    title: "Liquidation Value",
+    desc: "What the assets would fetch if the business were wound up and sold piecemeal",
+    badge: { label: "Floor Value", style: "red" },
+    tags: [["liquidation","red"], ["distress",""], ["asset sale","amber"], ["floor",""]],
+    data: [
+      { label: "Premise", value: "Orderly or forced sale", color: "red" },
+      { label: "Typical use", value: "Distress / deep value", color: "" },
+      { label: "Relationship to going concern", value: "Usually much lower", color: "amber" },
+    ],
+    body: [
+      `Liquidation value estimates the net proceeds that would be realised if the company ceased operations and sold its assets. An orderly liquidation assumes reasonable time to find buyers; a forced liquidation assumes a rapid, distressed sale and typically produces lower values. From the gross proceeds one subtracts liquidation costs, taxes, and all claims that rank senior to equity.`,
+      `This approach is most relevant for companies in financial distress, asset-heavy businesses trading below book value, or situations where the market appears to be pricing in a high probability of failure. It provides a conceptual floor: equity should not trade for long below a credible liquidation value unless the assets themselves are impaired or the liquidation process is expected to be value-destructive.`,
+      `Estimating liquidation value requires careful haircuts to receivables, inventory and fixed assets, plus a realistic assessment of wind-down costs and contingent liabilities. It is rarely the primary valuation method for healthy going concerns, but it is an essential reference point in downside analysis.`
+    ],
+    keyPoint: "Liquidation value answers a different question from going-concern valuation: not “what is the business worth as a living entity?” but “what is left for equity if the business dies?” Both questions matter."
+  },
+  {
+    era: "Asset-Based",
+    icon: "🏗️",
+    title: "Replacement Cost",
+    desc: "The current cost of recreating the firm’s assets from scratch",
+    badge: { label: "Economic", style: "slate" },
+    tags: [["replacement cost","slate"], ["Tobin's Q",""], ["reproduction","amber"], ["barriers",""]],
+    data: [
+      { label: "Related concept", value: "Tobin’s Q", color: "teal" },
+      { label: "Best suited for", value: "Asset-intensive businesses", color: "" },
+      { label: "Signal when Market < Replacement", value: "Potential under-investment", color: "amber" },
+    ],
+    body: [
+      `Replacement cost (or reproduction cost) asks how much it would cost today to build an identical set of productive assets. When the market value of a company is meaningfully below the replacement cost of its assets, it can indicate that the market is undervaluing the installed capital base — or that the assets are no longer economically viable at current prices.`,
+      `Tobin’s Q formalises this idea as the ratio of market value to replacement cost of assets. A Q significantly below 1 has historically been associated with periods of under-investment and, eventually, mean reversion as capital spending falls and scarcity supports higher returns. A Q well above 1 suggests that the market is capitalising organisational capital, brand, network effects or other intangibles beyond physical assets.`,
+      `Replacement-cost analysis is most useful in capital-intensive industries — shipping, energy, real estate, certain industrials — where physical assets dominate the value proposition. It is far less informative for pure software, content or platform businesses whose value lies primarily in intangibles and incremental margins.`
+    ],
+    keyPoint: "Replacement cost anchors valuation in the physical or technological reality of the asset base. It is a powerful cross-check when market prices diverge sharply from the cost of recreating the same productive capacity."
+  },
+  {
+    era: "Foundational",
+    icon: "⚖️",
+    title: "Market Cap vs. Enterprise Value",
+    desc: "Equity value versus the value of the whole operating business",
+    badge: { label: "Essential", style: "teal" },
+    tags: [["market cap","teal"], ["enterprise value","amber"], ["capital structure",""], ["apples-to-apples",""]],
+    data: [
+      { label: "Market Cap", value: "Equity claim only", color: "" },
+      { label: "Enterprise Value", value: "Operations as a whole", color: "teal" },
+      { label: "When they diverge most", value: "High net debt / cash", color: "amber" },
+    ],
+    body: [
+      `Market capitalisation is the market value of the company’s equity — share price multiplied by diluted shares outstanding. Enterprise value is the market value of the entire operating business, attributable to all capital providers (equity and debt), net of non-operating cash.`,
+      `The distinction is fundamental. Equity multiples (P/E, P/B) are influenced by leverage: two identical operating businesses will show different P/E ratios if one is more highly geared. Enterprise multiples (EV/EBITDA, EV/Sales) abstract from capital structure and therefore allow cleaner comparison across companies with different debt levels.`,
+      `Always match the numerator and denominator: equity value with equity metrics (earnings, book equity), enterprise value with enterprise metrics (EBITDA, EBIT, sales, unlevered free cash flow). Mixing them is one of the most common analytical errors.`
+    ],
+    compare: {
+      left: { label: "Market Capitalisation", text: "Value of residual equity claim. Affected by leverage. Appropriate for equity multiples and equity-side DCF (FCFE)." },
+      right: { label: "Enterprise Value", text: "Value of core operations. Capital-structure neutral. Appropriate for EV multiples and enterprise DCF (FCFF)." }
+    },
+    keyPoint: "Market cap answers “what is the equity worth?” Enterprise value answers “what is the operating business worth?” Using the wrong one produces distorted comparisons and incorrect conclusions."
+  },
+  {
+    era: "Foundational",
+    icon: "➕",
+    title: "EV = Market Cap + Debt − Cash",
+    desc: "The practical definition and its important refinements",
+    badge: { label: "Formula", style: "teal" },
+    tags: [["EV formula","teal"], ["net debt",""], ["adjustments","amber"], ["dilution",""]],
+    data: [
+      { label: "Core formula", value: "Equity + Net Debt", color: "teal" },
+      { label: "Common additions", value: "Minorities, Prefs, Leases", color: "" },
+      { label: "Common subtractions", value: "Cash, Equivalents, ST investments", color: "amber" },
+    ],
+    body: [
+      `The standard textbook definition is Enterprise Value = Market Capitalisation + Total Debt − Cash & Equivalents. In practice the calculation is refined. Debt should include all interest-bearing liabilities (bonds, bank loans, commercial paper) and, under modern lease accounting, capitalised operating leases. Preferred stock and non-controlling interests are usually added because they represent claims that rank ahead of or alongside ordinary equity in the capital structure.`,
+      `On the cash side, only surplus cash and liquid investments that are not required for operations should be subtracted. Trapped cash in foreign subsidiaries or cash needed for regulatory capital is often treated more conservatively. Equity value itself should be calculated on a fully diluted basis, incorporating in-the-money options, RSUs and convertibles.`,
+      `Getting EV right matters because every subsequent multiple and many DCF cross-checks depend on it. Inconsistent or incomplete EV calculations are a frequent source of error in both buy-side and sell-side work.`
+    ],
+    keyPoint: "Enterprise value is only as good as the care taken with its components. Always start from fully diluted equity value, include all debt-like claims, and subtract only truly surplus cash."
+  },
+  {
+    era: "Specialised",
+    icon: "🏢",
+    title: "Net Asset Value (NAV)",
+    desc: "The dominant valuation framework for real estate, funds and certain holding companies",
+    badge: { label: "Sector Specific", style: "amber" },
+    tags: [["NAV","amber"], ["real estate","teal"], ["REIT",""], ["holding company","slate"]],
+    data: [
+      { label: "Primary users", value: "REITs, Funds, Holdcos", color: "teal" },
+      { label: "Core idea", value: "Mark assets to market", color: "" },
+      { label: "Common metric", value: "P/NAV", color: "amber" },
+    ],
+    body: [
+      `Net asset value calculates the market value of a company’s assets minus the market value of its liabilities. For a real-estate company or REIT this typically means appraising each property (or applying capitalisation rates to net operating income) and subtracting net debt. For an investment fund it means marking the portfolio to market. For a holding company it means summing the market values of listed subsidiaries and estimated values of unlisted ones, then subtracting holdco debt and adjusting for other claims.`,
+      `NAV is the natural valuation approach when the assets are separable and have observable or reliably estimable market values. The resulting price-to-NAV ratio indicates whether the market is applying a premium or discount to the underlying asset value. Persistent discounts can reflect concerns about management, tax leakage, illiquidity, or the market’s view that the assets will not realise their appraised values.`,
+      `NAV is far less useful for operating businesses whose value derives primarily from the cash flows generated by an integrated organisation rather than from the sum of independently saleable assets.`
+    ],
+    keyPoint: "NAV shifts the focus from earnings power to asset value. It is the correct primary lens for asset-backed vehicles and a useful secondary cross-check for everyone else."
+  },
+  {
+    era: "Transaction",
+    icon: "🤝",
+    title: "Precedent Transactions Analysis",
+    desc: "Valuation implied by what acquirers have actually paid in similar deals",
+    badge: { label: "M&A Lens", style: "red" },
+    tags: [["precedents","red"], ["transaction multiples",""], ["control premium","amber"], ["M&A",""]],
+    data: [
+      { label: "Typical premium", value: "20–40% to undisturbed", color: "amber" },
+      { label: "Key multiples", value: "EV/EBITDA, EV/Sales", color: "teal" },
+      { label: "Main limitation", value: "Comparability & timing", color: "red" },
+    ],
+    body: [
+      `Precedent transactions analysis examines the multiples paid in completed M&A deals involving similar companies. Because these transactions usually involve a change of control, the multiples embed a control premium and often reflect synergies that the acquirer expects to realise. As a result, precedent transaction multiples are typically higher than trading multiples for the same sector.`,
+      `The method is central to fairness opinions, sell-side advisory work, and any situation in which a control transaction is being contemplated. Selection of truly comparable deals is critical — and difficult. Differences in size, growth, margins, geographic exposure, deal timing and competitive dynamics can make headline multiples misleading.`,
+      `When used alongside trading multiples and intrinsic valuation, precedent transactions help triangulate a reasonable control valuation range. They are less relevant for valuing a minority stake that will not convey control or strategic synergies.`
+    ],
+    keyPoint: "Precedent transactions tell you what acquirers have been willing to pay for control. They answer a different question from public trading multiples and should be interpreted in that light."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

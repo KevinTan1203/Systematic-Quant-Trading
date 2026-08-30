@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Analysis — 6.4 Comparable Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 6 · Section 6.4</div>
+      <h1 class="book-title">Comparable<br><em>Analysis</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Peer selection → Key multiples → Normalization → Drivers · click to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Financial Analysis · Revision Notes</span>
+    <span>6.4 Comparable Analysis</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Foundation",
+    icon: "👥",
+    title: "Peer Group Selection",
+    desc: "The single most important — and most subjective — step in any comps analysis",
+    badge: { label: "Critical", style: "red" },
+    tags: [["peer group","red"], ["comparability",""], ["screening","teal"], ["judgment","amber"]],
+    data: [
+      { label: "Primary screens", value: "Industry, Size, Growth, Geography", color: "teal" },
+      { label: "Ideal number", value: "6–12 close peers", color: "" },
+      { label: "Common error", value: "Forcing distant comps", color: "red" },
+    ],
+    body: [
+      `Comparable company analysis stands or falls on the quality of the peer group. The goal is to assemble a set of companies that face similar economics, risk profiles, growth trajectories and competitive dynamics so that differences in multiples can be attributed to differences in fundamentals rather than to apples-to-oranges comparisons.`,
+      `Practical screening usually begins with industry classification (GICS, SIC or proprietary taxonomies), then narrows by size (revenue or enterprise value), geographic exposure, growth rate, margin structure and business-model similarity. Pure-play companies are preferred over diversified conglomerates. When perfect peers do not exist — a frequent reality — the analyst must explicitly acknowledge the differences and adjust multiples or weightings accordingly.`,
+      `A well-constructed peer set is small enough to be meaningful (typically 6–12 names) and large enough to provide statistical context. Listing every company in the broad sector and then averaging produces noise, not insight. The best peer groups are curated, not automated.`
+    ],
+    keyPoint: "Garbage peers produce garbage multiples. The analytical work of comparable analysis begins long before any ratio is calculated — it begins with the disciplined selection of true economic comparables."
+  },
+  {
+    era: "Core Multiple",
+    icon: "📐",
+    title: "EV/EBITDA Comparison",
+    desc: "The workhorse enterprise multiple for most industrial and corporate valuations",
+    badge: { label: "Primary", style: "teal" },
+    tags: [["EV/EBITDA","teal"], ["enterprise","amber"], ["capital structure neutral",""], ["standard",""]],
+    data: [
+      { label: "Numerator", value: "Enterprise Value", color: "teal" },
+      { label: "Denominator", value: "EBITDA (often NTM or LTM)", color: "" },
+      { label: "Key advantage", value: "Ignores capital structure & D&A policy", color: "amber" },
+    ],
+    body: [
+      `EV/EBITDA is the most widely used enterprise multiple because it is capital-structure neutral and relatively robust to differences in depreciation policy. Enterprise value captures the claim of all capital providers; EBITDA is a proxy for unlevered operating cash generation before the effects of capital intensity and tax.`,
+      `It is particularly useful when comparing companies with different leverage or different ages of asset base. Limitations remain: EBITDA ignores capital expenditures, working-capital needs and stock-based compensation, so two companies with identical EV/EBITDA can have very different free-cash-flow conversion. It is also less meaningful for financials, early-stage companies with negative EBITDA, or businesses where D&A is a poor proxy for maintenance investment.`,
+      `Best practice is to use forward (NTM) EBITDA where consensus estimates are reliable, to normalize for one-time items, and to examine the multiple alongside growth, margin and reinvestment characteristics rather than in isolation.`
+    ],
+    keyPoint: "EV/EBITDA is a convenient summary statistic, not a complete valuation. Always ask what the multiple is capitalising and whether the EBITDA itself is sustainable and comparable across the peer set."
+  },
+  {
+    era: "Core Multiple",
+    icon: "📊",
+    title: "P/E NTM (Next Twelve Months)",
+    desc: "The most watched equity multiple — price relative to expected earnings over the coming year",
+    badge: { label: "Primary", style: "teal" },
+    tags: [["P/E","teal"], ["NTM",""], ["forward earnings","amber"], ["equity multiple",""]],
+    data: [
+      { label: "Numerator", value: "Share Price / Market Cap", color: "" },
+      { label: "Denominator", value: "NTM EPS (consensus)", color: "teal" },
+      { label: "Most useful when", value: "Earnings are positive & stable", color: "amber" },
+    ],
+    body: [
+      `The forward P/E ratio divides the current share price by expected earnings per share over the next twelve months. It is the multiple most frequently cited by investors, sell-side analysts and the financial media because it directly links price to the earnings that equity holders ultimately claim.`,
+      `NTM earnings are preferred to trailing earnings because valuation is inherently forward-looking. Consensus estimates provide a market-averaged view of near-term profitability, although they can embed biases (optimism early in the year, sandbagging later). P/E is most informative when earnings are positive, reasonably stable, and of high quality. It becomes misleading for cyclical companies at peak or trough earnings, for loss-making firms, or when large non-cash items distort EPS.`,
+      `Because P/E is an equity multiple it is affected by leverage: higher debt usually raises P/E for a given enterprise value. Cross-sectional comparison therefore requires either similar capital structures or explicit adjustment.`
+    ],
+    keyPoint: "Forward P/E embeds a view about both the level of earnings and their growth and risk. A low P/E can signal undervaluation or simply low expected growth and high risk — the multiple alone does not distinguish."
+  },
+  {
+    era: "Growth Focus",
+    icon: "🚀",
+    title: "EV/Revenue (for Growth Companies)",
+    desc: "The multiple of choice when earnings and EBITDA are negative or still immature",
+    badge: { label: "Growth", style: "amber" },
+    tags: [["EV/Sales","amber"], ["EV/Revenue",""], ["pre-profit","red"], ["SaaS / tech","teal"]],
+    data: [
+      { label: "Typical users", value: "High-growth, low/negative margin", color: "amber" },
+      { label: "Key driver", value: "Growth rate + path to profitability", color: "teal" },
+      { label: "Risk", value: "Ignores all cost structure", color: "red" },
+    ],
+    body: [
+      `When a company is still investing heavily for growth and has not yet reached positive EBITDA or net income, traditional earnings and EBITDA multiples are unavailable or meaningless. EV/Revenue (or EV/Sales) becomes the primary relative-valuation tool. It is especially common for software, internet, biotechnology and other high-growth sectors.`,
+      `The multiple is justified by the idea that current revenue is a leading indicator of future earnings power once scale and operating leverage appear. Interpretation therefore hinges on two variables: the expected growth rate of revenue and the expected long-term operating margin (or free-cash-flow margin). A company growing at 40% with a clear path to 30% margins deserves a far higher EV/Revenue multiple than one growing at 15% with structural margin pressure.`,
+      `Because the multiple ignores all costs, it can produce extreme valuations that only make sense under optimistic assumptions about future profitability. Cross-checking with unit economics, cohort data and discounted-cash-flow scenarios is essential.`
+    ],
+    keyPoint: "EV/Revenue is a growth multiple, not a profitability multiple. Its usefulness depends entirely on the credibility of the bridge from today’s revenue to tomorrow’s cash flow."
+  },
+  {
+    era: "Sector Specific",
+    icon: "🏦",
+    title: "Price/Book for Financials",
+    desc: "The traditional anchor multiple for banks, insurers and other balance-sheet businesses",
+    badge: { label: "Financials", style: "slate" },
+    tags: [["P/B","slate"], ["Price/Book",""], ["ROE linkage","teal"], ["banks / insurers",""]],
+    data: [
+      { label: "Core relationship", value: "P/B ≈ f(ROE, Growth, Risk)", color: "teal" },
+      { label: "Rule of thumb", value: "P/B > 1 when ROE > Cost of Equity", color: "" },
+      { label: "Key adjustment", value: "Tangible book / CET1", color: "amber" },
+    ],
+    body: [
+      `For banks, insurers and many other financial institutions the primary relative multiple is Price/Book (or Price/Tangible Book). Because these businesses are essentially leveraged portfolios of financial assets and liabilities, book value is a more meaningful starting point than for industrial companies, and earnings are often a direct function of the return earned on that book.`,
+      `The theoretical link is clear: a firm that earns a return on equity permanently above its cost of equity should trade at a premium to book; one that earns below its cost of equity should trade at a discount. Growth in book value and the riskiness of the asset base further modulate the multiple. In practice, analysts also look at Price/Tangible Book and, for banks, multiples of common equity tier 1 (CET1) capital.`,
+      `Asset quality, provisioning, regulatory capital ratios and interest-rate sensitivity must be examined alongside the headline P/B. Two banks with identical P/B ratios can have very different risk profiles and earnings power.`
+    ],
+    keyPoint: "For financials, Price/Book is not a crude asset multiple — it is a compressed expression of expected ROE relative to the cost of equity. The analytical task is to judge whether the implied ROE is achievable and sustainable."
+  },
+  {
+    era: "Data Quality",
+    icon: "🧹",
+    title: "Normalization of One-Time Items",
+    desc: "Cleaning earnings and EBITDA so that multiples reflect ongoing economic reality",
+    badge: { label: "Essential", style: "amber" },
+    tags: [["normalization","amber"], ["one-time items",""], ["adjusted EBITDA","teal"], ["comparability",""]],
+    data: [
+      { label: "Common adjustments", value: "Restructuring, Impairments, Legal, M&A", color: "" },
+      { label: "Goal", value: "Run-rate operating performance", color: "teal" },
+      { label: "Danger", value: "Over-adjustment / “add-back culture”", color: "red" },
+    ],
+    body: [
+      `Reported earnings and EBITDA frequently contain items that are not expected to recur — restructuring charges, asset impairments, litigation settlements, acquisition-related costs, gains or losses on asset sales, and other special items. Leaving these in the denominator distorts multiples and destroys comparability across companies and across time.`,
+      `Normalization seeks to produce a “clean” or “run-rate” earnings or EBITDA figure that reflects the ongoing economics of the business. The process requires judgment: some items labelled “one-time” by management recur with surprising regularity; others that look unusual may in fact be part of the normal cost of doing business in that industry.`,
+      `Best practice is to be consistent, transparent and conservative. Document every adjustment, prefer multi-year averages when items are lumpy, and be sceptical of large, persistent gaps between reported and adjusted figures. The same normalization logic should be applied uniformly across the entire peer set.`
+    ],
+    keyPoint: "A multiple is only as good as the denominator. Systematic normalization is what turns a collection of reported numbers into a set of comparable economic metrics."
+  },
+  {
+    era: "Context",
+    icon: "🏭",
+    title: "Sector-Specific Multiples",
+    desc: "Why different industries have developed their own preferred valuation metrics",
+    badge: { label: "Industry Practice", style: "slate" },
+    tags: [["sector multiples","slate"], ["custom metrics",""], ["REITs / SaaS / Energy","teal"], ["unit economics",""]],
+    data: [
+      { label: "REITs", value: "P/FFO, P/AFFO, Cap Rate", color: "teal" },
+      { label: "SaaS", value: "EV/ARR, EV/Revenue, Rule of 40", color: "" },
+      { label: "Energy / Mining", value: "EV/EBITDAX, P/NAV, $/boe", color: "amber" },
+    ],
+    body: [
+      `While EV/EBITDA and P/E are widely applicable, many sectors have evolved specialised multiples that better capture their economics. REITs are valued on Price/FFO or Price/AFFO because depreciation is a poor proxy for maintenance capex in real estate. Software-as-a-Service companies are frequently valued on EV/ARR or EV/Next-Twelve-Months Revenue, often in conjunction with growth-adjusted metrics such as the Rule of 40. Exploration & production companies use EV/EBITDAX or resource-based multiples ($ per flowing barrel or per proved reserve).`,
+      `These specialised metrics exist because the standard multiples either fail to reflect the key value drivers or are distorted by accounting conventions particular to the industry. Using the sector-standard multiple improves comparability with how the market and specialist investors actually price the stocks.`,
+      `The discipline is to understand why the specialised multiple is preferred and what economic reality it is trying to isolate — then to apply it consistently and to cross-check with more universal metrics where possible.`
+    ],
+    keyPoint: "Sector-specific multiples are not arbitrary traditions — they are adaptations to the distinctive economics and accounting of each industry. Ignoring them means ignoring how that sector is actually valued."
+  },
+  {
+    era: "Dynamics",
+    icon: "📈",
+    title: "Multiple Expansion & Compression Drivers",
+    desc: "What causes valuation multiples to rise or fall over time or across companies",
+    badge: { label: "Key Insight", style: "red" },
+    tags: [["expansion","teal"], ["compression","red"], ["drivers",""], ["re-rating","amber"]],
+    data: [
+      { label: "Expansion drivers", value: "Higher growth, margins, lower rates/risk", color: "teal" },
+      { label: "Compression drivers", value: "Slower growth, margin pressure, higher rates", color: "red" },
+      { label: "Market-wide factor", value: "Risk-free rate & ERP", color: "amber" },
+    ],
+    body: [
+      `Multiples are not static. They expand or compress as expectations about growth, profitability, risk and the macroeconomic environment change. Understanding the drivers of multiple change is as important as calculating the multiples themselves.`,
+      `Company-specific expansion typically comes from accelerating growth, expanding margins, improving capital returns, de-risking of the business model, or a shift toward a higher-quality earnings mix. Compression occurs when growth slows, margins come under pressure, competitive intensity rises, or governance and balance-sheet risks increase. Market-wide moves in the risk-free rate or the equity risk premium shift the entire valuation landscape: falling rates support higher multiples; rising rates compress them.`,
+      `In practice, multiple expansion is often the largest single contributor to total shareholder return over intermediate periods. Distinguishing between fundamental re-rating (justified by improving economics) and speculative re-rating (driven by sentiment or liquidity) is one of the central tasks of relative-value analysis.`
+    ],
+    compare: {
+      left: { label: "Expansion", text: "Higher expected growth or margins, lower perceived risk, falling discount rates, scarcity of growth, positive narrative shift. Often accompanies improving fundamentals." },
+      right: { label: "Compression", text: "Decelerating growth, margin pressure, rising rates or risk premia, increased competition, loss of narrative. Can create opportunity when fundamentals remain intact." }
+    },
+    keyPoint: "A multiple is a dynamic reflection of expectations. The most valuable analytical question is rarely “what is the multiple today?” but “why is the multiple changing and is that change justified?”"
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

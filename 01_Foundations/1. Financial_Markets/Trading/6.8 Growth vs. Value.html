@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Analysis — 6.8 Growth vs. Value</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 6 · Section 6.8</div>
+      <h1 class="book-title">Growth vs.<br><em>Value</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>6</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Factors → Cycles → GARP → Duration · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Financial Analysis · Revision Notes</span>
+    <span>6.8 Growth vs. Value</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Value",
+    icon: "📉",
+    title: "Value Factors: P/E, P/B, EV/EBITDA",
+    desc: "The classic cheapness metrics that define the value style",
+    badge: { label: "Style Factor", style: "teal" },
+    tags: [["value","teal"], ["P/E",""], ["P/B",""], ["EV/EBITDA","amber"]],
+    data: [
+      { label: "Core idea", value: "Low price relative to fundamentals", color: "teal" },
+      { label: "Common metrics", value: "P/E, P/B, EV/EBITDA, P/FCF", color: "" },
+      { label: "Risk", value: "Value traps / deteriorating fundamentals", color: "red" },
+    ],
+    body: [
+      `Value investing, in its factor form, systematically prefers stocks that appear cheap relative to current or near-term fundamentals. The most widely used metrics are low price-to-earnings (P/E), low price-to-book (P/B), and low enterprise value-to-EBITDA (EV/EBITDA). Other common variants include price-to-free-cash-flow, EV/Sales (in some contexts), and dividend yield.`,
+      `The economic intuition is that the market periodically over-discounts companies that are out of favour, cyclical, or simply neglected, creating opportunities when price understates normalised earning power or asset value. Empirically, baskets of cheap stocks have delivered a value premium over long periods in many markets, although the premium is cyclical and can experience long stretches of underperformance.`,
+      `The central practical challenge is distinguishing cheapness that reflects temporary pessimism from cheapness that reflects permanent impairment (the classic “value trap”). Purely mechanical low-multiple screens therefore benefit from quality, momentum or balance-sheet overlays that reduce exposure to deteriorating businesses.`
+    ],
+    keyPoint: "Value factors identify stocks that are statistically inexpensive. Whether that cheapness represents opportunity or a value trap depends on the sustainability of the fundamentals to which the price is being compared."
+  },
+  {
+    era: "Growth",
+    icon: "📈",
+    title: "Growth Factors: EPS Growth, Revenue Growth, PEG",
+    desc: "Metrics that capture the speed and trajectory of fundamental expansion",
+    badge: { label: "Style Factor", style: "amber" },
+    tags: [["growth","amber"], ["EPS growth",""], ["revenue growth","teal"], ["PEG",""]],
+    data: [
+      { label: "Primary measures", value: "EPS growth, Sales growth", color: "teal" },
+      { label: "Growth-adjusted value", value: "PEG ratio", color: "amber" },
+      { label: "Key risk", value: "Paying too much for expected growth", color: "red" },
+    ],
+    body: [
+      `Growth factors favour companies expected to expand earnings, revenue or cash flow at an above-average rate. The most common measures are historical or forecast EPS growth, revenue growth, and sometimes growth in free cash flow or book value. High-growth stocks typically trade at elevated multiples; the investment case rests on the idea that the growth will compound value fast enough to justify the starting valuation.`,
+      `The PEG ratio (P/E divided by expected earnings growth rate) is an attempt to blend value and growth in a single number. A lower PEG is often interpreted as growth available at a more reasonable price. While intuitively appealing, PEG has limitations: it assumes a linear relationship between P/E and growth, ignores the duration and risk of that growth, and can be distorted by near-term growth rates that are not sustainable.`,
+      `Growth investing succeeds when the market underestimates the magnitude or duration of future expansion. It fails when growth decelerates faster than expected or when the starting multiple already embeds heroic assumptions.`
+    ],
+    keyPoint: "Growth factors reward expected expansion. The critical variables are not only the growth rate itself but its sustainability, profitability and the price being paid for it today."
+  },
+  {
+    era: "Quality",
+    icon: "💎",
+    title: "Quality Factors: ROE, ROIC, Margins",
+    desc: "Measures of profitability and capital efficiency that cut across the growth–value spectrum",
+    badge: { label: "Style Factor", style: "slate" },
+    tags: [["quality","slate"], ["ROE",""], ["ROIC","teal"], ["margins","amber"]],
+    data: [
+      { label: "Key metrics", value: "ROE, ROIC, Gross & Operating margins", color: "teal" },
+      { label: "Economic meaning", value: "High returns on capital", color: "" },
+      { label: "Role", value: "Often combined with value or growth", color: "amber" },
+    ],
+    body: [
+      `Quality factors identify companies that earn high returns on capital and sustain attractive margins. Return on equity (ROE), return on invested capital (ROIC), gross margin, operating margin and related metrics are the usual building blocks. High and stable quality is often associated with economic moats, pricing power and lower fundamental risk.`,
+      `Quality is not itself a growth or value style; it is a characteristic that can appear in both. High-quality value seeks cheap stocks that still earn solid returns on capital. High-quality growth seeks companies that are expanding while maintaining or improving profitability. Pure quality strategies that simply prefer high-ROE or high-margin stocks have also delivered positive long-term premia in many studies.`,
+      `Because accounting choices and leverage affect ROE, many practitioners prefer ROIC (or return on tangible capital) and examine the persistence of returns rather than a single-year snapshot. Margin stability and the gap between ROIC and the cost of capital are particularly informative.`
+    ],
+    keyPoint: "Quality captures the ability to earn excess returns on capital. It is one of the most reliable ways to avoid value traps and to distinguish sustainable growth from growth that destroys value."
+  },
+  {
+    era: "Cycles",
+    icon: "🔄",
+    title: "Value vs. Growth Performance Cycles",
+    desc: "The long and sometimes extreme rotations between the two styles",
+    badge: { label: "Market Regime", style: "red" },
+    tags: [["style rotation","red"], ["value premium",""], ["growth leadership","amber"], ["regime shifts",""]],
+    data: [
+      { label: "Historical pattern", value: "Multi-year leadership swings", color: "amber" },
+      { label: "Value-friendly regimes", value: "Rising rates, recovery, inflation", color: "teal" },
+      { label: "Growth-friendly regimes", value: "Falling rates, scarcity of growth", color: "" },
+    ],
+    body: [
+      `Value and growth styles do not outperform steadily; they rotate. Periods of value leadership can last several years and then give way to extended growth dominance (and vice versa). The relative performance gap can become extreme, as seen in the late-1990s growth bubble, the post-GFC decade of growth outperformance, and the sharp value rebound in certain rising-rate or recovery episodes.`,
+      `Macro conditions influence the cycle. Rising discount rates and economic re-acceleration often favour value (and cyclicals); falling rates and low-growth, low-inflation environments often favour long-duration growth assets. Changes in market leadership, technology regimes and investor preference also play large roles.`,
+      `For practitioners the implication is that style exposure is a significant risk factor. A permanent, unchanging tilt to either pure value or pure growth embeds a bet on the continuation of the current regime. Many investors therefore monitor relative valuations between the two styles and the macro backdrop when deciding how much style risk to carry.`
+    ],
+    compare: {
+      left: { label: "Value Leadership", text: "Often coincides with rising rates, economic recovery, higher inflation, or mean-reversion after growth excesses. Cheaper stocks re-rate as pessimism lifts." },
+      right: { label: "Growth Leadership", text: "Often coincides with falling rates, scarce secular growth, or technological enthusiasm. Investors pay up for expected compounding." }
+    },
+    keyPoint: "Style performance is strongly regime-dependent. Understanding where the market sits in the value–growth cycle is as important as the stock-specific analysis within each style."
+  },
+  {
+    era: "Hybrid",
+    icon: "⚖️",
+    title: "GARP (Growth at a Reasonable Price)",
+    desc: "The middle path that seeks growth without paying speculative multiples",
+    badge: { label: "Approach", style: "teal" },
+    tags: [["GARP","teal"], ["hybrid",""], ["reasonable price","amber"], ["PEG-style",""]],
+    data: [
+      { label: "Core idea", value: "Growth + valuation discipline", color: "teal" },
+      { label: "Typical tools", value: "PEG, relative P/E vs growth, ROIC", color: "" },
+      { label: "Goal", value: "Avoid both value traps and speculative growth", color: "amber" },
+    ],
+    body: [
+      `Growth at a Reasonable Price (GARP) is an investment approach that deliberately sits between pure value and pure growth. It looks for companies with above-average growth prospects while insisting that the valuation paid for that growth remains sensible. The classic quantitative expression is a moderate PEG ratio; more sophisticated versions incorporate ROIC, margin trajectory, balance-sheet strength and the sustainability of growth.`,
+      `GARP practitioners typically avoid the cheapest deep-value names (where growth may be structurally impaired) and the most expensive hyper-growth names (where any disappointment can cause severe multiple compression). The target is companies that can compound earnings at an attractive rate while still offering a margin of safety on the starting multiple.`,
+      `The approach is popular among many fundamental long-only managers because it aligns with a common psychological preference: the desire for growth without the feeling of overpaying. Its success depends on accurate assessment of both the growth trajectory and what constitutes a “reasonable” price in the prevailing rate and liquidity environment.`
+    ],
+    keyPoint: "GARP is a discipline of balance. It accepts that growth has value, but refuses to treat that value as unbounded. The edge lies in calibrating the price paid to the growth actually delivered."
+  },
+  {
+    era: "Framework",
+    icon: "⏳",
+    title: "Duration of Equities (Growth = Long Duration)",
+    desc: "Why growth stocks behave like long-duration bonds when discount rates change",
+    badge: { label: "Conceptual", style: "slate" },
+    tags: [["duration","slate"], ["long duration","amber"], ["discount rates",""], ["rate sensitivity","red"]],
+    data: [
+      { label: "Core analogy", value: "Growth stocks ≈ long-duration assets", color: "teal" },
+      { label: "Mechanism", value: "More value in distant cash flows", color: "" },
+      { label: "Implication", value: "Higher sensitivity to rate changes", color: "red" },
+    ],
+    body: [
+      `In fixed income, duration measures the sensitivity of a bond’s price to changes in yields. Equities can be viewed through a similar lens. The proportion of a stock’s intrinsic value that comes from cash flows far in the future determines its effective equity duration. High-growth companies, whose current earnings are small relative to expected future earnings, have more of their value concentrated in the distant future and therefore exhibit longer duration.`,
+      `When discount rates fall, long-duration assets rally more; when discount rates rise, they suffer more. This is a primary reason growth stocks (especially unprofitable or barely profitable high-growth names) have historically been more sensitive to moves in real yields and equity risk premia than value stocks, whose cash flows are nearer-term and more heavily weighted to the present.`,
+      `The duration framework helps explain style rotations around monetary-policy and inflation regimes. It also cautions that a portfolio heavily tilted to high-growth, high-multiple stocks carries significant implicit interest-rate exposure even if no bonds are held.`
+    ],
+    keyPoint: "Growth stocks are long-duration assets. Their valuations embed distant cash flows and are therefore inherently more sensitive to changes in the discount rate than the valuations of near-term cash-flow businesses."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

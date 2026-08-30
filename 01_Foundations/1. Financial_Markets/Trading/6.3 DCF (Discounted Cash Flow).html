@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Analysis — 6.3 DCF (Discounted Cash Flow)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 6 · Section 6.3</div>
+      <h1 class="book-title">Discounted<br><em>Cash Flow</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">FCFF / FCFE → WACC → Terminal Value → Advanced techniques · click to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Financial Analysis · Revision Notes</span>
+    <span>6.3 DCF (Discounted Cash Flow)</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Cash Flow",
+    icon: "🏢",
+    title: "Free Cash Flow to Firm (FCFF)",
+    desc: "Unlevered free cash flow — the cash generated by operations available to all capital providers",
+    badge: { label: "Core Concept", style: "teal" },
+    tags: [["FCFF","teal"], ["unlevered",""], ["enterprise DCF","amber"], ["NOPAT",""]],
+    data: [
+      { label: "Starting point", value: "EBIT(1–t) or NOPAT", color: "teal" },
+      { label: "Add back", value: "D&A", color: "" },
+      { label: "Subtract", value: "Capex + ΔNWC", color: "amber" },
+    ],
+    body: [
+      `Free Cash Flow to the Firm (FCFF) is the cash flow generated by the company’s operations after taxes and reinvestment needs, but before any payments to debt or equity holders. It is the central input in an enterprise (unlevered) DCF. Because it is independent of capital structure, it can be discounted at the weighted average cost of capital (WACC) to arrive directly at enterprise value.`,
+      `The standard calculation begins with NOPAT (Net Operating Profit After Tax = EBIT × (1 – tax rate)), adds back non-cash charges (primarily depreciation & amortisation), subtracts capital expenditures, and subtracts the increase in non-cash working capital. An equivalent formulation starts from cash flow from operations and adjusts for after-tax interest and capital expenditures.`,
+      `FCFF answers the question: how much cash could the business distribute to all its capital providers (debt + equity) while still maintaining its productive capacity? It is the cleanest measure of operating cash generation for valuation purposes when the capital structure is expected to change or when comparing firms with different leverage.`
+    ],
+    keyPoint: "FCFF is capital-structure neutral. It measures the cash-generating power of the assets themselves, which is why it is the foundation of enterprise DCF models."
+  },
+  {
+    era: "Cash Flow",
+    icon: "👤",
+    title: "Free Cash Flow to Equity (FCFE)",
+    desc: "Levered free cash flow — the cash available to equity holders after debt service",
+    badge: { label: "Core Concept", style: "teal" },
+    tags: [["FCFE","teal"], ["levered",""], ["equity DCF","amber"], ["net borrowing",""]],
+    data: [
+      { label: "Starting point", value: "Net Income or FCFF", color: "teal" },
+      { label: "Adjust for", value: "Net borrowing – Debt repayments", color: "" },
+      { label: "Discount rate", value: "Cost of Equity", color: "amber" },
+    ],
+    body: [
+      `Free Cash Flow to Equity (FCFE) is the cash flow remaining after the firm has met its reinvestment needs and its obligations to debt holders. It represents the cash that could be paid out to equity investors without impairing the firm’s operations or capital structure trajectory. FCFE is discounted at the cost of equity to arrive directly at equity value.`,
+      `One common calculation is: FCFE = FCFF – Interest Expense × (1 – t) + Net Borrowing. Alternatively it can be derived from net income by adding back non-cash charges, subtracting reinvestment (capex – depreciation + ΔNWC), and adding net debt issuance. The key difference from FCFF is the explicit inclusion of after-tax interest and changes in net debt.`,
+      `FCFE is particularly useful when the capital structure is stable and when the analyst wants to focus on the residual cash available to shareholders. It is also the natural cash-flow concept for banks and financial institutions, where debt is more akin to raw material than to financing.`
+    ],
+    compare: {
+      left: { label: "FCFF (Unlevered)", text: "Cash to all capital providers. Discounted at WACC. Produces Enterprise Value. Preferred when leverage is changing or for cross-firm comparison." },
+      right: { label: "FCFE (Levered)", text: "Cash to equity holders only. Discounted at Cost of Equity. Produces Equity Value directly. Preferred when capital structure is stable." }
+    },
+    keyPoint: "FCFF and FCFE are two sides of the same economic reality. The choice between them is mainly about convenience and the stability of the capital structure, not about which is “more correct.”"
+  },
+  {
+    era: "Discount Rate",
+    icon: "⚖️",
+    title: "WACC Calculation",
+    desc: "The blended required return of all capital providers — the discount rate for FCFF",
+    badge: { label: "Critical Input", style: "amber" },
+    tags: [["WACC","amber"], ["cost of equity",""], ["cost of debt","teal"], ["target weights",""]],
+    data: [
+      { label: "Formula", value: "E/V × Re + D/V × Rd × (1–t)", color: "teal" },
+      { label: "Re usually from", value: "CAPM", color: "" },
+      { label: "Weights should be", value: "Target / Market", color: "amber" },
+    ],
+    body: [
+      `The Weighted Average Cost of Capital (WACC) is the average rate of return required by all of the firm’s capital providers, weighted by their proportions in the target capital structure. It is the appropriate discount rate for FCFF because FCFF is the cash flow available to both debt and equity holders.`,
+      `Cost of equity is typically estimated via the Capital Asset Pricing Model: Re = Rf + β × Equity Risk Premium. Cost of debt is the current yield the firm would pay on new borrowing, adjusted for the tax deductibility of interest (Rd × (1 – t)). Preferred stock, if material, is included with its own cost and weight. The weights should reflect the firm’s target capital structure on a market-value basis, not the current book-value weights.`,
+      `Common practical issues include: choosing the right risk-free rate and equity risk premium, unlevering and relevering betas to the target capital structure, deciding whether to use a country risk premium, and ensuring consistency between the WACC and the currency and inflation assumptions in the cash-flow forecast.`
+    ],
+    keyPoint: "WACC is not a precise constant — it is an estimate that embeds assumptions about risk, capital structure and tax. Small changes in WACC have large effects on value, which is why sensitivity analysis around it is essential."
+  },
+  {
+    era: "Terminal Value",
+    icon: "♾️",
+    title: "Terminal Value — Perpetuity Growth & Exit Multiple",
+    desc: "The value of all cash flows beyond the explicit forecast horizon",
+    badge: { label: "Largest Piece", style: "red" },
+    tags: [["terminal value","red"], ["Gordon Growth",""], ["exit multiple","amber"], ["fade",""]],
+    data: [
+      { label: "Typical share of EV", value: "60–80%+", color: "red" },
+      { label: "Perpetuity method", value: "FCFFₙ × (1+g) / (WACC–g)", color: "teal" },
+      { label: "Exit multiple method", value: "EBITDAₙ × Exit Multiple", color: "amber" },
+    ],
+    body: [
+      `In a typical DCF the explicit forecast covers only 5–10 years. Everything thereafter is captured in the terminal value. Because this residual often constitutes the majority of total enterprise value, the assumptions that drive it are among the most consequential in the entire model.`,
+      `The two standard approaches are the perpetuity-growth (Gordon Growth) method and the exit-multiple method. In the perpetuity-growth approach, terminal value = FCFFₙ₊₁ / (WACC – g), where g is a long-term growth rate that should not exceed the long-run nominal growth rate of the economy. In the exit-multiple approach, a normalised terminal-year metric (usually EBITDA) is multiplied by a carefully chosen exit multiple that reflects expected mature-company valuations.`,
+      `Best practice is to cross-check both methods. An implied exit multiple can be reverse-engineered from the perpetuity-growth terminal value (and vice versa) to test whether the assumptions are mutually consistent. Long-term growth, margins and reinvestment rates must also be internally coherent: high growth requires sufficient reinvestment, and returns on new capital should fade toward the cost of capital over time.`
+    ],
+    keyPoint: "Terminal value is not a residual afterthought — it is usually the dominant driver of DCF output. Treating it with the same rigour as the explicit forecast is non-negotiable."
+  },
+  {
+    era: "Robustness",
+    icon: "📉",
+    title: "DCF Sensitivity Analysis",
+    desc: "Mapping how value changes when key assumptions move",
+    badge: { label: "Essential Practice", style: "amber" },
+    tags: [["sensitivity","amber"], ["data tables",""], ["tornado","slate"], ["scenarios",""]],
+    data: [
+      { label: "Most sensitive variables", value: "WACC & Terminal Growth", color: "red" },
+      { label: "Common tools", value: "2-way tables, Tornado charts", color: "" },
+      { label: "Purpose", value: "Range, not point estimate", color: "teal" },
+    ],
+    body: [
+      `A single-point DCF value creates a false sense of precision. Sensitivity analysis systematically varies the most important assumptions — typically WACC, terminal growth rate, long-term operating margin, and revenue growth — and shows the resulting range of values. Two-way data tables (WACC vs. terminal growth is the classic) and tornado charts are the most common tools.`,
+      `The exercise reveals which assumptions dominate the valuation and how wide the plausible value range actually is. It also forces the analyst to confront the economic reasonableness of combinations of assumptions: a very low WACC paired with high terminal growth may produce an attractive value but be internally inconsistent or unrealistic.`,
+      `Scenario analysis complements sensitivity analysis by defining coherent sets of assumptions (base, upside, downside) rather than varying one variable at a time. Together they transform the DCF from a single number into a structured view of value under different states of the world.`
+    ],
+    keyPoint: "The output of a good DCF is not a price target — it is a map of how value depends on the key drivers. Sensitivity analysis is how that map is drawn."
+  },
+  {
+    era: "Implied",
+    icon: "🔄",
+    title: "Reverse DCF (Implied Growth Rates)",
+    desc: "Working backwards from market price to the expectations embedded in it",
+    badge: { label: "Market Lens", style: "slate" },
+    tags: [["reverse DCF","slate"], ["implied growth",""], ["market expectations","amber"], ["debate",""]],
+    data: [
+      { label: "Starting point", value: "Current Enterprise Value", color: "teal" },
+      { label: "Solved for", value: "Growth / Margins / WACC", color: "" },
+      { label: "Key question", value: "Are implied assumptions reasonable?", color: "amber" },
+    ],
+    body: [
+      `A conventional DCF starts with assumptions and produces a value. A reverse DCF starts with the current market price (or enterprise value) and solves for the assumptions that justify that price. Most commonly it solves for the implied long-term growth rate or the implied operating margin trajectory that makes the present value of cash flows equal the observed market value.`,
+      `This approach is powerful because it shifts the debate from “what is my value?” to “what does the market already believe?” If the reverse DCF implies perpetual growth well above GDP growth, or margins that have never been achieved by any peer, the current price may embed aggressive expectations. Conversely, if the implied assumptions look conservative relative to history and industry dynamics, the stock may be undervalued.`,
+      `Reverse DCF is especially useful in heated markets or for high-growth companies where traditional forward DCFs can feel arbitrary. It does not replace fundamental forecasting; it disciplines it by revealing the market’s embedded narrative.`
+    ],
+    keyPoint: "Reverse DCF turns valuation into a test of expectations rather than a hunt for a single “correct” price. The most useful question is often not “what is it worth?” but “what is the market already pricing in?”"
+  },
+  {
+    era: "Advanced",
+    icon: "🎲",
+    title: "Monte Carlo DCF",
+    desc: "Replacing point estimates with probability distributions for key inputs",
+    badge: { label: "Stochastic", style: "slate" },
+    tags: [["Monte Carlo","slate"], ["simulation",""], ["distributions","amber"], ["probability",""]],
+    data: [
+      { label: "Core idea", value: "Sample input distributions", color: "teal" },
+      { label: "Output", value: "Distribution of values", color: "" },
+      { label: "Key benefit", value: "Full risk picture", color: "amber" },
+    ],
+    body: [
+      `Traditional sensitivity analysis varies one or two inputs at a time. Monte Carlo simulation goes further by assigning probability distributions to many uncertain inputs simultaneously (revenue growth, margins, WACC, terminal growth, etc.) and then running thousands of iterations. Each iteration draws a random set of inputs from the defined distributions and calculates a DCF value. The result is a full probability distribution of possible enterprise or equity values.`,
+      `This approach surfaces the range and shape of outcomes — including the probability of severe downside or extreme upside — rather than a handful of discrete scenarios. It also naturally incorporates correlations between variables when they are specified. The method is particularly valuable for projects or companies with high uncertainty and for risk-management contexts where the left tail matters.`,
+      `The quality of a Monte Carlo DCF depends entirely on the realism of the input distributions and the correlations among them. Garbage-in, garbage-out remains the governing principle; the simulation only organises uncertainty that the analyst has already quantified.`
+    ],
+    keyPoint: "Monte Carlo does not reduce uncertainty — it quantifies and visualises it. Used well, it replaces false precision with an honest picture of the distribution of possible values."
+  },
+  {
+    era: "Limitations",
+    icon: "⚠️",
+    title: "Key Challenges — WACC & Terminal Value Sensitivity",
+    desc: "Why small changes in the two most influential inputs create large swings in value",
+    badge: { label: "Critical Warning", style: "red" },
+    tags: [["challenges","red"], ["WACC sensitivity",""], ["TV sensitivity","amber"], ["humility",""]],
+    data: [
+      { label: "WACC ±0.5%", value: "Often ±10–20% value", color: "red" },
+      { label: "Terminal g ±0.5%", value: "Large value swings", color: "red" },
+      { label: "Healthy response", value: "Ranges + cross-checks", color: "teal" },
+    ],
+    body: [
+      `Two inputs dominate most DCF valuations: the discount rate (WACC) and the assumptions that drive terminal value (especially long-term growth and the exit multiple or perpetuity formula). Because terminal value is itself a present-value calculation that extends to infinity, small changes in WACC or g produce disproportionately large changes in total value. This mathematical reality is the central practical challenge of DCF.`,
+      `WACC is sensitive to beta, the equity risk premium, the risk-free rate, and the target capital structure — all of which are estimates. Terminal growth is constrained by economics (it cannot forever exceed economy-wide growth) yet still requires a judgement that feels arbitrary. The combination means that two thoughtful analysts can produce very different values from the same set of cash-flow projections simply by making slightly different choices on these two parameters.`,
+      `The constructive response is not to abandon DCF but to treat it with appropriate humility: present ranges rather than point estimates, show explicit sensitivity tables, cross-check with multiples and reverse DCF, and focus debate on the cash-flow drivers that are more observable and more within the analyst’s comparative advantage.`
+    ],
+    compare: {
+      left: { label: "The Problem", text: "WACC and terminal value assumptions are both highly influential and inherently uncertain. Small differences create large value gaps, undermining the appearance of precision." },
+      right: { label: "The Discipline", text: "Use ranges, sensitivity tables, scenario analysis and market-implied reverse DCFs. Anchor the debate in cash-flow fundamentals rather than in the precise decimal places of WACC or g." }
+    },
+    keyPoint: "The greatest risk in DCF is not that the model is wrong, but that its precision is taken too seriously. Sensitivity to WACC and terminal value is a feature that demands humility, not a bug that can be engineered away."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

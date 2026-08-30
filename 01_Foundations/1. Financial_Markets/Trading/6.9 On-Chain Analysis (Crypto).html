@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Analysis — 6.9 On-Chain Analysis (Crypto)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 6 · Section 6.9</div>
+      <h1 class="book-title">On-Chain<br><em>Analysis</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Core metrics → Flows → Cohorts → Platforms · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Financial Analysis · Revision Notes</span>
+    <span>6.9 On-Chain Analysis (Crypto)</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Core Metrics",
+    icon: "📊",
+    title: "On-Chain Metrics: NVT, MVRV, SOPR, NUPL",
+    desc: "The foundational valuation and profitability ratios derived directly from blockchain data",
+    badge: { label: "Core", style: "teal" },
+    tags: [["NVT","teal"], ["MVRV",""], ["SOPR","amber"], ["NUPL",""]],
+    data: [
+      { label: "NVT", value: "Network Value to Transactions", color: "teal" },
+      { label: "MVRV", value: "Market Value / Realized Value", color: "" },
+      { label: "SOPR / NUPL", value: "Spent output profit; Net unrealized P/L", color: "amber" },
+    ],
+    body: [
+      `On-chain metrics exploit the transparency of public blockchains to construct valuation and sentiment indicators that have no direct analogue in traditional markets. NVT (Network Value to Transactions) compares market capitalisation to the value of coins moved on-chain, functioning loosely like a PE ratio for crypto networks. Elevated NVT can signal overvaluation relative to usage; depressed NVT can signal the opposite.`,
+      `MVRV compares market capitalisation to realized capitalization (the value of all coins at the price they last moved). Values significantly above 1 have historically coincided with cycle tops; values below 1 have often marked cycle bottoms. SOPR (Spent Output Profit Ratio) measures whether coins being moved are, on average, in profit or at a loss. NUPL (Net Unrealized Profit/Loss) aggregates the unrealized profit or loss of the entire supply.`,
+      `Together these metrics provide a framework for assessing whether the market is priced for euphoria, capitulation, or something in between, using data that is native to the blockchain rather than reported by intermediaries.`
+    ],
+    keyPoint: "On-chain valuation metrics turn the public ledger into a real-time fundamental dataset. Their power lies in measuring actual economic activity and holder profitability rather than reported earnings."
+  },
+  {
+    era: "Flows",
+    icon: "🏦",
+    title: "Exchange Inflows / Outflows",
+    desc: "Tracking the movement of coins onto and off centralized exchanges as a proxy for selling or accumulation pressure",
+    badge: { label: "Flow Signal", style: "amber" },
+    tags: [["exchange flows","amber"], ["inflows",""], ["outflows","teal"], ["supply on exchange",""]],
+    data: [
+      { label: "Inflows", value: "Often associated with sell pressure", color: "red" },
+      { label: "Outflows", value: "Often associated with accumulation", color: "teal" },
+      { label: "Aggregate metric", value: "Exchange reserve / supply on exchanges", color: "" },
+    ],
+    body: [
+      `Coins generally need to be deposited onto centralized exchanges before they can be sold for fiat or other assets. Persistent net inflows therefore tend to increase available sell-side liquidity and are frequently interpreted as a bearish or distributional signal. Conversely, sustained net outflows reduce exchange balances and are often read as accumulation or a preference for self-custody.`,
+      `The absolute level of exchange reserves (total supply held on exchanges) is equally watched. Multi-year declines in exchange balances have coincided with strong bull markets, as liquid supply tightens. Sharp reversals higher in exchange reserves have often accompanied distribution phases or capitulation events.`,
+      `Interpretation requires context: not every inflow is an imminent sale (transfers between exchange wallets, collateral movements, etc.), and not every outflow is long-term holding. Still, when combined with price action and other on-chain signals, exchange flow data remains one of the most widely used tactical indicators.`
+    ],
+    keyPoint: "Exchange flows reveal the movement of coins toward or away from the most liquid venues for selling. Rising exchange supply is a cautionary signal; falling exchange supply is a constructive one."
+  },
+  {
+    era: "Supply Side",
+    icon: "⛏️",
+    title: "Miner Behavior (Selling Patterns)",
+    desc: "How the economic agents who secure proof-of-work networks manage their coin inventories",
+    badge: { label: "Supply", style: "slate" },
+    tags: [["miners","slate"], ["miner outflows",""], ["hashprice","amber"], ["selling pressure",""]],
+    data: [
+      { label: "Key observation", value: "Miner-to-exchange flows", color: "amber" },
+      { label: "Stress signal", value: "Forced selling when hashprice collapses", color: "red" },
+      { label: "Constructive signal", value: "Miners holding through weakness", color: "teal" },
+    ],
+    body: [
+      `In proof-of-work networks such as Bitcoin, miners receive newly issued coins and transaction fees. Their operating costs (primarily energy and hardware) are largely fiat-denominated, so they are structurally motivated sellers of a portion of their production. Tracking miner balances and miner-to-exchange flows therefore provides insight into a systematic source of sell-side pressure.`,
+      `When hashprice (revenue per unit of hash rate) is high, miners can cover costs while retaining more coins. When hashprice collapses, weaker miners may be forced to sell more aggressively or exit, increasing exchange inflows from miner wallets. Periods of miner capitulation have historically coincided with late-stage bear market bottoms.`,
+      `Changes in miner inventory, the distribution of hash rate among pools, and the relationship between miner selling and price action are standard components of supply-side on-chain analysis.`
+    ],
+    keyPoint: "Miners are forced participants in the market. Their selling intensity rises when margins compress and eases when profitability recovers — making miner flows a useful real-time gauge of supply-side stress."
+  },
+  {
+    era: "Cohorts",
+    icon: "👥",
+    title: "Holder Cohorts (Short-Term vs. Long-Term Holders)",
+    desc: "Segmenting supply by the age of coins to distinguish speculative from conviction capital",
+    badge: { label: "Supply Structure", style: "teal" },
+    tags: [["LTH","teal"], ["STH",""], ["coin age","amber"], ["cohorts",""]],
+    data: [
+      { label: "LTH threshold", value: "Typically >155 days (Bitcoin)", color: "teal" },
+      { label: "STH behavior", value: "Higher turnover, more price-sensitive", color: "" },
+      { label: "Cycle signal", value: "LTH distribution at tops; accumulation at bottoms", color: "amber" },
+    ],
+    body: [
+      `On-chain analysis divides circulating supply into cohorts based on how long coins have remained unmoved. Long-term holders (LTH) are typically defined as entities whose coins have not moved for more than a threshold period (commonly ~155 days for Bitcoin). Short-term holders (STH) hold coins that have moved more recently and are presumed to be more speculative or reactive.`,
+      `LTH supply tends to rise during bear markets as weak hands transfer coins to stronger ones, and to decline during late-stage bull markets as long-term holders distribute into strength. STH supply and STH profitability metrics often spike near local and cyclical tops when newer entrants dominate activity.`,
+      `Cohort analysis therefore provides a structural view of who owns the supply and whether that ownership base is strengthening or weakening — information that is invisible in pure price data.`
+    ],
+    keyPoint: "The age distribution of coins reveals the conviction of the holder base. Rising long-term holder supply is typically constructive; aggressive long-term holder distribution into strength is a classic late-cycle warning."
+  },
+  {
+    era: "Valuation",
+    icon: "💰",
+    title: "Realized Cap & MVRV",
+    desc: "Valuing the network by the price at which each coin last moved rather than by the current spot price",
+    badge: { label: "Valuation", style: "teal" },
+    tags: [["realized cap","teal"], ["MVRV",""], ["cost basis","amber"], ["cycle tops / bottoms",""]],
+    data: [
+      { label: "Realized Cap", value: "Sum of coins × price at last move", color: "teal" },
+      { label: "MVRV", value: "Market Cap / Realized Cap", color: "" },
+      { label: "Historical zones", value: "MVRV >> 1 tops; MVRV < 1 bottoms", color: "amber" },
+    ],
+    body: [
+      `Realized capitalization values each coin at the price it last moved on-chain rather than at the current market price. It approximates the aggregate cost basis of the market. Because it only updates when coins actually transfer, it is smoother and less speculative than market capitalization.`,
+      `MVRV is simply the ratio of market capitalization to realized capitalization. When market value is far above realized value, the average holder is sitting on large unrealized profits and the incentive to take profits rises. When market value falls below realized value, the average holder is at an unrealized loss and the market is, in aggregate, underwater — a condition that has historically aligned with major cycle lows.`,
+      `Variants such as MVRV Z-Score normalise the ratio by its historical volatility and have been widely used to identify statistically extreme deviations from the long-term mean.`
+    ],
+    keyPoint: "Realized cap anchors valuation to the actual capital that has entered the network. MVRV translates that anchor into a cyclical oscillator of aggregate profitability and risk."
+  },
+  {
+    era: "Profitability",
+    icon: "📈",
+    title: "STH-SOPR (Short-Term Holder SOPR)",
+    desc: "Measuring whether recent buyers are selling at a profit or a loss",
+    badge: { label: "Sentiment", style: "amber" },
+    tags: [["STH-SOPR","amber"], ["profitability",""], ["capitulation","red"], ["euphoria",""]],
+    data: [
+      { label: "SOPR > 1", value: "Coins moved are in profit on average", color: "teal" },
+      { label: "SOPR < 1", value: "Coins moved are at a loss on average", color: "red" },
+      { label: "STH focus", value: "More sensitive to recent market entrants", color: "amber" },
+    ],
+    body: [
+      `SOPR (Spent Output Profit Ratio) calculates the ratio of the price at which coins are spent to the price at which they were acquired. A value above 1 means that, on average, the coins being moved are realizing a profit; a value below 1 means they are realizing a loss. Filtering the metric to short-term holders produces STH-SOPR, which focuses on the behaviour of more recent and typically more speculative participants.`,
+      `STH-SOPR is particularly useful around local tops and bottoms. Sustained readings well above 1 can indicate that newer buyers are comfortably in profit and may be inclined to distribute. Dips below 1, especially when accompanied by rising volume, often mark periods of panic or capitulation among short-term holders — conditions that have frequently preceded local or cyclical recoveries.`,
+      `Because it is based on actual spent outputs, STH-SOPR reflects realised rather than merely paper profitability and is therefore a direct behavioural signal.`
+    ],
+    keyPoint: "STH-SOPR reveals whether the most reactive part of the market is locking in gains or being forced to accept losses. Extremes in either direction have historically carried tactical significance."
+  },
+  {
+    era: "Activity",
+    icon: "⏳",
+    title: "Dormancy & Coin Days Destroyed",
+    desc: "Measuring the age of coins being moved as a signal of long-term holder activity",
+    badge: { label: "Activity", style: "slate" },
+    tags: [["dormancy","slate"], ["CDD",""], ["old coins","amber"], ["distribution",""]],
+    data: [
+      { label: "Coin Days Destroyed", value: "Coins moved × days held", color: "teal" },
+      { label: "High CDD", value: "Older coins are moving", color: "amber" },
+      { label: "Interpretation", value: "Potential distribution by long-term holders", color: "red" },
+    ],
+    body: [
+      `Every day a coin remains unmoved it accumulates one “coin day.” When that coin is finally spent, the accumulated coin days are “destroyed.” Coin Days Destroyed (CDD) therefore rises sharply when older coins are moved and stays low when only recently acquired coins are turning over. Dormancy metrics normalise or average this concept over time.`,
+      `Elevated CDD or dormancy indicates that long-term holders are becoming active. In the context of rising prices this often reflects distribution; in the context of deep bear markets it can reflect final capitulation or the transfer of coins to new strong hands. Low dormancy suggests that the bulk of activity is coming from short-term, higher-velocity participants.`,
+      `These metrics complement holder-cohort analysis by focusing on the actual movement of aged supply rather than on the static age distribution of the unmoved supply.`
+    ],
+    keyPoint: "When old coins move, long-term holders are making decisions. High dormancy or CDD is a signal that conviction capital is changing hands — a development that often carries cyclical weight."
+  },
+  {
+    era: "Concentration",
+    icon: "🐋",
+    title: "Whale Tracking (Large Wallet Flows)",
+    desc: "Monitoring the behaviour of the largest addresses and entities on the network",
+    badge: { label: "Concentration", style: "red" },
+    tags: [["whales","red"], ["large wallets",""], ["entity adjustment","teal"], ["smart money",""]],
+    data: [
+      { label: "Focus", value: "Top addresses / known entities", color: "" },
+      { label: "Signals", value: "Accumulation, distribution, exchange deposits", color: "amber" },
+      { label: "Caveat", value: "Exchange & custodian wallets must be filtered", color: "red" },
+    ],
+    body: [
+      `Because blockchain ledgers are public, the balances and transfers of the largest wallets can be observed directly. “Whale” tracking monitors these large addresses for signs of accumulation, distribution, or preparation to sell (e.g., large deposits to exchanges). In principle this offers a window into the behaviour of well-capitalised, potentially better-informed participants.`,
+      `In practice the analysis requires careful entity adjustment. Many of the largest addresses belong to exchanges, custodians, or protocol contracts rather than to single directional investors. Clustering heuristics and labelled datasets are used to distinguish genuine large holders from infrastructure wallets. Once filtered, changes in the balances of the top non-exchange cohorts can be informative.`,
+      `Whale activity is most useful when it diverges from retail behaviour or when it coincides with key technical or valuation levels. It is rarely a standalone signal but adds colour to the broader on-chain picture.`
+    ],
+    keyPoint: "Large-wallet flows can reveal the actions of concentrated capital. After filtering out exchange and custodial noise, they provide a high-signal view of whether the biggest players are accumulating or distributing."
+  },
+  {
+    era: "Tooling",
+    icon: "🛠️",
+    title: "Glassnode, CryptoQuant, Nansen Platforms",
+    desc: "The primary data and analytics providers that industrialise on-chain research",
+    badge: { label: "Infrastructure", style: "slate" },
+    tags: [["Glassnode","slate"], ["CryptoQuant",""], ["Nansen","teal"], ["data platforms",""]],
+    data: [
+      { label: "Glassnode", value: "Deep Bitcoin & multi-asset on-chain metrics", color: "teal" },
+      { label: "CryptoQuant", value: "Exchange flows, miner data, market indicators", color: "" },
+      { label: "Nansen", value: "Wallet labelling, smart-money tracking, DeFi", color: "amber" },
+    ],
+    body: [
+      `Raw blockchain data is voluminous and difficult to interpret without substantial engineering. Specialised platforms transform that data into clean, labelled, and visualised metrics. Glassnode is widely regarded for its comprehensive suite of Bitcoin and multi-asset on-chain indicators, including many of the valuation, cohort and profitability metrics discussed above. CryptoQuant emphasises exchange flows, miner metrics and real-time market signals. Nansen focuses on wallet labelling, “smart money” tracking, and activity across DeFi and NFT ecosystems.`,
+      `These platforms differ in coverage, methodology and interface, but all rest on the same foundation: the public ledger plus heuristics for clustering addresses into entities and labelling known participants (exchanges, funds, protocols, etc.). Professional on-chain analysis almost always relies on one or more of these (or similar) providers rather than on raw node data alone.`,
+      `Understanding the strengths and methodological choices of each platform is part of the skill set of serious crypto fundamental and quantitative researchers.`
+    ],
+    keyPoint: "On-chain analysis at scale is infrastructure-dependent. Glassnode, CryptoQuant and Nansen (among others) turn the public ledger into decision-ready datasets; fluency with their metrics is now table stakes."
+  },
+  {
+    era: "DeFi",
+    icon: "🔄",
+    title: "DEX Trading Volumes & Liquidity Trends",
+    desc: "Monitoring decentralised exchange activity as a measure of on-chain economic usage and risk appetite",
+    badge: { label: "DeFi Activity", style: "amber" },
+    tags: [["DEX volume","amber"], ["liquidity",""], ["TVL","teal"], ["on-chain trading",""]],
+    data: [
+      { label: "Key metrics", value: "DEX volume, TVL, depth, fees", color: "teal" },
+      { label: "Signal value", value: "Usage intensity & risk appetite", color: "" },
+      { label: "Risk lens", value: "Liquidity concentration & impermanent loss", color: "red" },
+    ],
+    body: [
+      `Decentralised exchanges (DEXs) settle trades directly on-chain via automated market makers or order books. Their volumes, total value locked (TVL), fee generation and liquidity depth are fully observable and have become core indicators of on-chain economic activity. Rising DEX volumes relative to centralised exchange volumes can signal a shift toward self-custodied trading and broader ecosystem usage.`,
+      `Liquidity trends matter for both opportunity and risk. Deep, stable liquidity supports efficient price discovery and reduces slippage; thin or highly concentrated liquidity increases the cost of trading and the vulnerability to large flows or exploits. Changes in TVL across protocols also reflect capital rotation, yield-seeking behaviour and shifts in risk appetite within DeFi.`,
+      `For analysts, DEX data provides a real-time window into whether on-chain activity is expanding or contracting, which protocols are gaining share, and whether liquidity conditions are supportive or fragile.`
+    ],
+    keyPoint: "DEX volumes and liquidity are the purest expression of on-chain trading demand. They measure actual economic usage of decentralised infrastructure and serve as both a growth indicator and a risk thermometer."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
