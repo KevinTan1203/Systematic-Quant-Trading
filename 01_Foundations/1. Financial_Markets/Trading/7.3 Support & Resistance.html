@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Technical Analysis — 7.3 Support & Resistance</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 7 · Section 7.3</div>
+      <h1 class="book-title">Support &amp;<br><em>Resistance</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Horizontal → dynamic → Fibonacci → pivots · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Technical Analysis · Revision Notes</span>
+    <span>7.3 Support &amp; Resistance</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Core",
+    icon: "➖",
+    title: "Horizontal S/R Levels",
+    desc: "Price levels where buying or selling interest has repeatedly appeared",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["horizontal","teal"], ["support",""], ["resistance","red"], ["tested levels",""]],
+    data: [
+      { label: "Support", value: "Floor — buyers defend", color: "teal" },
+      { label: "Resistance", value: "Ceiling — sellers defend", color: "red" },
+      { label: "Strength", value: "Number of tests + volume", color: "amber" },
+    ],
+    body: [
+      `Horizontal support and resistance are the most basic and often the most powerful form of S/R. Support is a price level or zone where demand has previously been strong enough to halt or reverse a decline. Resistance is a level where supply has previously been strong enough to halt or reverse an advance.`,
+      `These levels are identified by locating prior swing highs and lows, consolidation boundaries, and areas where price has repeatedly stalled or reversed. The more times a level has been tested and held, the more significant it becomes in the eyes of market participants.`,
+      `Horizontal levels are timeframe-dependent. A daily support level may be invisible on a 5-minute chart, and a minor intraday resistance may be irrelevant on the weekly chart. Always state the timeframe when discussing a level.`
+    ],
+    keyPoint: "Horizontal S/R exists because traders remember prices. The more memorable and frequently tested the level, the more likely it is to influence future behaviour — until it is decisively broken."
+  },
+  {
+    era: "Core",
+    icon: "📈",
+    title: "Dynamic S/R (Moving Averages)",
+    desc: "Sloping levels created by widely watched moving averages",
+    badge: { label: "Adaptive", style: "teal" },
+    tags: [["dynamic","teal"], ["MA support",""], ["MA resistance","red"], ["20 / 50 / 200",""]],
+    data: [
+      { label: "Common MAs", value: "20, 50, 100, 200", color: "" },
+      { label: "Rising MA", value: "Dynamic support", color: "teal" },
+      { label: "Falling MA", value: "Dynamic resistance", color: "red" },
+    ],
+    body: [
+      `Unlike static horizontal levels, dynamic support and resistance move with price. The most widely used sources are moving averages — particularly the 20, 50, 100 and 200-period averages on daily and weekly charts. In an uptrend a rising moving average often acts as support; in a downtrend a falling moving average often acts as resistance.`,
+      `The power of dynamic S/R comes from collective attention. Because so many participants watch the same averages, orders tend to cluster around them, creating self-fulfilling reactions. A rising 50-day MA that has been respected multiple times becomes a credible dynamic support zone.`,
+      `Dynamic levels are most reliable when they align with horizontal levels or other confluence factors. A moving average that is rising into a prior horizontal resistance creates a higher-probability decision zone than either factor alone.`
+    ],
+    keyPoint: "Dynamic S/R adapts to the current trend. Its effectiveness depends less on the mathematical formula and more on how many participants are watching and reacting to the same line."
+  },
+  {
+    era: "Psychology",
+    icon: "🧠",
+    title: "Psychological Levels (Round Numbers)",
+    desc: "Whole numbers and round figures that attract order clustering",
+    badge: { label: "Behavioural", style: "amber" },
+    tags: [["round numbers","amber"], ["psychology",""], ["00 / 50 levels",""], ["magnet",""]],
+    data: [
+      { label: "Classic examples", value: "100, 50, 1000, 10 000", color: "" },
+      { label: "Behaviour", value: "Order clustering", color: "amber" },
+      { label: "Effect", value: "Magnet + barrier", color: "teal" },
+    ],
+    body: [
+      `Psychological levels are prices that end in zeros or other round figures (10, 50, 100, 1 000, etc.). Humans preferentially use round numbers when setting targets, stops and limit orders, so these levels naturally attract a disproportionate amount of resting liquidity.`,
+      `As a result, round numbers often act as both magnets (price is drawn toward them) and barriers (price struggles to move cleanly through them). A break of a major round number frequently triggers cascading stops and accelerated movement; a rejection often produces a sharp reversal.`,
+      `The psychological effect is strongest at major whole numbers on higher timeframes and at “big figure” levels in forex and indices. Minor round numbers on lower timeframes still matter but carry less weight.`
+    ],
+    keyPoint: "Round numbers matter because traders are human. The clustering of orders around them turns an otherwise arbitrary price into a self-reinforcing support or resistance zone."
+  },
+  {
+    era: "Core",
+    icon: "🔝",
+    title: "Previous Highs / Lows",
+    desc: "Prior swing extremes that become natural reference points",
+    badge: { label: "Structural", style: "teal" },
+    tags: [["prior high","red"], ["prior low","teal"], ["swing points",""], ["memory",""]],
+    data: [
+      { label: "Prior high", value: "Potential resistance", color: "red" },
+      { label: "Prior low", value: "Potential support", color: "teal" },
+      { label: "Strength factor", value: "How extreme + volume", color: "amber" },
+    ],
+    body: [
+      `Every significant swing high and swing low leaves a memory in the market. A prior high marks a price at which sellers previously overwhelmed buyers; a prior low marks a price at which buyers previously overwhelmed sellers. These extremes become natural candidates for future resistance and support.`,
+      `The more significant the original swing (measured by the size of the move that followed, the volume at the extreme, and the time spent near the level), the more important the level becomes. Major weekly or monthly highs and lows routinely influence price months or years later.`,
+      `Price often reacts at prior extremes even when no other technical factor is present. This is why marking key swing highs and lows on the chart remains one of the highest-value habits in discretionary analysis.`
+    ],
+    keyPoint: "Previous highs and lows are the market’s own historical record of where supply and demand previously won. Until proven otherwise, treat them as live levels."
+  },
+  {
+    era: "Principle",
+    icon: "🔄",
+    title: "S/R Role Reversal",
+    desc: "Broken support becomes resistance · broken resistance becomes support",
+    badge: { label: "Key Concept", style: "red" },
+    tags: [["role reversal","red"], ["polarity",""], ["broken level",""], ["retest",""]],
+    data: [
+      { label: "Broken support", value: "→ Future resistance", color: "red" },
+      { label: "Broken resistance", value: "→ Future support", color: "teal" },
+      { label: "Best entry", value: "Retest of flipped level", color: "amber" },
+    ],
+    body: [
+      `One of the most reliable principles in technical analysis is polarity: once a support level is decisively broken, it often becomes resistance on any subsequent retest. Conversely, once a resistance level is decisively broken, it often becomes support.`,
+      `The logic is behavioural. Traders who bought at former support and are now underwater may sell into any rally back to that level in order to exit near break-even. Short sellers who covered on a breakout may re-short a retest of former resistance. Both groups reinforce the new role of the level.`,
+      `Role-reversal trades are among the highest-probability setups in trend-following and breakout systems. The ideal sequence is a decisive break, a period of acceptance beyond the level, and then a retest that fails to reclaim the old side.`
+    ],
+    keyPoint: "A broken level does not disappear — it changes teams. The old support becomes the new resistance, and the old resistance becomes the new support. The retest is often the highest-quality entry."
+  },
+  {
+    era: "Confirmation",
+    icon: "📊",
+    title: "Volume-Confirmed S/R",
+    desc: "Levels that coincide with high-volume nodes carry greater weight",
+    badge: { label: "Validation", style: "slate" },
+    tags: [["volume","slate"], ["HVN",""], ["confirmation",""], ["acceptance",""]],
+    data: [
+      { label: "High-volume node", value: "Stronger S/R", color: "teal" },
+      { label: "Low-volume node", value: "Weaker / faster travel", color: "amber" },
+      { label: "Break signal", value: "Volume expansion", color: "red" },
+    ],
+    body: [
+      `Not all price levels are equal. Levels that formed on high volume (high-volume nodes on a volume profile) represent areas where a large amount of business was conducted and where many participants still have positions or memory. These levels tend to produce stronger reactions.`,
+      `Conversely, low-volume areas (low-volume nodes) often act as zones that price travels through quickly once a break occurs, because fewer participants have a vested interest at those prices. Volume therefore helps rank the relative importance of competing S/R levels.`,
+      `A break of a level on expanding volume is more credible than a break on declining volume. Likewise, a successful defence of support on a volume spike suggests genuine demand rather than a temporary pause.`
+    ],
+    keyPoint: "Volume is the footprint of participation. High-volume S/R levels have more “owners” and therefore more reason to be defended or to attract reactive order flow."
+  },
+  {
+    era: "Practical",
+    icon: "🟦",
+    title: "S/R Zones vs. Exact Levels",
+    desc: "Treating support and resistance as areas rather than precise prices",
+    badge: { label: "Realism", style: "amber" },
+    tags: [["zones","amber"], ["areas",""], ["noise",""], ["practical",""]],
+    data: [
+      { label: "Exact level", value: "Single price", color: "" },
+      { label: "Zone", value: "Price band / area", color: "teal" },
+      { label: "Advantage", value: "Accounts for noise & wicks", color: "amber" },
+    ],
+    body: [
+      `In real markets price rarely reverses at an exact pip or tick. Spreads, stop runs, algorithmic probing and ordinary noise mean that reactions usually occur within a small band around a theoretical level. Treating S/R as zones rather than razor-thin lines is therefore more realistic and reduces false signals.`,
+      `A practical approach is to mark the extreme of the original swing and the body closes or high-volume area nearby, then treat the space between them as the zone. Entries, stops and targets are placed relative to the zone rather than a single price.`,
+      `Zones also help with role-reversal logic: once price has accepted beyond an entire zone, the whole area can flip polarity. This framing prevents the common error of calling a level “broken” on a momentary wick only for price to reverse back inside.`
+    ],
+    keyPoint: "Markets are noisy. Exact levels are intellectual conveniences; zones are what price actually respects. Trade the area, not the pixel."
+  },
+  {
+    era: "Fibonacci",
+    icon: "🌀",
+    title: "Fibonacci Retracements",
+    desc: "23.6 % · 38.2 % · 50 % · 61.8 % · 78.6 % — common pullback ratios",
+    badge: { label: "Classic", style: "teal" },
+    tags: [["Fib retracement","teal"], ["38.2 / 61.8",""], ["golden ratio",""], ["pullback",""]],
+    data: [
+      { label: "Key ratios", value: "38.2 % · 50 % · 61.8 %", color: "teal" },
+      { label: "Deep retrace", value: "78.6 %", color: "amber" },
+      { label: "Shallow", value: "23.6 %", color: "" },
+    ],
+    body: [
+      `Fibonacci retracement levels are horizontal lines drawn between a significant swing high and swing low at the key Fibonacci ratios: 23.6 %, 38.2 %, 50 %, 61.8 % and 78.6 %. Traders watch these levels as potential support during pullbacks in an uptrend or resistance during pullbacks in a downtrend.`,
+      `The 38.2 % and 61.8 % levels (derived from the golden ratio) are the most widely observed. The 50 % level is not a true Fibonacci ratio but is included because of its psychological and historical significance. The 78.6 % level is the square root of 61.8 % and often marks a final defence before a full trend reversal.`,
+      `Fibonacci levels work best when they coincide with other forms of S/R — prior swing points, moving averages, round numbers or volume nodes. Used in isolation they are only modestly predictive; used as confluence tools they become far more powerful.`
+    ],
+    keyPoint: "Fibonacci retracements are popular because enough traders watch them to create self-reinforcing reactions. Their edge is greatest at points of confluence with independent S/R."
+  },
+  {
+    era: "Fibonacci",
+    icon: "📏",
+    title: "Fibonacci Extensions",
+    desc: "Projecting potential targets beyond the original swing using Fib ratios",
+    badge: { label: "Targets", style: "slate" },
+    tags: [["Fib extension","slate"], ["127.2 / 161.8",""], ["targets",""], ["projection",""]],
+    data: [
+      { label: "Common extensions", value: "127.2 % · 161.8 % · 261.8 %", color: "teal" },
+      { label: "Primary use", value: "Profit targets", color: "amber" },
+      { label: "Method", value: "Project from pullback", color: "" },
+    ],
+    body: [
+      `Fibonacci extensions project potential price targets beyond the original impulse move. After a retracement has occurred, the extension levels (commonly 127.2 %, 161.8 %, 200 % and 261.8 %) are used to estimate where the next leg of the trend may reach.`,
+      `The most frequently watched extension is the 161.8 % level — the golden-ratio extension. Many trend-following and breakout traders take partial or full profits near this projection, which in turn can create actual resistance or support as orders cluster there.`,
+      `Extensions are most useful when they align with prior structural levels, measured-move targets, or other confluence factors. Blindly targeting a Fib extension without additional confirmation often leads to premature exits or missed moves.`
+    ],
+    keyPoint: "Extensions answer the question “How far might this move travel?” They are projection tools, not reversal signals. Treat them as areas of interest for profit-taking rather than automatic turning points."
+  },
+  {
+    era: "Calculated",
+    icon: "🎯",
+    title: "Pivot Points (Classic, Camarilla, Woodie)",
+    desc: "Floor-trader derived levels calculated from the prior period’s H/L/C",
+    badge: { label: "Intraday", style: "amber" },
+    tags: [["classic pivots","amber"], ["Camarilla",""], ["Woodie",""], ["floor levels",""]],
+    data: [
+      { label: "Classic", value: "PP, R1–R3, S1–S3", color: "" },
+      { label: "Camarilla", value: "Tighter, mean-reversion bias", color: "teal" },
+      { label: "Woodie", value: "Heavier open weighting", color: "amber" },
+    ],
+    body: [
+      `Pivot points are a set of horizontal support and resistance levels calculated from the previous period’s high, low and close (and in some variants the open). Originally used by floor traders to anticipate intraday turning points, they remain popular in futures, forex and equity index trading.`,
+      `The classic system produces a central pivot point (PP) plus three resistance levels (R1–R3) and three support levels (S1–S3). Camarilla pivots use a different set of multipliers and tend to produce tighter levels that favour mean-reversion trades. Woodie’s pivots give extra weight to the current session’s opening price.`,
+      `Because the levels are known to all participants before the session begins, they often attract order flow. Their practical value is highest on intraday timeframes and when they coincide with other forms of S/R. On higher timeframes they are generally secondary to structural and volume-based levels.`
+    ],
+    keyPoint: "Pivot points are pre-calculated consensus levels. Their edge comes from shared visibility rather than any mystical property of the formulas. Use them as one more confluence tool, especially for intraday decision-making."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

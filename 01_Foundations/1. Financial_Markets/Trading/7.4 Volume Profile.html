@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Technical Analysis — 7.4 Volume Profile</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 7 · Section 7.4</div>
+      <h1 class="book-title">Volume<br><em>Profile</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">POC → nodes → profiles → VWAP · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Technical Analysis · Revision Notes</span>
+    <span>7.4 Volume Profile</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Core",
+    icon: "📍",
+    title: "Point of Control (POC)",
+    desc: "The price level with the highest traded volume in the chosen profile period",
+    badge: { label: "Primary", style: "teal" },
+    tags: [["POC","teal"], ["highest volume",""], ["fair price",""], ["magnet",""]],
+    data: [
+      { label: "Definition", value: "Price with max volume", color: "teal" },
+      { label: "Behaviour", value: "Often acts as magnet", color: "amber" },
+      { label: "Shift signal", value: "POC migration", color: "red" },
+    ],
+    body: [
+      `The Point of Control (POC) is the single price level (or narrow price bin) at which the greatest volume was traded during the period covered by the volume profile. It represents the price where the largest amount of business was conducted and is therefore regarded as the “fairest” or most accepted price of that period.`,
+      `Price frequently returns to the POC after excursions away from it, especially in balanced or range-bound markets. In trending markets the POC tends to migrate in the direction of the trend as new high-volume areas are built.`,
+      `A developing or shifting POC can give early clues about acceptance or rejection of price levels. When the POC moves decisively higher or lower and price begins to build volume around the new location, it often signals a change in the market’s accepted value.`
+    ],
+    keyPoint: "The POC is the volume-weighted centre of gravity of the profile. It is the price the market has spent the most effort trading and therefore the level most participants are anchored to."
+  },
+  {
+    era: "Core",
+    icon: "📐",
+    title: "Value Area High (VAH) & Low (VAL)",
+    desc: "The price range containing approximately 70 % of the total volume",
+    badge: { label: "Core", style: "teal" },
+    tags: [["VAH","red"], ["VAL","teal"], ["70 % volume",""], ["value area",""]],
+    data: [
+      { label: "Value Area", value: "~70 % of volume", color: "" },
+      { label: "VAH", value: "Upper boundary", color: "red" },
+      { label: "VAL", value: "Lower boundary", color: "teal" },
+    ],
+    body: [
+      `The Value Area is the price range that contains a defined percentage of the total volume traded in the profile — conventionally 70 % (roughly one standard deviation in a normal distribution). The upper boundary of this range is the Value Area High (VAH); the lower boundary is the Value Area Low (VAL).`,
+      `Price inside the Value Area is considered “fair” or accepted by the market. Moves outside the Value Area are regarded as potential excess or discovery of new value. A close outside the prior session’s Value Area is often watched as an early indication of directional conviction.`,
+      `In balanced markets price tends to rotate between VAL and VAH. In trending markets the Value Area migrates, and price may spend extended time outside the previous Value Area while building a new one.`
+    ],
+    keyPoint: "VAH and VAL frame the market’s accepted value. Staying inside the Value Area implies balance; sustained acceptance outside it implies a potential regime shift."
+  },
+  {
+    era: "Nodes",
+    icon: "📶",
+    title: "High Volume Nodes (HVN)",
+    desc: "Price regions of significantly elevated volume — areas of acceptance",
+    badge: { label: "Acceptance", style: "teal" },
+    tags: [["HVN","teal"], ["acceptance",""], ["support / resistance",""], ["balance",""]],
+    data: [
+      { label: "Character", value: "High participation", color: "teal" },
+      { label: "Typical role", value: "Support or resistance", color: "" },
+      { label: "Behaviour", value: "Price slows / rotates", color: "amber" },
+    ],
+    body: [
+      `High Volume Nodes are local peaks in the volume profile — price levels or narrow bands where a disproportionately large amount of volume was traded. They represent areas of strong acceptance: many participants agreed that those prices were fair and conducted significant business there.`,
+      `Because so much volume changed hands at an HVN, the level often acts as future support or resistance. Price approaching an HVN from above or below frequently slows, pauses, or reverses as residual order flow and trader memory interact with the area.`,
+      `HVNs are natural locations for mean-reversion trades and for profit-taking. A decisive break through a well-formed HVN on expanding volume can signal that the old area of acceptance has been rejected and a new value area is being sought.`
+    ],
+    keyPoint: "HVNs are the market’s memory of fair price. They slow price down because many participants still have positions or psychological anchors there."
+  },
+  {
+    era: "Nodes",
+    icon: "📉",
+    title: "Low Volume Nodes (LVN)",
+    desc: "Price regions of unusually low volume — areas of rejection or rapid transit",
+    badge: { label: "Rejection", style: "red" },
+    tags: [["LVN","red"], ["rejection",""], ["fast travel",""], ["imbalance",""]],
+    data: [
+      { label: "Character", value: "Low participation", color: "red" },
+      { label: "Typical role", value: "Price accelerates through", color: "" },
+      { label: "Implication", value: "Unfair / rejected prices", color: "amber" },
+    ],
+    body: [
+      `Low Volume Nodes are troughs in the volume profile — price levels where relatively little volume was traded. They represent areas the market moved through quickly, either because participants found those prices unfair or because order flow was one-sided and little two-way trade occurred.`,
+      `Once price returns to an LVN it often accelerates through the region rather than pausing, because there is little historical participation or residual order flow to slow it down. LVNs therefore act as zones of low resistance to movement.`,
+      `A common tactical use of LVNs is to identify areas where stop placement is safer (beyond the LVN) or where a breakout is more likely to travel quickly. Conversely, a failure to travel quickly through an LVN can be an early warning that the expected directional move is losing energy.`
+    ],
+    keyPoint: "LVNs are the market’s discarded prices. Price tends to move swiftly through them because few participants are willing to do business there."
+  },
+  {
+    era: "Application",
+    icon: "📦",
+    title: "Volume Profile of a Range (VPoR)",
+    desc: "Composite profile built across a defined multi-session consolidation",
+    badge: { label: "Practical", style: "slate" },
+    tags: [["VPoR","slate"], ["composite",""], ["range analysis",""], ["breakout context",""]],
+    data: [
+      { label: "Construction", value: "Fixed start & end of range", color: "" },
+      { label: "Key outputs", value: "POC, VAH, VAL, HVN/LVN", color: "teal" },
+      { label: "Use case", value: "Breakout / mean-reversion", color: "amber" },
+    ],
+    body: [
+      `A Volume Profile of a Range (VPoR) is constructed by selecting the start and end of a visible consolidation or balance area and generating a single composite volume profile across that entire period. It reveals where the bulk of trading occurred while the market was ranging.`,
+      `The resulting POC, Value Area and volume nodes become the structural map of the range. Breakouts that occur from a well-defined VPoR, especially those that leave behind a prominent LVN just outside the Value Area, often travel further and with greater conviction.`,
+      `VPoR is particularly useful for swing and position traders who want an objective, volume-based definition of a multi-day or multi-week balance area rather than relying solely on horizontal lines drawn by eye.`
+    ],
+    keyPoint: "VPoR turns a visual range into a quantified structure. The location of the POC and the shape of the profile tell you whether the range is balanced, skewed, or preparing for directional discovery."
+  },
+  {
+    era: "Types",
+    icon: "⏱️",
+    title: "Fixed Range vs. Session Volume Profile",
+    desc: "Two common ways of defining the period that builds the profile",
+    badge: { label: "Method", style: "amber" },
+    tags: [["fixed range","amber"], ["session VP",""], ["composite",""], ["developing",""]],
+    data: [
+      { label: "Session VP", value: "Resets each session", color: "teal" },
+      { label: "Fixed Range", value: "User-defined period", color: "amber" },
+      { label: "Composite", value: "Multi-session merge", color: "" },
+    ],
+    body: [
+      `A session volume profile is built from the volume traded during a single trading session (or a defined session template such as RTH or ETH). It resets at the start of each new session and is the standard tool for day traders who want to see where value is being established today.`,
+      `A fixed-range volume profile allows the user to select any start and end point — a multi-day swing, a specific consolidation, or an arbitrary look-back. It is the tool of choice for analysing structure across longer horizons.`,
+      `Composite profiles merge multiple sessions into one view and are useful for identifying longer-term HVNs and POCs that may continue to influence price even after individual session profiles have rolled off. Choice of profile type should match the trader’s timeframe and question.`
+    ],
+    compare: {
+      left: { label: "Session Profile", text: "Resets daily. Ideal for intraday value migration, opening range analysis, and session-based mean reversion or breakout trades. Highly responsive to the current day’s order flow." },
+      right: { label: "Fixed / Composite", text: "User-defined or multi-session. Reveals longer-term acceptance and rejection zones. Better suited to swing structure, range definition, and identifying durable support/resistance." }
+    },
+    keyPoint: "Session profiles answer “Where is value today?” Fixed-range and composite profiles answer “Where has value been over the period that matters to my trade?”"
+  },
+  {
+    era: "Related",
+    icon: "🔤",
+    title: "TPO (Time at Price) Profiles",
+    desc: "Market Profile letters that show how long price spent at each level",
+    badge: { label: "Time", style: "slate" },
+    tags: [["TPO","slate"], ["Market Profile",""], ["time-based",""], ["letters",""]],
+    data: [
+      { label: "Unit", value: "Time period per letter", color: "" },
+      { label: "Focus", value: "Duration at price", color: "teal" },
+      { label: "Contrast to VP", value: "Time vs. volume", color: "amber" },
+    ],
+    body: [
+      `TPO (Time Price Opportunity) profiles, the original Market Profile display, assign a letter to each fixed time period (commonly 30 minutes). Each letter is plotted at the prices traded during that period, building a distribution that shows how long the market spent at each price level rather than how much volume was traded.`,
+      `Because TPO measures time rather than volume, it can highlight areas of balance (wide TPO distribution) or imbalance (thin TPO prints) even when volume data is unavailable or unreliable. The resulting shape — normal distribution, bimodal, elongated — conveys the same acceptance/rejection concepts as volume profile.`,
+      `Many modern platforms allow both volume profile and TPO to be displayed together. Divergences between time spent and volume traded at a level can themselves be informative.`
+    ],
+    keyPoint: "TPO asks “How long did price stay here?” Volume profile asks “How much business was done here?” Both map acceptance; they simply weight the evidence differently."
+  },
+  {
+    era: "Theory",
+    icon: "📚",
+    title: "Market Profile Theory (Peter Steidlmayer)",
+    desc: "The intellectual foundation: markets alternate between balance and imbalance",
+    badge: { label: "Origin", style: "slate" },
+    tags: [["Steidlmayer","slate"], ["balance / imbalance",""], ["auction theory",""], ["value area",""]],
+    data: [
+      { label: "Originator", value: "J. Peter Steidlmayer", color: "" },
+      { label: "Core idea", value: "Balance ↔ Imbalance", color: "teal" },
+      { label: "Practical output", value: "Value Area + POC", color: "amber" },
+    ],
+    body: [
+      `Market Profile theory, developed by J. Peter Steidlmayer at the Chicago Board of Trade in the 1980s, views the market as a continuous two-way auction that alternates between periods of balance (acceptance of value, range-bound rotation) and imbalance (directional discovery of new value).`,
+      `In balance the market builds a roughly normal distribution of TPOs or volume around a fair price (the POC). In imbalance price moves away from the old value area, often leaving low-volume tails, until a new balance is found. The Value Area and POC are practical tools derived from this auction framework.`,
+      `The theory emphasises reading the developing day or developing profile in real time: is the market accepting prices (building volume/TPOs) or rejecting them (leaving single prints or thin areas)? This day-type analysis remains central to many discretionary profile traders.`
+    ],
+    keyPoint: "Steidlmayer’s insight is that the market is an auction seeking value. Profile tools simply make the auction’s record of acceptance and rejection visible on the chart."
+  },
+  {
+    era: "VWAP",
+    icon: "⚖️",
+    title: "VWAP & Anchored VWAP",
+    desc: "Volume-Weighted Average Price — the average price weighted by volume",
+    badge: { label: "Benchmark", style: "teal" },
+    tags: [["VWAP","teal"], ["anchored VWAP","amber"], ["institutional",""], ["benchmark",""]],
+    data: [
+      { label: "Session VWAP", value: "Resets each session", color: "teal" },
+      { label: "Anchored VWAP", value: "From chosen event", color: "amber" },
+      { label: "Role", value: "Dynamic fair-price line", color: "" },
+    ],
+    body: [
+      `VWAP is the volume-weighted average price of all trades over a chosen period. Session VWAP resets at the start of each trading day and is the most widely watched intraday benchmark. Institutions often use it as an execution benchmark; price relative to VWAP is frequently interpreted as short-term premium or discount.`,
+      `Anchored VWAP allows the calculation to begin at any user-selected point — a major swing high/low, an earnings release, a breakout bar, or any other significant event. It therefore becomes a flexible, event-driven dynamic support/resistance and mean-reversion reference.`,
+      `Both forms of VWAP act as dynamic “fair price” lines. In trending conditions price may ride above or below VWAP for extended periods; in balanced conditions it tends to oscillate around it. Crosses and retests of VWAP are common tactical triggers.`
+    ],
+    keyPoint: "VWAP is the volume-weighted centre of gravity of the chosen period. Session VWAP answers “What is today’s average price?” Anchored VWAP answers “What is the average price since this important event?”"
+  },
+  {
+    era: "VWAP",
+    icon: "📏",
+    title: "VWAP Standard Deviation Bands",
+    desc: "Volatility bands plotted around VWAP to frame stretch and mean reversion",
+    badge: { label: "Context", style: "amber" },
+    tags: [["σ bands","amber"], ["stretch",""], ["mean reversion",""], ["volatility",""]],
+    data: [
+      { label: "Common settings", value: "±1σ · ±2σ · ±3σ", color: "" },
+      { label: "Near VWAP", value: "Fair value zone", color: "teal" },
+      { label: "Outer bands", value: "Stretched / extreme", color: "red" },
+    ],
+    body: [
+      `Standard deviation bands around VWAP measure how far price has extended from the volume-weighted average. Typical settings plot bands at one, two and sometimes three standard deviations. These bands expand and contract with realised volatility.`,
+      `Price near VWAP is considered close to fair value. Touches or closes beyond the outer bands (especially ±2σ) indicate statistical stretch and are often used by mean-reversion traders as areas to look for exhaustion or fading opportunities — provided the broader context supports mean reversion rather than trend continuation.`,
+      `In strong trends price can “ride” the outer band for extended periods. Therefore the bands are best treated as context and probability tools rather than automatic reversal signals. Confluence with volume-profile HVNs, prior structure or momentum divergence improves their reliability.`
+    ],
+    keyPoint: "VWAP bands convert distance from the volume-weighted mean into a volatility-adjusted scale. They tell you how unusual the current stretch is — not whether it must reverse."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

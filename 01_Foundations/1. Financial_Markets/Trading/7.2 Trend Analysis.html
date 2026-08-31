@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Technical Analysis — 7.2 Trend Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 7 · Section 7.2</div>
+      <h1 class="book-title">Trend<br><em>Analysis</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Definition → tools → strength → breakouts · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Technical Analysis · Revision Notes</span>
+    <span>7.2 Trend Analysis</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Basics",
+    icon: "📈",
+    title: "Trend Definition",
+    desc: "Higher highs + higher lows (up) · Lower highs + lower lows (down)",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["uptrend","teal"], ["downtrend","red"], ["sideways",""], ["swing points",""]],
+    data: [
+      { label: "Uptrend", value: "HH + HL", color: "teal" },
+      { label: "Downtrend", value: "LH + LL", color: "red" },
+      { label: "Range", value: "No clear sequence", color: "amber" },
+    ],
+    body: [
+      `A trend is the directional bias of price over a chosen look-back window. The classical definition rests on successive swing points: an uptrend produces a sequence of higher highs (HH) and higher lows (HL); a downtrend produces lower highs (LH) and lower lows (LL). When neither sequence is present, the market is ranging or consolidating.`,
+      `The quality of the trend is judged by the consistency and spacing of those swing points. Clean, well-spaced higher highs and higher lows indicate a healthy uptrend. Choppy, overlapping swings suggest a weaker or maturing trend that may be vulnerable to reversal.`,
+      `Trend is always timeframe-dependent. A daily uptrend can contain multiple lower-timeframe downtrends. Professional analysis therefore begins by stating the timeframe under examination before declaring the direction of the trend.`
+    ],
+    keyPoint: "Trend is not a feeling — it is a sequence of swing points. Higher highs and higher lows define an uptrend; the absence of that sequence means the trend has already changed or never existed."
+  },
+  {
+    era: "Tools",
+    icon: "📏",
+    title: "Trendlines (Support / Resistance)",
+    desc: "Diagonal lines connecting successive swing lows or highs",
+    badge: { label: "Core Tool", style: "teal" },
+    tags: [["trendline","teal"], ["support",""], ["resistance","red"], ["touch points",""]],
+    data: [
+      { label: "Uptrend line", value: "Connects higher lows", color: "teal" },
+      { label: "Downtrend line", value: "Connects lower highs", color: "red" },
+      { label: "Validity", value: "≥ 3 touches preferred", color: "amber" },
+    ],
+    body: [
+      `A trendline is a straight line drawn across successive swing lows in an uptrend (acting as dynamic support) or successive swing highs in a downtrend (acting as dynamic resistance). The line is extended forward in time and becomes a reference for future price action.`,
+      `The more times price respects the line without breaking it, the more significant the trendline becomes. Two points define a tentative line; three or more touches raise confidence. Steep trendlines are more easily broken; shallower trendlines often persist longer.`,
+      `A decisive close beyond a well-tested trendline is one of the earliest objective signals that the prevailing trend may be ending or pausing. Many traders wait for a retest of the broken line (now acting in the opposite role) before acting.`
+    ],
+    keyPoint: "A trendline is a hypothesis about where demand or supply should appear. Each additional touch strengthens the hypothesis; a clean break falsifies it."
+  },
+  {
+    era: "Tools",
+    icon: "📊",
+    title: "Trend Channels",
+    desc: "Parallel lines that contain price within a sloping corridor",
+    badge: { label: "Structure", style: "slate" },
+    tags: [["channel","slate"], ["parallel",""], ["upper boundary","red"], ["lower boundary","teal"]],
+    data: [
+      { label: "Construction", value: "Trendline + parallel copy", color: "" },
+      { label: "Bullish channel", value: "Rising support & resistance", color: "teal" },
+      { label: "Bearish channel", value: "Falling support & resistance", color: "red" },
+    ],
+    body: [
+      `A trend channel is formed by drawing a primary trendline and then placing a parallel line on the opposite side of price so that the two lines contain the majority of price action. In an uptrend the lower line connects swing lows and the upper line connects swing highs; the reverse applies in a downtrend.`,
+      `Channels give traders both a directional bias and a set of actionable boundaries. Touches of the lower boundary in a rising channel are potential long entries; touches of the upper boundary are potential profit-taking or short-term fade zones. A sustained break out of the channel often signals acceleration or the start of a new regime.`,
+      `Not every trend forms a clean channel. Forcing parallel lines onto irregular price action reduces reliability. The best channels are those that are obvious in hindsight and have been respected multiple times.`
+    ],
+    keyPoint: "Channels turn a one-sided trendline into a two-sided trading range that slopes. They are most useful when price has already demonstrated respect for both boundaries."
+  },
+  {
+    era: "Tools",
+    icon: "📉",
+    title: "Moving Averages (SMA, EMA, WMA)",
+    desc: "Lagging smoothers that define dynamic trend direction and support/resistance",
+    badge: { label: "Essential", style: "teal" },
+    tags: [["SMA","teal"], ["EMA","amber"], ["WMA",""], ["lag",""]],
+    data: [
+      { label: "SMA", value: "Equal weight to all periods", color: "" },
+      { label: "EMA", value: "More weight to recent data", color: "teal" },
+      { label: "WMA", value: "Linear weighting scheme", color: "amber" },
+    ],
+    body: [
+      `A simple moving average (SMA) calculates the arithmetic mean of the last N closing prices and updates with each new bar. An exponential moving average (EMA) applies greater weight to more recent prices, making it more responsive. A weighted moving average (WMA) uses a linear weighting scheme that also emphasises recent data but differs mathematically from the EMA.`,
+      `Moving averages serve three primary roles: (1) they define trend direction (price above a rising MA = bullish bias), (2) they act as dynamic support or resistance, and (3) crossovers between fast and slow averages generate signals. Common look-backs include 10, 20, 50, 100 and 200 periods.`,
+      `All moving averages lag. The longer the look-back, the smoother the line and the greater the lag. Shorter averages react faster but produce more false signals. Choice of type and length is always a trade-off between responsiveness and noise reduction.`
+    ],
+    keyPoint: "Moving averages do not predict; they describe the average price traders have paid over a look-back window. Their power lies in the behavioural tendency of price to mean-revert toward or trend away from that average."
+  },
+  {
+    era: "Signals",
+    icon: "⚔️",
+    title: "Golden Cross / Death Cross",
+    desc: "50-period MA crossing the 200-period MA — classic long-term regime signals",
+    badge: { label: "Classic", style: "amber" },
+    tags: [["golden cross","teal"], ["death cross","red"], ["50/200",""], ["lagging",""]],
+    data: [
+      { label: "Golden cross", value: "50 MA crosses above 200 MA", color: "teal" },
+      { label: "Death cross", value: "50 MA crosses below 200 MA", color: "red" },
+      { label: "Nature", value: "Lagging confirmation", color: "amber" },
+    ],
+    body: [
+      `A golden cross occurs when a shorter-term moving average (commonly the 50-period) crosses above a longer-term moving average (commonly the 200-period). It is widely interpreted as the transition from a bearish or neutral regime into a bullish one on that timeframe.`,
+      `A death cross is the opposite event: the 50-period average crosses below the 200-period average, signalling a potential shift into a bearish regime. Both signals are most often watched on daily and weekly charts.`,
+      `Because both averages are lagging indicators, the cross usually occurs after a substantial portion of the new trend has already developed. The signal is therefore better understood as confirmation of a regime change than as a precise entry trigger. False crosses are common in choppy, range-bound markets.`
+    ],
+    compare: {
+      left: { label: "Death Cross", text: "50 MA drops below 200 MA. Suggests long-term selling pressure is dominant. Often appears after significant downside has already occurred. Higher reliability in strong trending markets." },
+      right: { label: "Golden Cross", text: "50 MA rises above 200 MA. Suggests long-term buying pressure is dominant. Frequently lagged. Works best when accompanied by rising volume and higher-timeframe alignment." }
+    },
+    keyPoint: "Golden and death crosses are regime filters, not timing tools. They tell you the medium- to long-term current has changed direction; they rarely catch the exact turn."
+  },
+  {
+    era: "Strength",
+    icon: "💪",
+    title: "ADX (Average Directional Index)",
+    desc: "A pure measure of trend strength that ignores direction",
+    badge: { label: "Quant", style: "slate" },
+    tags: [["ADX","slate"], ["+DI / –DI",""], ["strength only",""], ["Wilder",""]],
+    data: [
+      { label: "ADX rising > 25", value: "Strong trend", color: "teal" },
+      { label: "ADX < 20", value: "Weak / ranging", color: "amber" },
+      { label: "Direction", value: "From +DI vs –DI", color: "" },
+    ],
+    body: [
+      `The Average Directional Index (ADX), developed by J. Welles Wilder, quantifies the strength of a trend on a scale from 0 to 100 without regard to whether the trend is up or down. It is derived from the Directional Movement System, which also produces the +DI and –DI lines that indicate direction.`,
+      `A rising ADX above approximately 25 is commonly read as evidence of a strong trend. Readings below 20 usually indicate a weak or non-existent trend (range-bound conditions). Extremely high readings (above 50–60) can signal an exhausted trend that is vulnerable to reversal or consolidation.`,
+      `Because ADX is non-directional, it is often paired with the +DI and –DI lines or with price structure. A high ADX with +DI above –DI confirms a strong uptrend; the reverse confirms a strong downtrend. ADX is particularly useful for deciding whether trend-following or mean-reversion tactics are more appropriate.`
+    ],
+    keyPoint: "ADX answers only one question: “How strong is the current trend?” It deliberately refuses to answer “Which way?” — that job belongs to price structure and the DI lines."
+  },
+  {
+    era: "Strength",
+    icon: "🧭",
+    title: "Trend Strength and Direction",
+    desc: "Combining structure, moving averages and ADX into a coherent regime view",
+    badge: { label: "Synthesis", style: "teal" },
+    tags: [["regime","teal"], ["strength",""], ["direction",""], ["multi-factor",""]],
+    data: [
+      { label: "Direction tools", value: "HH/HL, MAs, DI lines", color: "teal" },
+      { label: "Strength tools", value: "ADX, slope, spacing", color: "amber" },
+      { label: "Best practice", value: "Require agreement", color: "" },
+    ],
+    body: [
+      `Trend direction is established first through price structure (higher highs/higher lows or the reverse), reinforced by the slope and relative position of moving averages, and further confirmed by the relationship between +DI and –DI.`,
+      `Trend strength is assessed independently via ADX level and slope, the angle of the trendline or moving averages, the spacing between successive swing points, and the presence or absence of deep counter-trend retracements. A trend can be directionally clear yet weak, or strong yet late-stage.`,
+      `The highest-conviction environments occur when direction and strength agree: clear HH/HL structure, price above rising key moving averages, ADX above 25 and rising, and orderly pullbacks. Divergences between these elements (strong structure but falling ADX, or rising ADX against the prevailing structure) are early warnings that conditions are changing.`
+    ],
+    keyPoint: "Direction without strength is a fragile trend. Strength without clear direction is often a volatility expansion inside a range. Professional analysis demands both."
+  },
+  {
+    era: "Breakouts",
+    icon: "🚀",
+    title: "Trend Breakouts",
+    desc: "Decisive closes beyond a defining trendline, channel or consolidation boundary",
+    badge: { label: "Action", style: "teal" },
+    tags: [["breakout","teal"], ["close beyond",""], ["volume","amber"], ["continuation / reversal",""]],
+    data: [
+      { label: "Key evidence", value: "Decisive close + volume", color: "teal" },
+      { label: "Ideal location", value: "End of consolidation", color: "" },
+      { label: "Follow-through", value: "Critical for validity", color: "amber" },
+    ],
+    body: [
+      `A trend breakout occurs when price closes decisively beyond a previously respected boundary — a trendline, channel line, horizontal consolidation range, or significant moving average. The break can signal either the acceleration of an existing trend or the start of a new trend after a period of balance.`,
+      `Quality improves with expansion in volume, a wide-ranging candle that closes near its extreme, and a location that makes structural sense (for example, the apex of a contracting triangle or the end of a multi-week range). Breakouts that occur on low volume or that immediately reverse are treated with suspicion.`,
+      `Many practitioners wait for a retest of the broken level (now expected to act in the opposite capacity) before committing significant capital. Immediate follow-through in the breakout direction is the strongest confirmation that a true regime shift has occurred.`
+    ],
+    keyPoint: "A breakout is a claim that the old boundary no longer contains price. The market’s subsequent behaviour — acceptance or rejection — decides whether the claim is true."
+  },
+  {
+    era: "Breakouts",
+    icon: "🪤",
+    title: "False Breakouts",
+    desc: "Price pierces a level only to reverse and trap breakout participants",
+    badge: { label: "Trap", style: "red" },
+    tags: [["false break","red"], ["bull / bear trap",""], ["liquidity","amber"], ["fade",""]],
+    data: [
+      { label: "Classic form", value: "Pierce → reverse → close back inside", color: "red" },
+      { label: "Common fuel", value: "Stops + breakout orders", color: "amber" },
+      { label: "Tell", value: "Rejection candle + volume", color: "" },
+    ],
+    body: [
+      `A false breakout (also called a bull trap or bear trap) occurs when price moves beyond a significant level, triggering breakout entries and stop orders, only to reverse sharply and close back inside the prior range or opposite the breakout direction. The result is a rapid transfer of capital from late breakout traders to those positioned for the failure.`,
+      `False breakouts are especially common around obvious horizontal levels, round numbers, and well-watched moving averages where stop density is high. They are fuelled by the clustering of protective stops and the tendency of algorithms and discretionary traders to chase the initial pierce.`,
+      `Recognition cues include a long rejection wick beyond the level, a close back inside the range, declining volume on the breakout attempt, and rapid reclamation of the level. Trading the failure (fading the false break) can be high-reward when the broader context supports mean-reversion rather than trend continuation.`
+    ],
+    keyPoint: "Every breakout is guilty until proven innocent by acceptance and follow-through. The false breakout is the market’s most reliable mechanism for harvesting impatient capital."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
