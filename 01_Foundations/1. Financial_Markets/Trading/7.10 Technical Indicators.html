@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Technical Analysis — 7.10 Technical Indicators</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 7 · Section 7.10</div>
+      <h1 class="book-title">Technical<br><em>Indicators</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Trend → momentum → volatility → volume → practice · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Technical Analysis · Revision Notes</span>
+    <span>7.10 Technical Indicators</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Trend",
+    icon: "📈",
+    title: "Trend Indicators",
+    desc: "SMA · EMA · MACD · Supertrend · Ichimoku — tools that define and follow directional bias",
+    badge: { label: "Direction", style: "teal" },
+    tags: [["SMA / EMA","teal"], ["MACD",""], ["Supertrend",""], ["Ichimoku","slate"]],
+    data: [
+      { label: "Moving Averages", value: "SMA, EMA — lagging smoothers", color: "" },
+      { label: "MACD", value: "Trend + momentum hybrid", color: "teal" },
+      { label: "Ichimoku", value: "All-in-one system", color: "amber" },
+    ],
+    body: [
+      `Trend indicators help determine the prevailing direction and strength of price movement. Simple Moving Averages (SMA) and Exponential Moving Averages (EMA) smooth price and act as dynamic support/resistance; the EMA reacts faster because it weights recent data more heavily. Crossovers (e.g., 50/200) generate classic regime signals.`,
+      `MACD (Moving Average Convergence Divergence) subtracts a longer EMA from a shorter EMA and plots a signal line; the histogram shows the difference. It functions both as a trend-following tool and a momentum gauge. Supertrend uses ATR to create a trailing stop-style line that flips when price closes beyond it, giving clear long/short regimes.`,
+      `Ichimoku Kinko Hyo is a comprehensive system: Tenkan and Kijun lines, the cloud (Senkou Span A/B), and the lagging span. Price above a rising cloud is bullish; the cloud itself provides dynamic support/resistance and trend context in one view.`
+    ],
+    keyPoint: "Trend indicators lag by design. Their value lies in defining regime and filtering trades, not in precise timing. Use them to stay on the right side of the larger move."
+  },
+  {
+    era: "Momentum",
+    icon: "⚡",
+    title: "Momentum Indicators",
+    desc: "RSI · Stochastic · CCI · Williams %R · Rate of Change — measuring speed and exhaustion",
+    badge: { label: "Speed", style: "amber" },
+    tags: [["RSI","amber"], ["Stochastic",""], ["CCI",""], ["Williams %R",""], ["ROC",""]],
+    data: [
+      { label: "RSI", value: "0–100 relative strength", color: "teal" },
+      { label: "Stochastic", value: "%K / %D overbought-oversold", color: "" },
+      { label: "CCI / %R / ROC", value: "Deviation & pure momentum", color: "amber" },
+    ],
+    body: [
+      `Momentum indicators quantify the speed and magnitude of recent price changes. RSI (Relative Strength Index) compares average gains to average losses over a look-back (commonly 14) and oscillates between 0 and 100; traditional overbought/oversold levels are 70/30. Stochastic Oscillator measures where the close sits relative to the high-low range and is more sensitive to short-term turns.`,
+      `CCI (Commodity Channel Index) measures deviation from a moving average and is unbounded, making it useful for identifying extreme extensions. Williams %R is essentially an inverted stochastic. Rate of Change (ROC) is the purest momentum expression: the percentage change over N periods.`,
+      `These tools excel at highlighting exhaustion and potential turning points, but they generate many false signals in strong trends. They are most effective when used for divergence analysis or in ranging markets, and when filtered by higher-timeframe trend.`
+    ],
+    keyPoint: "Momentum indicators do not predict direction; they measure how forcefully price is moving. Extremes warn of possible exhaustion; divergences warn that the force is fading."
+  },
+  {
+    era: "Volatility",
+    icon: "🌊",
+    title: "Volatility Indicators",
+    desc: "Bollinger Bands · ATR · Keltner Channel · Donchian Channel — measuring range and expansion",
+    badge: { label: "Range", style: "slate" },
+    tags: [["Bollinger","slate"], ["ATR",""], ["Keltner",""], ["Donchian",""]],
+    data: [
+      { label: "Bollinger Bands", value: "SMA ± standard deviations", color: "" },
+      { label: "ATR", value: "Average True Range", color: "teal" },
+      { label: "Keltner / Donchian", value: "ATR or high-low channels", color: "amber" },
+    ],
+    body: [
+      `Volatility indicators measure the magnitude of price fluctuations rather than direction. Bollinger Bands plot a moving average with upper and lower bands set at a multiple of standard deviation; expansion signals rising volatility, contraction (the “squeeze”) often precedes a large move. Price riding the upper band shows strength; repeated touches of the lower band show weakness.`,
+      `ATR (Average True Range) quantifies average price range over a look-back and is widely used for position sizing, stop placement, and volatility filters. Keltner Channels are similar to Bollinger but use ATR instead of standard deviation, producing smoother bands. Donchian Channels simply plot the highest high and lowest low over N periods and form the basis of many breakout systems.`,
+      `Volatility tools are essential for risk management and for recognising regime changes (low-vol compression → high-vol expansion). They do not generate directional bias on their own.`
+    ],
+    keyPoint: "Volatility is the raw material of opportunity and risk. These indicators tell you how large the swings are — and therefore how wide your stops and targets should be."
+  },
+  {
+    era: "Volume",
+    icon: "📊",
+    title: "Volume Indicators",
+    desc: "OBV · MFI · VWAP · Accumulation/Distribution — confirming price with participation",
+    badge: { label: "Participation", style: "teal" },
+    tags: [["OBV","teal"], ["MFI",""], ["VWAP",""], ["A/D Line",""]],
+    data: [
+      { label: "OBV", value: "Cumulative volume by direction", color: "teal" },
+      { label: "MFI", value: "Volume-weighted RSI", color: "" },
+      { label: "VWAP / A/D", value: "Fair price & money flow", color: "amber" },
+    ],
+    body: [
+      `Volume indicators incorporate trading activity to confirm or question price moves. On-Balance Volume (OBV) adds volume on up days and subtracts it on down days, creating a cumulative line that should confirm the price trend; divergences warn of weakening conviction. Money Flow Index (MFI) is essentially a volume-weighted RSI and highlights overbought/oversold conditions with participation context.`,
+      `VWAP (Volume-Weighted Average Price) is the average price weighted by volume and serves as an institutional benchmark and dynamic support/resistance. Accumulation/Distribution (A/D) Line uses the close’s position within the bar’s range multiplied by volume to gauge buying versus selling pressure.`,
+      `Volume confirmation raises the reliability of breakouts, trend continuations, and reversals. A price move on declining volume is inherently more suspect than the same move on expanding volume.`
+    ],
+    keyPoint: "Price can lie; volume is harder to fake. These indicators reveal whether a move is supported by genuine participation or is running on empty."
+  },
+  {
+    era: "Oscillators",
+    icon: "〰️",
+    title: "Oscillators",
+    desc: "MACD histogram · Detrended Price Oscillator — centred tools for timing and cycle",
+    badge: { label: "Cycle", style: "amber" },
+    tags: [["MACD histogram","amber"], ["DPO",""], ["centred",""], ["timing",""]],
+    data: [
+      { label: "MACD Histogram", value: "Momentum of MACD line", color: "teal" },
+      { label: "DPO", value: "Removes trend to show cycles", color: "" },
+      { label: "Use case", value: "Timing entries / exits", color: "amber" },
+    ],
+    body: [
+      `Oscillators are typically bounded or centred indicators designed to highlight short-term momentum extremes and cyclical behaviour. The MACD histogram is the difference between the MACD line and its signal line; it expands when momentum is increasing and contracts when momentum is fading, often giving earlier warnings than the MACD lines themselves.`,
+      `The Detrended Price Oscillator (DPO) subtracts a prior moving average from price, effectively removing the trend so that underlying cycles become visible. It is useful for estimating cycle length and identifying turning points independent of the larger trend.`,
+      `Oscillators work best as timing tools inside a higher-timeframe directional bias. Used in isolation they produce frequent whipsaws; used to refine entries and exits within a structured framework they add precision.`
+    ],
+    keyPoint: "Oscillators measure the pulse, not the trend. They help you time the beats once you already know which direction the market is walking."
+  },
+  {
+    era: "Practice",
+    icon: "⚠️",
+    title: "Indicator Parameter Optimization Pitfalls",
+    desc: "The dangers of curve-fitting look-back periods and thresholds to historical data",
+    badge: { label: "Warning", style: "red" },
+    tags: [["overfitting","red"], ["curve-fit",""], ["robustness",""], ["walk-forward",""]],
+    data: [
+      { label: "Main risk", value: "Over-optimisation to past data", color: "red" },
+      { label: "Symptom", value: "Great backtest, poor live results", color: "amber" },
+      { label: "Remedy", value: "Robust defaults + out-of-sample", color: "teal" },
+    ],
+    body: [
+      `Because most indicators have adjustable parameters (look-back length, smoothing factors, overbought/oversold thresholds), it is tempting to optimise them until the historical results look exceptional. This process almost always produces curve-fitted parameters that capture noise rather than durable market structure.`,
+      `Over-optimised indicators fail when market regimes change. A 7-period RSI that perfectly timed every turn in a quiet 2020–2021 sample may generate constant false signals in a high-volatility trending environment. The more degrees of freedom you introduce, the greater the risk of fitting the past at the expense of the future.`,
+      `Best practice is to prefer widely used default settings, test across multiple instruments and regimes, employ walk-forward or out-of-sample validation, and treat any highly optimised parameter set with extreme scepticism.`
+    ],
+    keyPoint: "The indicator that looks perfect in the backtest is often the one that will hurt you most in live trading. Robustness beats precision."
+  },
+  {
+    era: "Practice",
+    icon: "🔗",
+    title: "Indicator Confluence",
+    desc: "Requiring agreement across independent tools before acting",
+    badge: { label: "Confirmation", style: "teal" },
+    tags: [["confluence","teal"], ["multi-indicator",""], ["filter",""], ["probability",""]],
+    data: [
+      { label: "Principle", value: "Independent agreement raises odds", color: "teal" },
+      { label: "Example", value: "Trend + momentum + volume", color: "" },
+      { label: "Risk", value: "Over-filtering / missed trades", color: "amber" },
+    ],
+    body: [
+      `Confluence is the practice of requiring multiple independent indicators or concepts to align before taking a trade. A long setup might require price above a rising 200 EMA (trend), RSI reclaiming 50 with bullish divergence (momentum), and expanding volume on the breakout (participation). Each factor alone is modest; together they raise probability.`,
+      `The key word is independent. Stacking three highly correlated moving averages adds little information. Combining a trend filter, a momentum oscillator, a volume confirmation, and a higher-timeframe structural level produces genuine confluence.`,
+      `The trade-off is frequency: stricter confluence reduces the number of trades. The goal is not to eliminate all losing trades but to improve the average quality of the trades that are taken.`
+    ],
+    keyPoint: "Confluence is the antidote to single-indicator dogmatism. When independent evidence points the same way, the edge compounds."
+  },
+  {
+    era: "Practice",
+    icon: "↕️",
+    title: "Divergences (Regular & Hidden)",
+    desc: "Price and indicator disagree — early warnings of exhaustion or continuation",
+    badge: { label: "Warning Signal", style: "amber" },
+    tags: [["regular divergence","amber"], ["hidden divergence",""], ["bullish / bearish",""], ["exhaustion",""]],
+    data: [
+      { label: "Regular bullish", value: "Lower low in price, higher low in indicator", color: "teal" },
+      { label: "Regular bearish", value: "Higher high in price, lower high in indicator", color: "red" },
+      { label: "Hidden", value: "Continuation signal", color: "amber" },
+    ],
+    body: [
+      `Divergence occurs when price and a momentum indicator move in opposite directions. Regular (or classical) bullish divergence forms when price makes a lower low but the indicator makes a higher low — suggesting selling pressure is fading. Regular bearish divergence forms when price makes a higher high but the indicator makes a lower high — suggesting buying pressure is fading.`,
+      `Hidden divergence signals continuation rather than reversal. Hidden bullish divergence (higher low in price, lower low in indicator) often appears in uptrends and suggests the pullback is losing force. Hidden bearish divergence (lower high in price, higher high in indicator) appears in downtrends.`,
+      `Divergences are early warning tools, not precise entry triggers. They are most reliable on higher timeframes, when confirmed by structure or volume, and when the indicator is not already in extreme territory for prolonged periods. Many divergences fail in strong trends; treat them as alerts to tighten risk or look for confirmatory price action.`
+    ],
+    compare: {
+      left: { label: "Regular Divergence", text: "Signals potential reversal. Price makes a new extreme while momentum fails to confirm. Most useful at the end of extended moves or at major support/resistance." },
+      right: { label: "Hidden Divergence", text: "Signals potential continuation. Price makes a higher low (or lower high) while momentum makes a lower low (or higher high). Often appears during trend pullbacks." }
+    },
+    keyPoint: "Divergence is the indicator’s way of saying the underlying force is changing even if price has not yet admitted it. It is a warning, not a command."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

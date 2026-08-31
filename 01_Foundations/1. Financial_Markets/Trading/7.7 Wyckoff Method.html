@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Technical Analysis — 7.7 Wyckoff Method</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 7 · Section 7.7</div>
+      <h1 class="book-title">Wyckoff<br><em>Method</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        topics covered
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Schematics → events → laws · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Technical Analysis · Revision Notes</span>
+    <span>7.7 Wyckoff Method</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Schematic",
+    icon: "📥",
+    title: "Accumulation Schematic (Phases A–E)",
+    desc: "The five-phase process by which large operators absorb supply before markup",
+    badge: { label: "Core Map", style: "teal" },
+    tags: [["accumulation","teal"], ["phases A–E",""], ["markup",""], ["range",""]],
+    data: [
+      { label: "Phase A", value: "Stopping the downtrend", color: "" },
+      { label: "Phase B", value: "Building the cause", color: "amber" },
+      { label: "Phase C–E", value: "Test → breakout → markup", color: "teal" },
+    ],
+    body: [
+      `The classic Wyckoff accumulation schematic divides the process into five phases. Phase A stops the prior downtrend (Selling Climax, Automatic Rally, Secondary Test). Phase B is the long cause-building range in which large operators absorb floating supply while price remains in a trading range. Phase C contains the critical test (often a Spring). Phase D shows the Sign of Strength and Last Point of Support as price begins to leave the range. Phase E is the sustained markup.`,
+      `The schematic is a template, not a rigid script. Real markets vary in duration, depth of tests, and the exact sequence of events. The value lies in recognising the overall narrative: transfer of shares from weak hands to strong hands inside a range, followed by an upward trend.`,
+      `Traders use the schematic to locate lower-risk entries (especially around Phase C Springs and Phase D LPS) and to avoid buying too early in Phase B or chasing too late in Phase E.`
+    ],
+    keyPoint: "Accumulation is the cause. Markup is the effect. The schematic simply organises the evidence that large operators are preparing for a sustained advance."
+  },
+  {
+    era: "Schematic",
+    icon: "📤",
+    title: "Distribution Schematic (Phases A–E)",
+    desc: "The five-phase process by which large operators distribute shares before markdown",
+    badge: { label: "Core Map", style: "red" },
+    tags: [["distribution","red"], ["phases A–E",""], ["markdown",""], ["range",""]],
+    data: [
+      { label: "Phase A", value: "Stopping the uptrend", color: "" },
+      { label: "Phase B", value: "Building the cause", color: "amber" },
+      { label: "Phase C–E", value: "Test → breakdown → markdown", color: "red" },
+    ],
+    body: [
+      `The distribution schematic is the mirror image of accumulation. Phase A stops the prior uptrend (Buying Climax, Automatic Reaction, Secondary Test). Phase B is the range in which large operators distribute shares into demand. Phase C often contains an Upthrust After Distribution (UTAD). Phase D shows Signs of Weakness and the Last Point of Supply. Phase E is the sustained markdown.`,
+      `As with accumulation, the phases describe a transfer of inventory — this time from strong hands back to weak hands — inside a trading range before a decline. Recognition of the schematic helps traders avoid buying strength near the end of distribution and positions them to participate in the subsequent markdown.`,
+      `Key practical difference: distribution ranges can be more volatile and contain more false breakouts upward (UTADs) as operators support price while selling into rallies.`
+    ],
+    keyPoint: "Distribution is the cause of the subsequent decline. The schematic organises the evidence that supply is being fed into the market while price is still elevated."
+  },
+  {
+    era: "Philosophy",
+    icon: "👤",
+    title: "Composite Man Concept",
+    desc: "The fictional large operator who embodies the collective actions of smart money",
+    badge: { label: "Mindset", style: "slate" },
+    tags: [["Composite Man","slate"], ["smart money",""], ["operator",""], ["narrative",""]],
+    data: [
+      { label: "Role", value: "Embodies institutional behaviour", color: "" },
+      { label: "Purpose", value: "Simplifies market reading", color: "teal" },
+      { label: "Focus", value: "What is he trying to do?", color: "amber" },
+    ],
+    body: [
+      `Richard Wyckoff invited students to imagine the market as being operated by a single “Composite Man” — a skilled, well-capitalised operator who accumulates when the public is fearful, distributes when the public is euphoric, and manipulates price to facilitate his own inventory management.`,
+      `The concept is a teaching device, not a conspiracy theory. It forces the analyst to ask continuous questions: Is the Composite Man still accumulating? Has he finished? Is he supporting price to distribute? Is he letting it fall to shake out weak holders? Reading price and volume as the footprints of this operator sharpens interpretation.`,
+      `Modern equivalents speak of “smart money,” “institutional order flow,” or “large operators.” The underlying discipline remains the same: interpret every significant swing and volume event as purposeful action rather than random noise.`
+    ],
+    keyPoint: "The Composite Man is a lens. By asking what a large, informed operator would be doing at each stage, the chart ceases to be random and becomes a narrative of accumulation, distribution, or trend."
+  },
+  {
+    era: "Critical Test",
+    icon: "🪤",
+    title: "Spring & UTAD",
+    desc: "False breakdown (Spring) in accumulation · false breakout (UTAD) in distribution",
+    badge: { label: "Key Event", style: "amber" },
+    tags: [["Spring","teal"], ["UTAD","red"], ["false break",""], ["Phase C",""]],
+    data: [
+      { label: "Spring", value: "False breakdown below support", color: "teal" },
+      { label: "UTAD", value: "False breakout above resistance", color: "red" },
+      { label: "Purpose", value: "Shakeout / final test", color: "amber" },
+    ],
+    body: [
+      `A Spring is a false breakdown below the support of an accumulation range. Price briefly trades under the range lows, triggering sell stops and attracting late short sellers, then recovers quickly back inside the range. It is the Composite Man’s final shakeout before markup — a last opportunity to acquire shares at depressed prices and to test residual supply.`,
+      `An Upthrust After Distribution (UTAD) is the opposite event in a distribution range: a false breakout above resistance that quickly fails and falls back inside (or through) the range. It serves to distribute remaining inventory into the last wave of demand and to trap late buyers.`,
+      `Both events are high-probability turning points when confirmed by volume (usually lighter on the false move than on the subsequent recovery/rejection) and by follow-through in the expected direction. They typically occur in Phase C of their respective schematics.`
+    ],
+    compare: {
+      left: { label: "UTAD", text: "False breakout above distribution resistance. Traps late bulls. Often on elevated volume that then dries up. Leads to markdown once the trap is sprung." },
+      right: { label: "Spring", text: "False breakdown below accumulation support. Traps late bears / shakes out weak longs. Ideally occurs on declining volume. Leads to markup once supply is confirmed exhausted." }
+    },
+    keyPoint: "Springs and UTADs are engineered liquidity events. They exist to transfer shares at the extremes of the range before the real move begins."
+  },
+  {
+    era: "Phase A",
+    icon: "📉",
+    title: "Selling Climax (SC) & Automatic Rally (AR)",
+    desc: "The climactic end of a downtrend and the first bounce that defines the range",
+    badge: { label: "Stopping Action", style: "teal" },
+    tags: [["SC","teal"], ["AR",""], ["climax",""], ["Phase A",""]],
+    data: [
+      { label: "SC", value: "High volume, wide spread selloff", color: "red" },
+      { label: "AR", value: "Automatic bounce after SC", color: "teal" },
+      { label: "Role", value: "Defines early range boundaries", color: "amber" },
+    ],
+    body: [
+      `The Selling Climax (SC) is a late-stage downtrend event characterised by a sharp, wide-spread decline on very high volume as panicky sellers finally capitulate. It frequently includes a selling climax bar or cluster of bars that exhaust remaining supply. The SC marks the approximate end of the prior markdown and the beginning of Phase A of accumulation.`,
+      `Immediately after the SC, an Automatic Rally (AR) occurs as short covering and early value buying lift price. The high of the AR becomes an early resistance reference for the developing trading range; the low of the SC becomes early support.`,
+      `Together, SC and AR provide the first concrete boundaries of the future accumulation range and signal that the one-sided selling pressure of the downtrend has been interrupted.`
+    ],
+    keyPoint: "The Selling Climax is the market’s emotional extreme. The Automatic Rally is the first evidence that demand can now compete. Together they stop the trend and start the range."
+  },
+  {
+    era: "Phase A/B",
+    icon: "🔁",
+    title: "Secondary Test (ST)",
+    desc: "A return to the climax area on reduced volume that confirms supply is exhausted",
+    badge: { label: "Confirmation", style: "amber" },
+    tags: [["ST","amber"], ["test",""], ["lower volume",""], ["Phase A/B",""]],
+    data: [
+      { label: "Location", value: "Near SC lows (accumulation)", color: "" },
+      { label: "Volume signature", value: "Noticeably lighter than SC", color: "teal" },
+      { label: "Success", value: "Holds above SC low", color: "amber" },
+    ],
+    body: [
+      `After the Automatic Rally, price typically returns toward the Selling Climax lows in a Secondary Test (ST). The critical diagnostic is volume: a successful ST occurs on clearly reduced volume and preferably with a narrower spread, indicating that supply is no longer pressing as aggressively.`,
+      `A successful ST that holds above the SC low (or only marginally undercuts it on light volume) confirms that the downtrend has been stopped and that the market is ready to enter the longer cause-building Phase B. Multiple secondary tests can occur.`,
+      `In distribution the corresponding event is a Secondary Test of the Buying Climax highs, again preferably on lighter volume, confirming that demand is no longer expanding.`
+    ],
+    keyPoint: "The Secondary Test is the market’s way of asking whether the climax really exhausted the dominant side. Lower volume on the test is the affirmative answer."
+  },
+  {
+    era: "Phase D",
+    icon: "💪",
+    title: "Sign of Strength (SOS) & Sign of Weakness (SOW)",
+    desc: "Decisive moves that show which side has gained control inside the range",
+    badge: { label: "Character Shift", style: "teal" },
+    tags: [["SOS","teal"], ["SOW","red"], ["Phase D",""], ["commitment",""]],
+    data: [
+      { label: "SOS", value: "Strong rally on rising volume", color: "teal" },
+      { label: "SOW", value: "Strong decline on rising volume", color: "red" },
+      { label: "Timing", value: "Usually Phase D", color: "amber" },
+    ],
+    body: [
+      `A Sign of Strength (SOS) is a marked upward move out of the accumulation range (or from a higher low inside it) that occurs on increased volume and usually wider spreads. It demonstrates that demand is now dominant and that the cause built during the range is beginning to express itself. An SOS often breaks above the resistance established by the Automatic Rally or subsequent peaks.`,
+      `A Sign of Weakness (SOW) is the distribution counterpart: a decisive decline on increased volume that shows supply has taken control. It frequently breaks below support established earlier in the distribution range.`,
+      `These events typically appear in Phase D and serve as confirmation that the range is ending and the trending phase (markup or markdown) is starting. They are often followed by a final pullback (LPS or LPSY) that offers a last lower-risk entry.`
+    ],
+    keyPoint: "SOS and SOW are the market’s public declaration of which side has won the range battle. Volume expansion and decisive price progress are required for the signal to be valid."
+  },
+  {
+    era: "Phase D",
+    icon: "📍",
+    title: "Last Point of Support (LPS) & Last Point of Supply (LPSY)",
+    desc: "The final pullback before the sustained markup or markdown begins",
+    badge: { label: "Entry Zone", style: "teal" },
+    tags: [["LPS","teal"], ["LPSY","red"], ["last pullback",""], ["low-risk entry",""]],
+    data: [
+      { label: "LPS", value: "Higher low after SOS", color: "teal" },
+      { label: "LPSY", value: "Lower high after SOW", color: "red" },
+      { label: "Ideal volume", value: "Light on the pullback", color: "amber" },
+    ],
+    body: [
+      `After a Sign of Strength, price often pulls back one last time before the sustained markup. This pullback is the Last Point of Support (LPS). It ideally occurs on lighter volume, holds above the prior support or Spring low, and sets a higher low. The LPS is classically regarded as one of the highest-probability, lowest-risk long entries in the Wyckoff framework.`,
+      `In distribution the corresponding event is the Last Point of Supply (LPSY): a final rally after a Sign of Weakness that fails at a lower high, preferably on reduced volume, offering a last favourable short entry before markdown.`,
+      `Both LPS and LPSY represent the final opportunity for the Composite Man to acquire or distribute remaining inventory at favourable prices before the trend phase accelerates away from the range.`
+    ],
+    keyPoint: "The LPS / LPSY is the last polite invitation to join the emerging trend. Once it is complete, price usually leaves the range with increasing momentum."
+  },
+  {
+    era: "Laws",
+    icon: "⚖️",
+    title: "Wyckoff Laws: Supply/Demand, Cause/Effect, Effort/Result",
+    desc: "The three governing principles that underpin all Wyckoff analysis",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["supply/demand","slate"], ["cause/effect",""], ["effort/result",""], ["laws",""]],
+    data: [
+      { label: "Supply & Demand", value: "Price rises/falls with imbalance", color: "teal" },
+      { label: "Cause & Effect", value: "Range size ↔ trend extent", color: "amber" },
+      { label: "Effort & Result", value: "Volume vs. price progress", color: "red" },
+    ],
+    body: [
+      `Wyckoff distilled market behaviour into three laws. The Law of Supply and Demand states that price rises when demand exceeds supply and falls when supply exceeds demand. All analysis ultimately seeks to determine which side is dominant.`,
+      `The Law of Cause and Effect states that the effect (the subsequent trend) is proportional to the cause (the time and intensity of accumulation or distribution). A long, well-defined trading range implies a more substantial markup or markdown than a brief one. Point-and-figure charting was originally used to measure the cause and project the effect.`,
+      `The Law of Effort versus Result compares volume (effort) with price progress (result). Large effort that produces little price progress suggests absorption or exhaustion; small effort that produces large progress suggests a lack of opposition. Divergences between effort and result are early warnings of a change in behaviour.`
+    ],
+    keyPoint: "The three laws are not optional overlays — they are the logic engine of the entire method. Every schematic, every event, and every volume interpretation is an application of one or more of these laws."
+  },
+  {
+    era: "Technique",
+    icon: "📊",
+    title: "Volume and Price Spread Analysis",
+    desc: "Reading the relative effort (volume) behind each price bar’s result (spread)",
+    badge: { label: "Diagnostic", style: "amber" },
+    tags: [["volume spread","amber"], ["effort/result",""], ["bar-by-bar",""], ["diagnosis",""]],
+    data: [
+      { label: "Wide spread + high vol", value: "Strong commitment", color: "teal" },
+      { label: "Wide spread + low vol", value: "Lack of opposition", color: "" },
+      { label: "Narrow spread + high vol", value: "Absorption / conflict", color: "red" },
+    ],
+    body: [
+      `Wyckoff analysis is fundamentally bar-by-bar (or wave-by-wave) interpretation of price spread (the distance from high to low) in the context of volume. A wide-spread bar on high volume shows strong commitment by one side. A wide-spread bar on low volume suggests the move met little opposition. A narrow-spread bar on high volume indicates absorption or intense two-way conflict.`,
+      `Contextual comparison is essential. Rising prices on declining volume can signal weakening demand. Falling prices on declining volume can signal exhaustion of supply. Climactic volume at extremes often marks the end of a move; drying-up volume on tests confirms that the opposing side is spent.`,
+      `This relative analysis is applied continuously inside the schematics: comparing the volume of the Selling Climax with the Secondary Test, the Spring with the subsequent recovery, the SOS with prior rallies, and so on. Mastery of volume-and-spread reading is what turns the schematic from a static picture into a living diagnosis.`
+    ],
+    keyPoint: "Price tells you what happened; volume tells you how much effort was required. The relationship between the two reveals whether the dominant side is gaining or losing control."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
