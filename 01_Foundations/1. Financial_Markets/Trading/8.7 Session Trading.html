@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 8.7 Session Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 8 · Section 8.7</div>
+      <h1 class="book-title">Session<br><em>Trading</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core windows
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Time-of-day liquidity &amp; behaviour · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>8.7 Session Trading</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Asia",
+    icon: "🌏",
+    title: "Asian Session Characteristics",
+    desc: "Lower volatility, range-bound behaviour, and the foundations laid for the London open",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["Asia","teal"], ["Tokyo","amber"], ["range-bound",""], ["low vol","slate"]],
+    data: [
+      { label: "Typical character", value: "Lower volatility, tighter ranges", color: "teal" },
+      { label: "Key centres", value: "Tokyo · Singapore · Hong Kong · Sydney", color: "" },
+      { label: "Strategic use", value: "Range definition / positioning", color: "amber" },
+    ],
+    body: [
+      `The Asian session (roughly 23:00–08:00 UTC, varying by season) is generally characterised by lower traded volume and tighter ranges in most USD, EUR and GBP pairs, as well as in global equity-index futures outside of local cash hours. Liquidity is thinner, spreads can widen, and many institutional participants are less active.`,
+      `This environment often produces clean, well-defined ranges. Breakouts that occur during Asia frequently fail or are revisited once London liquidity arrives, making false-break strategies and range-trading approaches statistically more viable than aggressive trend-following. Major directional impulses that do begin in Asia are often driven by local news (BOJ, RBA, Chinese data) or by positions being adjusted ahead of the European open.`,
+      `For global traders the Asian session is less about capturing large trends and more about observing where overnight inventory has been built, where stop clusters may sit, and what range the market is currently accepting. That information becomes high-value context once the London session injects fresh liquidity and volatility.`
+    ],
+    keyPoint: "Asia frequently defines the initial balance and the overnight inventory. Respect its ranges, note its false breaks, and treat its price action as the setup rather than the main event for most cross-border instruments."
+  },
+  {
+    era: "Europe",
+    icon: "🇪🇺",
+    title: "London Session Open",
+    desc: "The first major liquidity injection of the trading day and a primary volatility catalyst",
+    badge: { label: "High Impact", style: "red" },
+    tags: [["London open","red"], ["volatility spike","amber"], ["liquidity","teal"], ["breakout window",""]],
+    data: [
+      { label: "Timing (UTC)", value: "≈07:00–09:00 peak activity", color: "" },
+      { label: "Character", value: "Range expansion / directional discovery", color: "red" },
+      { label: "Common pattern", value: "Stop runs of Asian range", color: "amber" },
+    ],
+    body: [
+      `The London open (and the preceding 30–60 minutes) brings a sharp increase in participation from European banks, funds and proprietary desks. Spreads tighten, depth improves, and volatility typically expands. For many currency pairs and for European equity futures this is the highest-probability window for the day’s initial directional move.`,
+      `A frequent sequence is the “London raid” or stop-run of the Asian range: price briefly breaks one side of the overnight range, triggers resting stops and pending orders, then reverses as genuine directional interest reveals itself. On other days London simply continues and accelerates a move that began in Asia. Distinguishing the two requires watching order-flow, delta, and whether new value is being accepted outside the prior range.`,
+      `Because so much resting liquidity from the thinner Asian session sits at the overnight extremes, the first 30–90 minutes after the London open often contain the largest adverse excursions for positions that were carried overnight without a clear edge. Many professional desks reduce size or widen stops specifically around this window.`
+    ],
+    keyPoint: "London open is the market’s first major attempt to discover direction for the day. It routinely hunts the Asian range before revealing its true intent — treat the first impulse with respect and wait for confirmation when possible."
+  },
+  {
+    era: "Overlap",
+    icon: "🗽",
+    title: "New York Session Open & London Overlap",
+    desc: "The highest-liquidity window of the 24-hour cycle and the peak of institutional activity",
+    badge: { label: "Peak Liquidity", style: "teal" },
+    tags: [["New York","teal"], ["overlap","amber"], ["highest volume",""], ["continuation / reversal","red"]],
+    data: [
+      { label: "Overlap window", value: "≈12:00–16:00 UTC (varies)", color: "" },
+      { label: "Character", value: "Maximum depth & participation", color: "teal" },
+      { label: "Key risk", value: "Data releases + positioning shifts", color: "amber" },
+    ],
+    body: [
+      `The overlap between the London and New York sessions is the most liquid period of the trading week for the majority of global instruments. Both European and North American participants are active, depth is deepest, and spreads are tightest. This is when the largest institutional orders are typically worked and when macroeconomic data (especially US releases) have their greatest immediate impact.`,
+      `Behaviourally the overlap can produce either powerful continuation of the London move or a decisive reversal once New York inventory and opinion are expressed. Equity-index futures, major FX pairs, and US-centric commodities often see their largest directional legs or their most important reversals during these hours.`,
+      `Because liquidity is highest, large orders can be absorbed more easily — yet the same liquidity attracts the most aggressive opportunistic flow. Volatility remains elevated, particularly around scheduled data, and the combination of deep books and fast flow creates both the cleanest trends and the sharpest two-sided auctions of the day.`
+    ],
+    keyPoint: "The London–New York overlap is the market’s main arena. Size can be executed, trends can be sustained, and reversals can be violent. It is the session in which the day’s dominant narrative is usually confirmed or overturned."
+  },
+  {
+    era: "Europe",
+    icon: "🕔",
+    title: "London Close Dynamics",
+    desc: "Position squaring, reduced European participation, and the transition to New York afternoon conditions",
+    badge: { label: "Transition", style: "amber" },
+    tags: [["London close","amber"], ["squaring","teal"], ["thinning liquidity",""], ["NY afternoon","slate"]],
+    data: [
+      { label: "Timing (UTC)", value: "≈15:30–17:00 wind-down", color: "" },
+      { label: "Typical behaviour", value: "Profit-taking / range contraction", color: "amber" },
+      { label: "Risk", value: "Lower depth, wider spreads later", color: "red" },
+    ],
+    body: [
+      `As the London cash equity close approaches and European desks begin to wind down, a noticeable fraction of risk is reduced. This often produces a period of consolidation, mean-reversion toward session VWAP or value, and a decline in directional conviction. Many of the day’s remaining European-driven orders are completed in this window.`,
+      `After the official London close, liquidity in European names and in some cross pairs deteriorates. Spreads can widen and the market becomes more susceptible to New York-only flows or to algorithmic activity. Moves that begin after the London close frequently lack the participation depth of the overlap and can reverse more easily once the next day’s London open arrives.`,
+      `Traders who are not intentionally positioning for the New York afternoon or for overnight risk often use the London close as a natural de-risking horizon. Those who continue to hold must accept that the character of the market has shifted from dual-continent depth to a thinner, more regionally driven auction.`
+    ],
+    keyPoint: "London close marks a structural reduction in participation. Expect more two-sided, mean-reverting behaviour around the close itself, followed by a thinner and potentially more erratic New York afternoon."
+  },
+  {
+    era: "Extended",
+    icon: "🌙",
+    title: "After-Hours and Pre-Market Trading",
+    desc: "Lower-liquidity environments where news, earnings and order imbalances can produce outsized moves",
+    badge: { label: "Extended Hours", style: "slate" },
+    tags: [["after-hours","slate"], ["pre-market","amber"], ["thin liquidity","red"], ["news reaction","teal"]],
+    data: [
+      { label: "Character", value: "Wider spreads, lower depth", color: "red" },
+      { label: "Primary drivers", value: "Earnings · economic prints · headlines", color: "" },
+      { label: "Risk profile", value: "High gap / reversal potential", color: "amber" },
+    ],
+    body: [
+      `After-hours and pre-market sessions in equities (and the corresponding thin periods in futures) operate with significantly reduced participation. Bid-ask spreads widen, displayed size shrinks, and a single large order or news headline can move price multiple percentage points with relatively little volume.`,
+      `These windows are dominated by reactions to earnings releases, economic data published outside regular hours, and overnight geopolitical or corporate headlines. Price discovery is real but incomplete; the first print of the regular session often re-evaluates the extended-hours move once broader liquidity arrives.`,
+      `For discretionary traders the practical implications are clear: size must be reduced, stops (if used) must allow for greater noise, and many participants prefer to observe rather than initiate risk until the regular session confirms or rejects the overnight auction. Gap-and-go versus gap-fill statistics become highly relevant around these periods.`
+    ],
+    keyPoint: "Extended-hours markets price information with incomplete participation. Treat the resulting moves as provisional until the full regular-session auction has had the opportunity to accept or reject them."
+  },
+  {
+    era: "Structure",
+    icon: "⏱️",
+    title: "Futures Open vs. Equity Open",
+    desc: "The distinction between the continuous futures market and the discrete cash-equity opening auction",
+    badge: { label: "Microstructure", style: "teal" },
+    tags: [["futures","teal"], ["cash open","amber"], ["opening auction",""], ["basis","slate"]],
+    data: [
+      { label: "Futures", value: "Nearly continuous, global", color: "teal" },
+      { label: "Cash equities", value: "Discrete opening auction", color: "amber" },
+      { label: "Key focus", value: "Basis, imbalance, first prints", color: "" },
+    ],
+    body: [
+      `Equity-index futures trade nearly 24 hours and therefore open (or rather continue) long before the cash equity market. The cash session, by contrast, begins with a formal opening auction that matches accumulated overnight orders at a single clearing price. This structural difference creates recurring opportunities and risks around the cash open.`,
+      `In the minutes before the cash open, indicative opening prices and order-imbalance feeds (where available) give information about the direction and size of the opening print. Futures often lead, but the cash open can gap relative to the futures fair value if the imbalance is large. After the open, the basis (futures premium or discount to cash) typically normalises as arbitrageurs act.`,
+      `Professional traders watch both the futures price action in the pre-open and the cash imbalance data. A strong futures trend that is confirmed by a large cash-opening imbalance in the same direction has a higher probability of continuation; a divergence between the two can produce sharp early-session reversals once the cash market begins to trade freely.`
+    ],
+    keyPoint: "Futures discover price continuously; cash equities discover an opening price discretely. The interaction between the two at the cash open is one of the most information-rich moments of the equity trading day."
+  },
+  {
+    era: "Calendar",
+    icon: "📅",
+    title: "End-of-Month Rebalancing Flows",
+    desc: "Systematic and discretionary flows tied to month-end, quarter-end and index reconstitution",
+    badge: { label: "Flow Driven", style: "amber" },
+    tags: [["month-end","amber"], ["rebalancing","teal"], ["pension flows",""], ["window dressing","slate"]],
+    data: [
+      { label: "Timing", value: "Final 1–3 sessions of month/quarter", color: "" },
+      { label: "Drivers", value: "Pensions · mutual funds · indexes", color: "teal" },
+      { label: "Effect", value: "Can override short-term technicals", color: "amber" },
+    ],
+    body: [
+      `End-of-month and especially end-of-quarter periods see elevated rebalancing activity from pension funds, mutual funds, insurance accounts and index-tracking vehicles. These flows are largely non-discretionary: portfolios are brought back to target weights, cash is invested or raised, and benchmarks are matched.`,
+      `The result can be persistent directional pressure in individual names, sectors, or the broad index that has little to do with news or short-term technicals. Window-dressing (buying winners and selling losers into the print) can further exaggerate moves in the final sessions. Liquidity is usually still good, but the order flow has a distinct, systematic character.`,
+      `Awareness of the calendar is itself an edge. Many discretionary traders reduce opposing risk or explicitly look to align with the expected rebalancing direction in the final days of the month or quarter. The effect is most pronounced in less-liquid names and around major index reconstitutions (Russell, MSCI, S&P).`
+    ],
+    keyPoint: "Month-end and quarter-end flows are among the most reliable non-fundamental drivers of price. They are largely inelastic and can dominate price action for several sessions — respect the calendar."
+  },
+  {
+    era: "Derivatives",
+    icon: "📆",
+    title: "Options Expiry Effects (Monthly, Quarterly, OPEX)",
+    desc: "Pinning, hedging flows and volatility shifts around standard and quarterly options expiration",
+    badge: { label: "Event Driven", style: "red" },
+    tags: [["OPEX","red"], ["pinning","amber"], ["gamma","teal"], ["quarterly expiry","slate"]],
+    data: [
+      { label: "Monthly OPEX", value: "3rd Friday – stock & index options", color: "" },
+      { label: "Quarterly", value: "Also includes futures & some A.M. settles", color: "amber" },
+      { label: "Common effects", value: "Pinning · vol crush · hedging flows", color: "teal" },
+    ],
+    body: [
+      `Standard equity and index options expiration (OPEX) occurs on the third Friday of each month. Quarterly expirations (March, June, September, December) are larger because they also coincide with the expiration of many futures contracts and with the settlement of certain A.M.-settled index options. These events generate well-documented flow patterns.`,
+      `In the days leading into expiration, dealer gamma positioning can exert a measurable influence on price. When dealers are long gamma, they hedge by buying dips and selling rips, dampening volatility and often “pinning” price near large open-interest strikes. When dealers are short gamma, the opposite occurs and moves can be amplified. On expiration day itself, delta-hedging of expiring options and the unwinding of related hedges can produce abrupt intraday swings, after which implied volatility frequently resets lower.`,
+      `Traders monitor open interest by strike, the put/call distribution, and estimates of dealer gamma exposure. Large open-interest concentrations act as magnets or barriers into expiration; once the options expire, those magnets disappear and the underlying is free to reprice. The post-OPEX session often marks a change in short-term volatility regime.`
+    ],
+    keyPoint: "Options expiration redistributes risk and removes large concentrations of open interest. The preceding pinning or volatility suppression, the expiration-day hedging flows, and the subsequent vol reset are recurring, tradeable features of the market calendar."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

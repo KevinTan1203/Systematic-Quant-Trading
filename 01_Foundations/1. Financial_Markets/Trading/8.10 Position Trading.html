@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 8.10 Position Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 8 · Section 8.10</div>
+      <h1 class="book-title">Position<br><em>Trading</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Multi-month trends · thesis + structure · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>8.10 Position Trading</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Definition",
+    icon: "📆",
+    title: "Timeframes: Weekly to Monthly+",
+    desc: "Operating on the highest practical charts that capture major trend legs",
+    badge: { label: "Core", style: "teal" },
+    tags: [["weekly","teal"], ["monthly","amber"], ["major trend",""], ["long horizon","slate"]],
+    data: [
+      { label: "Primary charts", value: "Weekly · Monthly", color: "teal" },
+      { label: "Context", value: "Quarterly / Yearly structure", color: "" },
+      { label: "Execution", value: "Daily / Weekly for entry timing", color: "amber" },
+    ],
+    body: [
+      `Position trading is anchored on the weekly and monthly timeframes. These charts filter out the majority of intermediate noise and reveal the large, multi-month to multi-year structural trends that define bull and bear markets in individual assets, sectors, and macro regimes. The monthly chart in particular provides the dominant directional context.`,
+      `Daily and even 4-hour charts may be consulted for refining entry or exit timing, but they are subordinate. A position trader who becomes overly focused on daily fluctuations risks converting a long-horizon strategy into an anxious form of swing trading and cutting short the very moves the approach is designed to capture.`,
+      `The advantage of these higher timeframes is clarity: fewer false signals, more significant levels, and the ability to hold through substantial counter-trend volatility. The corresponding requirement is the willingness to endure multi-week or multi-month periods of little progress or adverse movement without abandoning a still-valid thesis.`
+    ],
+    keyPoint: "Position trading lives on the weekly and monthly charts. If the thesis and the structure are not clear at these horizons, the trade does not belong in a position-trading framework."
+  },
+  {
+    era: "Orientation",
+    icon: "📈",
+    title: "Trend Following Orientation",
+    desc: "Aligning with the dominant directional regime rather than forecasting turning points",
+    badge: { label: "Core", style: "teal" },
+    tags: [["trend following","teal"], ["direction","amber"], ["continuation",""], ["regime","slate"]],
+    data: [
+      { label: "Primary goal", value: "Capture large portions of major trends", color: "teal" },
+      { label: "Bias", value: "Continuation over reversal", color: "" },
+      { label: "Exit logic", value: "Trend structure breaks", color: "amber" },
+    ],
+    body: [
+      `Position trading is inherently trend-following at a high time horizon. The central premise is that once a significant trend is established and confirmed by both price structure and the underlying thesis, the highest-probability path is continuation rather than immediate reversal. The trader’s job is to identify the trend, enter with favourable asymmetry, and remain positioned until the trend structure itself is broken.`,
+      `This orientation deliberately de-emphasises the prediction of exact tops and bottoms. Instead of trying to sell the final high or buy the final low, the position trader accepts that a portion of the move will be left on the table in exchange for capturing the large middle portion with relatively low decision frequency.`,
+      `Trend strength is assessed through higher-high / higher-low sequences (or the inverse), slope and separation of key moving averages on the weekly/monthly charts, and the behaviour of related assets or macro variables that support the same directional regime. When these elements remain intact, the default posture is to stay with the position.`
+    ],
+    keyPoint: "Position trading does not require catching the exact turn. It requires correctly identifying a durable trend and having the discipline to remain aligned with it until the evidence of its end becomes objective and structural."
+  },
+  {
+    era: "Thesis",
+    icon: "🌍",
+    title: "Macro Thesis-Driven",
+    desc: "Building positions around durable macroeconomic, structural or thematic conclusions",
+    badge: { label: "Foundation", style: "amber" },
+    tags: [["macro","amber"], ["thesis","teal"], ["regime",""], ["structural","slate"]],
+    data: [
+      { label: "Drivers", value: "Growth · Inflation · Policy · Liquidity · Themes", color: "" },
+      { label: "Horizon", value: "Multi-quarter to multi-year", color: "teal" },
+      { label: "Role of price", value: "Confirmation & timing", color: "amber" },
+    ],
+    body: [
+      `Most robust position trades are expression of a macro or structural thesis: a view on the direction of growth, inflation, real rates, liquidity conditions, currency regimes, demographic or technological shifts, or major policy trajectories. The thesis supplies the “why” that justifies holding through intermediate volatility.`,
+      `A well-formed thesis is falsifiable. It identifies the key variables that must continue to evolve in a certain direction for the position to remain valid, and it anticipates the data or price signals that would indicate the thesis is breaking down. Without this intellectual scaffolding, long-horizon positions become fragile and are easily abandoned at the first sustained counter-move.`,
+      `Price action and technical structure remain essential for timing and risk management, but they are interpreted through the lens of the thesis. A pullback that occurs while the macro conditions remain supportive is treated as a potential opportunity; the same pullback that coincides with a clear deterioration in the underlying drivers is treated as a warning.`
+    ],
+    keyPoint: "A position trade without a durable thesis is merely a long-dated speculation. The macro or structural conclusion is what allows the trader to hold with conviction when intermediate price action becomes uncomfortable."
+  },
+  {
+    era: "Psychology",
+    icon: "📉",
+    title: "Large Drawdown Tolerance",
+    desc: "Accepting and sizing for the inevitable multi-week to multi-month adverse excursions",
+    badge: { label: "Critical", style: "red" },
+    tags: [["drawdown","red"], ["volatility","amber"], ["tolerance","teal"], ["sizing","slate"]],
+    data: [
+      { label: "Reality", value: "Large open drawdowns are normal", color: "red" },
+      { label: "Requirement", value: "Pre-accepted and pre-sized", color: "teal" },
+      { label: "Failure mode", value: "Abandoning valid thesis at max pain", color: "amber" },
+    ],
+    body: [
+      `Major trends do not move in straight lines. Even the strongest multi-month or multi-year advances experience deep pullbacks, consolidations, and periods of discouraging price action. A position trader who cannot tolerate open drawdowns of 15–30% (or more, depending on the asset class and volatility) will systematically exit high-quality trends at precisely the wrong time.`,
+      `Tolerance is not the same as complacency. It is the result of deliberate position sizing, clear invalidation criteria, and psychological preparation. Before entering, the trader calculates the monetary and percentage drawdown that would occur if price reaches the structural stop or a historically normal intermediate retracement, and confirms that this outcome is acceptable at both the account and personal levels.`,
+      `The greatest performance leakage in position trading often comes not from being wrong, but from being right about the thesis and still exiting during a routine but painful counter-trend phase. Building genuine drawdown tolerance — through sizing, experience, and process — is therefore a core competency.`
+    ],
+    keyPoint: "Large open drawdowns are an inherent feature of capturing large trends. Size positions so that a historically normal adverse excursion is uncomfortable but fully survivable, both financially and emotionally."
+  },
+  {
+    era: "Scaling",
+    icon: "🏗️",
+    title: "Pyramid-In Strategies",
+    desc: "Adding to winning positions as the trend confirms and extends",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["pyramiding","amber"], ["adding to winners","teal"], ["scaling","slate"], ["risk control","red"]],
+    data: [
+      { label: "Principle", value: "Add only to confirmed strength", color: "teal" },
+      { label: "Risk rule", value: "Never increase risk beyond initial plan", color: "red" },
+      { label: "Common method", value: "Add on pullbacks or breakouts", color: "amber" },
+    ],
+    body: [
+      `Pyramiding is the practice of adding to a position as the trade moves in the intended direction and the thesis remains intact. Done correctly, it concentrates capital in the highest-conviction, best-performing ideas and can dramatically improve the overall return profile of a position-trading approach.`,
+      `The critical discipline is that additions must not increase the overall risk of the trade beyond what was originally accepted. This is usually achieved by advancing the stop on the entire position (including the original units) as new units are added, so that the maximum loss remains controlled. Adding into strength while leaving the original stop unchanged is a common way to turn a well-sized trade into an oversized one.`,
+      `Typical pyramid triggers include: a successful retest of a breakout level, a higher-low / lower-high sequence that confirms trend continuation, or a new leg higher/lower that is accompanied by supportive macro data. The best practitioners treat pyramiding as a planned, rules-based process rather than an emotional response to open profits.`
+    ],
+    keyPoint: "Pyramiding done well concentrates exposure in proven trends while keeping total risk in check. Pyramiding done poorly simply increases the size of the eventual loss. The difference is disciplined stop advancement and pre-defined addition rules."
+  },
+  {
+    era: "Sizing",
+    icon: "⚖️",
+    title: "Position Sizing Relative to Conviction",
+    desc: "Allocating capital in proportion to the strength and durability of the thesis",
+    badge: { label: "Risk Framework", style: "teal" },
+    tags: [["sizing","teal"], ["conviction","amber"], ["risk budget",""], ["asymmetry","slate"]],
+    data: [
+      { label: "High conviction", value: "Larger (but still controlled) size", color: "teal" },
+      { label: "Medium conviction", value: "Standard risk unit", color: "" },
+      { label: "Low conviction", value: "Pass or very small probe", color: "amber" },
+    ],
+    body: [
+      `Not every position trade deserves equal capital. A high-conviction idea — one in which the macro thesis is strong, the technical structure is clean, the asymmetric payoff is favourable, and supporting evidence is broad — can justify a larger risk allocation. A lower-conviction idea may still be worth a smaller “probe” position or may simply be passed.`,
+      `Conviction is not the same as confidence or emotional attachment. It is an assessment of the quality and durability of the edge: how clear is the thesis, how well does price structure confirm it, how favourable is the risk/reward, and how robust is the idea across different future scenarios. Sizing scales with that assessment within pre-defined maximum risk limits.`,
+      `A practical framework assigns each potential trade a conviction tier and a corresponding maximum risk percentage of equity. This prevents the common error of over-sizing mediocre ideas while under-sizing the rare, exceptional ones. It also keeps the overall portfolio risk coherent even when multiple position trades are running simultaneously.`
+    ],
+    keyPoint: "Position size should reflect the quality of the opportunity, not the trader’s boredom or desire for action. Scale exposure to conviction, always inside hard maximum risk limits."
+  },
+  {
+    era: "Psychology",
+    icon: "🧘",
+    title: "Patience as Core Skill",
+    desc: "The ability to wait for the right conditions and then to stay with the resulting position",
+    badge: { label: "Human Edge", style: "slate" },
+    tags: [["patience","slate"], ["inaction","teal"], ["discipline","amber"], ["long horizon","red"]],
+    data: [
+      { label: "Two forms", value: "Waiting to enter · Staying in", color: "" },
+      { label: "Primary enemy", value: "Boredom & need for action", color: "red" },
+      { label: "Result of mastery", value: "Fewer, higher-quality exposures", color: "teal" },
+    ],
+    body: [
+      `Position trading places extreme demands on patience in two distinct phases. First is the patience to wait for a high-quality alignment of thesis, structure and risk/reward — which may mean weeks or months of little or no activity. Second is the patience to remain in a correctly identified trend through the inevitable periods of consolidation, shallow pullbacks and negative noise.`,
+      `Most traders are biased toward action. Markets, however, spend a large proportion of time in states that do not offer favourable long-horizon asymmetry. The position trader who can remain inactive without becoming restless, and who can hold a winning position without manufacturing reasons to exit, possesses a genuine competitive advantage.`,
+      `Patience is trainable. It is reinforced by a clear written process, by pre-defined criteria for both entry and exit, by reducing the frequency of chart-checking, and by maintaining a broader research and life routine that does not depend on constant trading stimulation. Without it, even an excellent analytical framework will be undermined by premature entries and premature exits.`
+    ],
+    keyPoint: "In position trading, patience is not a soft virtue — it is a primary source of edge. The ability to wait for the right conditions and then to endure the trend’s natural volatility determines how much of the available large moves the trader actually captures."
+  },
+  {
+    era: "Catalysts",
+    icon: "🔭",
+    title: "Long-Term Catalysts and Themes",
+    desc: "Identifying and expressing durable multi-year forces that can power extended trends",
+    badge: { label: "Strategic", style: "amber" },
+    tags: [["themes","amber"], ["secular","teal"], ["multi-year","slate"], ["catalysts","red"]],
+ dual: [
+      { label: "Examples", value: "Demographics · Technology · Energy transition · Policy regimes", color: "" },
+      { label: "Horizon", value: "Years, not months", color: "teal" },
+      { label: "Expression", value: "Concentrated or diversified thematic exposure", color: "amber" },
+    ],
+    body: [
+      `The most powerful position trades are often expressions of long-term structural themes: demographic shifts, technological adoption curves, energy transitions, changes in monetary or fiscal regimes, geopolitical realignments, or deep value dislocations that require years to resolve. These forces create persistent directional pressure that intermediate noise cannot easily erase.`,
+      `Identifying such themes early, while they are still under-appreciated by the broader market, provides both a fundamental tailwind and a psychological anchor. The trader who understands why a trend should persist for years is far more likely to hold through the multi-month corrections that will inevitably occur.`,
+      `Expression can take the form of concentrated single-name or sector positions, or a diversified basket of assets that all benefit from the same underlying driver. In either case, the theme must be continuously re-validated. When the fundamental trajectory changes or when price structure on the monthly chart clearly breaks, the position must be reduced or exited regardless of how compelling the original story once was.`
+    ],
+    keyPoint: "Long-term themes supply the deepest form of conviction. When a durable structural driver aligns with confirming price structure on the weekly and monthly charts, the resulting position can be held with a robustness that purely technical or short-horizon approaches rarely achieve."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    // Fix for the last entry which had a typo in the original thought ("dual" instead of "data")
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 8.4 Auction Market Theory</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 8 · Section 8.4</div>
+      <h1 class="book-title">Auction Market<br><em>Theory</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Market as continuous auction → structure &amp; behaviour · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>8.4 Auction Market Theory</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Foundation",
+    icon: "🏛️",
+    title: "Markets as Auction Mechanisms",
+    desc: "Price discovery as a continuous two-sided auction between buyers and sellers",
+    badge: { label: "Core", style: "teal" },
+    tags: [["auction","teal"], ["price discovery",""], ["two-sided","amber"], ["facilitation","slate"]],
+    data: [
+      { label: "Core function", value: "Facilitate trade", color: "teal" },
+      { label: "Mechanism", value: "Continuous double auction", color: "" },
+      { label: "Outcome", value: "Fair value discovery", color: "amber" },
+    ],
+    body: [
+      `Auction Market Theory (AMT), developed and popularised by J. Peter Steidlmayer in conjunction with the Chicago Board of Trade, reframes the market as a continuous double auction. Buyers and sellers arrive with different time horizons, information, and urgency. The auction’s job is to facilitate trade by finding the price at which the greatest amount of business can be done.`,
+      `In a well-functioning auction, price moves higher to shut off buying or to attract new selling, and moves lower to shut off selling or to attract new buying. When the auction is in balance, price rotates around a fair-value area and both sides are able to transact comfortably. When the auction becomes imbalanced, price travels (trends) in search of new participation and a new area of value.`,
+      `This perspective shifts the trader’s focus from predicting the next tick to understanding the current state of the auction: Is the market facilitating trade efficiently? Is it in balance or seeking new value? Who is in control — the short-term or longer-term participant? These questions form the foundation of all subsequent AMT concepts.`
+    ],
+    keyPoint: "The market is not a random walk or a pure battle of bulls and bears — it is an auction whose primary purpose is to facilitate trade. Understanding the current state of that auction is more valuable than forecasting its next print."
+  },
+  {
+    era: "Structure",
+    icon: "⏳",
+    title: "Two-Timeframe Auction Process",
+    desc: "The interaction between short-term and longer-term market participants",
+    badge: { label: "Core", style: "teal" },
+    tags: [["two-timeframe","teal"], ["day timeframe",""], ["other timeframe","amber"], ["control","slate"]],
+    data: [
+      { label: "Day timeframe", value: "Intraday / short-term", color: "" },
+      { label: "Other timeframe", value: "Swing / position / institutional", color: "amber" },
+      { label: "Key question", value: "Who is in control?", color: "teal" },
+    ],
+    body: [
+      `AMT distinguishes two primary timeframes operating simultaneously. The “day timeframe” (or short-term) participant is primarily concerned with the current session — scalpers, day traders, and market makers. The “other timeframe” (longer-term) participant includes swing traders, institutions, and commercials whose decisions are driven by horizons beyond the current day.`,
+      `Most of the time the day timeframe is in control and the market rotates within a value area, facilitating trade for both sides. When the other timeframe becomes active — usually visible as strong initiative buying or selling that drives price away from value — the auction changes character. Price begins to trend as the longer-term participant seeks a new area of perceived value.`,
+      `Recognising which timeframe is dominant is one of the highest-leverage skills in AMT. A market that is being driven by the other timeframe will continue until that participant is satisfied or until opposing other-timeframe activity appears. Fighting the other timeframe is usually expensive; aligning with it or fading its exhaustion is the professional approach.`
+    ],
+    keyPoint: "Every session is a negotiation between the day timeframe and the other timeframe. Identifying which one is currently dictating price is the first step in choosing the correct strategy for that day."
+  },
+  {
+    era: "Behaviour",
+    icon: "🔄",
+    title: "Responsive vs. Initiative Activity",
+    desc: "Activity that returns price to value versus activity that drives price away from value",
+    badge: { label: "Critical", style: "amber" },
+    tags: [["responsive","teal"], ["initiative","red"], ["value reference",""], ["behavioural edge","amber"]],
+    data: [
+      { label: "Responsive", value: "Fades moves away from value", color: "teal" },
+      { label: "Initiative", value: "Drives price to new value", color: "red" },
+      { label: "Context needed", value: "Location relative to value", color: "amber" },
+    ],
+    body: [
+      `Responsive activity occurs when participants buy weakness or sell strength in an attempt to return price to a previously accepted area of value. It is typically seen near the extremes of a balance area or after a temporary excess. Responsive traders are mean-reversion oriented within the current auction structure.`,
+      `Initiative activity occurs when participants buy strength or sell weakness, deliberately driving price away from known value in search of a new fair-value zone. Initiative behaviour is the hallmark of the other-timeframe participant and is the engine of trend days and structural breaks.`,
+      `The same order-flow signature (for example heavy aggressive buying) can be either responsive or initiative depending on location. Aggressive buying at the bottom of a well-defined value area is often responsive; the same aggressive buying breaking out of the top of value is initiative. Location relative to the developing or prior value area is therefore essential for correct classification.`
+    ],
+    compare: {
+      left: { label: "Responsive Activity", text: "Buys low / sells high relative to value. Expects price to return to the mean. Dominant in balanced, rotational markets. Mean-reversion bias." },
+      right: { label: "Initiative Activity", text: "Buys high / sells low relative to value. Seeks new value. Dominant on trend days and breakouts. Continuation bias until exhausted." }
+    },
+    keyPoint: "Behaviour only has meaning in location. Aggressive buying is not automatically bullish — it is bullish when it is initiative and often merely responsive when it occurs at the lower edge of value."
+  },
+  {
+    era: "Value",
+    icon: "🎯",
+    title: "Value Area Acceptance / Rejection",
+    desc: "How the market confirms or denies a price zone as fair value",
+    badge: { label: "Key Skill", style: "teal" },
+    tags: [["value area","teal"], ["acceptance",""], ["rejection","red"], ["70% volume","amber"]],
+    data: [
+      { label: "Value Area", value: "≈70% of session volume", color: "" },
+      { label: "Acceptance", value: "Time + volume at level", color: "teal" },
+      { label: "Rejection", value: "Quick traversal / excess", color: "red" },
+    ],
+    body: [
+      `The value area is the price range in which approximately 70% of the session’s volume (or TPO count) occurred. It represents the market’s collective opinion of fair value for that period. Acceptance of value is demonstrated by time spent and volume traded within a zone; the longer price remains and the more business is done, the stronger the acceptance.`,
+      `Rejection is the opposite: price enters a zone and is quickly expelled, often leaving behind an excess (a single-print tail or a sharp spike with little volume). Rejection of higher prices is bearish; rejection of lower prices is bullish. The strongest signals occur when the market rejects a previously accepted value area — this frequently marks the beginning of a migration to new value.`,
+      `Traders monitor both the developing value area of the current session and the value areas of prior sessions (especially the previous day and the weekly composite). Overlap of value areas suggests balance and the likelihood of rotation; non-overlapping value areas suggest a directional auction and the potential for continuation or a larger structural shift.`
+    ],
+    keyPoint: "Value is not a line; it is a zone of acceptance. The market’s willingness to spend time and print volume at a price is the ultimate confirmation that participants consider it fair."
+  },
+  {
+    era: "State",
+    icon: "⚖️",
+    title: "Balanced vs. Imbalanced Markets",
+    desc: "The two fundamental states of the auction and the strategies each demands",
+    badge: { label: "Core", style: "amber" },
+    tags: [["balance","teal"], ["imbalance","red"], ["rotation","amber"], ["trend","slate"]],
+    data: [
+      { label: "Balanced", value: "Two-sided trade, rotation", color: "teal" },
+      { label: "Imbalanced", value: "One-sided, price discovery", color: "red" },
+      { label: "Strategy shift", value: "Fade vs. follow", color: "amber" },
+    ],
+    body: [
+      `A balanced market is characterised by two-sided trade, overlapping value, and rotational behaviour. Price oscillates around a central fair-value area as short-term buyers and sellers are both able to transact. In balance the highest-probability trades are typically fades of the extremes back toward value.`,
+      `An imbalanced market is characterised by one-sided control, expanding range, and migrating value. The other timeframe is active and price is in search of new participation. In imbalance the correct posture is to follow the direction of the imbalance, buying pullbacks in an upward imbalance or selling rallies in a downward imbalance.`,
+      `Markets continuously transition between these two states. The transition from balance to imbalance is often signalled by a break of the balance extremes on initiative volume; the transition from imbalance back to balance is signalled by the appearance of responsive activity and the formation of a new overlapping value area. Reading the current state correctly is more important than any single indicator.`
+    ],
+    keyPoint: "Balance and imbalance are the two modes of the auction. Trading a balanced market with trend-following tactics (or an imbalanced market with mean-reversion tactics) is the most common structural error."
+  },
+  {
+    era: "Profile",
+    icon: "📉",
+    title: "Profile Shapes: P-Profile, B-Profile, Normal",
+    desc: "Visual signatures of short-covering, long-liquidation, and balanced trade",
+    badge: { label: "Visual", style: "slate" },
+    tags: [["P-shape","teal"], ["b-shape","red"], ["normal profile","amber"], ["TPO structure",""]],
+    data: [
+      { label: "P-profile", value: "Short covering / bullish", color: "teal" },
+      { label: "b-profile", value: "Long liquidation / bearish", color: "red" },
+      { label: "Normal", value: "Balanced, two-sided", color: "amber" },
+    ],
+    body: [
+      `Market Profile (TPO) charts produce distinctive shapes that reveal the nature of the day’s auction. A normal or “D” shaped profile shows a wide value area with relatively equal tails above and below — classic balanced, two-sided trade.`,
+      `A P-shaped profile has a narrow base (little volume at the lows) and a wide upper distribution. It typically forms when short-covering or aggressive buying lifts price quickly out of an area of low volume and then builds value higher. It is generally a bullish structural signal, especially if it occurs after a decline.`,
+      `A b-shaped profile is the inverse: a wide lower distribution and a thin upper tail. It often results from long liquidation or aggressive selling that drives price lower before value is established. It carries a bearish structural implication. These shapes are most reliable when confirmed by volume and by the behaviour of subsequent sessions relative to the profile’s value area and extremes.`
+    ],
+    keyPoint: "Profile shape is the market’s autobiographical sketch of the session. A P says shorts were forced to cover and value migrated higher; a b says longs were forced to liquidate and value migrated lower; a normal profile says the auction found comfortable two-sided trade."
+  },
+  {
+    era: "Behaviour",
+    icon: "🔁",
+    title: "Rotational vs. Trending Markets",
+    desc: "Recognising when price is oscillating around value versus seeking new value",
+    badge: { label: "Practical", style: "amber" },
+    tags: [["rotational","teal"], ["trending","red"], ["mean reversion",""], ["continuation","amber"]],
+    data: [
+      { label: "Rotational", value: "Overlapping value, fades work", color: "teal" },
+      { label: "Trending", value: "Migrating value, follow", color: "red" },
+      { label: "Transition clue", value: "Break of balance extremes", color: "amber" },
+    ],
+    body: [
+      `Rotational markets spend the majority of time inside a defined value area, repeatedly testing and failing at the extremes. Inventory builds on both sides and is cleaned up by responsive activity. Mean-reversion and range-trading tactics have the statistical edge.`,
+      `Trending markets show persistent directional movement, non-overlapping value areas, and a clear series of higher highs and higher lows (or the reverse). Initiative activity dominates and pullbacks are typically shallow relative to the impulse legs. Continuation and breakout tactics become appropriate.`,
+      `The practical skill is early recognition of the transition. A market that has been rotational for several days and then produces a wide-range bar that closes outside the multi-day balance, accompanied by strong delta and volume, is signalling a potential shift into trend mode. Conversely, a trending market that begins to show overlapping value and responsive activity at the extremes is signalling a return to balance.`
+    ],
+    keyPoint: "Rotation and trend are not opinions — they are observable states defined by the behaviour of value. Trade the state that exists, not the state you hope will appear."
+  },
+  {
+    era: "Classification",
+    icon: "📋",
+    title: "Day Type Classification (Trend, Neutral, Normal)",
+    desc: "A practical taxonomy for characterising the session and choosing tactics",
+    badge: { label: "Framework", style: "slate" },
+    tags: [["trend day","red"], ["normal day","teal"], ["neutral day","amber"], ["tactical map",""]],
+    data: [
+      { label: "Trend day", value: "Wide range, one-way, little rotation", color: "red" },
+      { label: "Normal day", value: "Initial balance defines most range", color: "teal" },
+      { label: "Neutral day", value: "Two-sided extremes, closes mid", color: "amber" },
+    ],
+    body: [
+      `Classic day-type classification provides a concise language for the session’s character. A <strong>Trend Day</strong> is characterised by a wide range, strong directional conviction, minimal rotation, and usually a close near the extreme. The initial balance is typically small and is broken early; the other timeframe remains in control throughout.`,
+      `A <strong>Normal Day</strong> (or Normal Variation) shows a relatively wide initial balance that contains most of the session’s range. There is rotation and two-sided trade, but the market still exhibits a modest directional preference. A <strong>Neutral Day</strong> features probes beyond both sides of the initial balance and a close back inside, reflecting pure two-sided inventory adjustment with no lasting control by either camp.`,
+      `Additional refinements (Non-Trend, Normal Variation Extreme, etc.) exist, but the core three already dictate strategy. On trend days the correct posture is continuation; on normal days a blend of breakout and rotation tactics; on neutral days pure mean-reversion between the extremes. Mis-classifying the day type is one of the fastest ways to apply the wrong playbook.`
+    ],
+    keyPoint: "Day type is the session’s operating system. Identify it early — through the size of the initial balance, the presence or absence of initiative activity, and the behaviour at the extremes — and the appropriate tactical playbook becomes obvious."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

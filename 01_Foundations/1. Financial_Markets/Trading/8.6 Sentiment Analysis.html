@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 8.6 Sentiment Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 8 · Section 8.6</div>
+      <h1 class="book-title">Sentiment<br><em>Analysis</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core gauges
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Crowd psychology → positioning extremes · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>8.6 Sentiment Analysis</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Composite",
+    icon: "🌡️",
+    title: "Fear & Greed Index",
+    desc: "A multi-factor composite that translates market behaviour into a simple 0–100 emotional reading",
+    badge: { label: "Popular", style: "teal" },
+    tags: [["Fear & Greed","teal"], ["CNN","amber"], ["composite",""], ["extremes","red"]],
+    data: [
+      { label: "Scale", value: "0 (Extreme Fear) – 100 (Extreme Greed)", color: "" },
+      { label: "Inputs", value: "Volatility, momentum, put/call, breadth…", color: "teal" },
+      { label: "Best use", value: "Contrarian at extremes", color: "amber" },
+    ],
+    body: [
+      `The CNN Fear & Greed Index (and its crypto analogues) aggregates several behavioural and market-based indicators into a single 0–100 score. Typical components include price momentum, stock-price strength, market breadth, put/call ratios, volatility (VIX), safe-haven demand, and junk-bond demand. The result is a quick gauge of whether participants are collectively fearful or greedy.`,
+      `Readings below 25 (Extreme Fear) have historically coincided with attractive medium-term entry zones in equities; readings above 75 (Extreme Greed) have often preceded consolidations or corrections. The index is most useful at the extremes and relatively uninformative in the middle zone.`,
+      `Because it is a composite, it can lag sudden regime changes and can remain at extreme levels longer than expected. Treat it as one input among several rather than a standalone timing tool. Crypto versions (which often incorporate funding rates, volatility, and social volume) behave similarly but with higher amplitude and faster mean reversion.`
+    ],
+    keyPoint: "Fear & Greed indices compress complex behaviour into a single number. Their edge lies almost entirely at the extremes — where the crowd is most one-sided and therefore most vulnerable to reversal."
+  },
+  {
+    era: "Options",
+    icon: "📊",
+    title: "Put/Call Ratio",
+    desc: "The volume or open-interest balance between puts and calls as a direct expression of hedging and speculative demand",
+    badge: { label: "Classic", style: "amber" },
+    tags: [["put/call","amber"], ["CBOE","teal"], ["hedging",""], ["speculation","red"]],
+    data: [
+      { label: "Equity P/C", value: "More sentiment-sensitive", color: "teal" },
+      { label: "Index P/C", value: "More hedging-driven", color: "" },
+      { label: "Extreme high", value: "Often bullish (fear)", color: "amber" },
+    ],
+    body: [
+      `The put/call ratio measures the volume (or open interest) of put options relative to call options. A high ratio indicates relatively heavy put buying — either speculative bearish bets or protective hedging. A low ratio indicates dominant call buying and complacent or bullish speculation.`,
+      `Important distinctions exist between the equity-only put/call ratio (more reflective of retail and speculative sentiment) and the index put/call ratio (more influenced by institutional hedging). Extremely high equity put/call ratios have frequently marked short-term and intermediate bottoms; extremely low ratios have marked tops or late-stage advances.`,
+      `Like most sentiment measures, the put/call ratio is best interpreted in the context of its own history (percentile rank) and alongside price action. A rising put/call ratio while the market is still making new highs can be an early warning of distribution; a spiked put/call ratio after a sharp decline often signals capitulation.`
+    ],
+    keyPoint: "The put/call ratio reveals whether the options market is paying for protection or for upside. Extremes in either direction have a long history of preceding mean-reverting moves in the underlying."
+  },
+  {
+    era: "Volatility",
+    icon: "⚡",
+    title: "VIX as Fear Gauge",
+    desc: "Implied volatility of S&P 500 options — the market’s consensus estimate of expected turbulence",
+    badge: { label: "Essential", style: "red" },
+    tags: [["VIX","red"], ["implied vol","amber"], ["fear gauge","teal"], ["term structure",""]],
+    data: [
+      { label: "Low VIX", value: "Complacency / low expected vol", color: "teal" },
+      { label: "High VIX", value: "Fear / high expected vol", color: "red" },
+      { label: "Key nuance", value: "Level + term structure + rate of change", color: "amber" },
+    ],
+    body: [
+      `The CBOE Volatility Index (VIX) measures the 30-day implied volatility derived from a wide strip of S&P 500 index options. It is widely called the “fear gauge” because implied volatility tends to rise when investors rush to buy protection. Sustained low readings (sub-15) often accompany steady bull markets; spikes above 30–40 have historically coincided with panic and forced selling.`,
+      `Raw level is only part of the story. The VIX term structure (contango vs. backwardation), the speed of the rise, and the behaviour of VIX relative to realised volatility all add information. A VIX spike that quickly mean-reverts often marks a short-term washout; a VIX that remains elevated while the market stabilises can signal ongoing uncertainty.`,
+      `VIX is a powerful contextual tool but a poor standalone timing signal. It is most effective when combined with positioning data, price structure, and other sentiment measures. Related products (VIX futures, VVIX, equity-only volatility indices) provide additional granularity for professional users.`
+    ],
+    keyPoint: "VIX does not predict the direction of the next move; it prices the expected magnitude of moves. Extreme elevations usually reflect capitulation-level fear and have a strong tendency to precede stabilisation or recovery."
+  },
+  {
+    era: "Survey",
+    icon: "📋",
+    title: "AAII Sentiment Survey",
+    desc: "Weekly poll of individual-investor bullish, bearish and neutral outlooks",
+    badge: { label: "Retail", style: "slate" },
+    tags: [["AAII","slate"], ["retail sentiment","amber"], ["survey",""], ["contrarian","teal"]],
+    data: [
+      { label: "Frequency", value: "Weekly", color: "" },
+      { label: "Bullish extreme", value: "Often near short-term tops", color: "red" },
+      { label: "Bearish extreme", value: "Often near short-term bottoms", color: "teal" },
+    ],
+    body: [
+      `The American Association of Individual Investors (AAII) Sentiment Survey asks members each week whether they are bullish, bearish, or neutral on the stock market over the next six months. The results are expressed as percentages and have been published continuously since 1987, giving a long and clean historical record of retail opinion.`,
+      `Because retail investors as a group have historically been wrong at extremes, the survey is primarily used as a contrarian indicator. Readings of bullish sentiment above ~50–55% (or bull/bear spreads at multi-year highs) have frequently occurred near intermediate tops. Readings of bearish sentiment above ~50% (or unusually low bullish percentages) have often coincided with intermediate bottoms.`,
+      `The survey is most powerful when it reaches rare extremes and when it diverges from price (price making new highs while bullish sentiment fails to confirm, or price making new lows while bearish sentiment is already elevated). It is less useful in the middle of its historical range.`
+    ],
+    keyPoint: "AAII is a pure measure of individual-investor mood. Its greatest value appears at historical extremes, where the retail crowd is most one-sided and therefore most likely to be positioned on the wrong side of the next significant move."
+  },
+  {
+    era: "Positioning",
+    icon: "🏦",
+    title: "COT Report Positioning",
+    desc: "Weekly Commitments of Traders data showing how large specs, commercials and non-reportables are positioned",
+    badge: { label: "Institutional", style: "teal" },
+    tags: [["COT","teal"], ["futures positioning","amber"], ["commercials",""], ["leveraged funds","red"]],
+    data: [
+      { label: "Release", value: "Friday (data as of Tuesday)", color: "" },
+      { label: "Key groups", value: "Commercial · Large Spec · Retail", color: "teal" },
+      { label: "Edge", value: "Extremes + divergence vs price", color: "amber" },
+    ],
+    body: [
+      `The CFTC Commitments of Traders (COT) report provides a weekly snapshot of open interest in futures and options broken down by trader category. The most widely followed groups are Commercials (hedgers), Non-Commercials / Large Speculators (including CTA and hedge-fund leverage), and Non-Reportable (smaller traders).`,
+      `Commercials are typically viewed as the “smart money” in many commodity and currency markets because their positioning is driven by real economic exposure. Large speculators are often trend-following and can become extremely positioned at the end of sustained moves. Extreme net-long or net-short readings in the speculative category, especially when diverging from price, have a long history as contrarian signals.`,
+      `Interpretation must be market-specific: the same extreme reading can mean different things in crude oil versus the S&P 500 versus the euro. Professionals look at both the absolute level (percentile rank over 1–3 years) and the rate of change in positioning. The lag inherent in the data (released Friday for the prior Tuesday) means COT is better suited to intermediate-term context than to day-to-day timing.`
+    ],
+    keyPoint: "COT reveals who is actually holding the risk. When leveraged speculative positioning reaches historic extremes while price momentum slows, the conditions for a positioning-driven reversal are usually in place."
+  },
+  {
+    era: "Positioning",
+    icon: "🩳",
+    title: "Short Interest as Sentiment",
+    desc: "The stock of borrowed shares sold short — a direct measure of overtly bearish conviction",
+    badge: { label: "Equity Specific", style: "amber" },
+    tags: [["short interest","amber"], ["days to cover",""], ["squeeze","red"], ["crowding","teal"]],
+    data: [
+      { label: "High SI %", value: "Heavy bearish positioning", color: "red" },
+      { label: "Days to cover", value: "SI ÷ average volume", color: "" },
+      { label: "Squeeze risk", value: "High SI + rising price + low float", color: "amber" },
+    ],
+    body: [
+      `Short interest measures the total number of shares sold short and not yet covered. Expressed as a percentage of float or of shares outstanding, and often converted into “days to cover” (short interest divided by average daily volume), it quantifies how much overtly bearish capital is deployed in a name or an index.`,
+      `Elevated short interest can be either a bullish or bearish signal depending on context. In a fundamentally deteriorating company it may simply reflect accurate negative analysis. In a name with improving fundamentals, catalyst potential, or strong technical momentum, high short interest becomes fuel for a short squeeze — forced covering that accelerates the advance.`,
+      `The most actionable situations combine high short interest, rising price, increasing volume, and a fundamental or narrative catalyst. Conversely, a sharp rise in short interest after an extended decline can signal that the easy money on the short side has already been made and that downside may be limited. Always pair short-interest data with borrow availability, cost of borrow, and days-to-cover for a complete picture.`
+    ],
+    keyPoint: "Short interest is concentrated, high-conviction bearish positioning. When it collides with advancing price and a catalyst, it can produce some of the most violent upside moves in the equity market."
+  },
+  {
+    era: "Crypto",
+    icon: "₿",
+    title: "Crypto: Funding Rates & Long/Short Ratios",
+    desc: "Perpetual-futures positioning metrics that reveal real-time leveraged sentiment",
+    badge: { label: "Crypto Native", style: "teal" },
+    tags: [["funding rate","teal"], ["long/short ratio","amber"], ["leverage","red"], ["perpetuals",""]],
+    data: [
+      { label: "Positive funding", value: "Longs pay shorts (bullish crowding)", color: "teal" },
+      { label: "Negative funding", value: "Shorts pay longs (bearish crowding)", color: "red" },
+      { label: "Extreme use", value: "Contrarian + liquidation risk", color: "amber" },
+    ],
+    body: [
+      `In crypto perpetual futures, the funding rate is a periodic payment exchanged between longs and shorts that keeps the perpetual price anchored to the spot index. Persistently positive funding means longs are dominant and are paying shorts to maintain their positions; persistently negative funding means the opposite. Extreme positive funding has repeatedly preceded long liquidations and sharp corrections; extreme negative funding has preceded short squeezes.`,
+      `Exchange long/short ratios (account-based or position-based) provide a complementary view of whether retail and leveraged traders are predominantly long or short. When both funding and long/short ratios reach simultaneous extremes, the market is often one catalyst away from a forced-deleveraging cascade.`,
+      `These metrics are closest to real-time of any major sentiment family. They can shift dramatically within hours. The highest-probability signals occur when extreme funding coincides with stretched price, declining open interest on one side, and visible liquidation clusters on the heatmap. Because crypto is highly leveraged, sentiment extremes tend to resolve more violently than in traditional markets.`
+    ],
+    keyPoint: "Funding rates and long/short ratios are the crypto market’s live positioning tape. When leveraged sentiment becomes one-sided, the next major move is frequently driven by the forced exit of that crowded side."
+  },
+  {
+    era: "Social",
+    icon: "📣",
+    title: "Social Media Sentiment (X / Twitter, Reddit)",
+    desc: "Real-time measurement of attention, emotional tone and narrative intensity across public platforms",
+    badge: { label: "Modern", style: "slate" },
+    tags: [["Twitter/X","slate"], ["Reddit","amber"], ["social volume",""], ["NLP sentiment","teal"]],
+    data: [
+      { label: "Key metrics", value: "Volume · Polarity · Influencer velocity", color: "" },
+      { label: "Bullish extreme", value: "Euphoric high-volume chatter", color: "red" },
+      { label: "Bearish extreme", value: "Capitulation / despair language", color: "teal" },
+    ],
+    body: [
+      `Social media sentiment analysis quantifies the volume of discussion, the emotional polarity (positive/negative), and the velocity of influential accounts around a given asset or theme. Natural-language-processing models classify posts at scale, while simpler metrics track mention counts, hashtag trends, and engagement rates.`,
+      `Extreme social euphoria — rapidly rising mention volume combined with overwhelmingly positive language — has frequently marked short-term and intermediate tops, especially in meme-sensitive names and crypto. Extreme social despair or silence after a decline can mark exhaustion. The signal is strongest when social extremes coincide with positioning extremes (options, funding, COT, short interest).`,
+      `Caveats are important: social data is noisy, easily manipulated by bots or coordinated campaigns, and often lags price in the early stages of a move. The highest-value approach is to treat social sentiment as a confirming or diverging overlay rather than a primary trigger, and to focus on rate-of-change and extremity rather than absolute levels.`
+    ],
+    keyPoint: "Social platforms turn private opinion into public, measurable attention. When that attention reaches euphoric or despairing extremes, the crowd is usually fully positioned and the marginal buyer or seller is scarce."
+  },
+  {
+    era: "Options",
+    icon: "📉",
+    title: "Options Skew as Sentiment",
+    desc: "The relative pricing of downside versus upside options — a market-implied fear and greed surface",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["skew","amber"], ["25-delta","teal"], ["put skew","red"], ["risk reversal",""]],
+    data: [
+      { label: "Steep put skew", value: "High demand for downside protection", color: "red" },
+      { label: "Flat / inverted skew", value: "Complacency or upside chasing", color: "teal" },
+      { label: "Best viewed", value: "Term structure + vs history", color: "amber" },
+    ],
+    body: [
+      `Options skew measures the difference in implied volatility between out-of-the-money puts and out-of-the-money calls (commonly the 25-delta risk reversal). A steeply negative skew (puts much more expensive than calls) indicates that the market is paying a large premium for downside protection — a classic fear signature. A flat or positive skew indicates relatively greater demand for upside calls or reduced concern about tail risk.`,
+      `Skew can be examined across the term structure (front-month versus longer-dated) and relative to its own history. A sudden steepening of put skew during a decline often marks panic hedging; a subsequent flattening while price stabilises can signal that the worst of the fear has passed. Conversely, unusually rich call skew in a rising market can indicate speculative excess.`,
+      `Skew is a sophisticated, market-derived sentiment measure that is less prone to survey bias. It is most powerful when combined with absolute volatility levels, positioning data, and the behaviour of the underlying. Changes in skew frequently lead changes in the broader narrative.`
+    ],
+    keyPoint: "Skew reveals what the options market is willing to pay for tail risk. When downside protection becomes extremely expensive relative to upside, fear is dominant; when the opposite occurs, complacency or speculative greed is in control."
+  },
+  {
+    era: "Framework",
+    icon: "🔄",
+    title: "Contrarian Sentiment Signals",
+    desc: "The systematic practice of leaning against extremes in crowd positioning and psychology",
+    badge: { label: "Core Principle", style: "red" },
+    tags: [["contrarian","red"], ["extremes","amber"], ["mean reversion","teal"], ["timing",""]],
+    data: [
+      { label: "Requirement", value: "True extreme + confirming price action", color: "" },
+      { label: "Failure mode", value: "Fighting a non-extreme trend", color: "red" },
+      { label: "Best edge", value: "Multiple indicators aligned", color: "teal" },
+    ],
+    body: [
+      `Contrarian sentiment analysis rests on a simple but powerful observation: when the overwhelming majority of participants are positioned and emotionally committed in one direction, the marginal capital available to push the market further in that direction is limited, while the capital available for a reversal is substantial. Extremes create asymmetric opportunity.`,
+      `Effective contrarian practice requires three elements: (1) a genuine historical extreme across one or more reliable indicators, (2) evidence that the existing trend is losing momentum or that price is diverging from the sentiment reading, and (3) a clear risk-management plan, because sentiment can remain extreme longer than expected. Single-indicator, mid-range “contrarian” calls are usually just noise.`,
+      `The highest-probability setups occur when several independent sentiment families — options, volatility, surveys, positioning, social, and funding — simultaneously reach rare extremes in the same direction. At those moments the crowd is maximally one-sided and the stage is set for mean reversion, often catalysed by a relatively modest piece of news or a positioning cascade.`
+    ],
+    compare: {
+      left: { label: "Crowd at Extreme", text: "One-sided positioning, elevated emotional language, scarcity of opposing capital. Historically fertile ground for reversal once momentum falters." },
+      right: { label: "Crowd in Middle", text: "Mixed positioning, neutral sentiment readings. Little contrarian edge. Trend-following or structure-based approaches are usually superior." }
+    },
+    keyPoint: "Contrarian sentiment is not automatic fading of every move. It is the disciplined identification of rare, multi-indicator extremes where the crowd has exhausted its capacity to push price further — and the subsequent alignment with the emerging mean-reverting flow."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
