@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 8.1 Tape Reading</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 8 · Section 8.1</div>
+      <h1 class="book-title">Tape<br><em>Reading</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core techniques
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Time &amp; Sales mastery → order-flow edge · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>8.1 Tape Reading</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Foundation",
+    icon: "📜",
+    title: "Time and Sales (Tape) Interpretation",
+    desc: "Reading the continuous stream of executed trades as the market’s real-time ledger",
+    badge: { label: "Core", style: "teal" },
+    tags: [["Time & Sales","teal"], ["prints",""], ["tick data","amber"], ["order flow","accent"]],
+    data: [
+      { label: "Primary data", value: "Price · Size · Time · Side", color: "teal" },
+      { label: "Key filter", value: "Remove noise / small prints", color: "" },
+      { label: "Edge source", value: "Sequence & clustering", color: "amber" },
+    ],
+    body: [
+      `The Time and Sales window (the “tape”) is the chronological record of every reported trade: price, size, timestamp, and often the aggressor side (buy or sell). Unlike the Level 2 book, which shows <em>intent</em>, the tape shows <em>what actually traded</em>. It is the ground truth of market activity.`,
+      `Interpretation begins with context. A single large print is meaningless without knowing the prevailing bid/ask, recent volume profile, and whether the print occurred on an uptick or downtick. Professional readers watch the <strong>pace</strong> of prints, the <strong>clustering</strong> of size at specific price levels, and the <strong>relationship</strong> between trade size and price movement.`,
+      `Modern feeds include exchange codes, trade conditions (odd-lot, out-of-sequence, late, etc.), and sometimes dark-pool indicators. Filtering out odd-lots and very small retail prints often reveals the institutional “story” more clearly. The highest-value skill is recognising when the tape is confirming or diverging from the visible order book — absorption, exhaustion, or hidden liquidity frequently appear first on the tape.`
+    ],
+    keyPoint: "The tape never lies about what traded, only about why. Your edge comes from reading the sequence, size distribution, and aggressor behaviour in context of the book and recent price action — not from any single print."
+  },
+  {
+    era: "Foundation",
+    icon: "📏",
+    title: "Print Size and Frequency Analysis",
+    desc: "Quantifying urgency and participation through size distribution and print velocity",
+    badge: { label: "Core", style: "teal" },
+    tags: [["size profile","teal"], ["print velocity",""], ["urgency","amber"], ["participation","slate"]],
+    data: [
+      { label: "Small prints", value: "Retail / algorithms", color: "" },
+      { label: "Medium prints", value: "Active institutional", color: "teal" },
+      { label: "Large prints", value: "Blocks / dark / icebergs", color: "amber" },
+    ],
+    body: [
+      `Print size is a direct proxy for participant type and urgency. Continuous streams of 100–300 share prints usually reflect retail or high-frequency market-making. Clusters of 1,000–5,000 share prints often indicate active institutional algorithms slicing larger orders. Prints of 10,000+ shares (or the equivalent notional in futures/crypto) frequently signal block interest or iceberg replenishment.`,
+      `Frequency — the number of prints per unit time — measures intensity. A sudden acceleration in print velocity at a key level, especially with rising average size, often precedes a directional move. Conversely, high velocity with shrinking size can indicate exhaustion or absorption by a large passive participant.`,
+      `Best practice is to maintain a running mental (or coded) distribution of print sizes relative to the stock’s average trade size and average daily volume. A 5,000-share print in a low-float name is far more significant than the same print in a mega-cap. Track whether large prints are occurring at the offer (aggressive buying) or the bid (aggressive selling), and whether subsequent price action respects or fades them.`
+    ],
+    keyPoint: "Size tells you who is participating; frequency tells you how urgently. The combination of increasing size and accelerating print rate is one of the purest short-term signals of institutional commitment."
+  },
+  {
+    era: "Aggressor",
+    icon: "⚔️",
+    title: "Aggressive Buyers / Sellers Identification",
+    desc: "Detecting which side is lifting offers or hitting bids with urgency",
+    badge: { label: "Critical", style: "amber" },
+    tags: [["aggressor","amber"], ["lift the offer",""], ["hit the bid","red"], ["delta","teal"]],
+    data: [
+      { label: "Buy aggression", value: "Trades at or above ask", color: "teal" },
+      { label: "Sell aggression", value: "Trades at or below bid", color: "red" },
+      { label: "Key metric", value: "Cumulative delta", color: "amber" },
+    ],
+    body: [
+      `An aggressive buyer is one who pays the offer (or higher); an aggressive seller hits the bid (or lower). Most modern platforms colour-code the tape accordingly — green for upticks/ask-side trades, red for downticks/bid-side trades. The cumulative difference between aggressive buy volume and aggressive sell volume is known as <strong>delta</strong>.`,
+      `Persistent positive delta (more volume trading at the ask) while price holds or rises indicates genuine demand. Negative delta while price refuses to fall suggests absorption by passive buyers. Divergences are especially powerful: price making new highs on declining delta often precedes exhaustion; price making new lows on rising delta can signal short-covering or accumulation.`,
+      `Advanced readers also watch for “sweeps” of multiple levels and for the ratio of aggressive volume to total volume. In thin names, a few large aggressive prints can move price dramatically; in liquid names the same prints may be absorbed without impact. Always contextualise aggression against the depth of the book and the time of day (opening/closing auctions distort the tape).`
+    ],
+    compare: {
+      left: { label: "Passive Flow", text: "Limit orders resting in the book. Absorb aggression. Visible on Level 2. Can disappear or refresh (icebergs)." },
+      right: { label: "Aggressive Flow", text: "Market or marketable limit orders that take liquidity. Immediately visible on the tape. Reveals urgency and commitment." }
+    },
+    keyPoint: "Aggression reveals urgency; absorption reveals capacity. The side that is consistently aggressive while the other side absorbs without price progress is usually the side that will eventually dominate."
+  },
+  {
+    era: "Institutional",
+    icon: "🏛️",
+    title: "Block Trades and Dark Pool Prints",
+    desc: "Recognising large, often hidden, institutional transactions and their implications",
+    badge: { label: "Critical", style: "red" },
+    tags: [["blocks","red"], ["dark pools","slate"], ["TRF","amber"], ["institutional","teal"]],
+    data: [
+      { label: "Block definition", value: "≥10k shares or $200k+", color: "" },
+      { label: "Reporting lag", value: "Often delayed / TRF", color: "amber" },
+      { label: "Signal value", value: "High when clustered", color: "teal" },
+    ],
+    body: [
+      `Block trades are large transactions typically negotiated off-exchange or executed via algorithms designed to minimise market impact. Many appear on the tape with special condition codes or via the Trade Reporting Facility (TRF) after a delay. Dark-pool prints (crosses executed on ATS venues) frequently print at the midpoint and may lack clear aggressor side.`,
+      `A single isolated block is often noise — it may be a facilitated cross or a one-off portfolio rebalance. Clusters of blocks in the same direction, especially when followed by continued aggressive flow on the lit exchanges, carry far more weight. Blocks printing consistently above the prevailing offer (or below the bid) can indicate a large participant willing to pay up (or sell down) for size.`,
+      `Dark-pool volume as a percentage of total volume is itself informative. Elevated dark volume relative to the stock’s norm can signal institutional accumulation or distribution that is deliberately avoiding the lit book. Cross-reference dark prints with subsequent lit-tape behaviour: if dark buying is followed by sustained ask-side aggression on the lit markets, the institutional interest is likely real.`
+    ],
+    keyPoint: "Blocks and dark prints are the footprints of size. Isolated prints are anecdotal; repeated prints in the same direction, especially when confirmed by lit-market aggression, are evidence of institutional conviction."
+  },
+  {
+    era: "Direction",
+    icon: "↕️",
+    title: "Uptick vs. Downtick Analysis",
+    desc: "Using tick direction and sequences to gauge short-term control",
+    badge: { label: "Classic", style: "slate" },
+    tags: [["uptick","teal"], ["downtick","red"], ["tick sequence",""], ["momentum","amber"]],
+    data: [
+      { label: "Uptick", value: "Trade ≥ previous trade", color: "teal" },
+      { label: "Downtick", value: "Trade < previous trade", color: "red" },
+      { label: "Power signal", value: "Runs of same-side ticks", color: "amber" },
+    ],
+    body: [
+      `An uptick occurs when a trade executes at a price equal to or higher than the previous trade; a downtick occurs at a lower price. Classic tape readers watched the sequence of ticks to determine which side was in control. Long strings of upticks with expanding size suggested buyers were in command; long strings of downticks suggested sellers.`,
+      `Modern analysis adds nuance. In a rising market, consistent upticks on increasing volume confirm strength. In a falling market, downticks on decreasing volume may indicate selling exhaustion. The most actionable patterns are <strong>tick reversals</strong> at key levels: a stock that has been printing downticks all day suddenly begins printing upticks on larger size often marks a short-term turning point.`,
+      `Tick rules (the old uptick rule for short sales) no longer constrain most markets, but the behavioural information remains. Combine tick direction with print size and aggressor side. A series of large upticks that lift the offer is far more bullish than a series of small upticks that merely trade at the bid. Context with the broader market and the stock’s own volume profile is essential.`
+    ],
+    keyPoint: "Ticks reveal the path of least resistance in real time. Sustained sequences of same-direction ticks on expanding size are one of the oldest and still most reliable short-term momentum signals."
+  },
+  {
+    era: "Crypto",
+    icon: "₿",
+    title: "Tape Reading in Crypto (Exchange Order Flow)",
+    desc: "Adapting classic tape techniques to continuous, 24/7, multi-venue digital asset markets",
+    badge: { label: "Modern", style: "amber" },
+    tags: [["crypto","amber"], ["order flow","teal"], ["liquidations","red"], ["funding","slate"]],
+    data: [
+      { label: "Key difference", value: "24/7 · multi-exchange", color: "" },
+      { label: "High-signal events", value: "Liquidation cascades", color: "red" },
+      { label: "Unique data", value: "Funding · OI · CVD", color: "teal" },
+    ],
+    body: [
+      `Crypto markets trade continuously across dozens of centralised and decentralised venues. There is no single consolidated tape; instead, traders monitor the dominant liquid exchanges (Binance, Bybit, OKX, Coinbase, etc.) and aggregate tools that reconstruct cumulative volume delta (CVD), liquidations, and open interest.`,
+      `Classic principles still apply: large aggressive market buys that lift the ask, repeated absorption of selling at a level, and sudden acceleration in print velocity. However, crypto adds unique signals. Cascading long or short liquidations produce distinctive tape signatures — rapid sequences of market orders that consume multiple price levels. Funding-rate extremes and large changes in open interest often precede these events.`,
+      `Because many crypto markets are thinner and more leveraged than equities, a single large market order can move price dramatically and trigger further liquidations. Successful crypto tape readers combine exchange-level Time & Sales with aggregated CVD, liquidation heatmaps, and the behaviour of the perpetual-futures basis. Whale-wallet tracking and on-chain flows provide additional context that has no direct equity analogue.`
+    ],
+    keyPoint: "Crypto tape reading is classic order-flow analysis accelerated by leverage and 24/7 trading. Liquidation cascades and multi-exchange CVD divergences are the highest-signal events unique to the asset class."
+  },
+  {
+    era: "Hidden Liquidity",
+    icon: "🧊",
+    title: "Iceberg Orders on Tape",
+    desc: "Detecting large hidden orders that refresh after partial execution",
+    badge: { label: "Advanced", style: "slate" },
+    tags: [["iceberg","slate"], ["refresh","amber"], ["hidden size","teal"], ["absorption","red"]],
+    data: [
+      { label: "Classic sign", value: "Repeated prints at same price", color: "teal" },
+      { label: "Confirmation", value: "Book refreshes after hit", color: "" },
+      { label: "Failure signal", value: "Refresh stops + break", color: "red" },
+    ],
+    body: [
+      `An iceberg order displays only a fraction of its total size on the book. When the visible portion is filled, the order automatically refreshes another slice. On the tape this appears as a series of prints of similar size at the same price level, often with the book showing the same size again moments later.`,
+      `Detection is probabilistic. Repeated prints of nearly identical size at a static bid or offer, especially when the visible book depth does not deplete, are the primary clue. If price repeatedly tests a level and is rejected while the tape shows consistent absorption of the opposite side, an iceberg (or a very large passive order) is likely present.`,
+      `Icebergs can be defensive (a large seller capping a rally) or accumulation (a large buyer supporting a decline). The eventual failure of an iceberg — when the refresh stops and price breaks through the level on expanding aggression — often produces a sharp directional move as the hidden liquidity is exhausted and stop orders are triggered.`
+    ],
+    keyPoint: "Icebergs turn the tape into a detective exercise. Repeated same-size prints at a fixed price, combined with book refresh, reveal hidden size; the moment the refresh fails is frequently the highest-probability breakout or breakdown signal."
+  },
+  {
+    era: "Execution Style",
+    icon: "💨",
+    title: "Sweeps vs. Layered Fills",
+    desc: "Distinguishing aggressive multi-level taking from patient, price-improving execution",
+    badge: { label: "Nuance", style: "teal" },
+    tags: [["sweep","red"], ["layered","teal"], ["urgency","amber"], ["impact",""]],
+    data: [
+      { label: "Sweep", value: "Consumes multiple levels", color: "red" },
+      { label: "Layered fill", value: "Patient, price-improved", color: "teal" },
+      { label: "Implication", value: "Urgency vs. discretion", color: "amber" },
+    ],
+    body: [
+      `A <strong>sweep</strong> occurs when a large market or marketable-limit order consumes liquidity across several price levels in rapid succession. On the tape it appears as a burst of consecutive prints at progressively higher (or lower) prices within milliseconds. Sweeps signal high urgency — the participant is willing to pay the spread and walk the book to obtain immediate size.`,
+      `Layered (or “patient”) fills are the opposite: an algorithm or trader posts or takes liquidity in smaller clips across time, often improving price or working inside the spread. The tape shows a more even distribution of prints, frequently at the same price or with minimal price progression. Layered execution aims to minimise market impact and information leakage.`,
+      `The distinction matters for both prediction and execution. A sweep that fails to hold its high (or low) often reverses quickly — the urgency was real but the follow-through was not. Sustained layered buying that gradually lifts the bid, however, can indicate a large participant who intends to stay in the market for an extended period. Reading the difference between the two styles is a core professional skill.`
+    ],
+    compare: {
+      left: { label: "Sweep", text: "High urgency, high impact, multi-level consumption. Often signals short-term directional intent or forced liquidation. Higher chance of immediate reversal if not followed by continued flow." },
+      right: { label: "Layered Fills", text: "Low urgency, low impact, patient execution. Suggests a larger parent order being worked carefully. More likely to persist and to reflect genuine longer-term accumulation or distribution." }
+    },
+    keyPoint: "Sweeps shout; layered fills whisper. Urgency creates short-term volatility and potential reversals; patience creates trends. Knowing which style is dominant tells you both the time horizon and the conviction of the active participant."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
