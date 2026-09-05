@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 9.10 Cointegration</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 9 · Section 9.10</div>
+      <h1 class="book-title">Cointegration</h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Definition · tests · hedge ratios · breakdown risk · pair selection · costs · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>9.10 Cointegration</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Definition",
+    icon: "🔗",
+    title: "Linear Combination of Non-Stationary Series is Stationary",
+    desc: "The formal definition that underpins all cointegration-based trading",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["cointegration","teal"], ["stationarity","amber"], ["I(1)","slate"], ["equilibrium",""]],
+    data: [
+      { label: "Definition", value: "X, Y ~ I(1) but aX + bY ~ I(0)", color: "teal" },
+      { label: "Implication", value: "Long-run equilibrium relationship exists", color: "" },
+      { label: "Trading use", value: "Spread is mean-reverting", color: "amber" },
+    ],
+    body: [
+      `Two or more time series are cointegrated if each is individually non-stationary (typically integrated of order 1) yet a linear combination of them is stationary. In economic terms this means the series share a common stochastic trend and are bound together by a long-run equilibrium relationship.`,
+      `The stationary linear combination is the residual (or spread). Because it is stationary it possesses a constant mean and a finite variance, and deviations from that mean are expected to be temporary. This is precisely the statistical property required for classic pairs-trading and residual-based mean-reversion strategies.`,
+      `Cointegration is a stronger and more economically meaningful condition than mere correlation. Correlated series can drift arbitrarily far apart; cointegrated series cannot.`
+    ],
+    keyPoint: "Cointegration supplies the rigorous statistical foundation for treating a spread as a mean-reverting object rather than a random walk."
+  },
+  {
+    era: "Test",
+    icon: "📝",
+    title: "Engle–Granger Two-Step Procedure",
+    desc: "The original and still widely used residual-based test for cointegration",
+    badge: { label: "Core", style: "teal" },
+    tags: [["Engle-Granger","teal"], ["two-step","amber"], ["ADF residual",""], ["bivariate","slate"]],
+    data: [
+      { label: "Step 1", value: "OLS regression of one series on the other(s)", color: "teal" },
+      { label: "Step 2", value: "ADF (or similar) test on the residual", color: "" },
+      { label: "Limitation", value: "Primarily pairwise · residual-based", color: "amber" },
+    ],
+    body: [
+      `The Engle–Granger procedure first estimates the candidate cointegrating relationship by ordinary least squares (one series regressed on the others). The residuals from that regression are then tested for stationarity, most commonly with an Augmented Dickey–Fuller test that uses special critical values.`,
+      `If the null of a unit root in the residual is rejected, the series are declared cointegrated and the OLS coefficients supply the cointegrating vector (hedge ratios). The test is simple, transparent and remains the workhorse for pairwise analysis.`,
+      `Its main limitations are that it is residual-based (and therefore sensitive to the choice of dependent variable in small samples), that it is designed primarily for a single cointegrating relationship, and that it has relatively low power.`
+    ],
+    keyPoint: "Engle–Granger remains the most intuitive entry point into cointegration testing: estimate the equilibrium, then test whether the residual behaves like a stationary process."
+  },
+  {
+    era: "Test",
+    icon: "📊",
+    title: "Johansen Cointegration Test",
+    desc: "A system-based maximum-likelihood framework capable of detecting multiple cointegrating vectors",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["Johansen","amber"], ["VECM","teal"], ["trace test",""], ["maximum eigenvalue","slate"]],
+    data: [
+      { label: "Framework", value: "Vector Error-Correction Model (VECM)", color: "teal" },
+      { label: "Tests", value: "Trace & maximum-eigenvalue statistics", color: "" },
+      { label: "Advantage", value: "Handles multiple series & multiple vectors", color: "amber" },
+    ],
+    body: [
+      `The Johansen procedure embeds the series in a vector error-correction model and uses reduced-rank regression to test the number of cointegrating relationships. Two sequential tests (trace and maximum eigenvalue) determine how many cointegrating vectors are statistically supported.`,
+      `Unlike Engle–Granger, Johansen treats all variables symmetrically, can detect several cointegrating relationships simultaneously, and produces asymptotically efficient estimates of the cointegrating space. It is the standard tool once the analysis moves beyond simple pairs.`,
+      `Practical implementation requires careful lag-length selection, attention to deterministic terms (constant, trend), and awareness that finite-sample properties can be fragile when the number of series is large relative to the sample size.`
+    ],
+    keyPoint: "Johansen is the system-wide generalisation of cointegration testing. It answers both “are these series cointegrated?” and “how many independent equilibrium relationships exist?”"
+  },
+  {
+    era: "Distinction",
+    icon: "⚖️",
+    title: "Cointegration vs. Correlation",
+    desc: "Why high correlation is neither necessary nor sufficient for a tradable mean-reverting spread",
+    badge: { label: "Conceptual", style: "slate" },
+    tags: [["correlation","slate"], ["cointegration","teal"], ["spurious","red"], ["equilibrium",""]],
+    data: [
+      { label: "Correlation", value: "Linear association of returns or levels", color: "" },
+      { label: "Cointegration", value: "Shared stochastic trend · stationary residual", color: "teal" },
+      { label: "Key difference", value: "Correlated series can still wander apart forever", color: "red" },
+    ],
+    body: [
+      `Correlation measures the degree of linear association between two series. Two assets can be highly correlated yet still diverge without bound if each follows its own stochastic trend. Conversely, cointegrated series must eventually revert; their residual cannot wander indefinitely.`,
+      `Trading strategies that rely only on correlation (for example, simple distance or return-correlation pairs) therefore lack a theoretical guarantee of mean reversion. Many historically correlated pairs have produced large, persistent losses precisely because the correlation was not underpinned by cointegration.`,
+      `In short, correlation is a statement about co-movement; cointegration is a statement about equilibrium. Only the latter justifies treating the spread as a stationary, mean-reverting process.`
+    ],
+    keyPoint: "Correlation is cheap to compute and easy to misinterpret. Cointegration is the statistically and economically meaningful condition for pairs trading."
+  },
+  {
+    era: "Estimation",
+    icon: "📐",
+    title: "Estimating the Hedge Ratio",
+    desc: "Obtaining the coefficients that define the stationary linear combination",
+    badge: { label: "Core", style: "teal" },
+    tags: [["hedge ratio","teal"], ["cointegrating vector","amber"], ["OLS","slate"], ["TLS",""]],
+    data: [
+      { label: "Common methods", value: "OLS · TLS · Johansen MLE · dynamic", color: "teal" },
+      { label: "Output", value: "Weights that make the residual stationary", color: "" },
+      { label: "Sensitivity", value: "Choice of method can matter in finite samples", color: "amber" },
+    ],
+    body: [
+      `Once cointegration is established, the cointegrating vector supplies the hedge ratios used to form the spread. In the bivariate case this is simply the slope coefficient from the Engle–Granger regression (or its total-least-squares counterpart). In the multivariate case the Johansen procedure yields the full cointegrating space.`,
+      `Ordinary least squares is the most common estimator for pairs, but it treats one variable as exogenous and can be biased in small samples. Total least squares (orthogonal regression) and the Johansen maximum-likelihood estimator are more symmetric alternatives.`,
+      `The estimated hedge ratio is not a constant of nature; it is a sample statistic. Rolling or expanding-window re-estimation, and formal tests of parameter stability, are prudent practice before capital is committed.`
+    ],
+    keyPoint: "The hedge ratio is the numerical embodiment of the equilibrium relationship. Its accurate and stable estimation is as important as the detection of cointegration itself."
+  },
+  {
+    era: "Dynamic",
+    icon: "📡",
+    title: "Dynamic Hedge Ratio (Kalman Filter)",
+    desc: "Allowing the cointegrating relationship to evolve slowly through time",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["Kalman filter","amber"], ["time-varying","teal"], ["state space",""], ["adaptive","slate"]],
+    data: [
+      { label: "Purpose", value: "Track a slowly changing hedge ratio", color: "teal" },
+      { label: "Mechanism", value: "State-space model with random-walk coefficient", color: "" },
+      { label: "Benefit", value: "Adapts to structural drift without full re-estimation", color: "amber" },
+    ],
+    body: [
+      `Static hedge ratios become stale when the relative behaviour of the legs changes. A Kalman-filter approach treats the hedge ratio as an unobservable state that evolves as a random walk (or other simple process). Each new price observation updates the state estimate in an optimal Bayesian fashion.`,
+      `The resulting dynamic hedge ratio produces a cleaner residual when the true relationship is slowly time-varying. It also supplies a natural measure of estimation uncertainty that can be used for position sizing or for detecting instability.`,
+      `The cost is additional parameters (process and measurement noise variances) that must be calibrated carefully; poorly tuned filters can introduce spurious mean reversion or excessive turnover.`
+    ],
+    keyPoint: "A Kalman filter converts a static cointegrating vector into an adaptive one, extending the useful life of a pairs relationship at the price of greater model complexity."
+  },
+  {
+    era: "Risk",
+    icon: "⚠️",
+    title: "Cointegration Breakdown Risk",
+    desc: "The possibility that a previously stationary relationship ceases to hold",
+    badge: { label: "Critical", style: "red" },
+    tags: [["breakdown","red"], ["structural break","amber"], ["regime shift","teal"], ["tail risk","slate"]],
+    data: [
+      { label: "Causes", value: "Mergers · regulation · business-model change · macro shifts", color: "red" },
+      { label: "Symptom", value: "Residual begins to trend; half-life lengthens", color: "amber" },
+      { label: "Defence", value: "Stops · monitoring · diversification · time limits", color: "teal" },
+    ],
+    body: [
+      `Cointegration is a historical statement, not a guarantee of future behaviour. Structural breaks — mergers, regulatory changes, shifts in industry structure, or major macroeconomic regime changes — can destroy a previously reliable equilibrium. When breakdown occurs the residual stops mean-reverting and the pairs trade becomes a directional bet.`,
+      `Because breakdown often coincides with elevated volatility and crowded positioning, losses can be rapid and severe. Many of the largest drawdowns in statistical-arbitrage history trace back to the simultaneous failure of multiple cointegrated relationships.`,
+      `Practical defences include hard stop-losses on the spread, continuous monitoring of residual diagnostics and realised half-life, rapid reduction of exposure when stability tests fail, and diversification across many weakly related pairs rather than concentration in a few historically strong ones.`
+    ],
+    keyPoint: "The single greatest risk in cointegration trading is that the relationship on which the entire strategy rests simply ends. Capital preservation requires explicit preparation for that possibility."
+  },
+  {
+    era: "Selection",
+    icon: "🔍",
+    title: "Selecting Pairs: Fundamental vs. Statistical Criteria",
+    desc: "Balancing economic rationale with formal statistical evidence when choosing candidates",
+    badge: { label: "Practical", style: "amber" },
+    tags: [["pair selection","amber"], ["fundamental","teal"], ["statistical","slate"], ["robustness",""]],
+    data: [
+      { label: "Fundamental", value: "Same industry · shared exposures · economic link", color: "teal" },
+      { label: "Statistical", value: "Cointegration tests · half-life · stability", color: "" },
+      { label: "Best practice", value: "Require both economic logic and statistical support", color: "amber" },
+    ],
+    body: [
+      `Purely statistical searches across thousands of possible pairs inevitably produce false positives. Fundamental filters — common industry membership, shared supply-chain exposure, similar customer bases, or explicit economic links — dramatically raise the prior probability that any detected cointegration is genuine and durable.`,
+      `Conversely, pairs that look economically obvious may still fail formal cointegration tests or may exhibit half-lives too long to be practically tradable. The highest-quality candidates therefore satisfy both criteria: a coherent economic story and clean, stable statistical evidence of cointegration.`,
+      `Additional practical filters include sufficient liquidity on both legs, modest transaction costs, and the absence of imminent corporate events that could break the relationship.`
+    ],
+    keyPoint: "The best pairs are those for which economic intuition and rigorous statistics point in the same direction. Relying on either alone invites both false discoveries and missed opportunities."
+  },
+  {
+    era: "Costs",
+    icon: "💸",
+    title: "Transaction Cost Impact on Cointegrated Pairs",
+    desc: "How spreads, commissions and market impact determine whether a statistical edge survives",
+    badge: { label: "Critical", style: "red" },
+    tags: [["transaction costs","red"], ["net edge","amber"], ["turnover","teal"], ["capacity","slate"]],
+    data: [
+      { label: "Impact", value: "Costs erode or eliminate gross mean-reversion edge", color: "red" },
+      { label: "Key variables", value: "Spread width · half-life · turnover · size", color: "" },
+      { label: "Requirement", value: "Net expected value after realistic costs > 0", color: "teal" },
+    ],
+    body: [
+      `Even a strongly cointegrated pair is worthless if the cost of entering and exiting the spread exceeds the expected profit from mean reversion. Round-trip costs include bid–ask spreads on both legs, commissions, market impact, and any borrow fees on the short leg.`,
+      `The economic viability of a pair is therefore jointly determined by the strength and speed of mean reversion (half-life) and by the cost of trading. Short half-lives tolerate higher costs; long half-lives require very tight markets. Capacity is likewise limited by the liquidity of the less-liquid leg.`,
+      `Rigorous back-tests must incorporate realistic, size-dependent cost models. Many statistically attractive pairs fail this final filter and should be discarded before live capital is committed.`
+    ],
+    keyPoint: "Cointegration creates a statistical edge; transaction costs determine whether that edge is economically real. Net-of-cost evaluation is the final and non-negotiable gate."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

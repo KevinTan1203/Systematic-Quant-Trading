@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 9.11 Kalman Filter in Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 9 · Section 9.11</div>
+      <h1 class="book-title">Kalman Filter<br><em>in Trading</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">State-space · prediction/update · applications · EKF/UKF · Python · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>9.11 Kalman Filter in Trading</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Foundation",
+    icon: "📐",
+    title: "State-Space Representation",
+    desc: "Casting the estimation problem as a latent state evolving with noisy observations",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["state-space","teal"], ["latent state","amber"], ["observation","slate"], ["linear Gaussian",""]],
+    data: [
+      { label: "State equation", value: "xₜ = F xₜ₋₁ + wₜ  (process noise)", color: "teal" },
+      { label: "Observation", value: "yₜ = H xₜ + vₜ  (measurement noise)", color: "" },
+      { label: "Assumption", value: "Linear dynamics · Gaussian noise", color: "amber" },
+    ],
+    body: [
+      `The Kalman filter operates on a state-space model. An unobserved state vector evolves according to a linear transition equation driven by process noise. At each time step an observation is received that is a linear function of the current state plus measurement noise.`,
+      `In trading applications the state might be a hedge ratio, a latent fair value, a local trend, or a set of time-varying factor loadings. The observation is typically a traded price, a spread, or a vector of asset returns.`,
+      `Once the problem is written in state-space form, the Kalman filter supplies the optimal recursive estimator of the state under the linear-Gaussian assumptions. Model design — choosing what belongs in the state, the transition matrix F, and the observation matrix H — is therefore the decisive modelling step.`
+    ],
+    keyPoint: "Everything begins with a clear state-space representation. The filter can only estimate what the modeller has declared to be the latent state."
+  },
+  {
+    era: "Algorithm",
+    icon: "🔄",
+    title: "Prediction and Update Steps",
+    desc: "The two alternating operations that propagate the state estimate through time",
+    badge: { label: "Core", style: "teal" },
+    tags: [["predict","teal"], ["update","amber"], ["recursive",""], ["Bayesian","slate"]],
+    data: [
+      { label: "Predict", value: "Propagate state & covariance with transition model", color: "teal" },
+      { label: "Update", value: "Correct estimate with new observation", color: "amber" },
+      { label: "Cycle", value: "Predict → Update → Predict → …", color: "" },
+    ],
+    body: [
+      `Each time step consists of two operations. In the prediction (time-update) step the current state estimate and its covariance are projected forward using the transition model; uncertainty grows by the process-noise covariance. In the update (measurement-update) step the new observation is incorporated: the prediction is corrected by a weighted fraction of the innovation (observation minus predicted observation).`,
+      `The relative weighting of prediction versus observation is controlled by the Kalman gain, which itself depends on the current uncertainty and the measurement-noise covariance. When measurement noise is low the filter trusts the observation more; when process noise is high the filter allows the state to move more freely.`,
+      `The recursion is computationally efficient: only the previous estimate and covariance need to be stored. This makes the filter ideal for real-time trading systems that must process every tick or bar.`
+    ],
+    keyPoint: "Predict then update is the entire algorithm. All of the filter’s power and all of its subtleties reside in how those two steps are parameterised."
+  },
+  {
+    era: "Core",
+    icon: "⚖️",
+    title: "Kalman Gain",
+    desc: "The optimal weighting factor that blends prediction with new information",
+    badge: { label: "Core", style: "teal" },
+    tags: [["Kalman gain","teal"], ["weighting","amber"], ["uncertainty",""], ["optimal","slate"]],
+    data: [
+      { label: "Role", value: "Determines how much to trust the new observation", color: "teal" },
+      { label: "High gain", value: "Observation dominates (low measurement noise)", color: "" },
+      { label: "Low gain", value: "Prediction dominates (high measurement noise)", color: "amber" },
+    ],
+    body: [
+      `The Kalman gain is the matrix (or scalar) that multiplies the innovation before it is added to the predicted state. It is computed from the predicted state covariance and the measurement-noise covariance so that the posterior state covariance is minimised.`,
+      `Intuitively the gain rises when the filter is uncertain about its prediction or when the observation is precise, and falls when the opposite is true. In steady state the gain converges to a constant that reflects the permanent balance between process and measurement noise.`,
+      `In trading implementations the gain (or the noise variances that determine it) is often the main tuning knob. Too high a gain produces a jittery estimate that chases noise; too low a gain produces an estimate that lags genuine changes in the latent state.`
+    ],
+    keyPoint: "The Kalman gain is the quantitative expression of “how much should I believe this new tick?” Getting the noise variances right is therefore the practical heart of filter design."
+  },
+  {
+    era: "Application",
+    icon: "🔗",
+    title: "Application: Dynamic Hedge Ratio",
+    desc: "Tracking a time-varying cointegrating coefficient for pairs or residual strategies",
+    badge: { label: "Trading", style: "amber" },
+    tags: [["hedge ratio","amber"], ["pairs trading","teal"], ["cointegration",""], ["adaptive","slate"]],
+    data: [
+      { label: "State", value: "Hedge ratio (and optionally intercept)", color: "teal" },
+      { label: "Observation", value: "Price of one leg (or the spread)", color: "" },
+      { label: "Benefit", value: "Adapts to structural drift without full re-estimation", color: "amber" },
+    ],
+    body: [
+      `A classic use of the Kalman filter in statistical arbitrage is to let the hedge ratio between two cointegrated assets evolve as a random walk. The state is the hedge ratio (sometimes together with an intercept); the observation is the price of the dependent leg. The filter produces a smooth, causal estimate of the current ratio and a measure of its uncertainty.`,
+      `Compared with rolling-window OLS, the Kalman approach uses all past data with exponentially decaying influence, supplies a natural confidence band, and updates with every new tick or bar. The residual formed with the filtered hedge ratio is typically cleaner and more stationary when the true relationship drifts slowly.`,
+      `Careful tuning of process-noise variance is essential: too little and the ratio is almost static; too much and the residual is over-fitted to noise.`
+    ],
+    keyPoint: "The Kalman filter turns a static cointegrating vector into a living, adaptive hedge ratio — one of the most direct and valuable applications in pairs trading."
+  },
+  {
+    era: "Application",
+    icon: "📡",
+    title: "Application: Price Signal Extraction",
+    desc: "Separating a latent “fair” or efficient price from microstructure noise",
+    badge: { label: "Trading", style: "amber" },
+    tags: [["fair price","amber"], ["microstructure noise","teal"], ["signal extraction",""], ["efficient price","slate"]],
+    data: [
+      { label: "State", value: "Latent efficient / fair price", color: "teal" },
+      { label: "Observation", value: "Noisy traded price or mid-quote", color: "" },
+      { label: "Use", value: "Cleaner signals · better execution benchmarks", color: "amber" },
+    ],
+    body: [
+      `Traded prices and even mid-quotes contain microstructure noise — bid–ask bounce, temporary liquidity shocks, and reporting artefacts. A simple state-space model treats the efficient price as a random walk (or random walk with drift) and the observed price as that efficient price plus i.i.d. or autocorrelated noise.`,
+      `The Kalman filter then extracts a real-time estimate of the latent efficient price. The cleaned series can be used as a more stable input to alpha signals, as a benchmark for measuring execution quality, or as the reference level for market-making reservation prices.`,
+      `Extensions allow the noise variance itself to be state-dependent (higher in volatile or illiquid regimes) or incorporate additional observations such as the micro-price or order-book imbalance.`
+    ],
+    keyPoint: "Price signal extraction is the microstructure application of the classic “signal-plus-noise” problem. The filter recovers a usable efficient-price estimate from the noisy tape."
+  },
+  {
+    era: "Application",
+    icon: "📈",
+    title: "Application: Trend Estimation",
+    desc: "Recursively estimating a local level or local linear trend for timing and positioning",
+    badge: { label: "Trading", style: "amber" },
+    tags: [["trend","amber"], ["local level","teal"], ["local linear trend",""], ["smoothing","slate"]],
+    data: [
+      { label: "Models", value: "Local level · local linear trend · higher-order", color: "teal" },
+      { label: "Output", value: "Filtered level / slope at each time", color: "" },
+      { label: "Trading use", value: "Position sizing · regime detection · overlays", color: "amber" },
+    ],
+    body: [
+      `A local-level model treats the underlying price level as a random walk; a local-linear-trend model adds a stochastic slope that itself follows a random walk. Both are linear-Gaussian state-space models and are therefore ideal candidates for the Kalman filter.`,
+      `The filtered level and slope provide a causal, low-lag estimate of the current trend. These estimates can drive position sizing in trend-following systems, serve as dynamic support/resistance levels, or act as features in broader alpha models.`,
+      `Because the filter is recursive and computationally light, multi-asset, multi-horizon trend estimation can be performed in real time across an entire futures or equity universe.`
+    ],
+    keyPoint: "Kalman trend estimation replaces ad-hoc moving averages with a statistically principled, uncertainty-aware extraction of level and slope."
+  },
+  {
+    era: "Extension",
+    icon: "🌀",
+    title: "Extended Kalman Filter (EKF) for Nonlinear Systems",
+    desc: "Linearising nonlinear dynamics and observation functions around the current estimate",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["EKF","amber"], ["nonlinear","teal"], ["linearisation",""], ["Jacobian","slate"]],
+    data: [
+      { label: "Approach", value: "First-order Taylor expansion of f and h", color: "teal" },
+      { label: "Requirement", value: "Analytic or numeric Jacobians", color: "" },
+      { label: "Limitation", value: "Can diverge if nonlinearity is severe", color: "red" },
+    ],
+    body: [
+      `Many trading-relevant processes are nonlinear: stochastic volatility, nonlinear mean-reversion, option-implied quantities, or observation functions that involve ratios or logarithms. The Extended Kalman Filter linearises the state-transition and observation functions by computing their Jacobians at the current estimate, then applies the ordinary Kalman update to the linearised system.`,
+      `The EKF is relatively easy to implement once the Jacobians are available and remains computationally cheap. It works well when the nonlinearities are mild and the sampling interval is short enough that the linear approximation stays accurate.`,
+      `When the true dynamics are strongly nonlinear or multi-modal, the EKF can produce biased estimates or even diverge. In those regimes the Unscented Kalman Filter or particle filters become preferable.`
+    ],
+    keyPoint: "The EKF extends the Kalman idea to nonlinear models by local linearisation. It is the first practical tool to reach for when the state-space equations cease to be linear."
+  },
+  {
+    era: "Extension",
+    icon: "🌐",
+    title: "Unscented Kalman Filter (UKF)",
+    desc: "Propagating a carefully chosen set of sigma points through the true nonlinear functions",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["UKF","amber"], ["sigma points","teal"], ["unscented transform",""], ["nonlinear","slate"]],
+    data: [
+      { label: "Idea", value: "Deterministic sampling → nonlinear map → recover mean/cov", color: "teal" },
+      { label: "Advantage", value: "No Jacobians · higher-order accuracy", color: "" },
+      { label: "Cost", value: "More function evaluations than EKF", color: "amber" },
+    ],
+    body: [
+      `The Unscented Kalman Filter replaces analytic linearisation with the unscented transform. A small set of sigma points is chosen that match the current mean and covariance; these points are passed through the true nonlinear transition and observation functions; the transformed points are then used to reconstitute the predicted mean and covariance.`,
+      `Because the nonlinear functions are applied exactly, the UKF captures higher-order moments more accurately than the EKF and does not require Jacobians. It is therefore more robust for many financial nonlinearities (stochastic volatility, nonlinear observation models, etc.).`,
+      `The extra accuracy comes at the cost of additional function evaluations. For the low-dimensional state vectors typical in trading applications the overhead is usually acceptable.`
+    ],
+    keyPoint: "The UKF is often the most practical nonlinear Kalman-style filter for trading: more accurate than the EKF, far cheaper than a particle filter, and free of Jacobian calculations."
+  },
+  {
+    era: "Implementation",
+    icon: "🐍",
+    title: "Implementation in Python (pykalman, filterpy)",
+    desc: "Production-ready libraries that turn the equations into usable trading code",
+    badge: { label: "Practical", style: "slate" },
+    tags: [["pykalman","slate"], ["filterpy","teal"], ["Python",""], ["implementation","amber"]],
+    data: [
+      { label: "pykalman", value: "Clean API · EM parameter estimation", color: "teal" },
+      { label: "filterpy", value: "Rich documentation · many filter variants", color: "amber" },
+      { label: "Also useful", value: "statsmodels.tsa · custom NumPy/SciPy", color: "" },
+    ],
+    body: [
+      `Two mature Python libraries dominate practical Kalman-filter work in quant finance. <strong>pykalman</strong> offers a concise interface for linear (and some switching) models and includes an expectation-maximisation routine for estimating noise covariances from data. <strong>filterpy</strong> provides a broader collection of filters (including EKF and UKF), excellent documentation, and a design that encourages understanding of the underlying steps.`,
+      `Both libraries accept the state-transition and observation matrices (or functions) and return filtered and smoothed state estimates together with covariances. They can be embedded directly in research notebooks or in production event-driven systems.`,
+      `For maximum control or ultra-low-latency requirements, practitioners often re-implement the scalar or low-dimensional recursion in NumPy or even in C++/Rust; the libraries remain invaluable for prototyping, validation and offline parameter estimation.`
+    ],
+    keyPoint: "Modern Python libraries remove the barrier between the textbook equations and a working trading signal. The remaining skill is correct state-space design and disciplined noise-parameter tuning."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

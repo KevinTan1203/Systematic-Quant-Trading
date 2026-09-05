@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 9.2 Factor Investing</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 9 · Section 9.2</div>
+      <h1 class="book-title">Factor<br><em>Investing</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>12</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Classic & alternative factors · construction · risks · implementation · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>9.2 Factor Investing</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Core",
+    icon: "📚",
+    title: "Classic Factors",
+    desc: "Value, Momentum, Quality, Size, and Low Volatility — the foundational set",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["value","teal"], ["momentum","amber"], ["quality","slate"], ["size","red"], ["low vol",""]],
+    data: [
+      { label: "Value", value: "Cheap vs expensive (P/B, P/E, etc.)", color: "teal" },
+      { label: "Momentum", value: "Recent winners vs losers", color: "amber" },
+      { label: "Others", value: "Quality · Size · Low Volatility", color: "slate" },
+    ],
+    body: [
+      `The classic factor set forms the backbone of most factor-investing frameworks. <strong>Value</strong> captures the tendency of cheap stocks (low price-to-book, price-to-earnings, or similar ratios) to outperform expensive ones over long horizons. <strong>Momentum</strong> exploits the persistence of relative performance: stocks that have outperformed over the past 6–12 months tend to continue doing so in the near term.`,
+      `<strong>Quality</strong> focuses on profitable, stable, well-managed companies (high ROE, low accruals, strong balance sheets). <strong>Size</strong> reflects the historical premium of smaller-capitalisation stocks over large ones. <strong>Low Volatility</strong> (or low beta) documents the outperformance of lower-risk stocks on a risk-adjusted basis, challenging the simple CAPM prediction.`,
+      `These five have the longest academic track records, the broadest cross-sectional and international evidence, and the deepest economic rationales (risk-based, behavioural, or institutional). They remain the starting point for almost every practical factor portfolio.`
+    ],
+    keyPoint: "Classic factors are not guaranteed premiums; they are empirically robust patterns with plausible economic stories. Understanding their construction, cyclicality, and interaction is the foundation of factor investing."
+  },
+  {
+    era: "Extension",
+    icon: "🔬",
+    title: "Alternative Factors",
+    desc: "Profitability, Investment, and Betting Against Beta (BAB) as important extensions",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["profitability","teal"], ["investment","amber"], ["BAB","slate"], ["Fama-French",""]],
+    data: [
+      { label: "Profitability", value: "High vs low operating profitability", color: "teal" },
+      { label: "Investment", value: "Conservative vs aggressive asset growth", color: "amber" },
+      { label: "BAB", value: "Long low-beta, short high-beta (levered)", color: "slate" },
+    ],
+    body: [
+      `Beyond the classic five, several alternative factors have gained prominence. <strong>Profitability</strong> (or robust profitability) shows that firms with higher operating profits relative to book equity tend to deliver higher future returns. <strong>Investment</strong> (or asset growth) documents that companies that aggressively expand their balance sheets underperform those that invest more conservatively.`,
+      `These two, together with Value and Size (and Market), form the Fama–French five-factor model. They help explain a large fraction of the cross-section of average returns and reduce the residual alpha of many other anomalies.`,
+      `<strong>Betting Against Beta (BAB)</strong>, popularised by Frazzini and Pedersen, formalises the low-beta anomaly: a portfolio that goes long low-beta stocks and short high-beta stocks, while leveraging the long side and deleveraging the short side to achieve beta-neutrality, has historically produced significant positive returns. BAB is closely related to, but distinct from, simple low-volatility strategies.`
+    ],
+    keyPoint: "Alternative factors expand the toolkit and often improve model completeness. They should be evaluated with the same rigor as classic factors — economic rationale, robustness, and implementability."
+  },
+  {
+    era: "Method",
+    icon: "🛠️",
+    title: "Factor Construction Methodologies",
+    desc: "How raw characteristics are turned into investable long-short or long-only portfolios",
+    badge: { label: "Core", style: "teal" },
+    tags: [["construction","teal"], ["sorting","amber"], ["weighting",""], ["rebalancing","slate"]],
+    data: [
+      { label: "Common approach", value: "Characteristic sort → long-short", color: "teal" },
+      { label: "Variants", value: "Equal / value / optimised weights", color: "" },
+      { label: "Frequency", value: "Monthly / quarterly rebalance", color: "amber" },
+    ],
+    body: [
+      `Most academic factors are constructed by sorting the universe on a characteristic (e.g., book-to-market), forming quantiles (often quintiles or deciles), and taking a long position in the top group and a short position in the bottom group. Portfolios may be equal-weighted or value-weighted; the latter is generally preferred for capacity and realism.`,
+      `Practical implementations introduce additional steps: liquidity filters, lagging of accounting data to avoid look-ahead bias, industry-neutrality, and constraints on turnover or position size. Some factors are built via regression-based approaches or optimisation that maximises exposure to the desired characteristic while controlling risk.`,
+      `Construction choices — universe, weighting, rebalancing frequency, and neutrality constraints — materially affect both the measured premium and the live investability of the factor. Two “value” factors built differently can behave quite differently.`
+    ],
+    keyPoint: "Factor construction is not unique. Small methodological decisions compound into large differences in return, risk, turnover, and capacity. Transparency about construction is essential."
+  },
+  {
+    era: "Measurement",
+    icon: "📏",
+    title: "Factor Exposure Measurement",
+    desc: "Quantifying how much of a portfolio’s return is attributable to known factors",
+    badge: { label: "Core", style: "teal" },
+    tags: [["exposure","teal"], ["beta","amber"], ["regression",""], ["attribution","slate"]],
+    data: [
+      { label: "Primary tool", value: "Time-series / cross-sectional regression", color: "teal" },
+      { label: "Output", value: "Factor betas + residual alpha", color: "" },
+      { label: "Use", value: "Risk monitoring & performance attribution", color: "amber" },
+    ],
+    body: [
+      `Factor exposure is typically measured by regressing portfolio returns (or individual stock returns) on a set of factor returns. The resulting betas quantify sensitivity to each factor. Cross-sectional approaches estimate exposures from characteristics directly.`,
+      `Accurate exposure measurement is the foundation of risk management, performance attribution, and portfolio construction. It reveals whether a strategy’s returns are driven by intentional factor bets, unintentional style drift, or true residual alpha.`,
+      `Exposures are not static. They evolve with market conditions, portfolio rebalancing, and changes in the underlying characteristics of holdings. Continuous monitoring is required.`
+    ],
+    keyPoint: "You cannot manage what you cannot measure. Reliable factor exposure estimation turns opaque returns into an interpretable risk and return decomposition."
+  },
+  {
+    era: "Control",
+    icon: "⚖️",
+    title: "Factor Neutralization",
+    desc: "Removing unwanted factor exposures to isolate a pure bet or residual alpha",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["neutralization","amber"], ["orthogonality","teal"], ["residual","slate"], ["purity",""]],
+    data: [
+      { label: "Goal", value: "Isolate intended exposure or residual", color: "teal" },
+      { label: "Methods", value: "Regression residuals · constrained optimisation", color: "" },
+      { label: "Trade-off", value: "Purity vs. capacity & turnover", color: "amber" },
+    ],
+    body: [
+      `Many signals and portfolios carry unintended exposures to classic factors. Neutralization seeks to remove those exposures so that the remaining return is a cleaner measure of the intended effect or of true idiosyncratic alpha.`,
+      `Common techniques include regressing the target characteristic or signal on the unwanted factors and using the residual, or explicitly constraining portfolio optimisation to zero (or target) exposure to a set of factors. Industry, country, and sector neutralization are frequent additional steps.`,
+      `Aggressive neutralization improves purity but can increase turnover, reduce capacity, and amplify noise. The appropriate degree of neutralization depends on the research or investment objective.`
+    ],
+    keyPoint: "Neutralization is a double-edged tool. It clarifies the source of returns but can destroy implementability if applied without regard to costs and capacity."
+  },
+  {
+    era: "Risk",
+    icon: "🚨",
+    title: "Factor Crowding Risks",
+    desc: "The danger that too much capital chasing the same factors erodes or reverses premiums",
+    badge: { label: "Critical", style: "red" },
+    tags: [["crowding","red"], ["capacity","amber"], ["crowding risk","teal"], ["liquidation",""]],
+    data: [
+      { label: "Symptom", value: "Rising valuations of factor portfolios", color: "amber" },
+      { label: "Consequence", value: "Compressed future premiums · crash risk", color: "red" },
+      { label: "Monitor", value: "AUM · correlation · valuation spreads", color: "teal" },
+    ],
+    body: [
+      `When large amounts of capital allocate to the same factors, valuations of the long legs become elevated and the short legs become cheap, compressing expected future returns. In stressed markets, crowded factors can experience sharp, correlated drawdowns as positions are liquidated simultaneously.`,
+      `Crowding is visible in rising assets under management in factor strategies, increasing correlation among factor portfolios, narrowing valuation spreads, and elevated short interest in the short legs. Momentum and low-volatility strategies have historically been particularly susceptible.`,
+      `Crowding does not eliminate factors permanently, but it can produce multi-year periods of poor performance and sudden crashes. Position sizing, diversification across factors, and awareness of aggregate positioning are essential risk controls.`
+    ],
+    keyPoint: "Factors are not immune to the iron law of capacity. Crowding converts a historical premium into a contemporary risk. Monitoring positioning is as important as monitoring the factor itself."
+  },
+  {
+    era: "Timing",
+    icon: "🔄",
+    title: "Factor Timing (Cyclicality)",
+    desc: "The time-varying nature of factor premiums and attempts to forecast them",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["timing","amber"], ["cyclicality","teal"], ["regime","slate"], ["valuation",""]],
+    data: [
+      { label: "Reality", value: "Premiums vary strongly over time", color: "amber" },
+      { label: "Common signals", value: "Valuation spreads · momentum of factor", color: "" },
+      { label: "Difficulty", value: "Timing itself is a low-IC activity", color: "red" },
+    ],
+    body: [
+      `Factor premiums are highly cyclical. Value can underperform for a decade; momentum can crash; low-volatility can lag in strong bull markets. These fluctuations are large relative to the long-term average premium.`,
+      `Factor timing attempts to increase exposure when a factor is expected to perform well and reduce it otherwise. Common signals include the valuation spread of the factor itself, its recent performance, macroeconomic indicators, or measures of crowding.`,
+      `While some timing signals have shown historical efficacy, the information coefficient of factor timing is generally low and the risk of mistiming is high. Many sophisticated investors therefore prefer strategic, diversified factor allocations with only modest tactical overlays.`
+    ],
+    keyPoint: "Factors earn their premiums unevenly. Timing can add value but is harder than it appears; most of the benefit of factor investing comes from patient strategic exposure rather than precise tactical calls."
+  },
+  {
+    era: "Distinction",
+    icon: "🎭",
+    title: "Risk Factor vs. Return Factor",
+    desc: "Separating factors that explain risk from those that are expected to deliver premium returns",
+    badge: { label: "Conceptual", style: "slate" },
+    tags: [["risk factor","slate"], ["return factor","teal"], ["premium",""], ["explanation","amber"]],
+    data: [
+      { label: "Risk factor", value: "Explains covariance / volatility", color: "slate" },
+      { label: "Return factor", value: "Carries a positive expected premium", color: "teal" },
+      { label: "Overlap", value: "Many factors serve both roles", color: "amber" },
+    ],
+    body: [
+      `In asset pricing, a <em>risk factor</em> is a systematic source of return variation that helps explain the covariance structure of assets. A <em>return factor</em> (or style premium) is a characteristic-based portfolio that has historically delivered positive average excess returns.`,
+      `Some factors are both: they explain risk and carry a premium (e.g., the market factor). Others primarily explain risk without a reliable premium, or appear to deliver a premium without a clear risk-based justification (inviting behavioural explanations).`,
+      `Distinguishing the two is important for portfolio construction. Risk factors are used for risk modelling and neutralisation; return factors are used for intentional return generation. Conflating them leads to poor risk forecasts or misguided alpha expectations.`
+    ],
+    keyPoint: "Not every factor that explains returns is a source of expected premium, and not every premium is a pure risk exposure. Clarity about the distinction improves both risk management and return seeking."
+  },
+  {
+    era: "Implementation",
+    icon: "📊",
+    title: "Long-Only vs. Long-Short Factor Portfolios",
+    desc: "The practical trade-offs between constrained and unconstrained factor expressions",
+    badge: { label: "Practical", style: "teal" },
+    tags: [["long-only","teal"], ["long-short","amber"], ["implementation",""], ["capacity","slate"]],
+    data: [
+      { label: "Long-only", value: "Tilted portfolios · lower turnover", color: "teal" },
+      { label: "Long-short", value: "Pure factor · higher capital efficiency", color: "amber" },
+      { label: "Constraint", value: "Long-only truncates the short leg", color: "red" },
+    ],
+    body: [
+      `Academic factors are typically long-short. In practice, many investors can only hold long-only portfolios. A long-only factor portfolio is constructed by overweighting stocks with desirable characteristics and underweighting (or excluding) those with undesirable ones, relative to a benchmark.`,
+      `Long-only implementations capture only part of the theoretical premium because the short leg is truncated. They generally have lower turnover and higher capacity, making them suitable for large asset owners. Long-short implementations offer greater purity and capital efficiency but introduce shorting costs, leverage, and higher operational complexity.`,
+      `The choice depends on the investor’s mandate, size, and risk tolerance. Many practical solutions blend both: a core long-only factor-tilted portfolio supplemented by a smaller long-short overlay.`
+    ],
+    keyPoint: "Long-only factor portfolios are diluted but scalable; long-short portfolios are purer but constrained by capital, costs, and regulations. Neither is universally superior."
+  },
+  {
+    era: "Product",
+    icon: "🏦",
+    title: "Smart Beta ETFs",
+ dual: "Rules-based, transparent vehicles that package factor exposures for broad audiences",
+    badge: { label: "Implementation", style: "amber" },
+    tags: [["smart beta","amber"], ["ETF","teal"], ["rules-based",""], ["transparency","slate"]],
+    data: [
+      { label: "Form", value: "Index-tracking ETFs with factor tilts", color: "teal" },
+      { label: "Appeal", value: "Low cost · transparent · liquid", color: "" },
+      { label: "Caveat", value: "Construction details matter enormously", color: "amber" },
+    ],
+    body: [
+      `Smart beta ETFs translate factor ideas into accessible, low-cost, rules-based products. They typically track an index that weights stocks by a factor characteristic (or a combination) rather than by market capitalisation.`,
+      `Their growth has democratised factor investing but has also concentrated large amounts of capital into a relatively small set of methodologies. Differences in construction — single vs multi-factor, weighting scheme, rebalancing rules, and buffers — produce material differences in live performance and risk.`,
+      `Investors must look through the “smart beta” label to the actual factor exposures, turnover, capacity, and fee levels. Not every smart beta product delivers a robust, well-implemented factor premium.`
+    ],
+    keyPoint: "Smart beta ETFs are tools, not magic. Their value depends entirely on the quality of the underlying factor definition, construction discipline, and cost structure."
+  },
+  {
+    era: "Landscape",
+    icon: "🦒",
+    title: "The Factor Zoo",
+    desc: "The proliferation of 200+ documented factors and the resulting complexity",
+    badge: { label: "Critical", style: "red" },
+    tags: [["factor zoo","red"], ["proliferation","amber"], ["complexity","teal"], ["selection",""]],
+    data: [
+      { label: "Scale", value: "200+ factors in the literature", color: "red" },
+      { label: "Problem", value: "Many are weak, redundant, or spurious", color: "amber" },
+      { label: "Response", value: "Focus on robust, independent factors", color: "teal" },
+    ],
+    body: [
+      `Academic research has documented hundreds of characteristics that appear to predict returns. This “factor zoo” creates both opportunity and danger. Most newly proposed factors have weak economic rationales, high turnover, limited capacity, or are simply re-expressions of existing factors.`,
+      `The existence of the zoo raises serious multiple-testing concerns: when thousands of potential characteristics are examined, many will look significant by chance. Published factors that fail to replicate out-of-sample or in live trading are common.`,
+      `Practitioners respond by focusing on a small set of factors with long track records, clear economic stories, robust performance across regions and decades, and acceptable implementation characteristics. Breadth of documented factors is not the same as breadth of usable factors.`
+    ],
+    keyPoint: "The factor zoo is real, but most of its inhabitants are not investable. Discipline lies in selecting a handful of robust factors rather than chasing every new anomaly."
+  },
+  {
+    era: "Integrity",
+    icon: "🧪",
+    title: "Data Mining Concerns",
+    desc: "The ever-present risk that apparent factor premiums are artefacts of intensive search",
+    badge: { label: "Critical", style: "red" },
+    tags: [["data mining","red"], ["multiple testing","amber"], ["overfitting","teal"], ["replication","slate"]],
+    data: [
+      { label: "Risk", value: "Spurious patterns from repeated testing", color: "red" },
+      { label: "Mitigation", value: "Economic rationale · out-of-sample · theory", color: "teal" },
+      { label: "Reality", value: "Many published factors fail to replicate", color: "amber" },
+    ],
+    body: [
+      `Because researchers and practitioners have searched exhaustively for return-predictive characteristics, the probability of finding spurious patterns is high. Standard statistical significance thresholds are inadequate when hundreds or thousands of tests have been performed.`,
+      `Robustness checks — out-of-sample periods, international markets, different construction methodologies, and pre-registered hypotheses — help, but cannot fully eliminate the problem. Factors that lack a coherent economic or behavioural rationale are especially suspect.`,
+      `The most reliable defence is intellectual humility combined with stringent filters: demand economic plausibility, require persistence across decades and geographies, insist on implementable turnover and capacity, and continuously re-evaluate live performance. Data-mined factors eventually reveal themselves through underperformance.`
+    ],
+    keyPoint: "In the factor zoo, data mining is the apex predator. Only factors that survive rigorous, sceptical scrutiny — theoretical, statistical, and practical — deserve capital."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    // Handle possible typo in data key
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 9.6 Market Making (Quant Perspective)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 9 · Section 9.6</div>
+      <h1 class="book-title">Market<br><em>Making</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Avellaneda-Stoikov · inventory · spreads · adverse selection · DEX LPs · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>9.6 Market Making (Quant Perspective)</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Model",
+    icon: "📐",
+    title: "Avellaneda–Stoikov Model",
+    desc: "The foundational stochastic-control framework for optimal market making",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["Avellaneda-Stoikov","teal"], ["optimal control","amber"], ["reservation price",""], ["intensity","slate"]],
+    data: [
+      { label: "Core output", value: "Reservation price + optimal spread", color: "teal" },
+      { label: "State variables", value: "Inventory · mid-price · time", color: "" },
+      { label: "Key insight", value: "Inventory risk shapes optimal quotes", color: "amber" },
+    ],
+    body: [
+      `The Avellaneda–Stoikov model (2008) frames market making as a stochastic control problem. The market maker posts bid and ask quotes around a reservation price that is adjusted for current inventory and remaining horizon. The objective is to maximise expected terminal wealth penalised for inventory risk.`,
+      `Arrival of market orders is modelled as a Poisson process whose intensity decreases with the distance of the quote from the mid-price. Solving the resulting Hamilton–Jacobi–Bellman equation yields closed-form approximations for the optimal bid and ask offsets.`,
+      `Although highly stylised (constant volatility, exponential utility, no adverse selection in the base version), the model supplies the conceptual backbone for almost all subsequent quant market-making frameworks: inventory-aware pricing, reservation-price adjustment, and intensity-based fill probabilities.`
+    ],
+    keyPoint: "Avellaneda–Stoikov turned market making from a heuristic activity into a solvable optimal-control problem. Every modern inventory-skewing rule ultimately descends from its reservation-price idea."
+  },
+  {
+    era: "Control",
+    icon: "📦",
+    title: "Inventory Management",
+    desc: "Actively controlling the size and sign of the position the market maker is willing to hold",
+    badge: { label: "Core", style: "teal" },
+    tags: [["inventory","teal"], ["risk limit","amber"], ["skew","slate"], ["mean reversion",""]],
+    data: [
+      { label: "Goal", value: "Keep inventory near target (usually zero)", color: "teal" },
+      { label: "Tool", value: "Quote skew + size adjustment + hedging", color: "" },
+      { label: "Constraint", value: "Hard inventory limits & stop-outs", color: "red" },
+    ],
+    body: [
+      `Inventory is the central state variable of a market-making operation. Accumulating a large long or short position exposes the firm to directional price risk that can quickly exceed the modest edge earned from the spread. Effective market making therefore continuously steers inventory back toward a target (commonly zero) or keeps it inside a tight band.`,
+      `Control is exercised primarily through quote skew (shifting both bid and ask in the same direction), differential sizing, and, when necessary, aggressive hedging in the underlying or correlated instruments. Soft penalties inside the optimisation and hard inventory limits provide layered protection.`,
+      `The speed of inventory mean-reversion is itself a design choice: too slow and risk accumulates; too fast and the market maker pays away edge by crossing the spread excessively.`
+    ],
+    keyPoint: "Inventory is not a residual of trading — it is the primary risk that must be managed. Everything else (spread, size, skew) is a tool for inventory control."
+  },
+  {
+    era: "Pricing",
+    icon: "💱",
+    title: "Spread Setting (Optimal Bid–Ask)",
+    desc: "Choosing the distance from mid at which to post bids and asks",
+    badge: { label: "Core", style: "teal" },
+    tags: [["optimal spread","teal"], ["reservation price","amber"], ["fill probability",""], ["edge","slate"]],
+    data: [
+      { label: "Trade-off", value: "Wider spread → higher edge, lower fill rate", color: "teal" },
+      { label: "Inputs", value: "Volatility · intensity · inventory · horizon", color: "" },
+      { label: "Output", value: "Symmetric or skewed bid/ask offsets", color: "amber" },
+    ],
+    body: [
+      `The optimal spread balances the higher per-trade profit of a wider quote against the lower probability of being filled. In the Avellaneda–Stoikov framework this trade-off is solved explicitly once the intensity function and risk-aversion parameter are specified.`,
+      `In practice the spread also embeds a buffer for adverse selection, latency, and discrete tick size. Many production systems start from a model-implied reservation price and optimal half-spread, then overlay microstructure adjustments (queue position, tick-size constraints, recent trade flow).`,
+      `Static spreads are almost never optimal. Volatility, inventory, remaining horizon, and observed order-flow toxicity all justify continuous recalibration of the posted spread.`
+    ],
+    keyPoint: "The optimal spread is not a constant percentage of price; it is the solution to a dynamic trade-off between edge per fill and probability of fill, conditioned on inventory and risk."
+  },
+  {
+    era: "Defence",
+    icon: "🛡️",
+    title: "Adverse Selection Management",
+    desc: "Protecting the book from informed or toxic flow that systematically picks off quotes",
+    badge: { label: "Critical", style: "red" },
+    tags: [["adverse selection","red"], ["toxic flow","amber"], ["information","teal"], ["protection","slate"]],
+    data: [
+      { label: "Problem", value: "Informed traders hit quotes just before moves", color: "red" },
+      { label: "Symptoms", value: "Negative realized spread · rising inventory risk", color: "" },
+      { label: "Responses", value: "Widen · skew · size down · cancel · signal filters", color: "teal" },
+    ],
+    body: [
+      `Adverse selection arises when counterparties possess superior information or simply react faster to public news. Their trades systematically occur on the side that leaves the market maker with a losing inventory. Over time the realized spread can turn negative even if the quoted spread looks attractive.`,
+      `Quant market makers combat adverse selection through a combination of wider spreads in toxic regimes, rapid cancellation when short-term predictive signals fire, inventory-aware skew that reduces exposure on the vulnerable side, and explicit toxicity scorers (VPIN-style metrics, order-flow imbalance, trade-sign autocorrelation).`,
+      `Complete elimination is impossible; the goal is to keep the fraction of toxic flow low enough that the remaining benign flow still generates positive expected value after costs.`
+    ],
+    keyPoint: "Adverse selection is the primary reason quoted spreads overstate true profitability. Managing it is as important as setting the spread itself."
+  },
+  {
+    era: "Sizing",
+    icon: "📊",
+    title: "Quote Sizing by Volatility",
+    desc: "Scaling the size of posted orders with prevailing volatility and risk appetite",
+    badge: { label: "Practical", style: "amber" },
+    tags: [["sizing","amber"], ["volatility","teal"], ["risk budget",""], ["capacity","slate"]],
+    data: [
+      { label: "Rule of thumb", value: "Size ∝ 1 / σ (or more sophisticated)", color: "teal" },
+      { label: "Rationale", value: "Keep inventory risk roughly constant", color: "" },
+      { label: "Extra factors", value: "Liquidity · tick size · queue priority", color: "amber" },
+    ],
+    body: [
+      `Larger size increases both expected profit and inventory risk. Because volatility directly scales the dollar risk of any given inventory, most market-making systems reduce posted size when volatility rises and increase it when volatility falls, targeting a more stable risk contribution.`,
+      `Simple inverse-volatility scaling is a common starting point; more advanced schemes incorporate the full covariance of the inventory with other positions, the expected fill intensity, and the depth of the order book. Size may also be capped by exchange risk limits or internal notional budgets.`,
+      `Sizing interacts with skew and spread: in high-volatility regimes a market maker may simultaneously widen, reduce size, and skew more aggressively to keep total risk inside tolerance.`
+    ],
+    keyPoint: "Quote size is a risk-management lever, not merely a volume target. Volatility-aware sizing keeps the market maker’s risk profile more stable across regimes."
+  },
+  {
+    era: "Skew",
+    icon: "↗️",
+    title: "Skewing Quotes Based on Inventory",
+    desc: "Shifting the entire quote ladder to encourage inventory-reducing fills",
+    badge: { label: "Core", style: "teal" },
+    tags: [["skew","teal"], ["inventory control","amber"], ["reservation price",""], ["asymmetric","slate"]],
+    data: [
+      { label: "Long inventory", value: "Lower both bid and ask (encourage sells)", color: "teal" },
+      { label: "Short inventory", value: "Raise both bid and ask (encourage buys)", color: "" },
+      { label: "Magnitude", value: "Proportional to inventory × risk aversion", color: "amber" },
+    ],
+    body: [
+      `When inventory is positive, the market maker wants to sell; the rational response is to lower both the bid and the ask so that the ask becomes more attractive to buyers while the bid becomes less attractive to sellers. The opposite skew is applied when inventory is negative.`,
+      `In the Avellaneda–Stoikov reservation-price framework the skew appears naturally: the reservation price itself declines linearly with inventory, and the optimal bid and ask are placed symmetrically around that adjusted reservation price. Production systems often implement a similar linear or piecewise-linear skew function.`,
+      `Excessive skew can signal distress to other participants or create mechanical arbitrage opportunities; therefore skew is usually bounded and combined with size reduction as inventory approaches hard limits.`
+    ],
+    keyPoint: "Skew is the continuous, market-friendly way to mean-revert inventory. It is the practical embodiment of the reservation-price adjustment at the heart of optimal market-making theory."
+  },
+  {
+    era: "Economics",
+    icon: "💰",
+    title: "Rebate Capture (Maker–Taker)",
+    desc: "Earning exchange rebates by providing liquidity in maker-taker fee schedules",
+    badge: { label: "Practical", style: "amber" },
+    tags: [["rebates","amber"], ["maker-taker","teal"], ["fee structure",""], ["queue priority","slate"]],
+    data: [
+      { label: "Mechanism", value: "Maker receives rebate; taker pays fee", color: "teal" },
+      { label: "Edge source", value: "Rebate + spread capture − adverse selection", color: "" },
+      { label: "Requirement", value: "High queue priority & low toxicity", color: "amber" },
+    ],
+    body: [
+      `In maker-taker markets the exchange pays a rebate to the party that provides liquidity (the maker) and charges a fee to the party that removes it (the taker). For many liquid instruments the rebate is large enough that a market maker can earn a positive expected value even with a very tight or zero quoted spread, provided fill quality remains high.`,
+      `Rebate capture therefore becomes an explicit component of the objective function. Strategies optimise not only for spread and inventory but also for the probability of earning the rebate versus paying the take fee when they must cross the spread to hedge.`,
+      `Success depends on maintaining queue priority (price-time or pro-rata) and on avoiding adverse selection that would turn rebate-earning fills into losing inventory. In highly competitive names the rebate alone may be insufficient once latency and toxicity are taken into account.`
+    ],
+    keyPoint: "Under maker-taker pricing the rebate is a first-class source of edge. Market-making systems must jointly optimise spread, inventory, and expected net fee income."
+  },
+  {
+    era: "Crypto",
+    icon: "🔄",
+    title: "Market Making on Crypto DEXs (AMM LPs)",
+    desc: "Providing liquidity to automated market makers and managing impermanent loss",
+    badge: { label: "Specialised", style: "slate" },
+    tags: [["AMM","slate"], ["liquidity provider","teal"], ["impermanent loss","red"], ["concentrated liquidity","amber"]],
+    data: [
+      { label: "Mechanism", value: "Passive LP in constant-product or concentrated pools", color: "teal" },
+      { label: "Risk", value: "Impermanent loss + toxic arbitrage flow", color: "red" },
+      { label: "Active response", value: "Dynamic range management · just-in-time liquidity", color: "amber" },
+    ],
+    body: [
+      `On decentralised exchanges that use automated market makers (Uniswap-style constant-product or concentrated-liquidity pools), liquidity providers (LPs) earn fees from swaps but are continuously exposed to impermanent loss — the underperformance of the LP position relative to simply holding the tokens when prices move.`,
+      `Quant market makers treat AMM LP positions as a form of passive market making whose “quotes” are determined by the bonding curve. They actively manage the price range in which liquidity is concentrated, rebalance inventory, and sometimes employ just-in-time liquidity or dynamic fee strategies to improve the risk-adjusted return.`,
+      `The adverse-selection problem appears in an extreme form: arbitrageurs and informed traders systematically trade against stale AMM prices, leaving LPs with the losing side of every large move. Sustainable DEX market making therefore requires either very active management or acceptance of fee income as compensation for providing a valuable but risky service.`
+    ],
+    keyPoint: "AMM liquidity provision is market making under a deterministic pricing rule. The same inventory, adverse-selection and risk-management principles apply, but the mechanics and the severity of toxic flow are distinctive."
+  },
+  {
+    era: "Risk",
+    icon: "⚠️",
+    title: "Toxic Flow & Adverse Selection Risk",
+    desc: "The ever-present danger that a large fraction of fills carry negative expected value",
+    badge: { label: "Critical", style: "red" },
+    tags: [["toxic flow","red"], ["informed trading","amber"], ["latency","teal"], ["protection","slate"]],
+    data: [
+      { label: "Definition", value: "Flow that predicts subsequent price moves against the MM", color: "red" },
+      { label: "Sources", value: "Informed traders · faster participants · news", color: "" },
+      { label: "Defence layers", value: "Signals · speed · wider spreads · selective quoting", color: "teal" },
+    ],
+    body: [
+      `Toxic flow is order flow that is systematically correlated with future price changes in the direction that hurts the market maker. It may originate from genuine informed traders, from latency-sensitive arbitrageurs, or from simple reactions to public news that the market maker’s quotes have not yet reflected.`,
+      `Because toxic flow is more likely to execute (it takes liquidity precisely when it is profitable to do so), even a modest fraction of toxic counterparties can dominate the P&L. Realized spread turns negative, inventory drifts in the wrong direction, and the apparent edge from the quoted spread evaporates.`,
+      `Quant responses include real-time toxicity scoring, short-term predictive alpha that conditions quote aggressiveness, selective quoting only when conditions are benign, and extreme speed to update or cancel quotes before toxic flow can hit them.`
+    ],
+    keyPoint: "In market making the average fill is not the typical fill. A small percentage of highly toxic trades can destroy the profitability of an otherwise well-designed strategy."
+  },
+  {
+    era: "Measurement",
+    icon: "📏",
+    title: "Realized Spread vs. Quoted Spread",
+    desc: "Comparing the spread that is posted with the spread that is actually earned after price moves",
+    badge: { label: "Diagnostic", style: "amber" },
+    tags: [["realized spread","amber"], ["quoted spread","teal"], ["performance","slate"], ["adverse selection",""]],
+    data: [
+      { label: "Quoted spread", value: "Ask − Bid at the moment of posting", color: "teal" },
+      { label: "Realized spread", value: "Effective edge after subsequent mid-price move", color: "amber" },
+      { label: "Gap", value: "Primarily adverse selection + inventory drift", color: "red" },
+    ],
+    body: [
+      `The quoted spread is the distance between the bid and ask that the market maker posts. The realized spread measures the actual economic edge obtained on a fill after accounting for the subsequent movement in the mid-price (often evaluated over a short horizon such as 1 second, 10 seconds or 1 minute).`,
+      `When adverse selection is present, the mid-price tends to move against the market maker after a fill, so realized spread is systematically lower than quoted spread. A large and persistent gap is the clearest quantitative symptom that the strategy is being picked off.`,
+      `High-quality market-making systems monitor realized-versus-quoted spread continuously, by venue, by time of day, and by inventory state. The gap feeds back into spread setting, toxicity filters and overall risk appetite.`
+    ],
+    keyPoint: "Quoted spread is a marketing number; realized spread is the truth. The difference between them is the most direct measure of how much adverse selection the market maker is suffering."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

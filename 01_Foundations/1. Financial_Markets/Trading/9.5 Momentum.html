@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 9.5 Momentum</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 9 · Section 9.5</div>
+      <h1 class="book-title">Momentum</h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Time-series · cross-sectional · crashes · construction · integration · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>9.5 Momentum</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Type",
+    icon: "📈",
+    title: "Time-Series Momentum (Trend Following)",
+    desc: "Betting that an asset’s own past return predicts its future return",
+    badge: { label: "Core", style: "teal" },
+    tags: [["time-series","teal"], ["trend following","amber"], ["absolute momentum",""], ["CTA","slate"]],
+    data: [
+      { label: "Signal", value: "Own past return (sign or magnitude)", color: "teal" },
+      { label: "Position", value: "Long if positive, short if negative", color: "" },
+      { label: "Classic form", value: "Managed-futures / CTA strategies", color: "amber" },
+    ],
+    body: [
+      `Time-series momentum (also called absolute momentum or trend following) takes a position in an asset based solely on that asset’s own past performance. If the asset has risen over the look-back window, the strategy goes long; if it has fallen, the strategy goes short (or stays flat). Position size may be constant or scaled by volatility.`,
+      `The economic rationale includes behavioural under-reaction, slow diffusion of information, and the existence of persistent risk premia or hedging flows that create trends. Time-series momentum has been documented across equities, bonds, commodities, and currencies over long historical periods.`,
+      `Because each asset is treated independently, the strategy naturally produces a diversified, multi-asset portfolio when applied broadly. Its principal risk is the sharp reversals that occur at trend turning points — the source of the well-known “momentum crashes.”`
+    ],
+    keyPoint: "Time-series momentum is the purest expression of “the trend is your friend.” It requires no cross-sectional ranking and thrives on the existence of persistent directional moves across markets."
+  },
+  {
+    era: "Type",
+    icon: "🏆",
+    title: "Cross-Sectional Momentum",
+    desc: "Ranking assets by relative past performance and going long winners / short losers",
+    badge: { label: "Core", style: "teal" },
+    tags: [["cross-sectional","teal"], ["relative strength","amber"], ["winners/losers",""], ["ranking","slate"]],
+    data: [
+      { label: "Signal", value: "Relative ranking of past returns", color: "teal" },
+      { label: "Portfolio", value: "Long top quantiles / short bottom quantiles", color: "" },
+      { label: "Classic paper", value: "Jegadeesh & Titman (1993)", color: "amber" },
+    ],
+    body: [
+      `Cross-sectional momentum ranks assets within a universe by their past returns and forms a long-short portfolio that buys the recent winners and sells the recent losers. The strategy is relative: an asset can be held long even if its absolute return is negative, provided it has outperformed its peers.`,
+      `This form of momentum is the original equity anomaly documented by Jegadeesh and Titman and remains one of the most robust factors in the academic literature. It is typically implemented with a formation period of 6–12 months and a holding period of 1–3 months, often with a one-month skip to avoid short-term reversal.`,
+      `Cross-sectional momentum is market-neutral by construction (equal long and short notional) and therefore has low correlation with broad market direction. Its main risks are concentrated factor exposures and the occasional violent rebounds of recent losers.`
+    ],
+    keyPoint: "Cross-sectional momentum harvests relative, not absolute, persistence. It is a ranking strategy whose edge lives in the ordering of past returns across the universe."
+  },
+  {
+    era: "Risk",
+    icon: "💥",
+    title: "Momentum Crash Risk",
+    desc: "The tendency of momentum portfolios to suffer large, sudden losses in certain regimes",
+    badge: { label: "Critical", style: "red" },
+    tags: [["crash risk","red"], ["rebound","amber"], ["tail risk","teal"], ["regime","slate"]],
+    data: [
+      { label: "Typical setting", value: "Market rebounds after large declines", color: "red" },
+      { label: "Mechanism", value: "Losers rebound violently; winners lag", color: "" },
+      { label: "Severity", value: "Can erase years of prior gains", color: "amber" },
+    ],
+    body: [
+      `Momentum strategies are prone to infrequent but severe drawdowns known as momentum crashes. These episodes typically occur when markets rebound sharply after a prolonged decline: the previous losers (often high-beta, distressed names) stage powerful recoveries while the previous winners lag or fall.`,
+      `Because a cross-sectional momentum portfolio is long the winners and short the losers, the short leg produces large losses precisely when the market is recovering. Time-series momentum suffers analogous losses when many simultaneous trends reverse.`,
+      `Crash risk is the dominant practical concern for momentum investors. Mitigations include volatility scaling, dynamic exposure reduction in high-volatility or after large market declines, diversification across asset classes, and explicit tail-risk hedges.`
+    ],
+    keyPoint: "Momentum’s attractive average returns come with a hidden left-tail liability. Understanding and sizing for crash risk is more important than fine-tuning the formation period."
+  },
+  {
+    era: "Construction",
+    icon: "📅",
+    title: "Formation Period (12 Months Minus Most Recent)",
+    desc: "The standard look-back window that balances signal strength against short-term noise",
+    badge: { label: "Practical", style: "amber" },
+    tags: [["formation","amber"], ["12-1","teal"], ["skip month",""], ["look-back","slate"]],
+    data: [
+      { label: "Common choice", value: "12 months excluding the most recent month", color: "teal" },
+      { label: "Reason for skip", value: "Avoid short-term reversal effect", color: "amber" },
+      { label: "Alternatives", value: "6-month, 3-month, or multi-horizon blends", color: "" },
+    ],
+    body: [
+      `The formation (or look-back) period is the historical window used to measure past performance. The academic and practitioner standard for equity cross-sectional momentum is the return over the past 12 months, excluding the most recent month (often written “12-1”).`,
+      `The one-month skip avoids contamination by the short-term reversal effect, which operates in the opposite direction at horizons of one week to one month. Including the most recent month therefore weakens the pure momentum signal.`,
+      `Shorter formation periods react faster but are noisier; longer periods are more stable but slower to adapt. Many modern implementations blend multiple horizons or use exponentially weighted returns to capture both intermediate and longer-term persistence.`
+    ],
+    keyPoint: "The 12-1 convention is not arbitrary: it is the empirically robust compromise that maximises intermediate-horizon momentum while minimising short-horizon reversal interference."
+  },
+  {
+    era: "Construction",
+    icon: "⏳",
+    title: "Holding Period Effects",
+    desc: "How long the momentum signal continues to predict returns after portfolio formation",
+    badge: { label: "Practical", style: "amber" },
+    tags: [["holding period","amber"], ["decay","teal"], ["rebalance",""], ["turnover","slate"]],
+    data: [
+      { label: "Typical range", value: "1–3 months for equities", color: "teal" },
+      { label: "Observation", value: "Signal decays; longer holds reduce turnover", color: "" },
+      { label: "Trade-off", value: "Freshness vs. transaction costs", color: "amber" },
+    ],
+    body: [
+      `After a momentum portfolio is formed, the predictive power of the ranking gradually decays. Holding periods of one to three months are common in equity applications; longer holds capture more of the cumulative premium but with a weaker per-period edge and lower turnover.`,
+      `Overlapping portfolios (forming a new portfolio every month and averaging the positions of the last K formation dates) produce smoother exposure and are the standard academic implementation. Non-overlapping portfolios are simpler but more volatile.`,
+      `The optimal holding period depends on the asset class, the speed of signal decay, and the level of transaction costs. Higher-cost environments favour longer holds; lower-cost, higher-frequency environments can support shorter, more responsive rebalancing.`
+    ],
+    keyPoint: "Holding-period choice is a cost–signal trade-off. The economically relevant quantity is the net premium after the turnover generated by the chosen rebalancing frequency."
+  },
+  {
+    era: "Evidence",
+    icon: "📜",
+    title: "Momentum in Equities (Jegadeesh–Titman)",
+    desc: "The original and still most-studied demonstration of intermediate-horizon momentum",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["Jegadeesh-Titman","teal"], ["equity momentum","amber"], ["anomaly",""], ["robust","slate"]],
+    data: [
+      { label: "Landmark", value: "Jegadeesh & Titman (1993)", color: "teal" },
+      { label: "Finding", value: "3–12 month winners outperform losers", color: "" },
+      { label: "Status", value: "One of the most robust equity anomalies", color: "amber" },
+    ],
+    body: [
+      `Jegadeesh and Titman’s 1993 paper established that U.S. equities ranked by past 3- to 12-month returns continue to deliver abnormal performance over the subsequent 3 to 12 months. The result survived a wide range of robustness checks and has been replicated in international equity markets.`,
+      `Equity momentum is stronger among smaller, less liquid, and higher-idiosyncratic-volatility stocks, yet it remains present (in attenuated form) among large-capitalisation names. It has persisted through multiple decades, although its magnitude and crash profile have varied.`,
+      `The anomaly is difficult to explain fully within standard risk-based asset-pricing models, leading many researchers to emphasise behavioural mechanisms (under-reaction, slow information diffusion, disposition effect) alongside possible risk-based contributions.`
+    ],
+    keyPoint: "Equity momentum is the empirical cornerstone of the broader momentum literature. Any serious factor framework must accommodate or explain the Jegadeesh–Titman result."
+  },
+  {
+    era: "Breadth",
+    icon: "🌍",
+    title: "Momentum Across Asset Classes",
+    desc: "The pervasiveness of time-series and cross-sectional momentum beyond equities",
+    badge: { label: "Evidence", style: "teal" },
+    tags: [["multi-asset","teal"], ["futures","amber"], ["currencies","slate"], ["commodities",""]],
+    data: [
+      { label: "Asset classes", value: "Equity indices · bonds · commodities · FX", color: "teal" },
+      { label: "Form", value: "Primarily time-series momentum", color: "" },
+      { label: "Implication", value: "Momentum is a broad market phenomenon", color: "amber" },
+    ],
+    body: [
+      `Momentum is not confined to individual equities. Time-series momentum has been documented in equity index futures, government bonds, commodities, and currencies over sample periods spanning more than a century in some cases. Cross-sectional momentum also appears across country equity indices and other cross-sections.`,
+      `The multi-asset evidence strengthens the case that momentum reflects deep features of price formation rather than an equity-specific anomaly. It also supplies the empirical foundation for the large managed-futures and CTA industry.`,
+      `Diversifying momentum exposure across asset classes improves the risk–return profile and reduces the impact of equity-specific momentum crashes, although global risk-off episodes can still produce correlated losses.`
+    ],
+    keyPoint: "Momentum’s appearance across independent asset classes is one of the strongest pieces of evidence that the phenomenon is real and economically meaningful."
+  },
+  {
+    era: "Portfolio",
+    icon: "🧩",
+    title: "Momentum Factor Integration",
+    desc: "Combining momentum with other factors and managing its interactions inside a portfolio",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["integration","amber"], ["multi-factor","teal"], ["correlation",""], ["diversification","slate"]],
+    data: [
+      { label: "Benefit", value: "Low correlation with value & quality", color: "teal" },
+      { label: "Challenge", value: "Crash risk & turnover", color: "red" },
+      { label: "Practice", value: "Risk-budgeted or optimised multi-factor", color: "amber" },
+    ],
+    body: [
+      `Momentum tends to exhibit low or negative correlation with value and, to a lesser extent, with quality and low-volatility factors. This makes it a powerful diversifier inside a multi-factor portfolio: periods when value struggles are often periods when momentum performs well, and vice versa.`,
+      `Integration methods range from simple equal risk weighting of factor portfolios to full optimisation that targets a desired set of factor exposures while controlling total risk, turnover, and crash exposure. Because momentum is high-turnover, transaction-cost modelling is especially important.`,
+      `Naive combination can still leave the overall portfolio exposed to momentum crashes. Explicit risk management — volatility targeting, dynamic scaling, or tail hedges — is therefore a necessary complement to static factor allocation.`
+    ],
+    keyPoint: "Momentum’s greatest portfolio contribution is often its diversification benefit rather than its stand-alone Sharpe ratio. Integration must respect both the average premium and the crash risk."
+  },
+  {
+    era: "Enhancement",
+    icon: "⚖️",
+    title: "Momentum with Volatility Scaling",
+    desc: "Adjusting position size inversely to recent volatility to stabilise risk and improve returns",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["vol scaling","amber"], ["risk targeting","teal"], ["position sizing",""], ["Sharpe","slate"]],
+    data: [
+      { label: "Rule", value: "Size ∝ 1 / recent volatility", color: "teal" },
+      { label: "Effect", value: "More stable risk · higher risk-adjusted returns", color: "" },
+      { label: "Benefit", value: "Automatically reduces exposure before crashes", color: "amber" },
+    ],
+    body: [
+      `Volatility scaling (or volatility targeting) sets the notional size of each momentum position inversely proportional to an estimate of recent volatility. In high-volatility environments the strategy automatically takes smaller positions; in calm markets it takes larger ones.`,
+      `The practice has two benefits. First, it produces a more stable risk profile through time, improving the realised Sharpe ratio. Second, because momentum crashes frequently coincide with elevated volatility, scaling tends to reduce exposure precisely when crash risk is highest.`,
+      `Implementation requires a robust volatility estimator (often an exponentially weighted or Parkinson-style measure) and careful handling of the lag between volatility observation and position adjustment. Overly reactive scaling can increase turnover without commensurate benefit.`
+    ],
+    keyPoint: "Volatility scaling is one of the simplest and most effective enhancements to momentum. It converts a constant-notional strategy into a more stable, crash-aware risk-taking process."
+  },
+  {
+    era: "Interaction",
+    icon: "↩️",
+    title: "Reversal Effects at Short Horizons",
+    desc: "The opposite pattern that appears at one-week to one-month horizons",
+    badge: { label: "Critical", style: "red" },
+    tags: [["short-term reversal","red"], ["1-month","amber"], ["noise","teal"], ["skip month","slate"]],
+    data: [
+      { label: "Horizon", value: "Approximately 1 week to 1 month", color: "red" },
+      { label: "Pattern", value: "Recent winners underperform; losers outperform", color: "" },
+      { label: "Implication", value: "Why momentum formation skips the last month", color: "teal" },
+    ],
+    body: [
+      `At short horizons (roughly one week to one month) the momentum pattern reverses: recent winners tend to underperform and recent losers tend to outperform. This short-term reversal is attributed to liquidity effects, temporary price pressure from order flow, and microstructure noise.`,
+      `Because the short-term effect operates in the opposite direction to intermediate-horizon momentum, including the most recent month in the formation period weakens the pure momentum signal. Hence the standard “12-1” construction that deliberately skips the last month.`,
+      `Short-term reversal can itself be traded as a distinct strategy, but it is capacity-constrained, high-turnover, and sensitive to transaction costs. For momentum investors the main practical consequence is the need to avoid contaminating the intermediate-horizon signal with short-horizon noise.`
+    ],
+    keyPoint: "Short-term reversal is the mirror image of intermediate momentum. Respecting the distinction in formation-period design is essential to capturing the intended premium cleanly."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

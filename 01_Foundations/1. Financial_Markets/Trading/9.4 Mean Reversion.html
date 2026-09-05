@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 9.4 Mean Reversion</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 9 · Section 9.4</div>
+      <h1 class="book-title">Mean<br><em>Reversion</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Fair value · half-life · OU · tests · strategies · failure modes · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>9.4 Mean Reversion</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Intuition",
+    icon: "🔄",
+    title: "Prices Revert to Mean / Fair Value",
+    desc: "The foundational idea that deviations from equilibrium are temporary",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["mean reversion","teal"], ["fair value","amber"], ["equilibrium",""], ["deviation","slate"]],
+    data: [
+      { label: "Core belief", value: "Extremes are temporary", color: "teal" },
+      { label: "Driver", value: "Fundamental anchors + behavioural correction", color: "" },
+      { label: "Opposite", value: "Momentum / trending behaviour", color: "amber" },
+    ],
+    body: [
+      `Mean reversion rests on the intuition that prices (or spreads, or residuals) fluctuate around a central tendency — a mean, fair value, or equilibrium level — and that large deviations are more likely to be corrected than to persist indefinitely. When an asset becomes expensive relative to its history or fundamentals, selling pressure eventually appears; when it becomes cheap, buying pressure emerges.`,
+      `The economic foundations include valuation anchors (earnings, book value, replacement cost), inventory and positioning effects, and behavioural over-reaction followed by correction. In relative-value contexts the “mean” is often a cointegrating relationship or a cross-sectional average rather than a simple historical average of a single price series.`,
+      `Mean reversion is not universal. It coexists with trending behaviour at different horizons and in different regimes. Successful strategies therefore require both evidence that reversion is present and disciplined recognition of the conditions under which it fails.`
+    ],
+    keyPoint: "Mean reversion is a statement about the tendency of deviations to correct, not a guarantee that every extreme will be reversed on a predictable schedule."
+  },
+  {
+    era: "Metric",
+    icon: "⏱️",
+    title: "Half-Life of Mean Reversion",
+    desc: "The expected time for a deviation to decay by half toward the mean",
+    badge: { label: "Core", style: "teal" },
+    tags: [["half-life","teal"], ["speed","amber"], ["horizon",""], ["expected return","slate"]],
+    data: [
+      { label: "Definition", value: "Time for residual to move halfway to mean", color: "teal" },
+      { label: "Link", value: "Directly tied to OU speed parameter κ", color: "" },
+      { label: "Use", value: "Sets holding period & required edge vs costs", color: "amber" },
+    ],
+    body: [
+      `The half-life quantifies how quickly mean reversion is expected to operate. A short half-life (hours or a few days) supports higher-turnover strategies; a long half-life (weeks or months) requires greater patience and larger deviation thresholds to overcome transaction costs and opportunity cost.`,
+      `Half-life is typically estimated from the speed parameter of an Ornstein–Uhlenbeck process or from the autocorrelation structure of the residual series. Because estimates are noisy and regime-dependent, practitioners often apply conservative haircuts and monitor realised speed in live trading.`,
+      `Mis-estimating half-life is costly: assuming faster reversion than actually occurs leads to premature exits or excessive turnover; assuming slower reversion leads to positions that remain open through adverse moves that never correct.`
+    ],
+    keyPoint: "Half-life converts a qualitative belief in mean reversion into a quantitative trading horizon and an expected return per unit of risk."
+  },
+  {
+    era: "Model",
+    icon: "📉",
+    title: "Ornstein-Uhlenbeck Process",
+    desc: "The canonical continuous-time model for mean-reverting dynamics",
+    badge: { label: "Core", style: "teal" },
+    tags: [["OU process","teal"], ["stochastic","amber"], ["stationary",""], ["κ, θ, σ","slate"]],
+    data: [
+      { label: "SDE", value: "dX = κ(θ − X)dt + σ dW", color: "teal" },
+      { label: "Parameters", value: "κ speed · θ mean · σ volatility", color: "" },
+      { label: "Property", value: "Gaussian, stationary, explicit half-life", color: "amber" },
+    ],
+    body: [
+      `The Ornstein–Uhlenbeck (OU) process is the standard mathematical description of mean-reverting behaviour. The instantaneous drift pulls the process toward a long-run mean θ with strength κ; the diffusion term adds Gaussian noise of intensity σ.`,
+      `Under the OU model the half-life is ln(2)/κ, the stationary distribution is known, and first-passage-time statistics can be derived. These properties make OU the natural framework for sizing positions, setting entry thresholds, and estimating expected holding periods.`,
+      `Real financial residuals only approximate OU dynamics. Volatility clustering, jumps, and occasional non-stationarity require diagnostics and, in some cases, more flexible models. Nevertheless, OU remains the most widely used and interpretable workhorse.`
+    ],
+    keyPoint: "OU supplies the cleanest analytic link between observed residual behaviour and the practical parameters of a mean-reversion strategy — speed, target, and risk."
+  },
+  {
+    era: "Test",
+    icon: "🧪",
+    title: "ADF Test for Mean Reversion",
+    desc: "Augmented Dickey-Fuller test as a formal check for stationarity / unit root",
+    badge: { label: "Diagnostic", style: "amber" },
+    tags: [["ADF","amber"], ["unit root","teal"], ["stationarity",""], ["cointegration","slate"]],
+    data: [
+      { label: "Null", value: "Unit root (non-stationary) present", color: "red" },
+      { label: "Rejection", value: "Evidence of stationarity / mean reversion", color: "teal" },
+      { label: "Caveat", value: "Low power · sensitive to specification", color: "amber" },
+    ],
+    body: [
+      `The Augmented Dickey–Fuller (ADF) test examines whether a series contains a unit root. Failure to reject the null suggests the series behaves like a random walk; rejection provides evidence of stationarity and therefore of mean-reverting behaviour.`,
+      `In pairs and residual strategies the ADF (or related tests such as KPSS or Phillips–Perron) is applied to the spread or regression residual. A stationary residual is a necessary condition for classical mean-reversion trading.`,
+      `ADF has limited power, especially in short samples, and results depend on lag length, trend specification, and the presence of structural breaks. It is a useful filter, not a definitive proof that profitable mean reversion exists after costs.`
+    ],
+    keyPoint: "Passing an ADF test is a necessary but far from sufficient condition for a viable mean-reversion strategy. Economic rationale and out-of-sample behaviour still matter more."
+  },
+  {
+    era: "Metric",
+    icon: "📏",
+    title: "Hurst Exponent",
+    desc: "H < 0.5 signals mean-reverting behaviour; H > 0.5 signals persistence",
+    badge: { label: "Diagnostic", style: "amber" },
+    tags: [["Hurst","amber"], ["H < 0.5","teal"], ["fractal","slate"], ["memory",""]],
+    data: [
+      { label: "H = 0.5", value: "Random walk (no memory)", color: "" },
+      { label: "H < 0.5", value: "Mean-reverting (anti-persistent)", color: "teal" },
+      { label: "H > 0.5", value: "Trending / persistent", color: "amber" },
+    ],
+    body: [
+      `The Hurst exponent characterises the long-memory properties of a time series. A value of 0.5 corresponds to a classical random walk; values below 0.5 indicate anti-persistence (mean reversion); values above 0.5 indicate persistence (trending).`,
+      `Hurst estimation (via R/S analysis, detrended fluctuation analysis, or wavelet methods) therefore supplies a complementary diagnostic to unit-root tests. It can detect subtler forms of mean reversion that ADF may miss, and it quantifies the strength of the effect.`,
+      `Like most scaling exponents, Hurst estimates are sensitive to sample size, noise, and non-stationarities. They are best used as one piece of evidence among several rather than as a standalone trading signal.`
+    ],
+    keyPoint: "Hurst < 0.5 is consistent with mean reversion, but the magnitude of the deviation from 0.5 and its stability over time determine whether the effect is economically usable."
+  },
+  {
+    era: "Strategy",
+    icon: "🎯",
+    title: "Z-Score Strategy Construction",
+    desc: "Standardised deviation from the mean as the primary trading signal",
+    badge: { label: "Practical", style: "teal" },
+    tags: [["z-score","teal"], ["threshold","amber"], ["entry/exit",""], ["normalisation","slate"]],
+    data: [
+      { label: "Signal", value: "z = (X − μ) / σ", color: "teal" },
+      { label: "Entry", value: "Typically |z| > 1.5 – 2.5", color: "" },
+      { label: "Exit", value: "z reverts toward 0 or opposite threshold", color: "amber" },
+    ],
+    body: [
+      `The simplest and most widely used mean-reversion rule converts the residual or price series into a z-score: current value minus a rolling (or expanding) mean, divided by a rolling standard deviation. Positions are opened when the absolute z-score exceeds a threshold and closed when it reverts toward zero.`,
+      `Rolling windows for mean and volatility must be chosen carefully: too short and the signal becomes noisy; too long and the strategy reacts slowly to regime changes. Some implementations use exponentially weighted statistics or volatility-normalised thresholds to improve robustness.`,
+      `Z-score strategies inherit every weakness of the underlying residual — non-stationarity, changing volatility, and structural breaks. Hard stops, time-based exits, and position-size limits remain essential.`
+    ],
+    keyPoint: "The z-score is a transparent, scalable way to operationalise mean reversion. Its performance is only as good as the quality and stability of the series being standardised."
+  },
+  {
+    era: "Horizon",
+    icon: "🌅",
+    title: "Intraday Mean Reversion (Gap Fills)",
+    desc: "Opening gaps and other short-horizon deviations that tend to correct within the day",
+    badge: { label: "Tactical", style: "amber" },
+    tags: [["intraday","amber"], ["gap fill","teal"], ["opening range",""], ["liquidity","slate"]],
+    data: [
+      { label: "Classic pattern", value: "Overnight gap tends to fill", color: "teal" },
+      { label: "Drivers", value: "Inventory · overnight news digestion · flow", color: "" },
+      { label: "Risk", value: "Trend days and news continuation", color: "red" },
+    ],
+    body: [
+      `A well-documented intraday phenomenon is the tendency of opening gaps to fill: when a market opens significantly above or below the previous close, price often retraces part or all of the gap during the session. Related effects include reversion of extreme opening-range moves and short-term over-reactions to news.`,
+      `These patterns are driven by overnight inventory imbalances, the gradual incorporation of news by a broader set of participants, and the desire of short-term traders to fade extremes. Edge is typically small and highly sensitive to transaction costs and adverse selection.`,
+      `Gap-fill strategies fail on strong trend days, around major scheduled announcements, and when overnight information is decisive rather than transient. Filters for volatility regime, overnight news intensity, and market breadth improve robustness.`
+    ],
+    keyPoint: "Intraday mean reversion is real but fragile. It rewards precise execution and strict filters more than elaborate forecasting."
+  },
+  {
+    era: "Type",
+    icon: "↔️",
+    title: "Cross-Sectional Mean Reversion",
+    desc: "Relative-value reversion across a universe of assets at a point in time",
+    badge: { label: "Core", style: "teal" },
+    tags: [["cross-sectional","teal"], ["relative value","amber"], ["ranking",""], ["long-short","slate"]],
+    data: [
+      { label: "Signal", value: "Rank or z-score across names today", color: "teal" },
+      { label: "Trade", value: "Long recent underperformers / short outperformers", color: "" },
+      { label: "Horizon", value: "Days to weeks typically", color: "amber" },
+    ],
+    body: [
+      `Cross-sectional mean reversion bets that assets that have outperformed their peers will lag, and assets that have underperformed will catch up, over a subsequent horizon. The signal is constructed by ranking or standardising recent returns (or other characteristics) across the universe on each date.`,
+      `This form of mean reversion is closely related to short-term reversal anomalies and is often implemented as a long-short, market-neutral portfolio. It can be applied within industries, across factors, or on residual returns after common-factor removal.`,
+      `Cross-sectional strategies benefit from breadth and are less dependent on any single series remaining stationary. They remain exposed to momentum regimes, crowding, and sudden factor rotations that can produce correlated losses across the book.`
+    ],
+    keyPoint: "Cross-sectional mean reversion harvests relative, not absolute, extremes. Its edge lives in the ranking, not in the level of any individual price."
+  },
+  {
+    era: "Type",
+    icon: "📈",
+    title: "Time-Series Mean Reversion",
+    desc: "Reversion of a single series toward its own historical mean or trend",
+    badge: { label: "Core", style: "teal" },
+    tags: [["time-series","teal"], ["univariate","amber"], ["own history",""], ["channel","slate"]],
+    data: [
+      { label: "Signal", value: "Deviation from own moving average / band", color: "teal" },
+      { label: "Examples", value: "Bollinger · RSI extremes · residual OU", color: "" },
+      { label: "Risk", value: "Prolonged trends invalidate the mean", color: "red" },
+    ],
+    body: [
+      `Time-series mean reversion treats each asset (or spread) in isolation: when its price or residual moves far from its own recent history, a position is taken in anticipation of a return toward that history. Classic technical tools — Bollinger Bands, RSI, moving-average envelopes — are practical expressions of this idea.`,
+      `In quantitative settings the same logic is applied to regression residuals, valuation ratios, or any series that has been shown to be stationary. Position sizing often scales with the magnitude of the deviation and with an estimate of half-life.`,
+      `The central vulnerability is that the historical mean itself can drift or jump. A series that looked mean-reverting for years can enter a prolonged trend, turning every reversion trade into a losing fade of a new regime.`
+    ],
+    keyPoint: "Time-series mean reversion assumes the past distribution remains relevant. When the mean itself changes, the strategy systematically sells strength and buys weakness at the worst possible moments."
+  },
+  {
+    era: "Risk",
+    icon: "⚠️",
+    title: "Failure Modes: Regime Changes & Trending Markets",
+    desc: "The conditions under which mean-reversion strategies systematically lose money",
+    badge: { label: "Critical", style: "red" },
+    tags: [["regime change","red"], ["trending","amber"], ["breakdown","teal"], ["tail risk","slate"]],
+    data: [
+      { label: "Primary killers", value: "Structural breaks · sustained trends", color: "red" },
+      { label: "Symptom", value: "Residuals trend; half-life lengthens", color: "amber" },
+      { label: "Defence", value: "Stops · regime filters · diversification", color: "teal" },
+    ],
+    body: [
+      `Mean-reversion strategies fail when the assumed equilibrium ceases to exist or when the market enters a persistent trend. Structural breaks (mergers, policy changes, index events, shifts in business models) can turn a previously stationary residual into a random walk or a new trend. Strong directional markets can keep “cheap” assets cheap and “expensive” assets expensive for far longer than historical half-lives suggest.`,
+      `In these regimes every reversion trade becomes a counter-trend position that accumulates losses. Crowded mean-reversion books can experience simultaneous, correlated drawdowns when the regime shifts, amplifying the damage.`,
+      `Robust practice includes hard stop-losses, time-based exits, continuous monitoring of residual diagnostics and realised half-life, volatility- or trend-based regime filters, and diversification across many weakly related relationships rather than concentration in a few historically strong ones.`
+    ],
+    keyPoint: "Mean reversion is a conditional edge. The most important risk-management skill is recognising — quickly and unemotionally — when the condition no longer holds."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 9.3 Statistical Arbitrage</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 9 · Section 9.3</div>
+      <h1 class="book-title">Statistical<br><em>Arbitrage</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Pairs · baskets · mean-reversion · dynamic hedges · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>9.3 Statistical Arbitrage</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Definition",
+    icon: "📐",
+    title: "Capturing Statistical Price Discrepancies",
+    desc: "Exploiting temporary deviations from statistically estimated equilibrium relationships",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["stat arb","teal"], ["mean reversion","amber"], ["relative value",""], ["market neutral","slate"]],
+    data: [
+      { label: "Core idea", value: "Prices deviate then revert to a statistical relationship", color: "teal" },
+      { label: "Horizon", value: "Typically days to weeks", color: "" },
+      { label: "Edge source", value: "Temporary mispricings + convergence", color: "amber" },
+    ],
+    body: [
+      `Statistical arbitrage (stat arb) seeks to profit from temporary deviations of prices from relationships that have been estimated statistically and are expected to reassert themselves. Unlike pure riskless arbitrage, the edge is probabilistic: the relationship holds on average, but there is no guarantee of convergence on any single trade.`,
+      `The approach is typically market-neutral or beta-neutral, focusing on relative rather than absolute price movements. Classic implementations include pairs trading, basket trading, and more complex multi-asset mean-reversion strategies. Success depends on the stability of the underlying statistical relationship, accurate estimation of mean-reversion dynamics, and disciplined risk management when the relationship breaks.`,
+      `Modern stat arb sits at the intersection of econometrics, market microstructure, and portfolio construction. It is capacity-constrained, sensitive to transaction costs, and vulnerable to regime changes that invalidate historical relationships.`
+    ],
+    keyPoint: "Statistical arbitrage is not risk-free arbitrage. It is the systematic harvesting of mean-reverting residual risk under the assumption that estimated relationships remain sufficiently stable."
+  },
+  {
+    era: "Classic",
+    icon: "🔗",
+    title: "Pairs Trading: Cointegrated Pairs",
+    desc: "Trading the spread between two assets that share a long-run equilibrium",
+    badge: { label: "Core", style: "teal" },
+    tags: [["pairs trading","teal"], ["cointegration","amber"], ["spread",""], ["Engle-Granger","slate"]],
+    data: [
+      { label: "Key test", value: "Cointegration (not just correlation)", color: "teal" },
+      { label: "Spread", value: "Residual of cointegrating regression", color: "" },
+      { label: "Trade", value: "Long undervalued / short overvalued leg", color: "amber" },
+    ],
+    body: [
+      `Pairs trading is the prototypical statistical arbitrage strategy. Two assets are selected because they are cointegrated: a linear combination of their prices is stationary. When the spread (the residual from the cointegrating relationship) deviates significantly from its mean, the trader takes a long position in the relatively cheap leg and a short position in the relatively expensive leg, expecting the spread to revert.`,
+      `Cointegration is stronger than simple correlation. Correlated assets can drift apart indefinitely; cointegrated assets are tethered by an equilibrium relationship. Formal tests (Engle–Granger, Johansen) are used to identify candidate pairs, after which the spread’s mean-reversion properties are examined.`,
+      `Practical pairs trading requires careful attention to hedge ratios, transaction costs, corporate actions, and the risk that the cointegrating relationship itself breaks down — the single largest source of pairs-trading losses.`
+    ],
+    keyPoint: "Correlation is not enough. Cointegration supplies the economic and statistical foundation that makes the spread a meaningful, mean-reverting object rather than a random walk."
+  },
+  {
+    era: "Extension",
+    icon: "🧺",
+    title: "Basket Trading",
+    desc: "Generalising pairs trading to a portfolio of assets versus another portfolio or factor",
+    badge: { label: "Core", style: "teal" },
+    tags: [["basket","teal"], ["multi-asset","amber"], ["residual",""], ["PCA","slate"]],
+    data: [
+      { label: "Structure", value: "Long basket vs short basket / factor", color: "teal" },
+      { label: "Construction", value: "Regression, PCA, or optimisation", color: "" },
+      { label: "Advantage", value: "Diversification of idiosyncratic risk", color: "amber" },
+    ],
+    body: [
+      `Basket trading extends the pairs concept to richer sets of assets. A long basket is formed against a short basket (or against a factor portfolio) so that the residual spread is stationary and mean-reverting. Construction methods include multivariate cointegration, principal-component analysis, or constrained optimisation that minimises residual variance subject to dollar or beta neutrality.`,
+      `Baskets reduce the impact of any single name’s idiosyncratic shock and can capture more complex relative-value relationships (sector vs sector, industry vs industry, or a custom long-short portfolio versus its residual). The cost is greater complexity in estimation, higher turnover potential, and more demanding risk management.`,
+      `As with pairs, the critical assumption remains that the estimated relationship continues to hold. Basket strategies are particularly exposed to structural breaks, regime shifts, and sudden changes in factor loadings.`
+    ],
+    keyPoint: "Baskets increase breadth and diversification but also multiply estimation risk. The quality of the residual process, not the number of names, determines the strategy’s viability."
+  },
+  {
+    era: "Relative Value",
+    icon: "⚖️",
+    title: "ETF vs. Basket Arbitrage",
+    desc: "Exploiting temporary discrepancies between an ETF and its underlying or a synthetic basket",
+    badge: { label: "Practical", style: "amber" },
+    tags: [["ETF arb","amber"], ["creation/redemption","teal"], ["NAV",""], ["liquidity","slate"]],
+    data: [
+      { label: "Classic form", value: "ETF price vs NAV / underlying basket", color: "teal" },
+      { label: "Mechanism", value: "Creation / redemption or cash-and-carry", color: "" },
+      { label: "Friction", value: "Fees, timing, liquidity, borrow", color: "red" },
+    ],
+    body: [
+      `ETF arbitrage exploits deviations between an ETF’s market price and the value of its underlying basket (or NAV). Authorised participants can create or redeem shares to enforce convergence, but temporary dislocations still appear because of liquidity differences, stale pricing, or order-flow imbalances.`,
+      `A related strategy trades an ETF against a custom basket that replicates or approximates its exposures when the official creation basket is expensive or constrained. Lead-lag effects between the ETF and its constituents, or between related ETFs, also create short-horizon opportunities.`,
+      `True arbitrage is limited by creation/redemption fees, timing risk, borrow availability, and the fact that many modern ETFs are far more liquid than their underlying holdings. What remains is typically a statistical, not riskless, edge.`
+    ],
+    keyPoint: "ETF–basket relationships are among the most tightly enforced in markets, yet residual statistical opportunities persist around liquidity events, stale NAVs, and microstructure frictions."
+  },
+  {
+    era: "Dynamics",
+    icon: "⏱️",
+    title: "Lead-Lag Relationships",
+    desc: "Exploiting delayed price discovery between related assets or markets",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["lead-lag","amber"], ["price discovery","teal"], ["cross-asset",""], ["high-frequency","slate"]],
+    data: [
+      { label: "Classic examples", value: "Index futures vs cash · large vs small caps", color: "teal" },
+      { label: "Horizon", value: "Seconds to days depending on friction", color: "" },
+      { label: "Edge decay", value: "Rapid as information efficiency rises", color: "red" },
+    ],
+    body: [
+      `Lead-lag relationships arise when one asset or market incorporates information faster than another. Index futures often lead the cash equity market; large-capitalisation stocks can lead smaller peers; liquid ETFs can lead less-liquid single names or related products.`,
+      `Statistical arbitrageurs estimate the lag structure (via cross-correlations, transfer entropy, or more sophisticated causality measures) and trade the lagging leg in the direction implied by the leading leg. The edge is inherently short-lived and highly sensitive to latency, transaction costs, and competition.`,
+      `As markets become more efficient and participants faster, many traditional lead-lag edges compress or migrate to higher frequencies. Persistent lead-lag opportunities usually reflect structural frictions — differing trading hours, liquidity tiers, or information-access asymmetries — rather than pure inefficiency.`
+    ],
+    keyPoint: "Lead-lag is a pure expression of differential information incorporation. It rewards speed and precise estimation, but the half-life of the edge is typically short and shrinking."
+  },
+  {
+    era: "Estimation",
+    icon: "📉",
+    title: "Mean-Reversion Speed Estimation",
+    desc: "Quantifying how quickly a spread is expected to return to equilibrium",
+    badge: { label: "Core", style: "teal" },
+    tags: [["half-life","teal"], ["mean reversion","amber"], ["OU process",""], ["speed","slate"]],
+    data: [
+      { label: "Key parameter", value: "Mean-reversion speed (κ) or half-life", color: "teal" },
+      { label: "Implication", value: "Holding period & expected return per trade", color: "" },
+      { label: "Risk", value: "Over-estimating speed inflates expected IR", color: "red" },
+    ],
+    body: [
+      `The economic value of a mean-reverting spread depends critically on how fast it reverts. Speed is commonly summarised by the half-life — the expected time for the spread to move halfway back to its mean — or by the mean-reversion parameter κ in an Ornstein–Uhlenbeck process.`,
+      `Estimation is performed on historical residuals after the cointegrating (or hedge) relationship has been fitted. Faster mean reversion supports higher turnover and, all else equal, higher information ratios; slower mean reversion requires greater patience and larger deviation thresholds to overcome costs.`,
+      `Speed estimates are noisy and regime-dependent. A spread that mean-reverted quickly in a calm market may become sticky or even trending when volatility rises or the underlying relationship weakens. Continuous re-estimation and conservative haircuts on historical speed are prudent.`
+    ],
+    keyPoint: "Mean-reversion speed turns a statistical relationship into a trading horizon and an expected return. Mis-estimating it is one of the most common sources of disappointing live performance."
+  },
+  {
+    era: "Modeling",
+    icon: "📊",
+    title: "OU vs. GBM Spread Modeling",
+    desc: "Choosing the right stochastic process for the residual spread",
+    badge: { label: "Technical", style: "slate" },
+    tags: [["Ornstein-Uhlenbeck","teal"], ["GBM","amber"], ["stationary",""], ["model risk","red"]],
+    data: [
+      { label: "OU process", value: "Mean-reverting · stationary", color: "teal" },
+      { label: "GBM", value: "Geometric Brownian motion · non-stationary", color: "amber" },
+      { label: "Choice", value: "Driven by statistical properties of residual", color: "" },
+    ],
+    body: [
+      `The Ornstein–Uhlenbeck (OU) process is the workhorse model for mean-reverting spreads: it is Gaussian, stationary, and possesses an explicit mean-reversion speed and long-run mean. Most pairs and residual strategies are designed under an OU assumption.`,
+      `Geometric Brownian motion (GBM) is appropriate when the residual itself behaves like a non-stationary price process — for example, when the relationship is multiplicative or when log-spreads are used. Treating a non-stationary residual as OU produces over-optimistic convergence probabilities and understated risk.`,
+      `Model selection should be data-driven: formal stationarity tests, residual diagnostics, and out-of-sample forecast performance. Many live blow-ups in statistical arbitrage trace back to forcing an OU model onto a process that had become closer to a random walk.`
+    ],
+    keyPoint: "The choice between OU and GBM is not aesthetic — it determines the entire risk and return profile of the strategy. Fit the process to the residual, not the residual to the process."
+  },
+  {
+    era: "Dynamic",
+    icon: "📡",
+    title: "Kalman Filter for Dynamic Hedges",
+    desc: "Continuously updating the hedge ratio as the relationship evolves",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["Kalman filter","amber"], ["dynamic hedge","teal"], ["state space",""], ["adaptive","slate"]],
+    data: [
+      { label: "Purpose", value: "Time-varying hedge ratio estimation", color: "teal" },
+      { label: "Advantage", value: "Adapts to structural drift", color: "" },
+      { label: "Cost", value: "More parameters · potential overfitting", color: "red" },
+    ],
+    body: [
+      `Static hedge ratios estimated over a fixed window become stale when the relative behaviour of the legs changes. The Kalman filter provides a principled, recursive way to update the hedge ratio (and optionally the mean and variance of the residual) as new price observations arrive.`,
+      `In state-space form, the unobservable true hedge ratio is treated as a latent state that evolves slowly, while the observed spread supplies noisy measurements. The filter optimally balances prior beliefs against new information, producing a smooth, adaptive hedge.`,
+      `Kalman-based approaches improve performance when relationships drift gradually, but they introduce additional degrees of freedom and can overfit noise if process and measurement variances are poorly calibrated. Robustness checks and conservative parameterisation are essential.`
+    ],
+    keyPoint: "A dynamic hedge keeps the residual cleaner for longer, but only if the filter itself is well-specified. Bad Kalman tuning can manufacture apparent mean reversion that does not exist."
+  },
+  {
+    era: "Execution",
+    icon: "🎯",
+    title: "Entry / Exit Z-Score Thresholds",
+    desc: "Rule-based triggers for opening and closing mean-reversion trades",
+    badge: { label: "Practical", style: "teal" },
+    tags: [["z-score","teal"], ["thresholds","amber"], ["entry/exit",""], ["discipline","slate"]],
+    data: [
+      { label: "Entry", value: "Typically |z| > 1.5 – 2.5", color: "teal" },
+      { label: "Exit", value: "z ≈ 0 or smaller opposite threshold", color: "" },
+      { label: "Stop", value: "Hard |z| or time-based stop", color: "red" },
+    ],
+    body: [
+      `Once a residual series is obtained, trades are commonly triggered by z-score thresholds: the current deviation of the spread from its rolling mean, scaled by its rolling standard deviation. Entry occurs when the absolute z-score exceeds a chosen level; exit occurs when the z-score reverts toward zero or crosses a tighter opposite threshold.`,
+      `Threshold choice balances frequency against expected edge per trade. Tighter thresholds generate more trades but smaller average moves and higher relative costs; wider thresholds produce fewer, larger moves but greater risk of non-reversion. Many practitioners also impose time stops or maximum adverse excursion limits.`,
+      `Z-score rules are simple, transparent, and robust, yet they inherit all the weaknesses of the underlying residual estimate. Changing volatility regimes can make a fixed threshold too aggressive or too conservative; adaptive or volatility-scaled thresholds are sometimes used in response.`
+    ],
+    keyPoint: "Z-score thresholds translate a continuous residual process into discrete trading decisions. Their effectiveness is only as good as the quality and stability of the residual itself."
+  },
+  {
+    era: "Risk",
+    icon: "⚠️",
+    title: "Cointegration Breakdown",
+    desc: "The fundamental risk that the estimated equilibrium relationship ceases to hold",
+    badge: { label: "Critical", style: "red" },
+    tags: [["breakdown","red"], ["regime shift","amber"], ["structural break","teal"], ["tail risk","slate"]],
+    data: [
+      { label: "Cause", value: "Structural change · regime shift · news", color: "red" },
+      { label: "Symptom", value: "Spread trends instead of reverts", color: "amber" },
+      { label: "Defence", value: "Stops · monitoring · diversification", color: "teal" },
+    ],
+    body: [
+      `The single largest risk in statistical arbitrage is that the cointegrating (or other statistical) relationship that justified the trade ceases to exist. Mergers, regulatory changes, shifts in business models, index reconstitutions, or macroeconomic regime changes can turn a previously stationary spread into a trending residual.`,
+      `When breakdown occurs, the mean-reversion assumption fails and losses can accumulate rapidly, especially if the position is leveraged or if multiple correlated pairs break simultaneously. Historical cointegration tests offer no protection against future structural breaks.`,
+      `Mitigation includes strict position sizing, hard stop-losses on the spread or on calendar time, continuous monitoring of residual diagnostics, rapid reduction of exposure when mean-reversion speed deteriorates, and diversification across many weakly correlated relationships rather than concentration in a few “best” pairs.`
+    ],
+    keyPoint: "Cointegration is a historical statement, not a guarantee. Every statistical arbitrage position carries the tail risk that the relationship on which it is predicated simply ends."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
