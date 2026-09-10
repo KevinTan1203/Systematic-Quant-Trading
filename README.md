@@ -1,123 +1,149 @@
 # Systematic Quant Trading
 
-> A curated repository of concepts, research, and projects in systematic trading and quantitative finance.
+> A structured learning path and research workspace for quantitative finance, systematic trading, and quantitative development.
 
----
+This repository brings together market knowledge, mathematical foundations, research methods, trading-system implementation, interactive visualisations, and hands-on projects. It is designed to make the full journey visible: understand the market, formulate a hypothesis, build a signal, construct a portfolio, test it honestly, and account for execution and risk.
 
-## Table of Contents
+The material is actively evolving. Some areas are polished reference material, while others are working notes, experiments, notebooks, and research in progress.
 
-- [Overview](#overview)
-- [What This Repository Covers](#what-this-repository-covers)
-  - [Core Quantitative & Financial Concepts](#1-core-quantitative--financial-concepts)
-  - [Systematic Trading Strategies](#2-systematic-trading-strategies)
-  - [Research & Experimentation](#3-research--experimentation)
-  - [Projects & Case Studies](#4-projects--case-studies)
-  - [Tooling & Implementation](#5-tooling--implementation)
-- [Philosophy](#philosophy)
+## Contents
+
+- [Repository at a Glance](#repository-at-a-glance)
+- [Suggested Learning Path](#suggested-learning-path)
+- [Repository Map](#repository-map)
+- [Getting Started](#getting-started)
+- [Research Workflow](#research-workflow)
+- [Technology](#technology)
+- [Contributing](#contributing)
 - [Disclaimer](#disclaimer)
 
----
+## Repository at a Glance
 
-## Overview
+| Area | What you will find |
+| --- | --- |
+| Foundations | Financial markets, mathematics, probability, statistics, Python, and data handling |
+| Core quant finance | Returns, portfolio mechanics, risk, regression, time series, derivatives, volatility, macroeconomics, and optimisation |
+| Quantitative research | Alpha research, factor models, statistical arbitrage, portfolio construction, backtesting, validation, machine learning, and execution |
+| Quantitative development | Software engineering, data engineering, APIs, databases, testing, research infrastructure, and performance engineering |
+| Advanced trading | Systematic trading, market making, high-frequency trading, execution, volatility, crypto, FX, options, futures, and cross-asset research |
+| Advanced models | Stochastic processes and calculus, Monte Carlo, state-space and hidden Markov models, Kalman filters, extreme value theory, copulas, and advanced machine learning |
+| Projects | Beginner through expert projects using notebooks, datasets, reports, and backtesting workflows |
+| Visualisations | Browser-based simulators for pricing, risk, portfolios, market microstructure, execution, and backtesting |
+| Research and reference | Papers, research notes, literature reviews, cheat sheets, formulas, glossaries, handbooks, and interview preparation |
 
-This repository is a structured knowledge base and project hub dedicated to **systematic trading** and **quantitative finance**. It brings together foundational concepts, practical implementations, research workflows, and end-to-end trading projects, with the goal of bridging theory and real-world application.
+## Suggested Learning Path
 
-The content here reflects both **learning-in-progress** and **hands-on experimentation**. It is designed to demonstrate how quantitative ideas are transformed into systematic, testable, and repeatable trading strategies.
+The numbered folders form a progression, but they can also be used as independent reference areas.
 
----
+1. Start with [Foundations](01_Foundations/README.md) to build market, mathematical, statistical, Python, and data fluency.
+2. Study [Core Quant Finance](02_Core_Quant_Finance/README.md) to connect those foundations to portfolio mathematics, risk, derivatives, volatility, and time series.
+3. Move into [Quantitative Research](03_Quantitative_Research/README.md) and follow the research lifecycle from alpha discovery through validation and execution.
+4. Use [Quantitative Development](04_Quantitative_Development/README.md) to make research code testable, reproducible, observable, and efficient.
+5. Explore [Advanced Trading](05_Advanced_Trading/README.md) and [Advanced Models](06_Advanced_Models/README.md) once the core workflow is familiar.
+6. Consolidate the material through [Projects](07_Projects/README.md), beginning with the beginner track and progressing by difficulty.
+7. Build intuition with [Interactive Visualisations](08_Interactive_Visualisations/README.md), then use [Research](09_Research/README.md), [Interview Preparation](10_Interview_Preparation/README.md), and [Reference](11_Reference/README.md) for deeper study and quick lookup.
 
-## What This Repository Covers
+## Repository Map
 
-### 1. Core Quantitative & Financial Concepts
+### Foundations and Core Finance
 
-This section focuses on building strong foundations, including:
+- [01 Foundations](01_Foundations/README.md): financial markets and instruments, market mechanics, mathematics, probability and statistics, Python, programming, macro context, and data handling.
+- [02 Core Quant Finance](02_Core_Quant_Finance/README.md): returns, portfolio mechanics, risk, regression, time series, derivatives, volatility, macroeconomics, optimisation, and model risk.
 
-- Market microstructure and price formation
-- Returns, risk, and volatility modeling
-- Statistical concepts (distributions, correlation, stationarity)
-- Time-series analysis
-- Portfolio construction and risk management principles
+### Research and Implementation
 
-These concepts serve as the building blocks for all research and strategies in this repository.
+- [03 Quantitative Research](03_Quantitative_Research/README.md): signal and factor research, statistical arbitrage, portfolio construction, backtesting, validation, machine learning, execution, and research data.
+- [04 Quantitative Development](04_Quantitative_Development/README.md): engineering practices that support reliable research and production-oriented trading systems.
 
----
+### Trading and Models
 
-### 2. Systematic Trading Strategies
+- [05 Advanced Trading](05_Advanced_Trading/README.md): systematic strategies, market making, high-frequency trading, execution, volatility trading, crypto, FX, options and futures, and cross-asset approaches.
+- [06 Advanced Models](06_Advanced_Models/README.md): stochastic modelling, simulation, regime and state-space models, tail-risk methods, dependence modelling, and machine learning.
 
-A collection of **rule-based and data-driven strategies**, such as:
+### Applied Work and Study Tools
 
-- Trend-following and momentum strategies
-- Mean-reversion strategies
-- Volatility-based and regime-aware strategies
-- Signal generation using technical and statistical indicators
-- Long/short portfolio construction
+- [07 Projects](07_Projects/README.md): end-to-end projects organised into beginner, intermediate, advanced, and expert tracks. The beginner track includes momentum, pairs trading, portfolio optimisation, event-based strategies, risk surfaces, and OHLCV validation.
+- [08 Interactive Visualisations](08_Interactive_Visualisations/README.md): self-contained HTML tools covering Black-Scholes and binomial pricing, Greeks, implied volatility, portfolio diversification, factor exposure, stochastic processes, regime switching, order books, market impact, margin, and execution.
+- [09 Research](09_Research/README.md): papers, research notes, and literature reviews.
+- [10 Interview Preparation](10_Interview_Preparation/README.md): preparation for quantitative research, development, trading, probability, mental maths, market microstructure, and resume discussions.
+- [11 Reference](11_Reference/README.md): cheat sheets, formula sheets, glossaries, and handbooks for quick lookup.
 
-Each strategy emphasizes:
+## Getting Started
 
-- Clear hypothesis formulation
-- Explicit trading rules
-- Position sizing and risk constraints
-- Objective performance evaluation
+### Clone the repository
 
----
+```bash
+git clone <repository-url>
+cd Systematic-Quant-Trading
+```
 
-### 3. Research & Experimentation
+### Conda environment
 
-This repository also acts as a **quantitative research workspace**, covering:
+The checked-in Conda file is the most complete environment specification:
 
-- Feature engineering and signal research
-- Backtesting methodologies and common pitfalls
-- Rolling window analysis and EWMA techniques
-- Event-driven analysis (e.g. macroeconomic releases)
-- Robustness checks and sensitivity analysis
+```bash
+conda env create -f environment.yml
+conda activate systematic_quant_finance
+```
 
-The focus is on developing **research discipline** and minimizing biases such as overfitting and look-ahead bias.
+### Python virtual environment
 
----
+For a lighter pip-based setup:
 
-### 4. Projects & Case Studies
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
 
-Included are **end-to-end quant and systematic trading projects**, typically involving:
+The project targets Python 3.10 or newer. JupyterLab is included in the dependency set for notebook-based work.
 
-- Data sourcing and preprocessing
-- Exploratory data analysis (EDA)
-- Strategy design and implementation
-- Backtesting and performance attribution
-- Risk metrics and drawdown analysis
-- Clear documentation of assumptions and limitations
+### Open the interactive tools
 
-These projects are shared for **learning, discussion, and shared understanding**.
+The files in [08 Interactive Visualisations](08_Interactive_Visualisations/README.md) are standalone HTML applications. Open an HTML file directly in a modern browser, or serve the repository locally if your browser blocks local assets:
 
----
+```bash
+python -m http.server 8000
+```
 
-### 5. Tooling & Implementation
+Then visit `http://localhost:8000/08_Interactive_Visualisations/`.
 
-Where relevant, projects make use of:
+## Research Workflow
 
-- **Python** for research and strategy development
-- Common quantitative libraries (`NumPy`, `pandas`, `matplotlib`, etc.)
-- Modular, readable, and reproducible code structures
-- Clear separation between data, signals, and execution logic
+The repository is organised around a repeatable research loop:
 
-The emphasis is on **clarity, reproducibility, and extensibility** rather than black-box approaches.
+1. **Understand the market:** define the instrument, participants, mechanics, liquidity, and risks.
+2. **State a hypothesis:** describe the economic or behavioural rationale before looking for a favourable result.
+3. **Prepare data:** document sources, frequency, timestamps, survivorship assumptions, corporate actions, and missing data.
+4. **Build the signal:** keep feature generation, signal logic, portfolio construction, and execution assumptions distinct.
+5. **Backtest honestly:** include transaction costs, slippage, turnover, position limits, and realistic information timing.
+6. **Validate robustness:** use out-of-sample tests, walk-forward analysis, sensitivity checks, and stress scenarios.
+7. **Review risk and implementation:** evaluate drawdowns, concentration, liquidity, model risk, and operational failure modes.
+8. **Document the result:** record assumptions, limitations, metrics, and what would invalidate the idea.
 
----
+Performance numbers without this context are not sufficient evidence of a tradable strategy.
 
-## Philosophy
+## Technology
 
-The guiding principles behind this repository are:
+The main stack is Python and the scientific Python ecosystem:
 
-- **Systematic over discretionary** – rules before intuition
-- **Research before results** – process matters more than outcomes
-- **Risk-aware thinking** – returns are meaningless without context
-- **Continuous learning** – strategies evolve as markets change
+- **Research and data:** NumPy, pandas, SciPy, pandas-datareader-compatible workflows, PyArrow, and yfinance
+- **Statistics and modelling:** statsmodels, scikit-learn, XGBoost, LightGBM, ARCH, and CVXPY
+- **Visualisation:** matplotlib, seaborn, and Plotly
+- **Backtesting:** backtesting.py and vectorbt
+- **Development:** JupyterLab, pytest, Black, Ruff, and pre-commit
 
----
+See [requirements.txt](requirements.txt), [environment.yml](environment.yml), and [pyproject.toml](pyproject.toml) for the maintained dependency and tooling configuration.
+
+## Contributing
+
+Contributions that improve accuracy, clarity, reproducibility, navigation, or practical usefulness are welcome. Useful additions include new notebooks, worked examples, visualisations, references, tests, interview material, and corrections to existing content.
+
+Before contributing, read [CONTRIBUTING.md](CONTRIBUTING.md). Please keep research assumptions explicit, avoid committing secrets or unnecessarily large generated files, and include documentation for new datasets or experiments.
 
 ## Disclaimer
 
-All content in this repository is for **educational and research purposes only**. Nothing here constitutes financial advice, investment recommendations, or an offer to trade any financial instrument.
+All content is provided for educational and research purposes only. Nothing in this repository constitutes financial advice, an investment recommendation, or an offer to buy or sell any financial instrument. Backtested or simulated results are hypothetical and do not guarantee future performance.
 
----
-
-_This repository is a living body of work. Ideas, strategies, and implementations will continue to evolve over time._
+_This is a living body of work. Concepts, experiments, and implementations will continue to evolve._
