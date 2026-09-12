@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 11.7 Drawdown Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 11 · Section 11.7</div>
+      <h1 class="book-title">Drawdown<br><em>Analysis</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Peak-to-trough · duration · distribution · CDaR · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>11.7 Drawdown Analysis</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Definition",
+    icon: "📉",
+    title: "Maximum Drawdown Calculation",
+    desc: "The largest peak-to-trough percentage decline in the equity curve over a specified horizon",
+    badge: { label: "Core", style: "red" },
+    tags: [["max DD","red"], ["peak-to-trough","amber"], ["high-water mark","teal"], ["path risk",""]],
+    data: [
+      { label: "Formula", value: "max_t (peak_t − equity_t) / peak_t", color: "red" },
+      { label: "Peak", value: "Running maximum of equity", color: "teal" },
+      { label: "Unit", value: "Percentage of capital", color: "amber" },
+    ],
+    body: [
+      `Maximum drawdown (MDD) is computed by tracking the running high-water mark of the portfolio equity curve and, at each point, recording the percentage decline from that peak to the current equity. The largest of these declines is the maximum drawdown. Formally, if \(E_t\) is equity at time \(t\) and \(M_t = \max_{s\le t} E_s\), then \(\text{DD}_t = (M_t - E_t)/M_t\) and \(\text{MDD} = \max_t \text{DD}_t\).`,
+      `The calculation is path-dependent and non-linear: two return series with identical volatility and mean can produce very different MDDs depending on the order of gains and losses. It is also sample-dependent; extending the history can only increase (or leave unchanged) the observed MDD.`,
+      `Practical implementations must decide whether to use end-of-day, intra-day or high-water-mark-within-bar equity, and whether external cash flows are included. For strategy comparison the same convention must be applied uniformly.`
+    ],
+    keyPoint: "Maximum drawdown is the single most visible scar on an equity curve. Its calculation is elementary, yet its economic and psychological importance routinely exceeds that of volatility."
+  },
+  {
+    era: "Time",
+    icon: "⏱️",
+    title: "Drawdown Duration",
+    desc: "The length of time the portfolio remains below a prior peak, from the onset of a decline until a new high-water mark is achieved",
+    badge: { label: "Path", style: "amber" },
+    tags: [["duration","amber"], ["time underwater","teal"], ["recovery time","slate"], ["patience",""]],
+    data: [
+      { label: "Start", value: "First breach of prior peak", color: "amber" },
+      { label: "End", value: "Return to or above that peak", color: "teal" },
+      { label: "Stats", value: "Max, average, median duration", color: "slate" },
+    ],
+    body: [
+      `Drawdown duration measures the temporal extent of capital impairment. A deep but brief drawdown may be tolerable; a moderate drawdown that lasts years can be fatal to investor retention and to the manager’s own decision-making. Duration is therefore a first-class risk statistic alongside depth.`,
+      `Commonly reported figures include the duration of the maximum-drawdown episode, the longest time spent underwater, and the average or median duration across all drawdown events. Some analysts also track “time to recovery” separately from “time to trough.”`,
+      `In live risk management, strategies that historically required multi-year recoveries face higher capital haircuts or lower leverage limits, regardless of their asymptotic Sharpe ratio.`
+    ],
+    keyPoint: "Duration converts drawdown from a static percentage into a lived experience of time. Capital that is impaired for years is capital that may never be allowed to compound."
+  },
+  {
+    era: "Visual",
+    icon: "🌊",
+    title: "Underwater Equity Curve",
+    desc: "A time-series plot of the current percentage drawdown from the running high-water mark, visualising the continuous path of capital impairment",
+    badge: { label: "Diagnostic", style: "teal" },
+    tags: [["underwater curve","teal"], ["drawdown series","amber"], ["visualization","slate"], ["pain path",""]],
+    data: [
+      { label: "Y-axis", value: "Current DD % (≤ 0)", color: "teal" },
+      { label: "X-axis", value: "Time", color: "" },
+      { label: "Insight", value: "Depth, duration & clustering", color: "amber" },
+    ],
+    body: [
+      `The underwater (or drawdown) equity curve plots \(\text{DD}_t = (M_t - E_t)/M_t\) (usually as a negative number) against time. Periods at zero indicate new highs; excursions below zero show the depth and persistence of losses relative to the peak. The chart makes clustering of drawdowns, slow recoveries and the relative severity of different episodes immediately visible.`,
+      `It is one of the most informative single diagnostics a risk or allocation committee can examine. Two strategies with identical MDD can look completely different once their underwater paths are overlaid: one may suffer a single deep V-shaped event, the other a series of prolonged, moderate underwater periods.`,
+      `Best practice is to display the underwater curve alongside the equity curve itself and to annotate the start, trough and recovery dates of the major episodes.`
+    ],
+    keyPoint: "The underwater equity curve turns an abstract maximum into a continuous narrative of pain. It is the visual language in which drawdown risk is most clearly communicated."
+  },
+  {
+    era: "Stats",
+    icon: "📊",
+    title: "Drawdown Distribution",
+    desc: "The empirical distribution of all peak-to-trough declines (and optionally their durations), moving beyond the single maximum observation",
+    badge: { label: "Distribution", style: "slate" },
+    tags: [["DD distribution","slate"], ["histogram","teal"], ["quantiles","amber"], ["tail risk",""]],
+    data: [
+      { label: "Objects", value: "Every completed drawdown episode", color: "slate" },
+      { label: "Summaries", value: "Mean, median, 95th pct, max", color: "teal" },
+      { label: "Value", value: "Stability vs. single MDD", color: "amber" },
+    ],
+    body: [
+      `Instead of focusing solely on the worst drawdown, one can collect every distinct peak-to-trough episode and examine their distribution. Summary statistics (mean, median, inter-quartile range, selected quantiles) and a histogram or kernel density give a far richer picture of the strategy’s typical and extreme capital impairment.`,
+      `The distribution approach reduces the sampling noise that plagues a single MDD figure and reveals whether large drawdowns are rare outliers or a recurring feature of the process. Joint distributions of depth and duration further illuminate the nature of the risk.`,
+      `In research, strategies whose drawdown distribution is heavy-tailed or shows strong clustering warrant higher capital buffers even when the historical maximum appears moderate.`
+    ],
+    keyPoint: "The drawdown distribution replaces a single noisy extreme with a full probabilistic description. It is the natural next step once maximum drawdown has been computed."
+  },
+  {
+    era: "Estimation",
+    icon: "🔮",
+    title: "VaR-Implied Max Drawdown Estimation",
+    desc: "Analytical or semi-analytical approximations that translate a Value-at-Risk or volatility figure into an expected or quantile maximum drawdown over a horizon",
+    badge: { label: "Model", style: "amber" },
+    tags: [["VaR","amber"], ["implied MDD","teal"], ["analytical approx","slate"], ["Magdon-Ismail",""]],
+    data: [
+      { label: "Input", value: "σ, μ, horizon, confidence", color: "amber" },
+      { label: "Output", value: "Expected or quantile MDD", color: "teal" },
+      { label: "Use", value: "Forward-looking risk budgets", color: "slate" },
+    ],
+    body: [
+      `When only volatility or VaR is known, or when the historical sample is too short to observe extreme drawdowns reliably, one can still form an estimate of expected or high-quantile maximum drawdown. For Brownian motion with drift there exist closed-form and series approximations (e.g., work descending from Magdon-Ismail et al.) that map \(\mu\), \(\sigma\) and horizon \(T\) into \(\mathbb{E}[\text{MDD}]\) or into quantiles of MDD.`,
+      `Simpler heuristics relate MDD to VaR by scaling factors that depend on the horizon and on the assumed return process. These estimates are useful for setting forward-looking risk limits and for stress-testing strategies whose live history is still short.`,
+      `All such mappings rest on distributional assumptions; fat tails, volatility clustering and serial correlation generally increase true MDD relative to the Gaussian benchmark. Conservative adjustments or Monte-Carlo methods under more realistic processes are therefore recommended.`
+    ],
+    keyPoint: "VaR-implied drawdown estimates convert a familiar risk number into a path-risk number. They are indispensable for forward-looking capital allocation when historical MDD is not yet informative."
+  },
+  {
+    era: "Quantile",
+    icon: "📐",
+    title: "Drawdown at Different Confidence Levels",
+    desc: "Quantiles of the drawdown distribution (or of simulated maximum drawdowns) expressed at conventional confidence levels such as 95 % or 99 %",
+    badge: { label: "Quantile", style: "teal" },
+    tags: [["DD quantile","teal"], ["95 % / 99 %","amber"], ["stress","red"], ["capital",""]],
+    data: [
+      { label: "Example", value: "95 % DD = depth exceeded only 5 %", color: "teal" },
+      { label: "Method", value: "Historical or Monte-Carlo", color: "amber" },
+      { label: "Use", value: "Risk limits & capital buffers", color: "slate" },
+    ],
+    body: [
+      `Just as VaR reports a loss quantile, one can report drawdown quantiles: the depth that is exceeded in only 5 % or 1 % of historical (or simulated) paths. These figures answer the question “how bad can the drawdown be at a chosen confidence level?” rather than “what was the single worst episode in this particular sample?”`,
+      `Estimation proceeds either by collecting all historical drawdown episodes and reading off empirical quantiles, or by Monte-Carlo simulation of the strategy’s return process (parametric or bootstrap) and extracting the distribution of maximum drawdowns over a fixed horizon.`,
+      `Confidence-level drawdowns are particularly useful for setting institutional risk limits that must be expressed probabilistically rather than as hard historical maxima.`
+    ],
+    keyPoint: "Drawdown quantiles transform an ex-post extreme into an ex-ante probabilistic statement. They align path-risk measurement with the language of VaR and regulatory capital."
+  },
+  {
+    era: "Tail",
+    icon: "⚠️",
+    title: "Conditional Drawdown at Risk (CDaR)",
+    desc: "The expected value of drawdowns that exceed a given quantile threshold — the drawdown analogue of Conditional Value-at-Risk (CVaR)",
+    badge: { label: "Advanced", style: "red" },
+    tags: [["CDaR","red"], ["expected shortfall","teal"], ["drawdown CVaR","amber"], ["optimization",""]],
+    data: [
+      { label: "Definition", value: "E[DD | DD ≥ DD_α]", color: "red" },
+      { label: "Property", value: "Coherent, tail-sensitive", color: "teal" },
+      { label: "Use", value: "Portfolio optimisation constraints", color: "amber" },
+    ],
+    body: [
+      `Conditional Drawdown at Risk (CDaR), introduced by Chekhlov, Uryasev and Zabarankin, is the average of all drawdowns that exceed a specified quantile of the drawdown distribution. It is the natural path-risk counterpart of Conditional VaR / Expected Shortfall: it answers “when drawdowns are already in the tail, how deep are they on average?”`,
+      `CDaR is a coherent risk measure (under appropriate definitions) and can be optimised with linear or convex programming techniques, making it attractive as a constraint or objective inside portfolio construction. Because it averages the entire tail rather than looking at a single quantile, it is less brittle than pure maximum-drawdown constraints.`,
+      `In practice CDaR is estimated either from the historical underwater path or from Monte-Carlo scenarios. It is especially valuable when the investor’s utility is dominated by the severity of the worst episodes rather than by average volatility.`
+    ],
+    keyPoint: "CDaR is Expected Shortfall applied to the drawdown process. It supplies a coherent, optimisable, tail-focused measure of path risk that pure maximum drawdown cannot provide."
+  },
+  {
+    era: "Link",
+    icon: "🔗",
+    title: "Relationship between Sharpe and Max Drawdown",
+    desc: "Theoretical and empirical links showing that higher Sharpe ratios tend to produce shallower expected drawdowns, yet the mapping is far from deterministic",
+    badge: { label: "Theory", style: "slate" },
+    tags: [["Sharpe vs MDD","slate"], ["theoretical bound","teal"], ["sample variation","amber"], ["leverage",""]],
+    data: [
+      { label: "Tendency", value: "Higher SR → lower E[MDD]", color: "teal" },
+      { label: "Caveat", value: "Path dependence & fat tails", color: "red" },
+      { label: "Practical", value: "SR alone does not control MDD", color: "amber" },
+    ],
+    body: [
+      `For diffusion processes there exist analytic relationships between the Sharpe ratio, the investment horizon and the expected maximum drawdown. Intuitively, a higher drift-to-volatility ratio makes deep or prolonged drawdowns less probable, so expected MDD declines as Sharpe rises. Rough rules of thumb (e.g., expected MDD scaling with \(1/\text{SR}\) or \(1/\text{SR}^2\) under certain assumptions) appear in the literature.`,
+      `In real markets the relationship is noisy. Serial correlation, volatility clustering, jumps and changing leverage can produce large drawdowns even for strategies that exhibit respectable full-sample Sharpes. Conversely, a modest-Sharpe strategy with very stable paths can show remarkably controlled drawdowns.`,
+      `Consequently, risk management that relies solely on targeting a Sharpe ratio is incomplete. Explicit drawdown constraints, CDaR limits or leverage rules that respond to the underwater curve remain necessary even when the headline Sharpe is attractive.`
+    ],
+    keyPoint: "Sharpe and maximum drawdown are related but not interchangeable. A high Sharpe improves the odds of modest drawdowns; it does not guarantee them. Path-risk must still be measured and constrained directly."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

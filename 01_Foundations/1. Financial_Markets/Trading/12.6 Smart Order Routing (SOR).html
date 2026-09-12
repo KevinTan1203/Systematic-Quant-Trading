@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 12.6 Smart Order Routing (SOR)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 12 · Section 12.6</div>
+      <h1 class="book-title">Smart Order<br><em>Routing</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Sweep · best ex · venue choice · fees · dark/lit · latency · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>12.6 Smart Order Routing (SOR)</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Action",
+    icon: "🌊",
+    title: "Multi-Venue Sweep",
+    desc: "The simultaneous or rapid sequential dispatch of child orders across multiple lit and dark venues to capture displayed and hidden liquidity before it disappears",
+    badge: { label: "Core Tactic", style: "teal" },
+    tags: [["sweep","teal"], ["multi-venue","amber"], ["IOC","slate"], ["liquidity capture",""]],
+    data: [
+      { label: "Pattern", value: "Parallel or staggered IOC across venues", color: "teal" },
+      { label: "Goal", value: "Maximise fill before quote updates", color: "amber" },
+      { label: "Risk", value: "Overfill, residual, information leakage", color: "red" },
+    ],
+    body: [
+      `A multi-venue sweep is the classic aggressive SOR action: the router calculates available size at the touch (and sometimes deeper) across protected and unprotected markets, then fires immediate-or-cancel (IOC) or fill-or-kill child orders so that the total captured size approaches the parent order’s immediate need. In Reg NMS markets the sweep must respect protected quotes; in other regimes the logic is similar but unconstrained by intermarket trade-through rules.`,
+      `Sweeps can be simultaneous (all messages released at once) or staggered by expected latency so that arrivals at the matching engines are more nearly concurrent. The design must handle partial fills, residual quantity, and the possibility that the act of sweeping itself moves prices or alerts other algorithms.`,
+      `Effective sweeps combine accurate, low-latency market data, precise share allocation, and post-sweep cleanup logic that either completes the residual or returns to a passive posture.`
+    ],
+    keyPoint: "The multi-venue sweep is SOR’s primary tool for taking liquidity. Its quality is measured by fill rate, price achieved, and the footprint left for the residual order."
+  },
+  {
+    era: "Obligation",
+    icon: "⚖️",
+    title: "Best Execution Obligation",
+    desc: "The regulatory and fiduciary duty to seek the most favourable terms reasonably available for client orders, shaping the objectives and constraints of every SOR",
+    badge: { label: "Regulatory", style: "red" },
+    tags: [["best execution","red"], ["Reg NMS","amber"], ["MiFID","teal"], ["fiduciary",""]],
+    data: [
+      { label: "Core duty", value: "Most favourable terms reasonably available", color: "red" },
+      { label: "Factors", value: "Price, cost, speed, likelihood, size", color: "amber" },
+      { label: "Evidence", value: "Policies, reviews, TCA, routing tables", color: "teal" },
+    ],
+    body: [
+      `Best execution is both a legal obligation and a commercial necessity. In the United States, broker-dealers must seek the best reasonably available terms under the circumstances; Reg NMS adds specific order-protection and access rules. In Europe, MiFID II imposes explicit best-execution policies, venue disclosures and regular reviews. Parallel duties exist in most other major markets.`,
+      `For SOR design the obligation translates into a multi-factor objective: price improvement, explicit costs (fees, taxes), speed, likelihood of execution, and size. A router that systematically favours a high-rebate venue at the expense of fill quality or that ignores accessible midpoint liquidity can fail the duty even if every individual fill looks “on market.”`,
+      `Compliance is demonstrated through documented policies, periodic execution-quality reviews, transaction-cost analysis, and the ability to explain why a given route was chosen. SOR logic is therefore both an alpha and a regulatory artefact.`
+    ],
+    keyPoint: "Best execution is the non-negotiable objective function of SOR. Every routing decision must be defensible as a reasonable effort to obtain the most favourable terms for the client."
+  },
+  {
+    era: "Decision",
+    icon: "🧠",
+    title: "Venue Selection Algorithms",
+    desc: "The decision engine that ranks and chooses among available exchanges, ATSs and dark pools for each child order on the basis of expected cost, fill probability and information leakage",
+    badge: { label: "Core Logic", style: "slate" },
+    tags: [["venue selection","slate"], ["ranking","teal"], ["fill probability","amber"], ["cost model",""]],
+    data: [
+      { label: "Inputs", value: "Depth, fees, historical fills, latency, toxicity", color: "slate" },
+      { label: "Output", value: "Ordered list or allocation of venues", color: "teal" },
+      { label: "Update", value: "Continuous or periodic recalibration", color: "amber" },
+    ],
+    body: [
+      `Venue selection is the heart of SOR. For every child order the router evaluates the set of eligible destinations and produces either a single choice or a weighted allocation. Inputs typically include displayed depth and price, maker-taker or taker-maker fees, historical fill rates and mark-outs by venue and order type, expected latency, dark midpoint probabilities, and real-time signals of toxicity or quote instability.`,
+      `Simple implementations use static priority lists or rule-based trees. Advanced implementations maintain statistical models of fill probability and expected shortfall, sometimes updated by online learning, and solve a small optimisation for each slice. Constraints include regulatory protections, client instructions, and internal risk limits.`,
+      `Because market structure and fee schedules change, venue-selection models require continuous monitoring and periodic recalibration; a router that was optimal last quarter can become a cost centre after a fee change or a shift in dark-pool composition.`
+    ],
+    keyPoint: "Venue selection converts market-structure data into an actionable ranking. The quality of that ranking is the largest controllable determinant of SOR performance."
+  },
+  {
+    era: "Economics",
+    icon: "💰",
+    title: "Rebate-Aware Routing",
+    desc: "Routing logic that explicitly incorporates maker rebates and taker fees into the expected-cost calculation, sometimes preferring passive or high-rebate destinations when net economics favour them",
+    badge: { label: "Fee-Sensitive", style: "amber" },
+    tags: [["rebates","amber"], ["maker-taker","teal"], ["fee optimisation","slate"], ["net cost",""]],
+    data: [
+      { label: "Maker", value: "Earn rebate for adding liquidity", color: "teal" },
+      { label: "Taker", value: "Pay fee for removing liquidity", color: "red" },
+      { label: "Balance", value: "Fee vs. fill probability & price", color: "amber" },
+    ],
+    body: [
+      `In maker-taker (and inverted taker-maker) markets the explicit fee or rebate can be several basis points—material relative to the spread of liquid names. Rebate-aware routers therefore treat the fee schedule as a first-class input: posting on a high-rebate venue may dominate taking on a low-fee venue once the probability of fill and the risk of adverse selection are taken into account.`,
+      `The optimisation is subtle. Chasing rebates can produce longer time-to-fill, greater information leakage, and worse queue priority. Conversely, ignoring rebates leaves money on the table. Sophisticated SORs evaluate the net expected cost (price + fees − rebates + expected mark-out) and may switch between passive rebate capture and aggressive taking as urgency and market conditions change.`,
+      `Client mandates and best-execution policies often constrain pure rebate maximisation; the router must still demonstrate that the chosen path was in the client’s interest on an all-in basis.`
+    ],
+    keyPoint: "Rebate-aware routing treats exchange fees as a controllable component of implementation shortfall. Done well it improves net performance; done naïvely it sacrifices fill quality for pennies of rebate."
+  },
+  {
+    era: "Sequence",
+    icon: "🌓",
+    title: "Dark-First vs. Lit-First Routing",
+    desc: "The strategic choice of whether to seek non-displayed midpoint or hidden size before accessing the lit book, or to prioritise lit liquidity and only then rest in the dark",
+    badge: { label: "Strategy", style: "teal" },
+    tags: [["dark-first","teal"], ["lit-first","amber"], ["midpoint priority","slate"], ["signalling",""]],
+    data: [
+      { label: "Dark-first", value: "Probe / rest dark before lit take", color: "teal" },
+      { label: "Lit-first", value: "Sweep or post lit, then dark residual", color: "amber" },
+      { label: "Driver", value: "Urgency, size, toxicity, alpha decay", color: "slate" },
+    ],
+    body: [
+      `Dark-first logic attempts to capture midpoint or improved price in non-displayed venues before any lit interaction, thereby minimising signalling and spread cost when a match occurs. It is attractive for larger, less urgent orders and for names where dark fill rates are historically high and mark-outs benign.`,
+      `Lit-first logic prioritises immediate, protected liquidity on lit exchanges—often via a sweep—and only afterwards parks residual size in the dark. It is preferred when urgency is high, when dark toxicity is elevated, or when the probability of a timely dark fill is low.`,
+      `Many modern routers blend the two: a simultaneous or near-simultaneous dark probe together with a lit path, or a conditional sequence that switches based on real-time fill feedback and short-horizon toxicity measures. The optimal mix is security-, size- and regime-dependent.`
+    ],
+    keyPoint: "Dark-first versus lit-first is a statement about the relative value of anonymity versus certainty. The best SOR treats the choice as state-dependent rather than as a fixed philosophy."
+  },
+  {
+    era: "Structure",
+    icon: "🧩",
+    title: "Fragmentation and Routing Costs",
+    desc: "The direct and indirect costs created by the dispersion of liquidity across many venues, and the ways SOR both mitigates and sometimes amplifies those costs",
+    badge: { label: "Market Structure", style: "slate" },
+    tags: [["fragmentation","slate"], ["connectivity","amber"], ["opportunity cost","red"], ["complexity",""]],
+    data: [
+      { label: "Direct costs", value: "Fees, technology, data, memberships", color: "amber" },
+      { label: "Indirect", value: "Missed fills, latency, information leakage", color: "red" },
+      { label: "SOR role", value: "Minimise net cost of fragmentation", color: "teal" },
+    ],
+    body: [
+      `Equity (and increasingly other) markets are fragmented across primary exchanges, satellite exchanges, ATSs and dark pools. Fragmentation creates explicit costs—connectivity, market-data fees, exchange memberships, clearing—and implicit costs: the risk that size available on one venue disappears before the router can reach it, the complexity of maintaining consistent priority and risk controls, and the leakage of information when multiple venues are pinged.`,
+      `SOR is the industry’s primary response. By centralising venue selection, sweep logic and post-trade allocation, a well-designed router converts a fragmented landscape into a single virtual liquidity pool. Poorly designed routers, however, can increase message traffic, create self-competition, and leave residual quantity stranded.`,
+      `The net social and private cost of fragmentation remains debated; what is clear is that the quality of SOR is now a first-order determinant of whether fragmentation is a net cost or a net source of competitive liquidity.`
+    ],
+    keyPoint: "Fragmentation is the problem; SOR is the principal solution. The economic value of a router is precisely the reduction in the total cost of accessing dispersed liquidity."
+  },
+  {
+    era: "TIF",
+    icon: "⚡",
+    title: "IOC (Immediate-or-Cancel) vs. GTC Routing",
+    desc: "The choice between immediate-or-cancel instructions that never rest and good-till-cancel (or day) instructions that can provide liquidity, and the implications for SOR design",
+    badge: { label: "Order Duration", style: "amber" },
+    tags: [["IOC","amber"], ["GTC","teal"], ["resting vs taking","slate"], ["TIF",""]],
+    data: [
+      { label: "IOC", value: "Fill now or cancel; never rests", color: "amber" },
+      { label: "GTC / Day", value: "May rest and provide liquidity", color: "teal" },
+      { label: "SOR use", value: "IOC for sweeps; GTC for passive", color: "slate" },
+    ],
+    body: [
+      `Immediate-or-cancel (IOC) orders are the natural instrument of a sweep: they interact with available size and disappear, leaving no resting footprint. Good-till-cancel (GTC) or day orders can rest, accumulate queue priority, earn maker rebates and participate in later price formation. The two time-in-force (TIF) choices therefore map onto the fundamental take-versus-make decision.`,
+      `SOR engines use IOC (and sometimes fill-or-kill) for aggressive multi-venue takes and for dark probes that must not leave displayed size. They use GTC or day orders, often with post-only or peg instructions, when the strategy intends to provide liquidity or to wait for a midpoint match. Mixed strategies send IOC to some venues and resting orders to others in the same wave.`,
+      `The TIF decision interacts with fees, queue priority, signalling and regulatory obligations; it is therefore an integral part of venue-and-order-type selection rather than an afterthought.`
+    ],
+    keyPoint: "IOC is the tool of immediate liquidity capture; GTC is the tool of patient liquidity provision. SOR must choose the right TIF for each child if it is to implement its intended take/make mix."
+  },
+  {
+    era: "Speed",
+    icon: "⏱️",
+    title: "Latency Considerations in SOR",
+    desc: "The impact of network, processing and venue latencies on the probability of obtaining quoted size and on the design of sweep and allocation logic",
+    badge: { label: "Infrastructure", style: "red" },
+    tags: [["latency","red"], ["race conditions","amber"], ["co-location","teal"], ["determinism",""]],
+    data: [
+      { label: "Problem", value: "Quotes stale by the time order arrives", color: "red" },
+      { label: "Mitigation", value: "Co-lo, short paths, predictive timing", color: "teal" },
+      { label: "Design", value: "Stagger releases, cancel stale, re-route", color: "amber" },
+    ],
+    body: [
+      `Even a perfectly calculated sweep fails if the messages arrive after the quoted size has been taken or cancelled. Latency—both the absolute delay to each venue and the relative dispersion of delays—therefore determines realised fill rates. Routers that ignore differential latency systematically over-allocate to slower venues and under-fill on the fastest ones.`,
+      `Mitigations include co-location at major data centres, optimised network paths, hardware timestamping, and release schedules that stagger messages so that expected arrival times at the matching engines are aligned. Some routers also maintain real-time estimates of quote stability and reduce aggressive size when the probability of a stale fill is high.`,
+      `Latency is not only a take-side problem: the speed with which a router can cancel or reprice resting orders affects queue management and adverse-selection control. End-to-end SOR latency is consequently a core infrastructure metric.`
+    ],
+    keyPoint: "In SOR, latency is part of the price. A router that is systematically late pays more and fills less, regardless of how sophisticated its venue-ranking model may be."
+  },
+  {
+    era: "Feedback",
+    icon: "📋",
+    title: "Post-Routing Analysis",
+    desc: "The systematic measurement of routing decisions after the fact—fill rates, mark-outs, fee capture, venue performance—to recalibrate models and satisfy best-execution review requirements",
+    badge: { label: "Feedback", style: "slate" },
+    tags: [["TCA","slate"], ["routing review","teal"], ["venue scorecards","amber"], ["calibration",""]],
+    data: [
+      { label: "Metrics", value: "Fill rate, shortfall, mark-out, fees, rebates", color: "slate" },
+      { label: "Grain", value: "By venue, order type, urgency, name", color: "teal" },
+      { label: "Action", value: "Update rankings, disable toxic venues", color: "amber" },
+    ],
+    body: [
+      `Post-routing analysis closes the loop. Every child order’s destination, order type, fill price, subsequent mark-out and fee/rebate are recorded and aggregated into venue and strategy scorecards. The resulting statistics reveal which destinations systematically deliver price improvement, which dark pools are toxic, which fee tiers are worth chasing, and where latency or data problems are costing fills.`,
+      `The same data support regulatory best-execution reviews and client reporting. More importantly, they feed back into the venue-selection models: fill-probability estimates, toxicity filters and rebate calculations are re-estimated on recent history so that the router adapts to structural change.`,
+      `Without disciplined post-routing analysis, SOR degrades into a static rule set that slowly drifts away from the evolving market. With it, routing becomes a continuously improving, evidence-based control system.`
+    ],
+    keyPoint: "Post-routing analysis turns SOR from a static map into a learning system. The quality of tomorrow’s routes is determined by the honesty with which today’s routes are measured."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

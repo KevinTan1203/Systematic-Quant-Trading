@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 12.7 Matching Engines</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 12 · Section 12.7</div>
+      <h1 class="book-title">Matching<br><em>Engines</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">FIFO · pro-rata · auctions · crosses · latency · protocols · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>12.7 Matching Engines</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Algorithm",
+    icon: "⏳",
+    title: "FIFO Matching Algorithm",
+    desc: "First-in, first-out matching that ranks resting orders by price and, at the same price, by arrival time — the dominant rule on most electronic venues",
+    badge: { label: "Standard", style: "teal" },
+    tags: [["FIFO","teal"], ["price-time","amber"], ["time priority","slate"], ["queue",""]],
+    data: [
+      { label: "Primary", value: "Best price executes first", color: "teal" },
+      { label: "Secondary", value: "Earliest timestamp at that price", color: "amber" },
+      { label: "Effect", value: "Strict linear queue per level", color: "slate" },
+    ],
+    body: [
+      `Under FIFO (price-time priority) the matching engine walks the book from the best price outward. At each price level, resting orders are filled in the exact sequence in which they were accepted. A newly arriving marketable order therefore trades first against the oldest order at the best opposing price, then the next-oldest, and so on until the incoming quantity is exhausted or the book is depleted.`,
+      `The rule is simple, transparent and deterministic. It creates a powerful incentive to obtain and defend early queue position, which in turn drives co-location, low-latency infrastructure and cancel-replace activity. Most major equity and futures matching engines use FIFO as the baseline algorithm.`,
+      `Because priority is strictly temporal, the engine’s acceptance timestamp is a critical design artefact; nanosecond-level ordering and fair access to that timestamp are central to the integrity of the market.`
+    ],
+    keyPoint: "FIFO turns the matching engine into a pure queue. Being first at a price is often more valuable than any other attribute of the order."
+  },
+  {
+    era: "Algorithm",
+    icon: "➗",
+    title: "Pro-Rata Matching",
+    desc: "Allocation of incoming volume across all resting orders at the best price in proportion to displayed size, rather than by arrival time",
+    badge: { label: "Alternative", style: "amber" },
+    tags: [["pro-rata","amber"], ["size allocation","teal"], ["hybrid","slate"], ["depth incentive",""]],
+    data: [
+      { label: "Rule", value: "Fill share ∝ displayed size", color: "amber" },
+      { label: "Incentive", value: "Post more size to gain allocation", color: "teal" },
+      { label: "Common form", value: "Pro-rata + time residual", color: "slate" },
+    ],
+    body: [
+      `In a pro-rata matching engine, when a marketable order arrives the entire quantity available at the best price is allocated across every resting order at that price in proportion to the size each order displays. Time of arrival is ignored (or used only for a residual after the pro-rata pass). Larger displayed quotes therefore receive a larger share of every fill.`,
+      `Pure pro-rata is relatively rare; most implementations are hybrids that combine a pro-rata tranche with a time-priority residual or with lead-market-maker guarantees. The design aims to encourage displayed depth while still retaining some reward for early arrival.`,
+      `Pro-rata changes strategic behaviour: participants compete on size rather than solely on speed, which can improve visible liquidity but also encourages oversizing, rapid cancel-replace cycles and more complex fill-probability modelling.`
+    ],
+    keyPoint: "Pro-rata replaces the race for time with a contest for size. The matching engine’s allocation rule becomes the dominant determinant of optimal quoting strategy."
+  },
+  {
+    era: "Auction",
+    icon: "🔨",
+    title: "Auction Mechanisms (Opening, Closing, IPO)",
+    desc: "Batch matching processes that aggregate supply and demand over an interval and execute at a single clearing price, used for opens, closes and primary offerings",
+    badge: { label: "Batch", style: "slate" },
+    tags: [["auction","slate"], ["clearing price","teal"], ["opening / closing","amber"], ["IPO",""]],
+    data: [
+      { label: "Mechanism", value: "Aggregate book → single price", color: "slate" },
+      { label: "Use cases", value: "Open, close, halt resumption, IPO", color: "teal" },
+      { label: "Goal", value: "Price discovery & orderly transition", color: "amber" },
+    ],
+    body: [
+      `An auction mechanism collects orders over a defined period, constructs an aggregate supply and demand schedule, and chooses a single clearing price that maximises matched volume (subject to any imbalance or price-collar rules). All matched orders execute at that price. Unmatched orders may be cancelled or carried into the subsequent continuous session according to venue rules.`,
+      `Opening and closing auctions concentrate liquidity at the most important reference times of the day. IPO and secondary-offering auctions establish the initial public price. Halt-resumption auctions restore orderly trading after a volatility interruption. In each case the batch design reduces the impact of any single order and improves the quality of the reference price.`,
+      `Modern electronic auctions publish indicative clearing prices and imbalance information in real time, allowing participants to adjust orders before the final match.`
+    ],
+    keyPoint: "Auctions replace continuous matching with a single, volume-maximising price. They are the matching engine’s tool for concentrated price discovery at critical moments."
+  },
+  {
+    era: "Session",
+    icon: "🔄",
+    title: "Continuous Trading Session",
+    desc: "The regular market period in which orders are matched continuously in real time as they arrive, forming the bulk of the trading day on most electronic venues",
+    badge: { label: "Core Mode", style: "teal" },
+    tags: [["continuous","teal"], ["real-time match","amber"], ["CLOB","slate"], ["intraday",""]],
+    data: [
+      { label: "Mode", value: "Match on arrival against resting book", color: "teal" },
+      { label: "Book", value: "Persistent central limit order book", color: "amber" },
+      { label: "Contrast", value: "Vs. scheduled batch auctions", color: "slate" },
+    ],
+    body: [
+      `In continuous trading the matching engine maintains a live limit order book and attempts to match every incoming order immediately against the resting opposite side. If the order is marketable it executes (fully or partially); any residual rests on the book according to the venue’s priority rules. Price formation is therefore continuous and path-dependent.`,
+      `Continuous sessions account for the large majority of equity, futures and many FX trading hours. They support high-frequency strategies, continuous market-making and real-time risk management, but they also expose the book to fleeting liquidity, rapid quote changes and the full force of latency competition.`,
+      `Most venues interleave continuous trading with discrete auctions at the open, close and after halts, so that the matching engine must switch modes cleanly and deterministically.`
+    ],
+    keyPoint: "Continuous trading is the default state of modern matching engines. It maximises immediacy and informational efficiency at the cost of continuous exposure to microstructure noise and latency races."
+  },
+  {
+    era: "Open",
+    icon: "🌅",
+    title: "Opening Cross Mechanics (NASDAQ, NYSE)",
+    desc: "The specialised auction processes that establish the official opening price and match the accumulated overnight and pre-open order flow on major U.S. equity venues",
+    badge: { label: "Auction", style: "amber" },
+    tags: [["opening cross","amber"], ["NASDAQ","teal"], ["NYSE","slate"], ["imbalance",""]],
+    data: [
+      { label: "NASDAQ", value: "Opening Cross with NOO / OIO", color: "teal" },
+      { label: "NYSE", value: "Opening Auction / DMM facilitated", color: "slate" },
+      { label: "Output", value: "Official opening price + matched volume", color: "amber" },
+    ],
+    body: [
+      `NASDAQ’s Opening Cross aggregates Market-On-Open (MOO), Limit-On-Open (LOO) and eligible continuous-book interest, publishes indicative clearing prices and imbalance data in the pre-open, and executes a single batch match at the open. Orders can be designated as eligible only for the cross (e.g., Opening Imbalance Only).`,
+      `NYSE’s opening process historically centred on the Designated Market Maker (DMM) who facilitates the open, though electronic auction mechanisms have taken an increasing role. Both venues aim to maximise matched volume at a single price while managing large imbalances that can arise from overnight news.`,
+      `The opening cross is a critical price-discovery event; index calculation, NAV strikes and many algorithmic benchmarks reference the official open. Participation and imbalance management are therefore first-order concerns for institutional flow.`
+    ],
+    keyPoint: "The opening cross converts overnight information and accumulated orders into a single, high-integrity reference price. Its design balances discovery, fairness and the orderly absorption of imbalance."
+  },
+  {
+    era: "Close",
+    icon: "🌇",
+    title: "Closing Cross (MOC/LOC Orders)",
+    desc: "The end-of-day auction that determines the official closing price, driven largely by Market-On-Close and Limit-On-Close order flow together with continuous-book interest",
+    badge: { label: "Auction", style: "red" },
+    tags: [["closing cross","red"], ["MOC","teal"], ["LOC","amber"], ["official close",""]],
+    data: [
+      { label: "MOC", value: "Market-On-Close — guaranteed at close price", color: "teal" },
+      { label: "LOC", value: "Limit-On-Close — executes only if price allows", color: "amber" },
+      { label: "Importance", value: "Index, NAV, marking, benchmarks", color: "red" },
+    ],
+    body: [
+      `The closing cross is the highest-volume event of the day on many equity markets. Participants submit Market-On-Close (MOC) orders that are guaranteed to execute at the closing price and Limit-On-Close (LOC) orders that execute only if the clearing price is at or better than their limit. The matching engine aggregates this interest with residual continuous-book volume, publishes imbalance information, and runs a final auction.`,
+      `Because so many funds, indices and derivatives reference the official close, the cross attracts both genuine rebalancing flow and tactical trading around the imbalance signal. Venues have repeatedly refined cut-off times, imbalance publication and order-type rules to protect price quality.`,
+      `For algorithms and desks the close is both an opportunity (concentrated liquidity) and a risk (large, information-rich imbalances). Closing-cross participation is a distinct execution skill.`
+    ],
+    keyPoint: "The closing cross sets the price that the rest of the industry marks to. MOC and LOC order flow, together with the venue’s imbalance mechanism, determine how efficiently that critical reference is formed."
+  },
+  {
+    era: "Priority",
+    icon: "🏆",
+    title: "Price Priority → Time Priority",
+    desc: "The universal hierarchical rule that better prices always execute before worse prices, and that only among equal prices does secondary priority (time, size, or pro-rata) apply",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["price priority","slate"], ["secondary priority","teal"], ["matching hierarchy","amber"], ["fairness",""]],
+    data: [
+      { label: "First key", value: "Better price always wins", color: "slate" },
+      { label: "Second key", value: "Time / size / pro-rata at same price", color: "teal" },
+      { label: "Invariant", value: "No trade-through of better price", color: "amber" },
+    ],
+    body: [
+      `Every orthodox matching engine enforces strict price priority: a buy order at a higher price must be filled before any buy order at a lower price, and symmetrically for sells. Only after price has selected the eligible set of orders does a secondary rule—time priority (FIFO), pro-rata, size priority, or a hybrid—rank those orders among themselves.`,
+      `Price priority is both an efficiency and a fairness principle. It guarantees that the best available terms are always consumed first and that a participant cannot be bypassed by an inferior price. Regulatory frameworks (e.g., order-protection rules) extend the same idea across venues.`,
+      `Understanding the hierarchy is essential for strategy design: improving price is the only way to jump an entire queue; within a price level, only the secondary rule matters.`
+    ],
+    keyPoint: "Price priority is absolute; time (or size) priority is conditional. The matching engine’s first duty is to honour the best price; everything else is a ranking among equals."
+  },
+  {
+    era: "Performance",
+    icon: "⚡",
+    title: "Matching Engine Latency Targets (< 1µs for HFT Venues)",
+    desc: "The engineering requirement that the time from order receipt to match decision (and often to market-data publication) be measured in hundreds of nanoseconds to low microseconds on latency-sensitive venues",
+    badge: { label: "Infrastructure", style: "red" },
+    tags: [["latency","red"], ["< 1 µs","amber"], ["determinism","teal"], ["HFT",""]],
+    data: [
+      { label: "Target", value: "Sub-microsecond tick-to-trade / match", color: "red" },
+      { label: "Techniques", value: "FPGA, kernel bypass, custom NIC, C++", color: "amber" },
+      { label: "Why", value: "FIFO races & fair access at scale", color: "teal" },
+    ],
+    body: [
+      `On venues that host high-frequency and market-making strategies, the matching engine’s internal latency is a first-order product attribute. Targets of well under one microsecond from the moment an order is read off the wire to the moment a fill or acknowledgement is generated are now common; some components operate in the low hundreds of nanoseconds.`,
+      `Achieving these numbers requires specialised hardware (FPGA or custom ASICs for parsing and book updates), kernel-bypass networking, careful core isolation, lock-free data structures and extreme attention to cache and memory layout. Determinism—minimising jitter as well as mean latency—is equally important so that no participant systematically benefits from variability.`,
+      `Latency is not only a speed contest; it is also a fairness and capacity issue. An engine that remains fast and deterministic under peak message rates preserves the integrity of FIFO priority and the usability of the market for all participants.`
+    ],
+    keyPoint: "Sub-microsecond matching is the price of admission for modern HFT-capable venues. Latency and determinism are as fundamental to the product as the matching rule itself."
+  },
+  {
+    era: "Protocols",
+    icon: "📡",
+    title: "Nasdaq’s Glimpse vs. ITCH vs. OUCH Protocols",
+    desc: "The complementary binary protocols that Nasdaq provides for high-speed market-data snapshots, full depth-of-book feeds, and order entry",
+    badge: { label: "Protocols", style: "teal" },
+    tags: [["ITCH","teal"], ["OUCH","amber"], ["Glimpse","slate"], ["Nasdaq",""]],
+    data: [
+      { label: "ITCH", value: "Full depth-of-book market data feed", color: "teal" },
+      { label: "OUCH", value: "Low-latency order entry / cancel", color: "amber" },
+      { label: "Glimpse", value: "Point-in-time snapshot for recovery", color: "slate" },
+    ],
+    body: [
+      `ITCH is Nasdaq’s outbound binary protocol for real-time depth-of-book market data. It delivers every add, cancel, execute and replace message with nanosecond timestamps, enabling participants to reconstruct the full order book. Multiple channels and moulded/souped transport variants support different latency and recovery trade-offs.`,
+      `OUCH is the corresponding inbound protocol for order entry, cancellation and replacement. It is designed for minimal encoding overhead and rapid acknowledgement so that strategies can react to ITCH updates with the least possible round-trip delay.`,
+      `Glimpse supplies a point-in-time snapshot of the order book, used primarily for recovery after a disconnect or for late joiners who need a consistent starting state before applying the incremental ITCH stream. Together the three protocols form a complete, high-performance interface to Nasdaq’s matching engines and are representative of the binary, feed-handler-centric architecture used across major U.S. equity venues.`
+    ],
+    keyPoint: "ITCH, OUCH and Glimpse are the language of Nasdaq’s matching engine. ITCH shows the book, OUCH acts on it, and Glimpse recovers it—together enabling the full low-latency trading loop."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

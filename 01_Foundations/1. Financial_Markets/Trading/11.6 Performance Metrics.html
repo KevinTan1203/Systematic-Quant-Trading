@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 11.6 Performance Metrics</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 11 · Section 11.6</div>
+      <h1 class="book-title">Performance<br><em>Metrics</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>17</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Risk-adjusted · drawdown · trade stats · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>11.6 Performance Metrics</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Classic",
+    icon: "📏",
+    title: "Sharpe Ratio = (R_p − R_f) / σ_p (Annualized)",
+    desc: "Excess return per unit of total volatility — the most widely used risk-adjusted performance measure",
+    badge: { label: "Standard", style: "teal" },
+    tags: [["Sharpe","teal"], ["volatility","amber"], ["annualized","slate"], ["risk-adjusted",""]],
+    data: [
+      { label: "Formula", value: "(R_p − R_f) / σ_p × √N", color: "teal" },
+      { label: "Strength", value: "Simple, universal benchmark", color: "" },
+      { label: "Weakness", value: "Penalises upside volatility", color: "amber" },
+    ],
+    body: [
+      `The Sharpe ratio measures the average excess return of a portfolio over the risk-free rate per unit of return volatility. When returns are measured at a frequency of \(N\) periods per year, the ratio is annualised by multiplying by \(\sqrt{N}\) (under the usual i.i.d. assumption). A higher Sharpe indicates more reward per unit of total risk.`,
+      `It remains the default industry metric because it is dimensionless, easy to compute, and comparable across strategies and asset classes. However, it treats upside and downside volatility symmetrically, assumes approximately normal returns, and is sensitive to the choice of risk-free rate and to serial correlation (which inflates the annualised figure if not corrected).`,
+      `Practical refinements include using a robust volatility estimator, reporting confidence intervals, and computing the probabilistic Sharpe ratio that accounts for sample length and non-normality. Still, any strategy whose headline Sharpe is quoted without the underlying return frequency, sample period and risk-free convention should be viewed with caution.`
+    ],
+    keyPoint: "The Sharpe ratio is the lingua franca of risk-adjusted performance. It is indispensable for first-pass comparison, yet incomplete once asymmetry, drawdowns or benchmark-relative goals matter."
+  },
+  {
+    era: "Downside",
+    icon: "📉",
+    title: "Sortino Ratio = (R_p − R_f) / σ_downside",
+    desc: "Excess return per unit of downside volatility only — a refinement that ignores beneficial upside variation",
+    badge: { label: "Asymmetric", style: "amber" },
+    tags: [["Sortino","amber"], ["downside deviation","teal"], ["semi-variance","slate"], ["MAR",""]],
+    data: [
+      { label: "Denominator", value: "Downside deviation below target", color: "amber" },
+      { label: "Advantage", value: "Does not punish upside vol", color: "teal" },
+      { label: "Use case", value: "Strategies with skewed returns", color: "slate" },
+    ],
+    body: [
+      `The Sortino ratio replaces total volatility with downside deviation — the square root of the lower partial moment below a chosen target (often the risk-free rate or zero). Only returns that fall short of the target contribute to the risk measure, so strategies that produce large positive outliers are not penalised for that variability.`,
+      `It is particularly informative for option-selling, trend-following and other strategies whose return distributions are materially skewed or fat-tailed on the upside. The choice of target return and the precise definition of downside deviation (sample versus continuous, with or without compounding) must be stated for comparability.`,
+      `Like the Sharpe, the Sortino can be annualised, but the same caveats about serial correlation and sample size apply. It should be read alongside the Sharpe: a large gap between the two often signals positive skewness that the Sharpe understates.`
+    ],
+    keyPoint: "Sortino answers a more investor-relevant question than Sharpe: how much excess return is earned per unit of harmful volatility. When upside and downside risks are asymmetric, it is the clearer metric."
+  },
+  {
+    era: "Drawdown",
+    icon: "🏔️",
+    title: "Calmar Ratio = CAGR / Max Drawdown",
+    desc: "Compound annual growth rate divided by the magnitude of the largest peak-to-trough decline",
+    badge: { label: "Drawdown", style: "red" },
+    tags: [["Calmar","red"], ["CAGR","teal"], ["max DD","amber"], ["path risk",""]],
+    data: [
+      { label: "Formula", value: "CAGR / |Max Drawdown|", color: "red" },
+      { label: "Horizon", value: "Typically 36 months trailing", color: "amber" },
+      { label: "Focus", value: "Return versus worst loss", color: "teal" },
+    ],
+    body: [
+      `The Calmar ratio relates the annualised compound return to the deepest drawdown experienced over a chosen look-back (commonly three years). It directly answers how much growth was achieved relative to the worst capital impairment the investor had to endure.`,
+      `Because maximum drawdown is a path-dependent, non-linear statistic, Calmar is sensitive to the precise sample window and to single extreme events. Two strategies with identical Sharpe can have very different Calmars if one suffered a prolonged or deep drawdown.`,
+      `It is widely used by CTA and hedge-fund allocators who care more about the pain of underwater periods than about average volatility. Reporting Calmar together with the date and duration of the max drawdown adds essential context.`
+    ],
+    keyPoint: "Calmar puts the worst loss in the denominator. For investors whose primary risk is capital drawdown rather than day-to-day volatility, it is often more decision-relevant than the Sharpe ratio."
+  },
+  {
+    era: "Drawdown",
+    icon: "📊",
+    title: "MAR Ratio = Annual Return / Max Drawdown",
+    desc: "A close cousin of Calmar that uses arithmetic or simple annualised return in the numerator instead of CAGR",
+    badge: { label: "Drawdown", style: "amber" },
+    tags: [["MAR","amber"], ["Managed Account Reports","slate"], ["return / DD","teal"], [""]],
+    data: [
+      { label: "Origin", value: "Managed Account Reports", color: "slate" },
+      { label: "Difference", value: "Often uses non-compounded return", color: "amber" },
+      { label: "Interpretation", value: "Similar to Calmar in practice", color: "teal" },
+    ],
+    body: [
+      `The MAR ratio, popularised by Managed Account Reports, is defined as annualised return divided by maximum drawdown. In many implementations the numerator is a simple or arithmetic annualised return rather than the fully compounded CAGR used by Calmar; in practice the two ratios are often used interchangeably.`,
+      `Its interpretive value is identical to Calmar’s: higher values indicate more return per unit of worst-case capital loss. Because both metrics rely on a single extreme observation (the max DD), they are noisy in short samples and should be supplemented by average drawdown or drawdown duration statistics.`,
+      `When presenting results it is best practice to state explicitly whether CAGR or arithmetic return is used and over what window the maximum drawdown is measured.`
+    ],
+    keyPoint: "MAR and Calmar both price return against the deepest scar on the equity curve. The distinction is mainly conventional; the shared insight is that drawdown magnitude is a first-class risk measure."
+  },
+  {
+    era: "Threshold",
+    icon: "⚖️",
+    title: "Omega Ratio = Gain Probability Mass / Loss Probability Mass",
+    desc: "The ratio of probability-weighted gains above a threshold to probability-weighted losses below that threshold",
+    badge: { label: "Distribution", style: "slate" },
+    tags: [["Omega","slate"], ["threshold","teal"], ["higher moments","amber"], ["utility",""]],
+    data: [
+      { label: "Threshold", value: "Usually 0 or R_f", color: "teal" },
+      { label: "Captures", value: "Entire return distribution", color: "slate" },
+      { label: "Advantage", value: "No normality assumption", color: "amber" },
+    ],
+    body: [
+      `The Omega ratio, introduced by Keating & Shadwick, partitions the return distribution at a threshold \(L\) (commonly zero or the risk-free rate) and takes the ratio of the first-order upper partial moment to the first-order lower partial moment. Equivalently it is the probability-weighted gain above \(L\) divided by the probability-weighted loss below \(L\).`,
+      `Unlike Sharpe or Sortino, Omega incorporates information from the entire distribution and does not require a volatility estimate. It is therefore attractive for highly non-normal strategies. The cost is that the ratio depends on the chosen threshold and is less intuitive to most allocators than a simple volatility-scaled number.`,
+      `In practice Omega is often reported for a grid of thresholds, producing an Omega curve that reveals how the strategy’s attractiveness changes with the investor’s required return.`
+    ],
+    keyPoint: "Omega evaluates the quality of the whole return distribution relative to a threshold. It is the metric of choice when higher moments and asymmetry are central to the strategy’s economic identity."
+  },
+  {
+    era: "Relative",
+    icon: "🎯",
+    title: "Information Ratio = Active Return / Tracking Error",
+    desc: "Benchmark-relative excess return per unit of tracking-error volatility — the natural metric for active managers",
+    badge: { label: "Benchmark", style: "teal" },
+    tags: [["IR","teal"], ["tracking error","amber"], ["active return","slate"], ["appraisal",""]],
+    data: [
+      { label: "Numerator", value: "R_p − R_b (active return)", color: "teal" },
+      { label: "Denominator", value: "σ(R_p − R_b)", color: "amber" },
+      { label: "Use", value: "Long-only & long-short active", color: "slate" },
+    ],
+    body: [
+      `The information ratio (IR) measures the consistency of active returns relative to a chosen benchmark. It is the appraisal ratio of residual returns in a single-factor benchmark model. A high IR indicates that the manager’s active bets have been rewarded relative to the residual risk taken.`,
+      `IR is the correct primary metric for strategies whose mandate is to beat a specific index or peer group. Absolute Sharpe can be misleading when the bulk of return is simply market exposure. Annualisation again assumes limited serial correlation of active returns.`,
+      `Fundamental law of active management approximations (IR ≈ IC × √Breadth) provide a useful diagnostic, but realised IR remains an empirical quantity that must be measured out-of-sample and after costs.`
+    ],
+    keyPoint: "Information ratio is Sharpe’s benchmark-relative twin. For any strategy evaluated against an index, IR — not absolute Sharpe — is the decision-relevant risk-adjusted statistic."
+  },
+  {
+    era: "Factor",
+    icon: "α",
+    title: "Alpha (Jensen’s Alpha)",
+    desc: "The intercept of a regression of portfolio excess returns on market (or factor) excess returns — average return unexplained by systematic exposure",
+    badge: { label: "Factor", style: "amber" },
+    tags: [["Jensen alpha","amber"], ["CAPM","teal"], ["intercept","slate"], ["abnormal return",""]],
+    data: [
+      { label: "Regression", value: "R_p − R_f = α + β(R_m − R_f) + ε", color: "amber" },
+      { label: "Meaning", value: "Return not explained by beta", color: "teal" },
+      { label: "Caveat", value: "Model-dependent & sample-sensitive", color: "red" },
+    ],
+    body: [
+      `Jensen’s alpha is the intercept from the CAPM time-series regression. Positive alpha indicates average outperformance after adjusting for market beta. In multi-factor settings the same idea generalises to the intercept after controlling for all priced factors.`,
+      `Alpha is only as meaningful as the factor model that defines it. A strategy can show positive CAPM alpha yet zero alpha once size, value, momentum or industry factors are included. Statistical significance requires adequate sample length and must survive multiple-testing corrections when many strategies are examined.`,
+      `Reported alpha should always be accompanied by the exact factor specification, the estimation window, and robust standard errors. “Raw” outperformance versus a benchmark is not alpha until risk exposures have been removed.`
+    ],
+    keyPoint: "Alpha is the residual claim to skill after systematic risks have been paid for. Its magnitude and significance are only interpretable inside a fully articulated factor model."
+  },
+  {
+    era: "Factor",
+    icon: "β",
+    title: "Beta to Market",
+    desc: "The sensitivity of portfolio returns to market excess returns — the core measure of systematic equity exposure",
+    badge: { label: "Systematic", style: "slate" },
+    tags: [["beta","slate"], ["market exposure","teal"], ["hedging","amber"], ["CAPM",""]],
+    data: [
+      { label: "Estimate", value: "Cov(R_p, R_m) / Var(R_m)", color: "slate" },
+      { label: "Interpretation", value: "Expected % move per 1 % market", color: "teal" },
+      { label: "Variants", value: "Rolling, downside, fundamental beta", color: "amber" },
+    ],
+    body: [
+      `Beta quantifies how much the portfolio is expected to move when the market moves. A beta of 1.0 implies market-like systematic exposure; a beta near zero characterises market-neutral designs. Estimation is typically by OLS on excess returns, though robust, Bayesian or high-frequency estimators are common in practice.`,
+      `Beta is not constant: it varies with market regime, portfolio composition and leverage. Rolling or exponentially weighted betas, downside betas (estimated only on negative market days), and fundamental betas derived from accounting exposures all address different aspects of that instability.`,
+      `In risk management beta is used for hedging and for decomposing variance into systematic and residual components. In performance evaluation it is the quantity that must be neutralised before residual alpha can be claimed.`
+    ],
+    keyPoint: "Beta is the price of market insurance. Knowing it precisely is the prerequisite both for honest alpha measurement and for intentional control of systematic risk."
+  },
+  {
+    era: "Path",
+    icon: "🕳️",
+    title: "Maximum Drawdown (Peak-to-Trough)",
+    desc: "The largest cumulative percentage decline from a historical peak to a subsequent trough in the equity curve",
+    badge: { label: "Critical", style: "red" },
+    tags: [["max DD","red"], ["peak-to-trough","amber"], ["capital impairment","slate"], ["path risk",""]],
+    data: [
+      { label: "Definition", value: "sup (peak − trough) / peak", color: "red" },
+      { label: "Unit", value: "Percentage of NAV", color: "" },
+      { label: "Use", value: "Capacity, leverage, psychology", color: "teal" },
+    ],
+    body: [
+      `Maximum drawdown (MDD) is the most severe peak-to-trough loss observed over the evaluation horizon. It is path-dependent, non-linear and often the single statistic that determines whether a strategy remains investable from the perspective of clients, prime brokers or internal risk limits.`,
+      `Because it is driven by the worst episode, MDD is statistically noisy and can change dramatically with the addition or removal of a few months of data. Reporting the start date, end date and duration of the drawdown, together with the recovery date if any, is essential for interpretation.`,
+      `Risk systems frequently impose hard MDD limits or scale leverage so that a repeated historical MDD would not breach a capital threshold. In research, strategies with attractive Sharpe but catastrophic MDD are usually discarded or redesigned.`
+    ],
+    keyPoint: "Maximum drawdown measures the worst capital scar. For many real-world constraints it is a more binding risk metric than volatility or VaR."
+  },
+  {
+    era: "Path",
+    icon: "📉",
+    title: "Average Drawdown",
+    desc: "The mean magnitude of all drawdown episodes, providing a more stable complement to the single maximum drawdown observation",
+    badge: { label: "Path", style: "amber" },
+    tags: [["avg DD","amber"], ["drawdown depth","teal"], ["underwater","slate"], [""]],
+    data: [
+      { label: "Calculation", value: "Mean of all peak-to-trough declines", color: "amber" },
+      { label: "Advantage", value: "Less dominated by one event", color: "teal" },
+      { label: "Pair with", value: "Max DD and duration stats", color: "slate" },
+    ],
+    body: [
+      `While maximum drawdown captures the single worst episode, average drawdown summarises the typical depth of all underwater periods. It is computed by identifying every drawdown run (from a peak until a new peak is made) and taking the mean of their percentage declines.`,
+      `Average drawdown is more stable across sample periods and gives a better sense of the “normal” pain an investor must tolerate. A strategy with a moderate max DD but very high average DD may still be psychologically or institutionally difficult to hold.`,
+      `Best practice is to report the full distribution of drawdown depths and durations — max, average, median, and selected quantiles — rather than any single summary number.`
+    ],
+    keyPoint: "Average drawdown reveals the everyday cost of the strategy’s path risk. Together with maximum drawdown it paints a far richer picture than volatility alone."
+  },
+  {
+    era: "Path",
+    icon: "⏱️",
+    title: "Recovery Period",
+    desc: "The time required to regain a previous equity-curve peak after a drawdown has occurred",
+    badge: { label: "Path", style: "slate" },
+    tags: [["recovery","slate"], ["time underwater","amber"], ["duration","teal"], ["patience",""]],
+    data: [
+      { label: "Metric", value: "Days / months from trough to new high", color: "slate" },
+      { label: "Related", value: "Time under water, max recovery", color: "amber" },
+      { label: "Investor", value: "Determines tolerable patience", color: "teal" },
+    ],
+    body: [
+      `Recovery period (or time to recovery) measures how long the portfolio remains below a prior high-water mark after a drawdown begins. Long recovery times, even after moderate drawdowns, can be more damaging to investor confidence and capital retention than short, sharp losses that are quickly recouped.`,
+      `Statistics commonly reported include the recovery time of the maximum drawdown, the average recovery time across all drawdowns, and the maximum time spent underwater. These duration metrics are especially important for strategies marketed to investors with short reporting horizons or liquidity needs.`,
+      `In research, a strategy that historically required multi-year recoveries after typical losses faces a high hurdle for live capital allocation regardless of its asymptotic Sharpe.`
+    ],
+    keyPoint: "Recovery period quantifies the temporal dimension of drawdown risk. Capital that is impaired for years is capital that may never be given the chance to compound."
+  },
+  {
+    era: "Trade",
+    icon: "🎲",
+    title: "Win Rate and Payoff Ratio",
+    desc: "The fraction of trades that are profitable and the ratio of average win size to average loss size — the two building blocks of expectancy",
+    badge: { label: "Trade Stats", style: "teal" },
+    tags: [["win rate","teal"], ["payoff ratio","amber"], ["expectancy","slate"], ["edge",""]],
+    data: [
+      { label: "Win rate", value: "# wins / # trades", color: "teal" },
+      { label: "Payoff", value: "Avg win / |Avg loss|", color: "amber" },
+      { label: "Link", value: "Expectancy = f(win rate, payoff)", color: "slate" },
+    ],
+    body: [
+      `Win rate is the proportion of closed trades (or signals) that produce a positive return. Payoff ratio (or win/loss ratio) is the average size of winning trades divided by the average size of losing trades. Neither statistic alone determines profitability; a 40 % win rate can be highly profitable if the average winner is several times the average loser, and a 70 % win rate can lose money if losers are disproportionately large.`,
+      `These metrics are most meaningful for discrete-trade strategies (discretionary, pattern-based, or high-frequency) where individual round-trips are well defined. For continuous or portfolio-level strategies the notion of a single “trade” is ambiguous and the statistics become less informative.`,
+      `Always report both numbers together and over a sufficiently large sample. Soft win-rate targets without reference to payoff are a common source of false confidence.`
+    ],
+    keyPoint: "Win rate and payoff ratio are the atomic ingredients of trade expectancy. Edge exists only in their combination, never in either statistic taken in isolation."
+  },
+  {
+    era: "Trade",
+    icon: "💰",
+    title: "Profit Factor = Gross Profit / Gross Loss",
+    desc: "The ratio of the sum of all winning trade P&L to the absolute sum of all losing trade P&L",
+    badge: { label: "Trade Stats", style: "amber" },
+    tags: [["profit factor","amber"], ["gross profit","teal"], ["gross loss","red"], ["robustness",""]],
+    data: [
+      { label: "Formula", value: "Σ wins / |Σ losses|", color: "amber" },
+      { label: "Benchmark", value: "> 1.5 often sought", color: "teal" },
+      { label: "Sensitivity", value: "Outliers can dominate", color: "red" },
+    ],
+    body: [
+      `Profit factor compresses the entire trade history into a single ratio of money made on winners to money lost on losers. A value of 1.0 is break-even before costs; values above 1.5–2.0 are commonly regarded as evidence of a robust edge for discretionary or systematic trade-based systems.`,
+      `Because it is a ratio of sums, profit factor is sensitive to a few large winners or losers. Reporting it alongside the number of trades, the win rate and a trimmed or median-based variant improves robustness. After transaction costs the live profit factor is almost always lower than the back-test figure.`,
+      `Profit factor is less natural for strategies that are continuously invested or that mark-to-market a portfolio rather than closing discrete trades; in those cases expectancy or risk-adjusted return metrics are preferable.`
+    ],
+    keyPoint: "Profit factor asks a simple question: for every dollar lost, how many dollars were gained? It is a direct, intuitive screen for trade-based systems once sample size and outlier influence are respected."
+  },
+  {
+    era: "Trade",
+    icon: "🧮",
+    title: "Expected Value per Trade",
+    desc: "The probability-weighted average P&L of a single trade — the fundamental measure of edge at the trade level",
+    badge: { label: "Expectancy", style: "teal" },
+    tags: [["expectancy","teal"], ["EV","amber"], ["edge per trade","slate"], ["Kelly",""]],
+    data: [
+      { label: "Formula", value: "p_w · avg win + p_l · avg loss", color: "teal" },
+      { label: "Sign", value: "Must be positive after costs", color: "amber" },
+      { label: "Use", value: "Position sizing & system health", color: "slate" },
+    ],
+    body: [
+      `Expected value (EV) per trade is the mean P&L that would be realised if the same probabilistic trade were repeated indefinitely. It is computed as win-rate × average win + loss-rate × average loss (where average loss is negative). After all costs and slippage, EV must be reliably positive for the system to have a statistical edge.`,
+      `EV is the quantity that position-sizing rules (Kelly, fractional Kelly, volatility targeting) scale. A high EV with low win rate implies occasional large wins; a modest EV with high win rate implies a more consistent but potentially capacity-constrained profile.`,
+      `Tracking realised EV over rolling windows is one of the cleanest live diagnostics of whether a strategy’s edge is intact or decaying.`
+    ],
+    keyPoint: "Expected value per trade is the atomic unit of edge. Everything else — Sharpe, drawdowns, capacity — is a higher-order consequence of whether that number is positive and stable."
+  },
+  {
+    era: "Growth",
+    icon: "📈",
+    title: "CAGR (Compound Annual Growth Rate)",
+    desc: "The constant annual return that would be required to grow the starting NAV to the ending NAV over the same number of years",
+    badge: { label: "Return", style: "slate" },
+    tags: [["CAGR","slate"], ["compounded","teal"], ["geometric","amber"], ["annualized",""]],
+    data: [
+      { label: "Formula", value: "(Ending / Beginning)^(1/y) − 1", color: "slate" },
+      { label: "Property", value: "Path-independent given endpoints", color: "teal" },
+      { label: "Contrast", value: "Vs. arithmetic mean return", color: "amber" },
+    ],
+    body: [
+      `CAGR is the geometric average rate of return. It depends only on the initial and final portfolio values and the elapsed time; intermediate volatility does not appear in the formula. That makes it the correct answer to the question “how fast did capital actually compound?”`,
+      `Arithmetic average return is always higher than CAGR when returns vary, the difference being approximately half the variance. For performance reporting and for comparison with hurdle rates, CAGR is the more honest growth metric. It is also the numerator of the Calmar ratio.`,
+      `CAGR should be accompanied by the exact start and end dates and by a statement of whether external cash flows were time-weighted or money-weighted; different treatments produce different numbers.`
+    ],
+    keyPoint: "CAGR is the purest statement of how fast wealth grew. When the investor’s goal is terminal wealth, it is the return figure that matters most."
+  },
+  {
+    era: "Pain",
+    icon: "🩹",
+    title: "Ulcer Index",
+    desc: "A measure of the depth and duration of drawdowns that emphasises the continuous pain of being underwater",
+    badge: { label: "Drawdown", style: "red" },
+    tags: [["Ulcer Index","red"], ["drawdown pain","amber"], ["RMS","teal"], ["Martin ratio",""]],
+    data: [
+      { label: "Form", value: "RMS of percentage drawdowns", color: "red" },
+      { label: "Focus", value: "Depth × time underwater", color: "amber" },
+      { label: "Related", value: "Martin ratio = CAGR / UI", color: "teal" },
+    ],
+    body: [
+      `The Ulcer Index (UI) computes the root-mean-square of the percentage drawdown on each day (or bar) relative to the prior peak. Unlike maximum drawdown, which looks only at the single worst point, UI accumulates the daily pain of every underwater observation, thereby penalising both deep and prolonged drawdowns.`,
+      `It was designed to capture the psychological and capital stress of remaining below a high-water mark. The Martin ratio (CAGR / Ulcer Index) is the natural risk-adjusted companion, analogous to Calmar but using a more continuous drawdown measure.`,
+      `UI is especially useful for comparing strategies whose max-DD figures are similar but whose typical time spent underwater differs markedly.`
+    ],
+    keyPoint: "The Ulcer Index quantifies the continuous discomfort of drawdowns rather than only their maximum depth. It is the drawdown metric for investors who care about how long the pain lasts."
+  },
+  {
+    era: "Drawdown",
+    icon: "📉",
+    title: "Sterling Ratio",
+    desc: "Annualised return divided by the average of the most significant drawdowns (often average of the N largest), providing a smoother alternative to Calmar",
+    badge: { label: "Drawdown", style: "amber" },
+    tags: [["Sterling","amber"], ["avg max DD","teal"], ["return / pain","slate"], [""]],
+    data: [
+      { label: "Typical form", value: "Return / |Avg of N largest DDs|", color: "amber" },
+      { label: "Advantage", value: "Less noise than single max DD", color: "teal" },
+      { label: "Variant", value: "Sometimes +10 % in denominator", color: "slate" },
+    ],
+    body: [
+      `The Sterling ratio replaces the single maximum drawdown in the Calmar denominator with an average of the largest drawdowns (commonly the average of all drawdowns or of the N worst). Some definitions also add a fixed buffer (e.g., 10 %) to the denominator to avoid division by near-zero numbers and to express a more conservative risk penalty.`,
+      `By averaging several deep drawdowns the ratio becomes less sensitive to one idiosyncratic event and more reflective of the strategy’s repeated capacity to inflict capital pain. It therefore sits between pure max-DD metrics and continuous measures such as the Ulcer Index.`,
+      `As with all drawdown-based ratios, the exact definition (how many drawdowns, what averaging method, whether a buffer is used) must be stated for results to be comparable across studies or managers.`
+    ],
+    keyPoint: "Sterling smooths the severity of path risk by averaging the worst episodes. It is a pragmatic middle ground between the fragility of pure Calmar and the complexity of full drawdown-distribution analysis."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 12.3 Hidden Liquidity</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 12 · Section 12.3</div>
+      <h1 class="book-title">Hidden<br><em>Liquidity</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Icebergs · dark pools · midpoint · detection · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>12.3 Hidden Liquidity</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Displayed",
+    icon: "🧊",
+    title: "Iceberg Orders (Show Portion Only)",
+    desc: "Limit orders that display only a fraction of their total size, automatically replenishing the visible quantity as it is filled",
+    badge: { label: "Classic", style: "teal" },
+    tags: [["iceberg","teal"], ["display size","amber"], ["refresh","slate"], ["hidden residual",""]],
+    data: [
+      { label: "Visible", value: "Peak / display quantity", color: "teal" },
+      { label: "Hidden", value: "Reserve that refreshes the peak", color: "amber" },
+      { label: "Priority", value: "Usually loses time priority on refresh", color: "red" },
+    ],
+    body: [
+      `An iceberg (or “iceberg order”) shows only a pre-set display quantity at a price level while the bulk of the order remains hidden. When the visible portion is filled, the exchange or the broker’s algorithm automatically reloads a new display quantity from the hidden residual, until the total size is exhausted or the order is cancelled.`,
+      `Icebergs let large participants advertise limited size, reducing signalling risk and the likelihood that the rest of the market will move the price before the full quantity is executed. The trade-off is usually a loss of time priority each time the peak is refreshed, and the risk that sophisticated observers detect the reload pattern.`,
+      `Detection is possible by watching for repeated replenishment at the same price after partial fills, often with characteristic size and timing signatures. Execution algorithms must therefore decide whether to “take” apparent size that may be only the tip of a much larger iceberg.`
+    ],
+    keyPoint: "Icebergs hide quantity while remaining inside the lit order book. They are the most common form of partially displayed liquidity and a primary reason that observed depth understates true available size."
+  },
+  {
+    era: "Exchange",
+    icon: "🔒",
+    title: "Reserve Orders",
+    desc: "Exchange-native order types that keep a portion or all of an order’s size non-displayed while still resting in the central limit order book",
+    badge: { label: "Native", style: "amber" },
+    tags: [["reserve","amber"], ["hidden size","teal"], ["exchange order type","slate"], ["priority rules",""]],
+    data: [
+      { label: "Visibility", value: "Zero or partial display", color: "amber" },
+      { label: "Matching", value: "Still participates in the LOB", color: "teal" },
+      { label: "Priority", value: "Often behind displayed size", color: "slate" },
+    ],
+    body: [
+      `Reserve (or “hidden” / “non-displayed”) orders are supported natively by many exchanges. The order rests at a price, is eligible to trade, yet does not appear in the public depth feed (or appears only up to a display quantity). When a marketable order arrives, the hidden size can be filled according to the venue’s priority rules—commonly after all displayed size at that price has been exhausted.`,
+      `Because they do not signal intent, reserve orders reduce information leakage. In return they typically receive inferior queue priority relative to displayed orders at the same price, and in some regimes they may be skipped by certain order types that interact only with visible liquidity.`,
+      `The economic calculus is therefore a trade-off between lower signalling cost and lower fill probability / worse priority. Large, patient flow often finds the trade-off attractive; short-horizon or latency-sensitive flow usually prefers full display.`
+    ],
+    keyPoint: "Reserve orders are hidden liquidity that still lives inside the lit book. They buy anonymity at the price of priority and, sometimes, of interaction with the full set of opposing order types."
+  },
+  {
+    era: "Dark",
+    icon: "🌑",
+    title: "Dark Pools (No Pre-Trade Transparency)",
+    desc: "Trading venues that accept orders and execute matches without publishing the resting order book, providing pre-trade opacity while still reporting post-trade prints",
+    badge: { label: "Venue", style: "slate" },
+    tags: [["dark pool","slate"], ["pre-trade opacity","teal"], ["ATS","amber"], ["block liquidity",""]],
+    data: [
+      { label: "Key feature", value: "No public depth or BBO", color: "slate" },
+      { label: "Reporting", value: "Post-trade transparency required", color: "teal" },
+      { label: "Users", value: "Institutions seeking size & anonymity", color: "amber" },
+    ],
+    body: [
+      `Dark pools (alternative trading systems or internal matching engines) do not display a public limit order book. Participants submit orders that rest invisibly; matches occur when buy and sell interest cross at a reference price (often the midpoint of the NBBO) or according to the pool’s matching rules. Only after a trade occurs is the print disseminated.`,
+      `The principal attraction is reduced information leakage and the ability to source or provide size without moving the lit market. The principal risks are adverse selection (informed flow may preferentially hit the pool), limited transparency into the true nature of the contra party, and the possibility of lower fill rates or wider effective spreads once opportunity cost is included.`,
+      `Regulatory frameworks require post-trade reporting and, in many jurisdictions, impose conditions on the types of flow and the reference-price mechanisms dark pools may use. Their share of total volume remains material in equities and is closely monitored.`
+    ],
+    keyPoint: "Dark pools trade the public display of liquidity for anonymity and reduced signalling. They are a core component of modern equity market structure and a permanent source of hidden size."
+  },
+  {
+    era: "Crossing",
+    icon: "🤝",
+    title: "Crossing Networks (POSIT, Liquidnet)",
+    desc: "Specialised venues or systems designed to match large institutional orders with minimal information leakage, often at the midpoint and with continuous or scheduled cross mechanisms",
+    badge: { label: "Institutional", style: "teal" },
+    tags: [["crossing","teal"], ["Liquidnet","amber"], ["POSIT","slate"], ["block trading",""]],
+    data: [
+      { label: "Classic examples", value: "POSIT, Liquidnet, ITG, etc.", color: "teal" },
+      { label: "Style", value: "Midpoint / scheduled / continuous cross", color: "amber" },
+      { label: "Clientele", value: "Buy-side institutions, blocks", color: "slate" },
+    ],
+    body: [
+      `Crossing networks evolved to solve the block-trading problem: how to match large institutional orders without revealing them to the short-term predatory or market-making community. Early systems such as POSIT ran scheduled crosses; later platforms (Liquidnet and others) combined continuous matching, indication-of-interest (IOI) protocols, and conditional orders to source natural liquidity.`,
+      `Execution is typically at or near the midpoint of the prevailing lit quote, eliminating the spread cost for both sides when a match occurs. The economic value is therefore the saving of the half-spread (and of potential impact) in exchange for uncertainty of fill and possible adverse selection if the contra side is systematically better informed.`,
+      `Modern incarnations blend dark matching with smart-order-routing and conditional messaging, yet the original purpose—large-size, low-signalling interaction among institutions—remains central.`
+    ],
+    keyPoint: "Crossing networks are purpose-built hidden-liquidity venues for institutional size. Their product is not speed but the possibility of meeting natural contra flow without paying the full cost of the lit book."
+  },
+  {
+    era: "Price",
+    icon: "🎯",
+    title: "Midpoint Orders",
+    desc: "Orders that are priced to execute only at the midpoint of the prevailing best bid and offer, commonly used inside dark pools and certain lit midpoint facilities",
+    badge: { label: "Pricing", style: "amber" },
+    tags: [["midpoint","amber"], ["spread capture","teal"], ["dark / lit","slate"], ["price improvement",""]],
+    data: [
+      { label: "Execution price", value: "Exactly (Bid + Ask) / 2", color: "amber" },
+      { label: "Benefit", value: "Zero spread cost if filled", color: "teal" },
+      { label: "Risk", value: "Lower fill rate, possible toxicity", color: "red" },
+    ],
+    body: [
+      `A midpoint order is willing to trade only at the average of the current best bid and best offer. In a dark pool this is the natural reference price that splits the spread equally between buyer and seller. Some lit exchanges also offer midpoint or midpoint-peg order types that rest non-displayed and fire only when a cross at the mid is possible.`,
+      `For the liquidity taker, a midpoint fill saves the half-spread relative to crossing the lit market. For the liquidity provider, it forgoes the full spread that would have been earned by posting at the touch, but may still be attractive if the alternative is not trading at all or suffering greater impact.`,
+      `Midpoint flow is especially sensitive to adverse selection: if informed traders can systematically hit midpoint liquidity when they have an edge, the average fill becomes toxic. Pools and algorithms therefore monitor midpoint mark-outs carefully.`
+    ],
+    keyPoint: "Midpoint orders convert the bid–ask spread into a shared surplus. They are the pricing convention that makes most dark and crossing liquidity economically viable."
+  },
+  {
+    era: "Constraint",
+    icon: "📏",
+    title: "Minimum Execution Quantity (MEQ) Orders",
+    desc: "Orders that specify a minimum size that must be filled in a single transaction, preventing partial fills below a chosen threshold",
+    badge: { label: "Size Control", style: "slate" },
+    tags: [["MEQ","slate"], ["min quantity","teal"], ["partial fill control","amber"], ["block intent",""]],
+    data: [
+      { label: "Rule", value: "No fill smaller than stated MEQ", color: "slate" },
+      { label: "Purpose", value: "Avoid scraps & information leakage", color: "teal" },
+      { label: "Cost", value: "Lower probability of any fill", color: "amber" },
+    ],
+    body: [
+      `A minimum execution quantity (MEQ) constraint instructs the matching engine that the order may trade only if the contra side can satisfy at least the stated size in one transaction (or sometimes in one matching event). Smaller available size is ignored; the order continues to rest.`,
+      `MEQ is valuable for participants who do not want to leave a trail of small prints that reveal their presence, or who find the operational and signalling cost of many partial fills unacceptable. It is common in dark pools and in reserve / iceberg strategies aimed at true block size.`,
+      `The constraint reduces fill probability and can leave the order unexecuted even when some liquidity is present. It therefore expresses a clear preference for size and anonymity over completeness of execution.`
+    ],
+    keyPoint: "MEQ is a filter that trades fill probability for size integrity. It is one of the simplest ways to keep hidden or large orders from being nibbled into visibility."
+  },
+  {
+    era: "Maker",
+    icon: "📌",
+    title: "Post-Only Orders",
+    desc: "Orders that are accepted only if they will rest on the book as liquidity-providing (maker) orders; they are rejected or re-priced if they would take liquidity",
+    badge: { label: "Maker", style: "teal" },
+    tags: [["post-only","teal"], ["maker-taker","amber"], ["no take","slate"], ["rebate capture",""]],
+    data: [
+      { label: "Behaviour", value: "Reject or adjust if marketable", color: "teal" },
+      { label: "Goal", value: "Guarantee maker status & rebate", color: "amber" },
+      { label: "Use", value: "Market making, passive strategies", color: "slate" },
+    ],
+    body: [
+      `A post-only (or “add-liquidity-only”) instruction ensures that the order cannot accidentally become a liquidity remover. If, at the moment of entry, the limit price would cross the opposing side, the exchange either rejects the order or slides it to a non-marketable price. The participant therefore never pays the taker fee and remains eligible for the maker rebate.`,
+      `Post-only is essential for pure market-making and for any strategy whose economics depend on capturing the spread or the rebate rather than on immediate execution. It is also a form of protection against rapid quote changes that would otherwise turn a passive intent into an aggressive fill.`,
+      `In combination with hidden or reserve attributes, post-only allows sophisticated passive strategies to remain non-displayed while still guaranteeing maker treatment when they do interact.`
+    ],
+    keyPoint: "Post-only is the order-type guarantee of maker status. It converts a pricing and fee intention into an enforceable matching constraint."
+  },
+  {
+    era: "Detection",
+    icon: "🕵️",
+    title: "Hidden Order Detection Signals",
+    desc: "Empirical and statistical patterns in the public tape and depth feed that reveal the likely presence of icebergs, reserve size or other non-displayed liquidity",
+    badge: { label: "Inference", style: "red" },
+    tags: [["detection","red"], ["iceberg signals","amber"], ["trade vs quote","teal"], ["pinging",""]],
+    data: [
+      { label: "Classic signs", value: "Repeated refresh after partial fill", color: "red" },
+      { label: "Methods", value: "Size clustering, pinging, residual analysis", color: "amber" },
+      { label: "Use", value: "Routing, taking, or avoiding hidden size", color: "teal" },
+    ],
+    body: [
+      `Although hidden size does not appear in the depth feed, its presence leaves footprints. Repeated replenishment of the same display quantity after partial trades, trades that exceed visible size, characteristic round-lot or odd-lot patterns, and systematic differences between trade volume and visible depth changes are all classic indicators of icebergs or reserve orders.`,
+      `Active detection can also involve “pinging”—sending small immediate-or-cancel orders to test for hidden size at a price—while more passive methods rely on statistical models trained on historical trade-and-quote data. Detection quality varies with tick size, market fragmentation and the sophistication of the hiding algorithms.`,
+      `Once detected, hidden liquidity can be taken (if the strategy wants the size), avoided (if it is likely toxic), or used to update short-term fair-value and imbalance models. The cat-and-mouse game between hiders and detectors is a permanent feature of modern microstructure.`
+    ],
+    keyPoint: "Hidden liquidity is never perfectly hidden. The public record of trades and quote updates supplies statistical evidence that skilled observers routinely exploit."
+  },
+  {
+    era: "Scale",
+    icon: "📊",
+    title: "Dark Pool Volume as Percentage of Total",
+    desc: "The share of overall trading volume executed in non-displayed venues, a key aggregate statistic of market structure and of the prevalence of hidden liquidity",
+    badge: { label: "Aggregate", style: "slate" },
+    tags: [["dark share","slate"], ["market structure","teal"], ["volume statistics","amber"], ["transparency",""]],
+    data: [
+      { label: "Typical range", value: "Significant double-digit % in equities", color: "slate" },
+      { label: "Drivers", value: "Institutional size, fee, information", color: "teal" },
+      { label: "Monitoring", value: "Regulators & participants track trends", color: "amber" },
+    ],
+    body: [
+      `The fraction of total share volume executed in dark pools and other non-displayed venues is a headline measure of how much liquidity has moved off the lit book. In major equity markets the dark share has fluctuated with regulatory change, fee levels, the rise of midpoint facilities, and institutional preferences for anonymity.`,
+      `A higher dark percentage implies that a larger portion of price formation and size discovery occurs without pre-trade transparency. This can reduce signalling costs for large investors while simultaneously raising concerns about the quality of the public price signal and about potential segmentation of informed versus uninformed flow.`,
+      `Both regulators and sophisticated trading desks monitor dark-volume statistics by venue, by security and by time of day. Shifts in the dark share are treated as structural facts that affect optimal routing, the calibration of impact models, and the interpretation of lit-book imbalance signals.`
+    ],
+    keyPoint: "Dark-pool volume share is the macro footprint of hidden liquidity. It quantifies how much of the market’s trading activity has chosen opacity over display, and it shapes every practical decision about where and how to source size."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

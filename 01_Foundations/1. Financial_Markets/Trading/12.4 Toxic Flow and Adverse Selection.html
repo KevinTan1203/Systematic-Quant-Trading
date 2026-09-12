@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 12.4 Toxic Flow and Adverse Selection</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 12 · Section 12.4</div>
+      <h1 class="book-title">Toxic Flow &amp;<br><em>Adverse Selection</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Informed flow · PIN · VPIN · models · measures · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>12.4 Toxic Flow and Adverse Selection</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Core",
+    icon: "☠️",
+    title: "Adverse Selection: Trading Against Informed Parties",
+    desc: "The systematic loss incurred by uninformed or liquidity-providing counterparties when they trade with agents who possess superior information about future price moves",
+    badge: { label: "Foundation", style: "red" },
+    tags: [["adverse selection","red"], ["informed flow","amber"], ["pick-off risk","teal"], ["toxicity",""]],
+    data: [
+      { label: "Mechanism", value: "Informed side knows more about value", color: "red" },
+      { label: "Victim", value: "Market makers & uninformed flow", color: "amber" },
+      { label: "Result", value: "Losses concentrated on the uninformed", color: "teal" },
+    ],
+    body: [
+      `Adverse selection arises whenever one side of a trade has better information about the fundamental or short-term value of the asset. The informed party buys when the price is too low and sells when it is too high; the uninformed or liquidity-providing party systematically ends up on the wrong side. Over repeated interactions those losses become a primary cost of providing liquidity.`,
+      `In electronic markets the informed side may be a fundamental investor reacting to news, a statistical-arbitrageur exploiting a fleeting signal, or a latency-sensitive trader who simply arrives first. The uninformed side is typically a market maker, a passive institutional algorithm, or retail flow. The economic consequence is that quoted and effective spreads must embed compensation for expected adverse-selection losses.`,
+      `Measuring and managing adverse selection is therefore central both to market-making profitability and to the design of execution algorithms that try to avoid becoming the uninformed counterparty.`
+    ],
+    keyPoint: "Adverse selection is the informational tax on liquidity provision. Every market maker’s P&L is, to a first approximation, the spread earned minus the losses to informed flow."
+  },
+  {
+    era: "Measure",
+    icon: "📐",
+    title: "PIN (Probability of Informed Trading)",
+    desc: "A structural estimate of the fraction of trades that originate from informed agents, derived from a sequential trade model of the order flow",
+    badge: { label: "Classic", style: "slate" },
+    tags: [["PIN","slate"], ["Easley et al.","teal"], ["informed probability","amber"], ["MLE",""]],
+    data: [
+      { label: "Origin", value: "Easley, Kiefer, O’Hara, Paperman", color: "slate" },
+      { label: "Output", value: "Daily / period probability of informed trade", color: "teal" },
+      { label: "Method", value: "Maximum likelihood on buy/sell counts", color: "amber" },
+    ],
+    body: [
+      `The Probability of Informed Trading (PIN) model treats each trading day (or interval) as the outcome of a sequential process: with some probability an information event occurs; if it does, informed traders arrive according to a Poisson process and trade in the direction of the news; uninformed traders arrive symmetrically. The observable data are the counts of buyer- and seller-initiated trades. Maximum-likelihood estimation recovers the structural parameters and, from them, the unconditional probability that a given trade is informed.`,
+      `PIN has been widely used as a cross-sectional and time-series measure of information asymmetry. Higher PIN is associated with wider spreads, higher required returns, and greater price impact. The original daily formulation has been extended to intraday windows and to richer arrival processes.`,
+      `Limitations include sensitivity to trade classification, the assumption of a single daily information event, and computational cost. Nevertheless PIN remains the conceptual benchmark for structural measures of informed trading.`
+    ],
+    keyPoint: "PIN converts the abstract notion of informed flow into an estimable probability. It is the foundational quantitative link between order-flow imbalance and information asymmetry."
+  },
+  {
+    era: "High-Freq",
+    icon: "⚡",
+    title: "VPIN (Volume-Synchronized PIN)",
+    desc: "A high-frequency, volume-clock adaptation of the PIN idea that estimates flow toxicity from the imbalance of volume classified into buy and sell buckets",
+    badge: { label: "Modern", style: "amber" },
+    tags: [["VPIN","amber"], ["volume clock","teal"], ["toxicity","red"], ["Easley et al.",""]],
+    data: [
+      { label: "Clock", value: "Volume buckets, not calendar time", color: "amber" },
+      { label: "Signal", value: "Buy/sell volume imbalance per bucket", color: "teal" },
+      { label: "Use", value: "Real-time toxicity & crash warning", color: "red" },
+    ],
+    body: [
+      `VPIN (Volume-Synchronized Probability of Informed Trading) re-expresses the PIN intuition in volume time. Trades are accumulated into equal-volume buckets; within each bucket volume is classified as buy or sell (typically by a tick rule or bulk-volume classification); the absolute imbalance is normalised to produce a toxicity metric that updates after every bucket. Because the clock is volume rather than calendar time, the measure naturally accelerates in active markets.`,
+      `VPIN was designed for real-time monitoring and has been examined as a possible early-warning indicator of liquidity crises and flash events. High VPIN readings indicate that recent volume has been heavily one-sided, consistent with informed or momentum flow that market makers find toxic.`,
+      `Practical implementations must choose bucket size, classification method and smoothing. The metric is complementary to, rather than a replacement for, traditional PIN and for direct mark-out measures of adverse selection.`
+    ],
+    keyPoint: "VPIN brings the PIN concept into the high-frequency, volume-clock domain. It supplies a continuously updating gauge of order-flow toxicity that market makers and risk systems can act upon in real time."
+  },
+  {
+    era: "Practice",
+    icon: "🛡️",
+    title: "Toxic Flow Detection by Market Makers",
+    desc: "Operational techniques used by liquidity providers to identify, in real time, order flow that is likely to be adversely selected and to adjust quotes or inventory accordingly",
+    badge: { label: "Operational", style: "red" },
+    tags: [["toxicity detection","red"], ["mark-outs","teal"], ["quote adaptation","amber"], ["inventory",""]],
+    data: [
+      { label: "Signals", value: "Mark-outs, VPIN, imbalance, velocity", color: "red" },
+      { label: "Response", value: "Widen, pull, skew, or reduce size", color: "amber" },
+      { label: "Horizon", value: "Milliseconds to minutes", color: "teal" },
+    ],
+    body: [
+      `Market makers continuously evaluate whether the flow they are filling is “toxic”—i.e., predictive of subsequent price moves against their residual inventory. Short-horizon mark-outs (the mid-price change a few hundred milliseconds to several minutes after a fill), local order-book imbalance, trade-sign autocorrelation, VPIN-style metrics and simple velocity of the mid are all used as real-time toxicity indicators.`,
+      `When toxicity rises, the maker’s rational responses include widening the quoted spread, reducing displayed size, skewing quotes away from the inferred informed direction, or temporarily withdrawing. The speed and accuracy of this detection loop are among the principal determinants of market-making profitability in competitive electronic markets.`,
+      `Detection is inherently statistical and error-prone; overly aggressive withdrawal can lose valuable uninformed flow, while under-reaction produces rapid inventory and P&L damage. The quality of the toxicity signal is therefore a core research and engineering focus.`
+    ],
+    keyPoint: "Toxic-flow detection is the market maker’s immune system. The ability to recognise and respond to adverse selection in real time separates durable liquidity provision from rapid capital erosion."
+  },
+  {
+    era: "Pricing",
+    icon: "📏",
+    title: "Flow Toxicity as Spread Driver",
+    desc: "The economic channel through which the risk of adverse selection is compensated by wider quoted and effective spreads",
+    badge: { label: "Economics", style: "amber" },
+    tags: [["spread components","amber"], ["adverse-selection component","red"], ["inventory + order processing","teal"], ["compensation",""]],
+    data: [
+      { label: "Decomposition", value: "AS + inventory + order-processing", color: "amber" },
+      { label: "AS share", value: "Often the dominant component", color: "red" },
+      { label: "Implication", value: "Toxicity ↑ → equilibrium spread ↑", color: "teal" },
+    ],
+    body: [
+      `Microstructure theory decomposes the bid–ask spread into at least three parts: an order-processing cost, an inventory-risk premium, and an adverse-selection premium. The last of these is the market maker’s required compensation for the expected loss to informed traders. When the probability or severity of toxic flow rises, the adverse-selection component—and therefore the equilibrium spread—widens.`,
+      `Empirically, periods of elevated PIN, VPIN or realised mark-out losses are associated with wider spreads and thinner depth. Cross-sectionally, securities with greater information asymmetry (e.g., around earnings, or among smaller, less-covered names) exhibit larger adverse-selection components.`,
+      `For execution algorithms the same logic implies that the cost of taking liquidity is partly a payment for the information risk the maker bears; understanding that channel helps in choosing when to cross the spread versus when to post passively.`
+    ],
+    keyPoint: "Spreads are not merely operational costs; they are in large part insurance premiums against toxic flow. Flow toxicity is therefore a first-order fundamental of liquidity pricing."
+  },
+  {
+    era: "Model",
+    icon: "📘",
+    title: "Glosten–Milgrom Model",
+    desc: "The canonical sequential-trade model in which a competitive market maker sets bid and ask prices to break even in the presence of informed and uninformed traders",
+    badge: { label: "Theory", style: "slate" },
+    tags: [["Glosten-Milgrom","slate"], ["sequential trade","teal"], ["break-even quotes","amber"], ["Bayesian update",""]],
+    data: [
+      { label: "Setting", value: "Informed + uninformed, competitive MM", color: "slate" },
+      { label: "Result", value: "Spread = adverse-selection compensation", color: "teal" },
+      { label: "Dynamics", value: "Quotes update with each trade", color: "amber" },
+    ],
+    body: [
+      `Glosten & Milgrom (1985) model a market in which a risk-neutral, competitive market maker posts bid and ask prices. Traders arrive sequentially; some are informed and trade only when they have an edge, others are uninformed and trade for liquidity reasons. The market maker does not know the type of the next trader but updates beliefs after each trade via Bayes’ rule and sets the next quotes so that the expected profit on the next trade is zero.`,
+      `The model delivers a positive spread even in the absence of order-processing costs or inventory risk: the spread is exactly the compensation for adverse selection. It also produces the intuitive result that trades cause permanent price impacts in the direction of the trade, because each trade revises the market maker’s belief about true value.`,
+      `Glosten–Milgrom remains the conceptual foundation for almost all subsequent adverse-selection and information-based microstructure models.`
+    ],
+    keyPoint: "Glosten–Milgrom shows that adverse selection alone is sufficient to generate a bid–ask spread. It is the theoretical origin of the idea that spreads price the risk of informed flow."
+  },
+  {
+    era: "Impact",
+    icon: "λ",
+    title: "Kyle’s Lambda (Price Impact Parameter)",
+    desc: "The coefficient that maps signed order flow into permanent price change in Kyle’s strategic model of informed trading with a competitive market maker",
+    badge: { label: "Theory", style: "teal" },
+    tags: [["Kyle lambda","teal"], ["price impact","amber"], ["informed trading","slate"], ["depth",""]],
+    data: [
+      { label: "Definition", value: "ΔP ≈ λ · signed volume", color: "teal" },
+      { label: "Interpretation", value: "Inverse depth / impact coefficient", color: "amber" },
+      { label: "Origin", value: "Kyle (1985) batch-auction model", color: "slate" },
+    ],
+    body: [
+      `In Kyle’s (1985) model an informed trader and noise traders submit market orders to a competitive market maker who sets a single price that is linear in the net order flow. The slope of that pricing rule is Kyle’s lambda (λ). A larger λ means that a given signed volume moves the price more—i.e., the market is less deep and adverse selection is more severe.`,
+      `Lambda is therefore both a measure of illiquidity and a summary of the market maker’s optimal response to the risk of informed trading. Empirically it is estimated by regressing price changes on signed volume (or on innovations in signed volume) over chosen horizons; the resulting coefficient is widely used as a continuous measure of price impact and information asymmetry.`,
+      `Because λ is determined in equilibrium by the intensity of informed trading, the volatility of noise trading and the residual uncertainty about value, it links the theoretical adverse-selection literature directly to observable impact statistics.`
+    ],
+    keyPoint: "Kyle’s lambda is the structural price of signed order flow. It compresses the adverse-selection problem into a single, estimable impact coefficient that remains central to both theory and empirical work."
+  },
+  {
+    era: "Empirical",
+    icon: "📉",
+    title: "Amihud Illiquidity Measure",
+    desc: "A simple daily ratio of absolute return to trading volume that serves as a widely used empirical proxy for price impact and illiquidity",
+    badge: { label: "Proxy", style: "amber" },
+    tags: [["Amihud","amber"], ["illiquidity","teal"], ["|r| / volume","slate"], ["low-frequency",""]],
+    data: [
+      { label: "Formula", value: "Average of |r_t| / Volume_t", color: "amber" },
+      { label: "Horizon", value: "Typically daily, averaged monthly", color: "teal" },
+      { label: "Interpretation", value: "Return per unit volume ≈ impact", color: "slate" },
+    ],
+    body: [
+      `Amihud (2002) proposed the average daily ratio of absolute return to dollar (or share) volume as a practical measure of illiquidity. On days when a given volume produces a large price move, the ratio is high and the stock is deemed less liquid. The measure requires only daily data, making it computable over long histories and across many markets.`,
+      `Although it does not separately identify adverse selection from other sources of impact, the Amihud ratio correlates strongly with microstructure-based measures of price impact and with the adverse-selection component of the spread. It has become a standard control and sorting variable in asset-pricing studies of liquidity risk.`,
+      `Refinements include square-root versions, robust averaging, and adjustments for zero-volume days. Its simplicity remains its greatest advantage for large-scale empirical work.`
+    ],
+    keyPoint: "The Amihud measure is the low-frequency workhorse of empirical illiquidity. It translates the idea of price impact into a statistic that can be computed wherever daily returns and volumes exist."
+  },
+  {
+    era: "Spread",
+    icon: "📏",
+    title: "Roll Measure of Effective Spread",
+    desc: "An estimator of the effective bid–ask spread derived solely from the serial covariance of returns, under the assumption that the efficient price follows a random walk and the only friction is a constant spread",
+    badge: { label: "Classic", style: "slate" },
+    tags: [["Roll","slate"], ["effective spread","teal"], ["serial covariance","amber"], ["implicit spread",""]],
+    data: [
+      { label: "Formula", value: "2 √(−Cov(Δp_t, Δp_{t−1}))", color: "slate" },
+      { label: "Assumption", value: "Random-walk efficient price + constant spread", color: "teal" },
+      { label: "Use", value: "Spread when quotes are unavailable", color: "amber" },
+    ],
+    body: [
+      `Roll (1984) observed that if the only deviation from a random-walk efficient price is a constant bid–ask bounce, then successive price changes are negatively serially correlated and the magnitude of that covariance identifies the spread. The resulting estimator—twice the square root of the negative first-order autocovariance of returns—requires no quote data and can be computed from transaction prices alone.`,
+      `The measure is an estimate of the effective spread under strong assumptions. In practice those assumptions are violated by time-varying spreads, inventory effects, and genuine return autocorrelation, so the Roll estimator is often biased downward or undefined (when the sample covariance is positive). Robust variants and Bayesian adjustments are commonly applied.`,
+      `Despite its limitations, the Roll measure remains a foundational tool for historical or data-poor settings and a useful benchmark against which quote-based effective-spread calculations can be compared.`
+    ],
+    keyPoint: "The Roll measure extracts an implied spread from the bounce of transaction prices. It is the classic demonstration that adverse-selection and order-processing costs leave a detectable statistical footprint even without an observable order book."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

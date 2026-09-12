@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 12.1 Order Book Dynamics</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 12 · Section 12.1</div>
+      <h1 class="book-title">Order Book<br><em>Dynamics</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">LOB · queue · depth · imbalance · resilience · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>12.1 Order Book Dynamics</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Structure",
+    icon: "📖",
+    title: "Limit Order Book (LOB) Structure",
+    desc: "The organised collection of outstanding limit orders at discrete price levels that constitutes the visible supply and demand for an instrument",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["LOB","slate"], ["limit orders","teal"], ["price-time priority","amber"], ["central limit",""]],
+    data: [
+      { label: "Sides", value: "Bid (buy) and Ask (sell) books", color: "slate" },
+      { label: "Levels", value: "Discrete ticks with aggregated size", color: "teal" },
+      { label: "Priority", value: "Price first, then time (usually)", color: "amber" },
+    ],
+    body: [
+      `A limit order book is the canonical market mechanism in modern electronic exchanges. Participants submit limit orders that rest at specified prices until they are filled, cancelled or modified. The book aggregates these orders into a ladder of price levels, each showing the total quantity available to buy (bid) or sell (ask) at that price.`,
+      `Most equity, futures and many FX venues operate a central limit order book (CLOB) with strict price-time priority: better prices execute first; at the same price, earlier orders execute first. Some markets use pro-rata or hybrid matching, but the LOB paradigm remains dominant.`,
+      `The LOB is the primary source of short-term liquidity information. Its evolution—new orders, cancellations, trades—is the raw material of microstructure research and of any high-frequency or execution algorithm.`
+    ],
+    keyPoint: "The limit order book is the living map of visible liquidity. Every subsequent concept—queue, depth, imbalance, resilience—is a description of its geometry or of how that geometry changes."
+  },
+  {
+    era: "Mechanics",
+    icon: "⚙️",
+    title: "Bid-Ask Queue Mechanics",
+    desc: "The rules and dynamics that govern how orders join, advance and leave the queues at each price level on the bid and ask sides",
+    badge: { label: "Mechanics", style: "teal" },
+    tags: [["queue","teal"], ["matching","amber"], ["cancel / replace","slate"], ["FIFO",""]],
+    data: [
+      { label: "Join", value: "New limit order added to tail", color: "teal" },
+      { label: "Advance", value: "Ahead orders fill or cancel", color: "amber" },
+      { label: "Exit", value: "Fill, cancel, or modify", color: "slate" },
+    ],
+    body: [
+      `At each price level the book maintains a queue of orders. Under price-time priority a newly arriving limit order is placed at the back of the queue at that price. It advances only when orders ahead of it are executed or cancelled. A marketable order that lifts the ask (or hits the bid) consumes size from the front of the opposing queue.`,
+      `Cancellations and modifications are first-class events. A large fraction of order-book activity consists of orders that never trade; they are submitted to gain queue priority or to probe liquidity and are later withdrawn. Understanding the relative rates of arrival, cancellation and execution is essential for modelling fill probability and adverse selection.`,
+      `Queue dynamics differ markedly between the touch (top of book) and deeper levels, and between calm and volatile regimes. Empirical queue models therefore condition on side, distance from mid, and local market state.`
+    ],
+    keyPoint: "Queue mechanics determine who gets filled and at what price. Time priority turns the order book into a strategic race for position as much as a pure price auction."
+  },
+  {
+    era: "Priority",
+    icon: "🥇",
+    title: "Queue Position and Execution Priority",
+    desc: "The rank of an order within its price-level queue and the consequent probability and timing of execution",
+    badge: { label: "Critical", style: "red" },
+    tags: [["queue position","red"], ["priority","teal"], ["fill probability","amber"], ["adverse selection",""]],
+    data: [
+      { label: "Value", value: "Front of queue = higher fill odds", color: "teal" },
+      { label: "Cost", value: "Later position = more adverse selection", color: "red" },
+      { label: "Strategy", value: "Join, improve, or take", color: "amber" },
+    ],
+    body: [
+      `An order’s queue position is its rank among resting orders at the same price. The first order in the queue is filled first when the price is touched; the last order may never fill if the level is only partially consumed or if the market moves away. Expected fill time and fill probability therefore decline sharply with position.`,
+      `Worse positions also suffer greater adverse selection: by the time a back-of-queue order is reached, the information that caused the price to trade through the level has already been revealed, so the remaining size is more likely to be picked off. Market makers and execution algorithms therefore invest heavily in obtaining and defending favourable queue priority.`,
+      `When full depth-of-book data are available, queue position can be tracked exactly; with only aggregated size, it must be inferred statistically from the sequence of trades and quote updates.`
+    ],
+    keyPoint: "Queue position is a scarce, valuable resource. In many regimes it matters as much as the price of the order itself for realised execution quality."
+  },
+  {
+    era: "Depth",
+    icon: "📚",
+    title: "Order Book Depth and Market Impact",
+    desc: "The quantity of liquidity available at successive price levels and the price displacement required to consume a given size",
+    badge: { label: "Liquidity", style: "amber" },
+    tags: [["depth","amber"], ["market impact","red"], ["slippage","teal"], ["walk the book",""]],
+    data: [
+      { label: "Depth", value: "Size available at each level", color: "amber" },
+      { label: "Impact", value: "Price move to execute size Q", color: "red" },
+      { label: "Shape", value: "Often concave / square-root-like", color: "teal" },
+    ],
+    body: [
+      `Depth is the volume resting at each price level (or the cumulative volume within a certain distance of the mid). A deep book can absorb large market orders with little price movement; a thin book produces immediate and often persistent impact. Market impact of a marketable order is literally the act of “walking the book” until the desired size is filled.`,
+      `Empirical impact curves are typically concave: the marginal price cost of additional size declines, consistent with latent liquidity and with square-root-type models. Impact also depends on the speed of execution, the prevailing volatility, and whether the order is expected or stealthy.`,
+      `Depth is itself dynamic. It evaporates under stress (liquidity dry-up) and rebuilds after large trades (resilience). Any realistic impact model must therefore treat depth as a state variable, not a constant.`
+    ],
+    keyPoint: "Depth is the raw material of liquidity; market impact is the price of consuming it. The shape and stability of the depth profile determine how costly size really is."
+  },
+  {
+    era: "Signal",
+    icon: "⚖️",
+    title: "Order Book Imbalance as Signal",
+    desc: "The relative size of bid versus ask queues (or cumulative depth) used as a short-term predictor of mid-price moves and of the next trade direction",
+    badge: { label: "Signal", style: "teal" },
+    tags: [["imbalance","teal"], ["OBI","amber"], ["predictive","slate"], ["order flow",""]],
+    data: [
+      { label: "Form", value: "(Bid size − Ask size) / (Bid + Ask)", color: "teal" },
+      { label: "Horizon", value: "Milliseconds to minutes", color: "amber" },
+      { label: "Edge", value: "Predicts short-term mid moves", color: "slate" },
+    ],
+    body: [
+      `Order-book imbalance (OBI) measures the asymmetry between standing buy and sell liquidity, most often at the best bid and ask or within a few ticks of the mid. A large positive imbalance (far more size on the bid) statistically predicts an upward move in the mid price, and vice versa, because it both signals buying pressure and mechanically makes an upward tick more likely once the ask is depleted.`,
+      `The predictive power is strongest at short horizons and decays as the book is reshuffled by new arrivals and cancellations. Imbalance is therefore a classic high-frequency feature used in market-making, short-term directional signals, and optimal limit-order placement.`,
+      `Refinements include multi-level imbalance, volume-weighted imbalance, and imbalance conditioned on recent order-flow toxicity. All require careful handling of latency and of the difference between displayed and true available size.`
+    ],
+    keyPoint: "Order-book imbalance is one of the purest expressions of short-term supply and demand. It converts the static geometry of the book into a dynamic, tradable signal."
+  },
+  {
+    era: "Pricing",
+    icon: "🎯",
+    title: "Microprice: Weighted Mid Based on Order Imbalance",
+    desc: "A volume-weighted mid-price that adjusts the simple midpoint by the relative sizes of the best bid and ask queues",
+    badge: { label: "Refined", style: "amber" },
+    tags: [["microprice","amber"], ["weighted mid","teal"], ["fair value","slate"], ["BBO sizes",""]],
+    data: [
+      { label: "Formula", value: "(V_b · Ask + V_a · Bid) / (V_b + V_a)", color: "amber" },
+      { label: "Bias", value: "Pulled toward the thinner side", color: "teal" },
+      { label: "Use", value: "Short-term fair-value proxy", color: "slate" },
+    ],
+    body: [
+      `The ordinary mid-price treats the best bid and ask symmetrically. The microprice (or weighted mid) recognises that a larger queue on one side makes a move in the opposite direction more probable. It is typically defined as a size-weighted average of the best bid and ask, so that the microprice lies closer to the side with less size (the side more likely to be depleted).`,
+      `Empirically the microprice is a better short-horizon predictor of the next mid-price than the raw mid, and it reduces the apparent bid–ask bounce in mark-to-market calculations. It is widely used as a fair-value reference inside market-making and execution algorithms.`,
+      `Extensions incorporate deeper levels, recent trade direction, or a decay factor that tempers the weight of very large, possibly fleeting, sizes. The core insight remains: the book’s asymmetry contains information that the simple midpoint discards.`
+    ],
+    keyPoint: "Microprice is the mid-price corrected for queue imbalance. It is a minimal, high-signal adjustment that improves almost every short-term pricing and marking application."
+  },
+  {
+    era: "Dynamics",
+    icon: "🔄",
+    title: "Order Book Resilience",
+    desc: "The speed and extent to which depth and spreads recover after a liquidity-consuming event such as a large trade or a burst of cancellations",
+    badge: { label: "Dynamics", style: "slate" },
+    tags: [["resilience","slate"], ["liquidity recovery","teal"], ["post-trade","amber"], ["stability",""]],
+    data: [
+      { label: "Metric", value: "Time / path of depth recovery", color: "slate" },
+      { label: "Fast", value: "Liquid names, calm regimes", color: "teal" },
+      { label: "Slow", value: "Stress, thin books, news", color: "red" },
+    ],
+    body: [
+      `Resilience describes how quickly the order book replenishes after it has been depleted. A resilient book sees new limit orders arrive rapidly at the depleted levels, restoring depth and often the original spread. A non-resilient book remains thin, spreads stay wide, and subsequent trades suffer elevated impact.`,
+      `Resilience is a function of the competitive intensity of liquidity providers, of the information content of the original shock, and of prevailing volatility and inventory constraints. It can be measured by the half-life of depth recovery, by the path of the spread, or by the cumulative volume that reappears within fixed time windows.`,
+      `Execution algorithms and market-impact models that ignore resilience systematically mis-estimate the cost of large or urgent orders, especially in regimes where liquidity providers step back after informed flow.`
+    ],
+    keyPoint: "Resilience is the book’s capacity to heal. Impact is not only how far price moves when liquidity is consumed, but how long the market remains impaired afterward."
+  },
+  {
+    era: "Geometry",
+    icon: "🪜",
+    title: "Price Levels and Bid/Ask Ladder",
+    desc: "The discrete tick grid on which limit orders may rest and the resulting stepped shape of cumulative depth on each side of the book",
+    badge: { label: "Structure", style: "teal" },
+    tags: [["price levels","teal"], ["tick size","amber"], ["ladder","slate"], ["cumulative depth",""]],
+    data: [
+      { label: "Tick", value: "Minimum price increment", color: "amber" },
+      { label: "Ladder", value: "Ordered sequence of levels", color: "teal" },
+      { label: "Shape", value: "Cumulative size vs. distance", color: "slate" },
+    ],
+    body: [
+      `Exchanges quote prices on a discrete tick grid. The bid/ask ladder is the ordered list of those ticks that currently contain resting size, together with the aggregate quantity at each tick. Cumulative depth as a function of distance from the mid produces the familiar “ladder” or “depth chart” visualisation.`,
+      `Tick size is a first-order institutional parameter: a larger tick coarsens the ladder, increases the value of queue priority at each level, and can widen effective spreads; a smaller tick allows finer pricing but may fragment size across more levels and raise messaging traffic.`,
+      `The shape of the ladder—how rapidly cumulative size grows with distance from the mid—determines the convexity of market impact and the attractiveness of limit orders placed at different depths.`
+    ],
+    keyPoint: "The bid/ask ladder is the discrete geometry of visible liquidity. Tick size and the distribution of size across levels jointly govern both the cost of taking liquidity and the value of providing it."
+  },
+  {
+    era: "Top",
+    icon: "🔝",
+    title: "Best Bid/Offer (BBO)",
+    desc: "The highest-priced bid and lowest-priced offer currently resting in the book — the tightest available quotes and the locus of most immediate trading interest",
+    badge: { label: "Top of Book", style: "amber" },
+    tags: [["BBO","amber"], ["NBBO","teal"], ["touch","slate"], ["top of book",""]],
+    data: [
+      { label: "Best Bid", value: "Highest buy limit price", color: "teal" },
+      { label: "Best Offer", value: "Lowest sell limit price", color: "amber" },
+      { label: "Spread", value: "Best Offer − Best Bid", color: "red" },
+    ],
+    body: [
+      `The best bid and best offer (collectively BBO) define the inside market. Their difference is the quoted spread; their sizes are the quantities immediately available for a marketable order that does not walk deeper. In fragmented markets the National Best Bid and Offer (NBBO) aggregates the BBO across venues.`,
+      `Most short-term signals, microprice calculations and market-making quotes are anchored to the BBO. Changes in the BBO—improvements, deteriorations, or flips—are among the highest-frequency and highest-information events in the order-book stream.`,
+      `Because the BBO concentrates attention and order flow, competition for queue priority at the touch is especially intense, and the adverse-selection and fill-probability characteristics of the top of book differ systematically from those of deeper levels.`
+    ],
+    keyPoint: "The BBO is the frontier of the order book. It is where spreads are measured, where most aggressive flow interacts, and where the informational and strategic battles of microstructure are most visible."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

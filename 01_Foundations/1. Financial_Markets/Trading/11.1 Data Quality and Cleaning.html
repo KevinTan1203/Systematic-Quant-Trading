@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 11.1 Data Quality and Cleaning</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 11 · Section 11.1</div>
+      <h1 class="book-title">Data Quality<br><em>&amp; Cleaning</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Integrity → point-in-time → robustness · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>11.1 Data Quality and Cleaning</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Bias",
+    icon: "🪦",
+    title: "Survivorship Bias in Equity Data",
+    desc: "Systematic overstatement of returns and understatement of risk caused by excluding delisted or failed securities",
+    badge: { label: "Critical", style: "red" },
+    tags: [["survivorship","red"], ["delisting","amber"], ["universe construction","slate"], ["backtest integrity","teal"]],
+    data: [
+      { label: "Effect size", value: "Often +1–3 % p.a. on equity indices", color: "red" },
+      { label: "Primary fix", value: "Point-in-time universe + delisting returns", color: "teal" },
+      { label: "Worst case", value: "Small-cap & high-turnover strategies", color: "amber" },
+    ],
+    body: [
+      `Survivorship bias arises when historical datasets retain only securities that still exist at the end of the sample. Failed, acquired, or delisted names disappear, so average returns are inflated and volatility, drawdowns, and left-tail events are understated. The bias is especially severe in small-cap, micro-cap, and emerging-market universes where attrition rates are high.`,
+      `Classic manifestations include back-tests that appear to beat the market by a wide margin yet collapse once the true point-in-time membership is restored. Even sophisticated factor models can embed survivorship if the estimation universe is constructed from today’s survivors rather than the actual tradable set on each historical date.`,
+      `Proper remediation requires a complete historical membership file (including dead names), accurate delisting dates, and explicit handling of terminal returns. Vendor “current-universe” files are almost always survivorship-biased and should never be used for serious research without reconstruction.`
+    ],
+    keyPoint: "Any equity back-test that ignores delisted names is, to a first approximation, fiction. Survivorship bias is not a minor statistical nuisance; it is often the dominant source of apparent alpha in naïve historical studies."
+  },
+  {
+    era: "Terminal",
+    icon: "📉",
+    title: "Delisting Returns Handling",
+    desc: "Correct treatment of the final return of securities that cease trading—merger consideration, bankruptcy residuals, or pure disappearance",
+    badge: { label: "Critical", style: "red" },
+    tags: [["delisting return","red"], ["CRSP","slate"], ["bankruptcy","amber"], ["M&A","teal"]],
+    data: [
+      { label: "Typical loss", value: "−30 % to −100 % on pure delists", color: "red" },
+      { label: "Best source", value: "CRSP delisting codes + returns", color: "teal" },
+      { label: "Common error", value: "Dropping the name at last close", color: "amber" },
+    ],
+    body: [
+      `When a security is delisted, the investor’s economic outcome is rarely the last traded price. In liquid mergers the terminal value is the cash or stock consideration; in bankruptcy it is often near zero after a prolonged decline; in regulatory or exchange-driven delists the residual value can be highly uncertain. Simply removing the name at the last available close systematically biases performance upward.`,
+      `CRSP provides carefully constructed delisting returns for U.S. equities, coded by reason (merger, exchange, liquidation, etc.). Outside the U.S., researchers must reconstruct terminal values from corporate-action files, news, and bankruptcy dockets. For international or OTC names the data quality is frequently poor, forcing conservative assumptions (e.g., −100 % or −30 % for performance delists).`,
+      `In portfolio simulations the delisting return must be applied on the correct date and the position must be closed; continuing to mark the security at stale prices or carrying it at zero without a realized loss both distort risk and return statistics.`
+    ],
+    keyPoint: "The single most common and most damaging data-handling error in equity research is treating a delisting as a clean exit at the last quoted price. Explicit delisting returns are non-negotiable for credible performance measurement."
+  },
+  {
+    era: "Integrity",
+    icon: "⏳",
+    title: "Point-in-Time Data (Avoiding Look-Ahead)",
+    desc: "Ensuring every datum used in a decision was actually knowable at the moment the decision is simulated",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["point-in-time","slate"], ["look-ahead bias","red"], ["as-of date","teal"], ["restatements","amber"]],
+    data: [
+      { label: "Risk", value: "Look-ahead inflates almost every metric", color: "red" },
+      { label: "Key fields", value: "Fundamentals, estimates, indices, ratings", color: "" },
+      { label: "Discipline", value: "Strict as-of / knowledge timestamps", color: "teal" },
+    ],
+    body: [
+      `Point-in-time (PIT) data records not only the value of a field but the exact moment that value became available to market participants. Using a restated earnings figure, a revised index membership, or a later analyst estimate in a historical simulation introduces look-ahead bias that can turn mediocre strategies into apparent powerhouses.`,
+      `Critical domains include: fundamental data (original vs. restated filings), earnings estimates and actuals (timestamp of the release), index and ETF constituents (announcement vs. effective date), credit ratings, and even corporate-action effective dates. Many commercial databases supply both “current” and “point-in-time” views; only the latter is safe for research.`,
+      `Implementation requires a dual-timestamp design: the economic date of the observation and the knowledge date (when it entered the analyst’s information set). Any back-test engine that cannot answer “was this number known on date t?” is fundamentally compromised.`
+    ],
+    keyPoint: "Look-ahead bias is silent, pervasive, and usually larger than the edge being studied. Point-in-time discipline is the single most important hygiene factor separating serious quant research from back-test theatre."
+  },
+  {
+    era: "Events",
+    icon: "🔀",
+    title: "Corporate Actions: Splits, Dividends, Mergers",
+    desc: "Accurate capture and application of the full spectrum of capital events that alter prices, shares outstanding, and investor cash flows",
+    badge: { label: "Core", style: "amber" },
+    tags: [["splits","amber"], ["dividends","teal"], ["mergers","slate"], ["spin-offs","red"]],
+    data: [
+      { label: "Price impact", value: "Splits & dividends require adjustment", color: "amber" },
+      { label: "Cash impact", value: "Dividends & special distributions", color: "teal" },
+      { label: "Identity change", value: "M&A, spin-offs, name changes", color: "slate" },
+    ],
+    body: [
+      `Corporate actions fall into three broad categories: (1) pure price adjustments (stock splits, reverse splits, stock dividends), (2) cash distributions (ordinary and special dividends, return of capital), and (3) identity-changing events (mergers, acquisitions, spin-offs, bankruptcies, ticker or CUSIP changes). Each must be handled with both economic and technical correctness.`,
+      `Failure modes are numerous: missing a large special dividend turns a profitable long position into an apparent loss; incorrect split factors create artificial jumps that destroy any technical or statistical model; unhandled spin-offs leave orphan positions or incorrect cost bases. International markets add complexity with local conventions, tax treatments, and less standardized announcement-to-effective lag structures.`,
+      `A robust corporate-action engine maintains an event calendar, applies adjustments in the correct chronological order, tracks cash flows separately from price returns, and preserves the mapping between historical identifiers and the economic security through time.`
+    ],
+    keyPoint: "Corporate actions are not edge cases; they are the primary mechanism by which equity capital structures evolve. Incomplete or mistimed handling is a leading cause of both back-test inflation and live-trading discrepancies."
+  },
+  {
+    era: "Adjustment",
+    icon: "🔧",
+    title: "Price Adjustment Methodologies",
+    desc: "Alternative conventions for constructing continuous price series—backward adjustment, forward adjustment, total-return, and unadjusted—and their consequences",
+    badge: { label: "Numerics", style: "amber" },
+    tags: [["adjusted close","amber"], ["total return","teal"], ["split factor","slate"], ["dividend reinvestment",""]],
+    data: [
+      { label: "Common", value: "Backward adjustment (CRSP-style)", color: "amber" },
+      { label: "Use case", value: "Technical analysis & charting", color: "" },
+      { label: "Research", value: "Total-return series preferred", color: "teal" },
+    ],
+    body: [
+      `Most vendors supply “adjusted” closing prices that remove the mechanical effects of splits and, optionally, dividends. The dominant convention is backward adjustment: historical prices are scaled so that the series is continuous at the most recent price. Forward adjustment keeps the oldest prices fixed and scales subsequent observations; it is rarer but useful for certain accounting and tax calculations.`,
+      `For pure price-momentum or chart-based work, split-adjusted series are usually sufficient. For performance measurement, risk modelling, and any strategy that earns dividends, a total-return series (price plus reinvested dividends) is required. Mixing the two produces inconsistent results. Special dividends, rights issues, and spin-offs often receive incomplete treatment even in high-quality databases.`,
+      `Researchers must also decide whether to adjust volume (share volume should be scaled by the inverse of the split factor) and whether to maintain an unadjusted series for corporate-action reconstruction and audit. Documenting the exact adjustment policy is essential for reproducibility.`
+    ],
+    keyPoint: "There is no single “correct” adjusted price series—only series that are appropriate for a given purpose. Clarity about whether dividends are reinvested, how specials are treated, and which direction the adjustment runs is mandatory."
+  },
+  {
+    era: "Anomalies",
+    icon: "🚨",
+    title: "Outlier Detection and Handling",
+    desc: "Systematic identification and treatment of extreme or implausible observations without destroying genuine tail information",
+    badge: { label: "Robustness", style: "teal" },
+    tags: [["outliers","teal"], ["winsorization","amber"], ["fat tails","red"], ["data errors","slate"]],
+    data: [
+      { label: "Danger", value: "Genuine extremes vs. data errors", color: "red" },
+      { label: "Methods", value: "IQR, MAD, robust z, domain rules", color: "teal" },
+      { label: "Policy", value: "Flag, investigate, then treat", color: "amber" },
+    ],
+    body: [
+      `Market data contain both true extreme moves (flash crashes, earnings gaps, geopolitical shocks) and pure errors (decimal-place mistakes, bad prints, corporate-action mis-applications). Blindly deleting or winsorizing extremes discards valuable information about tail risk; ignoring errors injects noise and spurious signals into every downstream model.`,
+      `Effective pipelines combine statistical screens (median absolute deviation, interquartile range, robust z-scores) with domain-specific rules (price changes exceeding exchange limit-up/down thresholds, zero-volume prints, crossed markets). Suspicious points are flagged rather than immediately altered; human or automated secondary review then decides among correction, deletion, or retention with a confidence weight.`,
+      `For returns-based research a common robust practice is soft winsorization or ranking-based transformations that limit the influence of any single observation while preserving rank order. Hard deletion should be reserved for observations that can be proven erroneous.`
+    ],
+    keyPoint: "Outlier handling is a bias–variance trade-off with an epistemic component: the goal is not to make the data “nice,” but to remove only those observations that would not have been tradeable or that demonstrably never occurred."
+  },
+  {
+    era: "Gaps",
+    icon: "🧩",
+    title: "Missing Data Imputation",
+    desc: "Principled strategies for dealing with absent observations—ranging from list-wise deletion to model-based imputation—while respecting the missingness mechanism",
+    badge: { label: "Analytics", style: "teal" },
+    tags: [["imputation","teal"], ["MAR / MNAR","amber"], ["forward-fill","slate"], ["multiple imputation","red"]],
+    data: [
+      { label: "Mechanism", value: "MCAR / MAR / MNAR diagnosis first", color: "amber" },
+      { label: "Simple", value: "LOCF, interpolation, cross-sectional median", color: "" },
+      { label: "Advanced", value: "EM, multiple imputation, matrix completion", color: "teal" },
+    ],
+    body: [
+      `Missingness in financial data is rarely completely at random. Prices may be absent because a security did not trade (informative), because of a vendor outage (less informative), or because of deliberate delays in emerging markets. Treating all gaps identically produces biased estimates of volatility, correlation, and factor exposures.`,
+      `For high-frequency or daily price series, last-observation-carried-forward (LOCF) is common but induces artificial zero returns and understates volatility. Linear or spline interpolation can be preferable for visualization yet still distorts returns. Cross-sectional imputation (using related securities or factor models) is often superior when the missingness is security-specific.`,
+      `In panel settings with fundamentals or alternative data, multiple imputation or expectation-maximization procedures that respect the covariance structure are preferred. Whatever method is chosen, the imputation model must itself be point-in-time and the uncertainty introduced by imputation should be propagated into subsequent inference.`
+    ],
+    keyPoint: "Imputation is not a neutral preprocessing step; it is a modelling decision. The safest default is often to keep missingness explicit and let the downstream estimator handle unbalanced panels, rather than inventing data."
+  },
+  {
+    era: "Calendar",
+    icon: "📅",
+    title: "Exchange Holiday Calendars",
+    desc: "Accurate mapping of trading versus non-trading days across venues, including early closes, ad-hoc closures, and cross-border differences",
+    badge: { label: "Infrastructure", style: "slate" },
+    tags: [["holidays","slate"], ["trading calendar","teal"], ["early close","amber"], ["multi-venue",""]],
+    data: [
+      { label: "Scope", value: "Full & partial holidays, early closes", color: "slate" },
+      { label: "Risk", value: "Misaligned returns & stale data", color: "red" },
+      { label: "Best practice", value: "Venue-specific, versioned calendars", color: "teal" },
+    ],
+    body: [
+      `Every exchange maintains its own holiday schedule, early-close rules, and occasional unscheduled closures (weather, technical failures, national mourning). Using a single “U.S. equity calendar” for a global universe, or ignoring early closes, produces misaligned return series, incorrect overnight/gap calculations, and faulty volatility estimates.`,
+      `Multi-listed securities and ADRs introduce further complexity: a price may be available on one venue while the primary market is closed. For strategies that trade across time zones or that rely on synchronized snapshots (e.g., index arbitrage, statistical arbitrage), the precise intersection of trading sessions must be known.`,
+      `Production systems maintain versioned, venue-specific calendars that include both regular holidays and historical exceptions. These calendars drive data alignment, back-test day counts, and live trading schedules. Relying on a static list of “New York holidays” is a frequent source of subtle but material errors.`
+    ],
+    keyPoint: "A trading calendar is not a convenience; it is part of the definition of a return. Incorrect calendars silently corrupt every time-based statistic that follows."
+  },
+  {
+    era: "Microstructure",
+    icon: "🔍",
+    title: "Tick Data Cleaning (Erroneous Prints)",
+    desc: "Detection and removal of bad ticks, outlier prints, crossed markets, and other artifacts that contaminate high-frequency series",
+    badge: { label: "HFT / HF", style: "red" },
+    tags: [["bad ticks","red"], ["quote cleaning","teal"], ["BBO","amber"], ["trade conditions","slate"]],
+    data: [
+      { label: "Sources", value: "Fat-finger, crossed, late, cancelled", color: "red" },
+      { label: "Filters", value: "Price vs. BBO, condition codes, MAD", color: "teal" },
+      { label: "Impact", value: "Corrupts spreads, volatility, signals", color: "amber" },
+    ],
+    body: [
+      `Raw tick data contain a non-negligible fraction of non-informative or erroneous prints: trades reported outside the prevailing bid–ask, trades with special condition codes (average-price, bunched, late), cancelled or busted trades, and occasional decimal or currency errors. Even a handful of such prints can dominate high-frequency volatility estimators or generate false signals.`,
+      `Standard cleaning pipelines apply a sequence of filters: (1) condition-code exclusion, (2) comparison of trade price with contemporaneous best bid and offer (often requiring the trade to lie inside or within a small tolerance of the BBO), (3) robust statistical screens on returns or quote updates, and (4) removal of locked or crossed markets for quote-based analysis. Different research questions tolerate different residual error rates.`,
+      `Because cleaning rules interact with the microstructure of each venue, a one-size-fits-all filter is rarely optimal. Documenting the exact sequence of rules and validating residual series against known benchmarks (e.g., official exchange volume, VWAP) is essential for reproducibility and for avoiding the introduction of new biases.`
+    ],
+    keyPoint: "High-frequency research is only as good as its tick-cleaning rules. Unfiltered prints are not “more data”—they are contamination that systematically distorts every microstructure statistic."
+  },
+  {
+    era: "Integration",
+    icon: "🔗",
+    title: "Data Normalization Across Vendors",
+    desc: "Reconciling identifiers, corporate actions, timestamps, and conventions so that multiple data sources can be combined without introducing artifacts",
+    badge: { label: "Production", style: "slate" },
+    tags: [["identifiers","slate"], ["vendor differences","amber"], ["mapping","teal"], ["reconciliation","red"]],
+    data: [
+      { label: "Pain points", value: "Tickers, CUSIPs, FIGIs, timestamps", color: "amber" },
+      { label: "Actions", value: "Splits & dividends applied differently", color: "red" },
+      { label: "Solution", value: "Master security file + event ledger", color: "teal" },
+    ],
+    body: [
+      `No two vendors apply identical conventions. Identifier schemes differ (ticker vs. CUSIP vs. ISIN vs. FIGI vs. internal keys); corporate-action effective dates and adjustment factors diverge; timestamp conventions (exchange time, UTC, publication lag) are inconsistent; and even the definition of “closing price” can vary (last trade, official close, VWAP).`,
+      `Naïve joins on ticker and date therefore produce both missing matches and false matches, especially around ticker reuse, class changes, and dual-listed securities. The only robust architecture is a master security master that maps every vendor identifier to a stable internal key through time, together with a unified corporate-action ledger that records the canonical treatment of each event.`,
+      `Normalization also requires explicit policies for conflict resolution (which vendor is authoritative for prices, for fundamentals, for estimates) and continuous reconciliation reports that surface residual discrepancies. Without this infrastructure, multi-vendor research pipelines silently accumulate inconsistencies that are extremely costly to diagnose later.`
+    ],
+    keyPoint: "Vendor data are not interchangeable building blocks; they are partially overlapping, differently calibrated representations of the same underlying reality. Normalization is the engineering discipline that makes multi-source quant research possible."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 11.5 Transaction Cost Modeling</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 11 · Section 11.5</div>
+      <h1 class="book-title">Transaction Cost<br><em>Modeling</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Spread → impact → fees → budget → optimize · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>11.5 Transaction Cost Modeling</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Spread",
+    icon: "↔️",
+    title: "Spread Cost: 0.5 × Spread",
+    desc: "The elementary half-spread cost incurred when crossing the bid–ask to obtain immediate liquidity",
+    badge: { label: "Baseline", style: "teal" },
+    tags: [["half-spread","teal"], ["bid-ask","amber"], ["immediate cost","slate"], ["liquidity premium",""]],
+    data: [
+      { label: "Formula", value: "0.5 × (ask − bid) / mid", color: "teal" },
+      { label: "Assumption", value: "Fill at the far touch", color: "amber" },
+      { label: "Use", value: "Lower bound on round-trip cost", color: "slate" },
+    ],
+    body: [
+      `The simplest transaction-cost model charges half the prevailing quoted spread for each aggressive (marketable) order. Buying at the ask and later selling at the bid therefore costs approximately one full spread round-trip, ignoring impact and fees. The quantity is usually expressed in basis points of the mid price: \(0.5 \times (P_{\text{ask}} - P_{\text{bid}}) / P_{\text{mid}}\).`,
+      `This half-spread term captures the pure cost of immediacy. It is an excellent starting point for liquid large-cap equities and major FX pairs where spreads are tight and stable, but it systematically understates costs for larger orders that walk the book or for names whose quoted spread is a poor proxy for effective spread.`,
+      `In simulation the half-spread is typically applied at the decision mid or at the arrival price. More refined implementations use time-of-day or volatility-conditioned spreads, or replace the quoted spread with a measured effective spread from trade-and-quote data.`
+    ],
+    keyPoint: "Half-spread is the irreducible price of crossing the market. Every more elaborate cost model should recover it as the limiting case of vanishing order size."
+  },
+  {
+    era: "Classic",
+    icon: "📐",
+    title: "Market Impact Model (Almgren–Chriss)",
+    desc: "The canonical optimal-execution framework that decomposes impact into temporary and permanent components and yields a closed-form trading trajectory",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["Almgren-Chriss","slate"], ["optimal execution","teal"], ["temporary / permanent","amber"], ["trajectory",""]],
+    data: [
+      { label: "Core idea", value: "Trade-off speed vs. impact & risk", color: "slate" },
+      { label: "Output", value: "Optimal schedule & expected cost", color: "teal" },
+      { label: "Parameters", value: "η (temp), γ (perm), λ (risk aversion)", color: "amber" },
+    ],
+    body: [
+      `Almgren & Chriss (2000/2001) model the price process as an arithmetic Brownian motion plus a permanent impact term linear in the cumulative quantity traded and a temporary impact term that depends on the instantaneous trading rate. The executor minimises a mean–variance objective of implementation shortfall, producing an optimal trading trajectory that is typically front-loaded relative to a naïve VWAP.`,
+      `The framework supplies both a practical cost formula and a rigorous way to think about the speed–cost–risk trade-off. Temporary impact is paid once and recovered after trading ceases; permanent impact permanently shifts the price path and is therefore shared with all subsequent market participants (including the trader’s own remaining inventory).`,
+      `Although the original linear-impact, arithmetic-BM assumptions are stylised, the Almgren–Chriss decomposition remains the conceptual backbone of most institutional execution algorithms and of the cost models used inside portfolio construction.`
+    ],
+    keyPoint: "Almgren–Chriss turned market impact from an empirical nuisance into an optimisable control problem. Its temporary/permanent split and mean–variance objective still organise almost all modern transaction-cost thinking."
+  },
+  {
+    era: "Impact",
+    icon: "📈",
+ dual: "Linear Impact: α × σ × √(V/ADV)",
+    title: "Linear Impact: α × σ × √(V/ADV)",
+    desc: "A widely used reduced-form impact rule in which percentage cost scales with volatility and the square root of participation rate",
+    badge: { label: "Empirical", style: "amber" },
+    tags: [["square-root law","amber"], ["participation rate","teal"], ["σ × √(Q/V)","slate"], ["calibration",""]],
+    data: [
+      { label: "Form", value: "α · σ · √(V / ADV)", color: "amber" },
+      { label: "σ", value: "Daily (or horizon) volatility", color: "" },
+      { label: "V/ADV", value: "Order size / average daily volume", color: "teal" },
+    ],
+    body: [
+      `Empirical studies across equities, futures and FX repeatedly find that the average implementation shortfall of a meta-order grows roughly with the square root of the fraction of average daily volume (ADV) that the order represents, scaled by the asset’s volatility. A common working formula is therefore \(\text{Impact (bp)} \approx \alpha \cdot \sigma \cdot \sqrt{V/\text{ADV}}\), where \(\alpha\) is a calibrated prefactor (often in the range 0.5–1.0 for equities when \(\sigma\) is daily).`,
+      `The square-root dependence is milder than linear impact and captures the intuition that doubling participation does not double cost. It is simple enough for real-time portfolio optimisers yet surprisingly robust across regimes once \(\alpha\) is allowed to vary by liquidity bucket or venue.`,
+      `Caveats include the horizon over which ADV and \(\sigma\) are measured, the treatment of very large or very small participation rates (where the power law can break), and the fact that the formula typically embeds both temporary and permanent effects unless further decomposed.`
+    ],
+    keyPoint: "The square-root impact rule is the workhorse of practical cost modelling. It is not a theorem, but it is one of the most reliable empirical regularities in market microstructure."
+  },
+  {
+    era: "Impact",
+    icon: "√",
+    title: "Square-Root Impact Model",
+    desc: "The broader family of models in which temporary or total impact is proportional to the square root of traded volume or participation, often motivated by propagator or latent-order-book arguments",
+    badge: { label: "Theory", style: "teal" },
+    tags: [["square-root","teal"], ["propagator","amber"], ["latent OB","slate"], ["meta-order",""]],
+    data: [
+      { label: "Scaling", value: "Impact ∝ √Q  (or √ participation)", color: "teal" },
+      { label: "Motivation", value: "Empirical + latent liquidity", color: "amber" },
+      { label: "Horizon", value: "Holds for meta-orders over minutes–days", color: "slate" },
+    ],
+    body: [
+      `Beyond the simple practical formula, a theoretical literature (Tóth et al., Donier et al., and others) derives square-root impact from the assumption of a latent order book whose density is locally linear near the mid. A meta-order of size \(Q\) must “eat” through that density, producing a price displacement that scales as \(\sqrt{Q}\). Propagator models that convolve past order flow with a slowly decaying kernel can generate the same average scaling.`,
+      `The square-root law is most reliable for the average impact of meta-orders executed over horizons from a few minutes to a few days and for participation rates that are neither microscopic nor extreme. At the single-trade level impact is closer to linear in volume; at the multi-day portfolio level permanent impact and information effects dominate.`,
+      `For modelling purposes one therefore chooses the square-root form when the object being costed is a parent order or a daily rebalance, and switches to more granular models when simulating individual child orders or high-frequency flow.`
+    ],
+    keyPoint: "Square-root impact is both an empirical fact about meta-orders and a theoretical prediction of simple latent-liquidity models. It bridges microstructure theory and day-to-day portfolio trading cost estimation."
+  },
+  {
+    era: "Decomposition",
+    icon: "⏳",
+    title: "Temporary vs. Permanent Impact",
+    desc: "The distinction between price pressure that decays after trading finishes and the long-lived shift in the price path caused by the information or inventory transferred to the market",
+    badge: { label: "Core", style: "amber" },
+    tags: [["temporary","amber"], ["permanent","red"], ["decay","teal"], ["information",""]],
+    data: [
+      { label: "Temporary", value: "Decays after execution ends", color: "amber" },
+      { label: "Permanent", value: "Shifts the subsequent price path", color: "red" },
+      { label: "Implication", value: "Only permanent affects later marks", color: "teal" },
+    ],
+    body: [
+      `Temporary impact is the additional cost paid to induce liquidity providers to take the other side of the trade; once the meta-order finishes, this component mean-reverts (often within minutes to hours). Permanent impact is the lasting displacement of the mid price that remains after all transient effects have died—commonly attributed to the information content of the order flow or to a durable change in inventory held by intermediaries.`,
+      `The distinction is central to optimal execution: temporary impact is a pure trading cost that can be reduced by slowing down, while permanent impact is incurred regardless of schedule (to first order) and therefore influences the decision of whether to trade at all. In portfolio construction only the permanent component should affect expected future returns of remaining positions.`,
+      `Empirically the two are hard to separate cleanly; most reduced-form models either estimate them jointly or adopt a functional form (e.g., a fast-decaying plus a non-decaying term) that can be calibrated to post-trade price trajectories.`
+    ],
+    keyPoint: "Temporary impact is a transaction cost; permanent impact is a change in the expected price path. Conflating them leads to incorrect optimal schedules and to double-counting of costs inside multi-period portfolio optimisers."
+  },
+  {
+    era: "Fees",
+    icon: "🏛️",
+    title: "Exchange Fees and Rebates",
+    desc: "Explicit venue charges and liquidity-provision rebates that form a first-order component of net transaction cost, especially in maker-taker markets",
+    badge: { label: "Explicit", style: "slate" },
+    tags: [["maker-taker","slate"], ["fees","amber"], ["rebates","teal"], ["venue selection",""]],
+    data: [
+      { label: "Taker fee", value: "Paid for removing liquidity", color: "red" },
+      { label: "Maker rebate", value: "Earned for adding liquidity", color: "teal" },
+      { label: "Net", value: "Often comparable to half-spread", color: "amber" },
+    ],
+    body: [
+      `Modern equity and options venues operate under maker-taker (or inverted taker-maker) schedules. Liquidity-removing orders pay a fee; liquidity-providing orders receive a rebate. The difference can be several basis points—material relative to the quoted spread of liquid names. Routing decisions, order-type choice (limit vs. marketable), and even the design of market-making strategies are heavily influenced by these schedules.`,
+      `Accurate cost models therefore maintain a venue-by-venue, order-type-by-order-type fee table and apply the correct rate at fill time. Aggregation across venues must also account for regulatory fees (SEC, FINRA, CAT, etc.) and clearing charges. In back-tests a constant “all-in” fee is a common simplification, but it hides the value of smart order routing and maker strategies.`,
+      `Because rebates can turn a seemingly expensive spread into a net credit for passive flow, any strategy that systematically provides liquidity must model the rebate side explicitly; otherwise its edge will be understated.`
+    ],
+    keyPoint: "Exchange fees and rebates are not rounding errors; in many liquid markets they are of the same order as the half-spread. Ignoring the maker-taker structure produces both incorrect cost estimates and suboptimal routing logic."
+  },
+  {
+    era: "Shorts",
+    icon: "📉",
+    title: "Borrow Cost for Short Positions",
+    desc: "The continuous financing charge (and occasional hard-to-borrow premia) paid to maintain a short equity or security position",
+    badge: { label: "Financing", style: "red" },
+    tags: [["stock loan","red"], ["borrow fee","amber"], ["HTB","slate"], ["short rebate","teal"]],
+    data: [
+      { label: "General collateral", value: "Near zero to low single-digit %", color: "teal" },
+      { label: "Hard-to-borrow", value: "Can exceed tens of % p.a.", color: "red" },
+      { label: "Impact", value: "Erodes short alpha continuously", color: "amber" },
+    ],
+    body: [
+      `To sell a security short an investor must borrow it, posting collateral and paying a borrow fee (or receiving a reduced rebate on the cash proceeds). For general-collateral names the fee is modest; for hard-to-borrow (HTB) names it can become the dominant cost and can change abruptly when supply tightens. In addition, recall risk forces covering at potentially adverse prices.`,
+      `A realistic cost model therefore maintains a security-level borrow-fee time series (or at least a flag for HTB status) and accrues the fee daily against the short market value. Strategies that rely on shorting crowded or low-supply names must treat borrow cost as a first-class, time-varying input rather than a constant haircut.`,
+      `In portfolio construction the expected borrow cost enters the net alpha of each short; names whose borrow fee exceeds their expected residual return are simply not shorted. Failure to model this cost produces optimistic capacity estimates for short-side alpha.`
+    ],
+    keyPoint: "Borrow cost is the continuous tax on short exposure. For any strategy with a material short book it is as important as spread and impact, and far more heterogeneous across names."
+  },
+  {
+    era: "Budget",
+    icon: "📊",
+    title: "Total Cost Budget Allocation",
+    desc: "The process of assigning an acceptable implementation-shortfall budget across orders, assets or strategies so that trading intensity remains consistent with expected alpha",
+    badge: { label: "Portfolio", style: "amber" },
+    tags: [["cost budget","amber"], ["implementation shortfall","teal"], ["alpha vs cost","slate"], ["participation",""]],
+    data: [
+      { label: "Principle", value: "Cost ≤ fraction of expected alpha", color: "teal" },
+      { label: "Unit", value: "bp of NAV or of order value", color: "amber" },
+      { label: "Control", value: "Max participation / urgency", color: "slate" },
+    ],
+    body: [
+      `Even with perfect cost models, a portfolio manager still needs a policy for how much cost is tolerable. A common discipline is to set a total cost budget as a fraction of expected gross alpha (e.g., costs should not consume more than 30–50 % of the forecast edge) or as an absolute basis-point ceiling per unit of risk or NAV. The budget is then allocated across individual orders according to urgency, liquidity and alpha decay.`,
+      `In practice this appears as constraints inside the portfolio optimiser (maximum participation rate, maximum expected impact) or as an adaptive urgency parameter supplied to the execution algorithm. When realised costs threaten to breach the budget, participation is slowed or the residual order is cancelled.`,
+      `The budget also serves as a governance tool: persistent breaches trigger review of either the alpha model or the cost model. Without an explicit budget, trading desks optimise locally for speed or for minimising visible impact while the aggregate cost quietly erodes the strategy’s edge.`
+    ],
+    keyPoint: "A cost budget converts transaction-cost estimates into an actionable constraint. It forces the organisation to treat implementation shortfall as a scarce resource that must be spent where expected alpha is highest."
+  },
+  {
+    era: "Optimization",
+    icon: "🎯",
+    title: "Transaction Cost Optimization",
+    desc: "The joint or sequential optimisation of portfolio holdings and execution trajectories so that net-of-cost expected return is maximised under risk and liquidity constraints",
+    badge: { label: "Integration", style: "slate" },
+    tags: [["TCA","slate"], ["portfolio + execution","teal"], ["net alpha","amber"], ["dynamic schedules",""]],
+    data: [
+      { label: "Levels", value: "Portfolio construction & child orders", color: "slate" },
+      { label: "Objective", value: "Max E[return] − cost − risk penalty", color: "teal" },
+      { label: "Feedback", value: "Live cost → model recalibration", color: "amber" },
+    ],
+    body: [
+      `Transaction-cost optimisation exists at two nested layers. At the portfolio layer the optimiser includes expected impact and fees in the objective or constraints, producing target holdings that already internalise liquidity. At the execution layer an optimal-trajectory algorithm (Almgren–Chriss or its descendants) converts each parent order into a schedule of child orders that minimises residual shortfall for a chosen risk aversion.`,
+      `Advanced systems solve the two layers jointly or iteratively: the portfolio optimiser proposes a target, the execution model returns an expected cost surface, and the portfolio is re-optimised until consistency. Dynamic schedules further update urgency in response to realised volume and price moves.`,
+      `The feedback loop is closed by systematic transaction-cost analysis (TCA) that compares predicted versus realised shortfall and recalibrates impact parameters. Without that loop, cost models drift and the optimisation silently solves the wrong problem.`
+    ],
+    keyPoint: "Transaction-cost optimisation is the discipline of making portfolio and execution decisions with the same cost model in view. When the two layers are consistent and continuously calibrated, net-of-cost performance becomes a controllable engineering quantity rather than an after-the-fact surprise."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

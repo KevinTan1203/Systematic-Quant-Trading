@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 12.5 Execution Algorithms</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 12 · Section 12.5</div>
+      <h1 class="book-title">Execution<br><em>Algorithms</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>12</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">TWAP · VWAP · POV · IS · adaptive · SOR · optimal · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>12.5 Execution Algorithms</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Classic",
+    icon: "⏱️",
+    title: "TWAP (Time-Weighted Average Price)",
+    desc: "An execution schedule that slices a parent order into equal-sized child orders and releases them at uniform intervals over a chosen horizon",
+    badge: { label: "Baseline", style: "teal" },
+    tags: [["TWAP","teal"], ["equal slices","amber"], ["time schedule","slate"], ["simple",""]],
+    data: [
+      { label: "Logic", value: "Equal size every Δt", color: "teal" },
+      { label: "Benchmark", value: "Own average execution price vs. TWAP", color: "amber" },
+      { label: "Strength", value: "Predictable, low signalling", color: "slate" },
+    ],
+    body: [
+      `TWAP divides the order quantity evenly across a sequence of time bins and attempts to complete each bin’s allocation within its window. The resulting trajectory is a straight line in cumulative quantity versus time. Because the schedule is deterministic and independent of volume, it is simple to implement, easy to explain to clients, and relatively stealthy when participation rates remain modest.`,
+      `The principal weakness is that it ignores the market’s natural volume profile: it may trade too aggressively in quiet periods and too passively in liquid ones, producing higher impact or incomplete fills relative to a volume-aware strategy. It also offers no automatic response to price moves or liquidity shocks.`,
+      `TWAP remains a default choice for medium-sized orders in liquid names when the trader’s primary goal is a steady, non-tactical presence rather than minimisation of a specific cost benchmark.`
+    ],
+    keyPoint: "TWAP is the simplest disciplined schedule. It trades the optimality of volume-matching for predictability and ease of control."
+  },
+  {
+    era: "Classic",
+    icon: "📊",
+    title: "VWAP (Volume-Weighted Average Price)",
+    desc: "An algorithm that targets the volume-weighted average price of the market over the execution horizon by following a historical or predicted volume curve",
+    badge: { label: "Standard", style: "amber" },
+    tags: [["VWAP","amber"], ["volume curve","teal"], ["participation","slate"], ["benchmark",""]],
+    data: [
+      { label: "Target", value: "Match market VWAP over the interval", color: "amber" },
+      { label: "Input", value: "Intraday volume profile (historical / predicted)", color: "teal" },
+      { label: "Risk", value: "Profile misspecification & residual risk", color: "red" },
+    ],
+    body: [
+      `VWAP algorithms allocate the parent order across the day (or a chosen window) in proportion to expected market volume in each interval. The goal is to finish with an average execution price close to the market’s own volume-weighted average price. Because most institutional flow is itself benchmarked to VWAP, the algorithm minimises relative under-performance against the most common yardstick.`,
+      `Implementation relies on a volume-prediction model (historical U-shaped profiles, dynamic forecasts, or real-time adaptation). Deviations between predicted and realised volume create residual tracking error; large orders can also move the very VWAP they are trying to match.`,
+      `VWAP is the workhorse of equity execution. It is less suitable when the trader has a strong directional view, when the horizon is very short, or when the dominant risk is absolute arrival-price slippage rather than benchmark tracking.`
+    ],
+    keyPoint: "VWAP aligns execution with the market’s own liquidity rhythm. It is the default institutional benchmark and therefore the default algorithmic target."
+  },
+  {
+    era: "Participation",
+    icon: "📈",
+    title: "POV (Percent of Volume)",
+    desc: "A strategy that maintains a target participation rate in the market’s traded volume, speeding up or slowing down as real-time volume fluctuates",
+    badge: { label: "Adaptive", style: "teal" },
+    tags: [["POV","teal"], ["participation rate","amber"], ["volume following","slate"], ["dynamic",""]],
+    data: [
+      { label: "Control", value: "Target % of market volume", color: "teal" },
+      { label: "Behaviour", value: "Accelerates in active, slows in quiet", color: "amber" },
+      { label: "Limit", value: "Max participation cap essential", color: "red" },
+    ],
+    body: [
+      `Percent-of-volume (POV) algorithms set a target fraction of contemporaneous market volume (e.g., 5–15 %) and continuously adjust child-order size so that the strategy’s own volume stays near that fraction. When the market is active the algorithm trades more; when volume dries up it backs off. The result is a more natural footprint than pure TWAP and less dependence on a pre-committed volume curve than classic VWAP.`,
+      `POV is particularly useful when the horizon is flexible or when the trader wants to avoid becoming a dominant fraction of the tape. Hard caps on maximum participation and on absolute speed are required to prevent the algorithm from chasing spikes or exhausting the order too early.`,
+      `Because realised participation depends on the market’s own activity, the completion time is stochastic; clients who need a hard deadline often combine POV with a time-based fallback.`
+    ],
+    keyPoint: "POV makes the market’s volume the clock. It is the simplest way to keep a consistent, non-dominant presence while still responding to liquidity conditions."
+  },
+  {
+    era: "Cost",
+    icon: "🎯",
+    title: "IS (Implementation Shortfall) Algorithm",
+    desc: "An execution style that explicitly minimises the expected shortfall relative to the decision (arrival) price, balancing market impact against timing risk",
+    badge: { label: "Optimal", style: "red" },
+    tags: [["implementation shortfall","red"], ["arrival price","teal"], ["impact vs risk","amber"], ["utility",""]],
+    data: [
+      { label: "Objective", value: "Min E[cost] + λ · risk of delay", color: "red" },
+      { label: "Trade-off", value: "Speed (impact) vs. patience (price risk)", color: "amber" },
+      { label: "Output", value: "Optimal trajectory / urgency", color: "teal" },
+    ],
+    body: [
+      `Implementation-shortfall (IS) algorithms treat the difference between the decision-time price and the final average execution price as the quantity to be minimised. They incorporate an explicit model of temporary and permanent impact together with a risk term that penalises residual inventory (the risk that the price moves unfavourably while the order is still open). The resulting schedule is typically front-loaded relative to VWAP when urgency or risk aversion is high, and more patient when impact dominates.`,
+      `IS is the practical embodiment of the Almgren–Chriss framework and of related optimal-execution theory. It requires calibrated impact and volatility parameters and a clear statement of the trader’s risk aversion or risk limit.`,
+      `Because the benchmark is the arrival price rather than a market average, IS performance is directly comparable to the opportunity cost of the investment decision itself—an attractive property for portfolio managers.`
+    ],
+    keyPoint: "IS algorithms optimise the true economic cost of trading: the shortfall from the price at which the decision was made. They replace benchmark-tracking with explicit cost-and-risk minimisation."
+  },
+  {
+    era: "Benchmark",
+    icon: "📍",
+    title: "Arrival Price Algorithm",
+    desc: "A family of strategies whose primary benchmark and optimisation target is the market price prevailing at the moment the order is released to the algorithm",
+    badge: { label: "Cost-Focused", style: "amber" },
+    tags: [["arrival price","amber"], ["decision price","teal"], ["shortfall","red"], ["urgency",""]],
+    data: [
+      { label: "Benchmark", value: "Price at order arrival / decision", color: "amber" },
+      { label: "Focus", value: "Absolute cost, not relative to VWAP", color: "teal" },
+      { label: "Typical", value: "More aggressive than pure VWAP", color: "slate" },
+    ],
+    body: [
+      `Arrival-price algorithms are the operational counterparts of implementation-shortfall optimisation. They measure success by how close the average fill price stays to the price observed when the parent order was received (or when the investment decision was made). The schedule therefore balances the desire to finish quickly—before the price can drift—against the impact of trading too fast.`,
+      `In practice “arrival price” and “IS” labels are often used interchangeably; the distinction is mainly whether the algorithm is presented as a pure benchmark tracker or as an explicit optimiser of a shortfall-plus-risk objective. Both stand in contrast to VWAP, which can look good on a relative basis while still delivering a large absolute shortfall if the market moves during the day.`,
+      `Arrival-price logic is preferred when the portfolio manager cares about the performance of the decision itself rather than about matching the average trader’s experience.`
+    ],
+    keyPoint: "Arrival-price algorithms answer the question the portfolio manager actually asks: “How much did the act of trading cost me relative to the price I saw when I decided?”"
+  },
+  {
+    era: "Dynamic",
+    icon: "🔄",
+    title: "Adaptive Algos (Respond to Market Conditions)",
+    desc: "Execution engines that continuously revise schedule, aggressiveness and venue mix in response to real-time volume, volatility, spread and order-book state",
+    badge: { label: "Dynamic", style: "teal" },
+    tags: [["adaptive","teal"], ["real-time","amber"], ["state-dependent","slate"], ["feedback",""]],
+    data: [
+      { label: "Inputs", value: "Volume, vol, spread, imbalance, toxicity", color: "teal" },
+      { label: "Actions", value: "Speed up, slow down, switch venue, hide", color: "amber" },
+      { label: "Goal", value: "Stay optimal as conditions change", color: "slate" },
+    ],
+    body: [
+      `Static schedules (fixed TWAP or historical-VWAP curves) ignore the fact that liquidity, volatility and information flow evolve during the life of the order. Adaptive algorithms maintain a running estimate of market state and adjust participation rate, limit-versus-market mix, dark-versus-lit allocation and even the residual horizon in response.`,
+      `Typical triggers include realised volume running ahead of or behind forecast, sudden spread widening, spikes in short-term volatility, adverse mark-outs, or the appearance of block-sized hidden liquidity. The adaptation rules can be heuristic, model-based (re-solving a small optimal-execution problem) or machine-learned.`,
+      `Adaptivity improves average performance and reduces tail outcomes, but it also introduces path-dependence and makes post-trade attribution more complex. Governance and auditability of the adaptation logic are therefore essential.`
+    ],
+    keyPoint: "Adaptive algorithms treat the market as a live environment rather than a fixed volume curve. Their edge is the continuous re-optimisation of urgency and tactics as conditions change."
+  },
+  {
+    era: "Opportunistic",
+    icon: "🎯",
+    title: "Sniper Algo (Take Liquidity Opportunistically)",
+    desc: "A tactical style that remains largely passive or hidden and strikes aggressively only when transient liquidity or favourable price dislocations appear",
+    badge: { label: "Tactical", style: "red" },
+    tags: [["sniper","red"], ["opportunistic","amber"], ["liquidity taking","teal"], ["patience",""]],
+    data: [
+      { label: "Default", value: "Passive / hidden / dark", color: "teal" },
+      { label: "Trigger", value: "Fleeting size, wide quote, dislocation", color: "amber" },
+      { label: "Action", value: "Immediate aggressive take", color: "red" },
+    ],
+    body: [
+      `Sniper (or opportunistic) algorithms do not follow a continuous schedule. They post passively, rest in dark pools, or simply wait, and they fire marketable orders only when the expected cost of taking is unusually low—large hidden size appears, a quote becomes abnormally wide, an imbalance signals a short-term move in the desired direction, or a liquidity shock temporarily improves the terms of trade.`,
+      `The style is attractive when the order is not urgent and when the trader believes that patience will be rewarded by occasional high-quality fills. It is risky when the market trends away from the arrival price or when the hoped-for opportunities never materialise; a time or shortfall backstop is therefore usually attached.`,
+      `Sniping is often combined with dark-seeking and with real-time toxicity filters so that opportunistic takes do not systematically occur against informed flow.`
+    ],
+    keyPoint: "Sniper algorithms replace continuous presence with selective aggression. They trade schedule certainty for the possibility of capturing rare, high-quality liquidity events."
+  },
+  {
+    era: "Routing",
+    icon: "🗺️",
+    title: "SOR (Smart Order Routing)",
+    desc: "The real-time decision layer that chooses among lit venues, dark pools and order types in order to minimise expected cost or maximise fill probability for each child order",
+    badge: { label: "Infrastructure", style: "slate" },
+    tags: [["SOR","slate"], ["venue selection","teal"], ["fragmentation","amber"], ["best execution",""]],
+    data: [
+      { label: "Inputs", value: "Fees, rebates, depth, latency, fill rates", color: "slate" },
+      { label: "Output", value: "Venue + order-type for each child", color: "teal" },
+      { label: "Constraint", value: "Reg NMS / best-execution rules", color: "amber" },
+    ],
+    body: [
+      `In fragmented equity markets a single parent order must be broken into child orders that can be sent to many exchanges, ATSs and dark pools. Smart order routing is the logic that, for each slice, selects the destination and the order type expected to deliver the best combination of price, fill probability, fees and information leakage.`,
+      `Modern SORs incorporate real-time depth, queue estimates, historical fill-rate matrices, maker-taker fee schedules, latency differences and dark-pool midpoint probabilities. They must also satisfy regulatory obligations (e.g., protected quotes under Reg NMS) and internal best-execution policies.`,
+      `SOR quality is a major determinant of overall algorithmic performance; two identical schedule engines can produce very different shortfalls solely because of differences in routing intelligence.`
+    ],
+    keyPoint: "Smart order routing is the micro-structure brain of any modern execution stack. Schedule decides when and how much to trade; SOR decides where and in what form each piece is sent."
+  },
+  {
+    era: "Dark",
+    icon: "🌑",
+    title: "Dark Seeking Algos",
+    desc: "Algorithms or algorithm modules that systematically probe and rest in non-displayed venues in order to source hidden size at midpoints or improved prices",
+    badge: { label: "Hidden", style: "teal" },
+    tags: [["dark seeking","teal"], ["midpoint","amber"], ["conditional orders","slate"], ["block",""]],
+    data: [
+      { label: "Goal", value: "Capture non-displayed size cheaply", color: "teal" },
+      { label: "Tactics", value: "Rest, ping, conditional, IOI", color: "amber" },
+      { label: "Risk", value: "Adverse selection & low fill rate", color: "red" },
+    ],
+    body: [
+      `Dark-seeking logic allocates a portion of the residual order to dark pools and midpoint facilities, using resting midpoint orders, minimum-quantity constraints, conditional (contingent) orders and, where permitted, indications of interest. The objective is to obtain size at the mid or better without signalling to the lit market.`,
+      `Success depends on the quality of the dark venues (natural versus opportunistic flow), on anti-gaming protections, and on the algorithm’s ability to detect when dark fills are becoming toxic. Many implementations continuously measure post-fill mark-outs and reduce dark allocation when toxicity rises.`,
+      `Dark seeking is rarely used in isolation; it is typically a module inside a broader VWAP, POV or IS algorithm that still maintains a lit presence for completion certainty.`
+    ],
+    keyPoint: "Dark-seeking algorithms treat hidden liquidity as a distinct, lower-cost resource. They attempt to harvest midpoint size while protecting the residual order from the information leakage of the lit book."
+  },
+  {
+    era: "Order Type",
+    icon: "📌",
+    title: "Pegged Orders",
+    desc: "Orders whose limit price is automatically adjusted to track a reference (primary, midpoint, or market) so that the order remains competitive without continuous manual repricing",
+    badge: { label: "Order Type", style: "amber" },
+    tags: [["pegged","amber"], ["primary peg","teal"], ["midpoint peg","slate"], ["auto-reprice",""]],
+    data: [
+      { label: "Primary peg", value: "Tracks own-side BBO", color: "teal" },
+      { label: "Midpoint peg", value: "Tracks NBBO mid", color: "amber" },
+      { label: "Market peg", value: "Tracks far side (aggressive)", color: "slate" },
+    ],
+    body: [
+      `A pegged order maintains a dynamic limit price defined relative to a live reference. A primary peg stays at the best bid (for a buy) or best offer (for a sell), automatically following improvements and often holding a defined offset. A midpoint peg rests at the mid of the NBBO and is typically non-displayed. A market peg tracks the opposite side and is therefore more aggressive.`,
+      `Pegging reduces the need for the algorithm to send continuous cancel/replace messages and keeps the order at the touch or mid as the quote moves. It is heavily used inside market-making, passive VWAP/POV slices and dark midpoint strategies.`,
+      `The cost is loss of control over exact queue priority (each re-peg may go to the back of the new price level) and potential interaction with exchange rules on display and fees. Sophisticated engines combine pegging with discretionary offsets and with post-only constraints.`
+    ],
+    keyPoint: "Pegged orders outsource the micro-adjustment of price to the exchange. They keep liquidity competitive in a moving quote while freeing the algorithm to manage size, venue and urgency."
+  },
+  {
+    era: "Theory",
+    icon: "📐",
+    title: "Almgren–Chriss Optimal Execution",
+    desc: "The foundational continuous-time framework that derives optimal trading trajectories by minimising expected impact cost plus a risk penalty on residual inventory",
+    badge: { label: "Theory", style: "slate" },
+    tags: [["Almgren-Chriss","slate"], ["optimal trajectory","teal"], ["temporary / permanent","amber"], ["mean-variance",""]],
+    data: [
+      { label: "Objective", value: "E[cost] + λ · Var(cost)", color: "slate" },
+      { label: "Solution", value: "Closed-form or numerical schedule", color: "teal" },
+      { label: "Insight", value: "Front-load when risk aversion high", color: "amber" },
+    ],
+    body: [
+      `Almgren & Chriss model the price as an arithmetic Brownian motion plus a permanent impact linear in cumulative volume and a temporary impact that depends on the instantaneous trading rate. The executor minimises a mean–variance criterion of implementation shortfall over a fixed horizon. The solution is a deterministic trajectory that is typically more aggressive at the beginning (and sometimes at the end) than a naïve VWAP when risk aversion is material.`,
+      `The framework supplies both a practical optimisation engine and the conceptual language—temporary versus permanent impact, urgency, risk aversion—used by almost every modern IS and arrival-price algorithm. Extensions incorporate stochastic volume, nonlinear impact, constraints, and adaptive re-optimisation.`,
+      `Even when the exact closed form is not used, the qualitative insight remains: optimal execution is the solution to a control problem, not merely the tracking of a volume curve.`
+    ],
+    keyPoint: "Almgren–Chriss turned execution into a solvable optimisation problem. Its temporary/permanent impact decomposition and risk-adjusted objective are the theoretical backbone of implementation-shortfall algorithms."
+  },
+  {
+    era: "Comparison",
+    icon: "⚖️",
+    title: "Benchmark: TWAP vs. VWAP vs. Arrival Price",
+    desc: "The comparative properties and appropriate use-cases of the three dominant execution benchmarks and their associated algorithmic styles",
+    badge: { label: "Synthesis", style: "slate" },
+    tags: [["benchmarks","slate"], ["TWAP","teal"], ["VWAP","amber"], ["arrival / IS","red"]],
+    data: [
+      { label: "TWAP", value: "Time-uniform, simple, low signalling", color: "teal" },
+      { label: "VWAP", value: "Volume-matched, peer-relative", color: "amber" },
+      { label: "Arrival", value: "Decision-price shortfall, absolute cost", color: "red" },
+    ],
+    body: [
+      `TWAP is the right mental model when the trader wants a steady, predictable schedule and is relatively indifferent to the market’s volume shape. VWAP is the right model when the performance evaluation will be relative to other market participants or to a volume-weighted benchmark. Arrival-price / IS is the right model when the economic question is the total cost of implementing an investment decision relative to the price that motivated it.`,
+      `In practice the three are not mutually exclusive: many engines offer a continuum of urgency that interpolates between patient VWAP-like behaviour and aggressive arrival-price behaviour, and many orders are scheduled with a VWAP-style profile while still being measured on an arrival-price basis (or vice versa).`,
+      `Choosing the benchmark is therefore both a measurement decision and a statement of economic priority. Misalignment between the algorithm’s objective and the investor’s true utility is a common source of apparent under-performance.`
+    ],
+    keyPoint: "TWAP, VWAP and arrival price are not interchangeable. Each encodes a different notion of success; the correct algorithmic choice is the one whose benchmark matches the decision-maker’s actual loss function."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

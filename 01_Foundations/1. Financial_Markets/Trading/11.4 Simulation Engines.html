@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 11.4 Simulation Engines</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 11 · Section 11.4</div>
+      <h1 class="book-title">Simulation<br><em>Engines</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Event loop → vectorized → fills → realism · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>11.4 Simulation Engines</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Architecture",
+    icon: "⚙️",
+    title: "Event-Driven Backtest Framework Design",
+    desc: "A sequential simulation architecture that processes a stream of market events (ticks, bars, fills, signals) in chronological order, updating portfolio state only when events arrive",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["event-driven","slate"], ["event loop","teal"], ["causality","red"], ["state machine","amber"]],
+    data: [
+      { label: "Core loop", value: "Next event → handlers → update state", color: "teal" },
+      { label: "Strength", value: "Natural causality & path dependence", color: "amber" },
+      { label: "Cost", value: "Slower than pure vectorized code", color: "red" },
+    ],
+    body: [
+      `An event-driven engine treats the market as a sequence of discrete events—trade prints, quote updates, bar closes, order acknowledgements, timer events—and advances simulation time only when the next event is processed. Strategy logic, portfolio accounting, risk checks and execution models are implemented as handlers that react to specific event types. Because state is updated strictly in timestamp order, look-ahead is structurally difficult and path-dependent effects (margin calls, position limits, cascading stops) arise naturally.`,
+      `Typical components include an event queue (priority queue ordered by timestamp), data handlers that emit market events, a strategy layer that emits order events, an execution or broker simulator that converts orders into fill events, and a portfolio/accounting module that maintains positions, cash and performance statistics. The design maps cleanly onto live trading systems, easing the transition from research to production.`,
+      `The principal trade-off is speed: pure event processing is slower than vectorized matrix operations. Hybrid designs therefore keep the event loop for order and fill logic while vectorizing feature calculation and signal generation where possible.`
+    ],
+    keyPoint: "Event-driven architecture is the most faithful digital twin of live trading. It forces chronological discipline and makes realistic microstructure modelling tractable at the cost of computational overhead."
+  },
+  {
+    era: "Speed",
+    icon: "🚀",
+    title: "Vectorized Backtesting (vectorbt, pandas)",
+    desc: "High-throughput simulation that expresses signals, positions and returns as array or DataFrame operations, evaluating entire histories in a handful of NumPy/pandas passes",
+    badge: { label: "Throughput", style: "teal" },
+    tags: [["vectorbt","teal"], ["pandas","amber"], ["NumPy","slate"], ["parameter sweep",""]],
+    data: [
+      { label: "Advantage", value: "Orders-of-magnitude faster iteration", color: "teal" },
+      { label: "Best for", value: "Signal research & large grids", color: "amber" },
+      { label: "Limitation", value: "Harder to model complex fills", color: "red" },
+    ],
+    body: [
+      `Vectorized engines represent prices, indicators, signals and positions as aligned arrays or DataFrames. A long/short signal series is multiplied by forward returns, costs are subtracted as another series, and performance statistics are computed with cumulative products or expanding windows—all without an explicit time loop. Libraries such as vectorbt build on this idea, adding portfolio simulation, parameter broadcasting and fast Sharpe/drawdown calculations.`,
+      `The approach excels when the research question is “how does this family of signals behave across thousands of parameter combinations?” Entire grids can be evaluated in seconds. It is less natural when order logic is stateful, when fills depend on available liquidity at the precise moment of the order, or when path-dependent risk constraints must be enforced bar-by-bar.`,
+      `Best practice is to use vectorized methods for rapid hypothesis screening and to graduate promising candidates to an event-driven or hybrid engine for realistic cost, capacity and microstructure validation.`
+    ],
+    keyPoint: "Vectorized backtesting maximises research velocity. It is the right tool for exploring signal space; it is rarely the final word on executable performance once microstructure and capacity matter."
+  },
+  {
+    era: "Classic",
+    icon: "🏛️",
+    title: "Zipline Architecture",
+    desc: "The event-driven engine originally developed for Quantopian: a pipeline-aware, minute-bar simulator with integrated data, commission and slippage models",
+    badge: { label: "Framework", style: "amber" },
+    tags: [["Zipline","amber"], ["Quantopian","slate"], ["pipeline","teal"], ["minute bars",""]],
+    data: [
+      { label: "Core", value: "Event-driven, Python, pandas-centric", color: "amber" },
+      { label: "Strength", value: "Pipeline API & factor research", color: "teal" },
+      { label: "Status", value: "Open-source; community maintained", color: "slate" },
+    ],
+    body: [
+      `Zipline processes a chronological stream of bar data (typically minute or daily), invoking user-defined <code>handle_data</code> (or pipeline-driven) logic at each timestamp. Orders are emitted into a simulated broker that applies commission and slippage models before generating fills. A separate Pipeline API allows efficient, point-in-time computation of factors across large universes, with careful handling of survivorship and look-ahead.`,
+      `The architecture popularised several research hygiene practices: explicit capital constraints, built-in performance tear-sheets, and a clear separation between data ingestion, signal generation and execution simulation. Although Quantopian itself shut down, the open-source Zipline (and its forks) remain widely used for equity and futures research.`,
+      `Limitations include relatively slow pure-Python event processing for very high-frequency or multi-asset options workloads, and a data model originally centred on U.S. equities. Extensions and alternative backends have mitigated some of these constraints.`
+    ],
+    keyPoint: "Zipline demonstrated that a clean event-driven Python engine plus a point-in-time factor pipeline could support serious quant research at scale. Its design patterns still influence most subsequent open-source frameworks."
+  },
+  {
+    era: "Flexible",
+    icon: "🔧",
+    title: "Backtrader Framework",
+    desc: "A highly extensible pure-Python event-driven engine supporting multiple data feeds, timeframes, live brokers and a rich set of analyzers",
+    badge: { label: "Framework", style: "teal" },
+    tags: [["Backtrader","teal"], ["multi-timeframe","amber"], ["live trading","slate"], ["analyzers",""]],
+    data: [
+      { label: "Style", value: "Cerebro engine, strategy classes", color: "teal" },
+      { label: "Flexibility", value: "Indicators, sizers, brokers, writers", color: "amber" },
+      { label: "Use case", value: "Research + lightweight live", color: "slate" },
+    ],
+    body: [
+      `Backtrader centres on a <code>Cerebro</code> engine that orchestrates data feeds, strategies, observers, analyzers and optional live broker connections. Strategies are written as classes with <code>next</code> (or line-by-line) logic; indicators are composable and can operate on multiple timeframes. The framework ships with a broad library of built-in indicators, commission schemes, sizers and performance analyzers.`,
+      `Its design emphasises flexibility over raw speed: almost every component can be subclassed or replaced. This makes it attractive for rapid prototyping of multi-asset, multi-timeframe ideas and for bridging research code to paper or live trading via broker adapters. The pure-Python implementation, however, becomes a bottleneck for large universes or tick-level simulation.`,
+      `Backtrader remains a pragmatic choice when developer velocity and extensibility matter more than microsecond-level performance, and when the strategy logic benefits from an explicit event/strategy object model rather than pure vectorization.`
+    ],
+    keyPoint: "Backtrader prioritises a clean, object-oriented event model and extreme extensibility. It is less a high-performance production engine than a versatile research and light-production workbench."
+  },
+  {
+    era: "Institutional",
+    icon: "🏢",
+    title: "QuantConnect (Lean) Engine",
+    desc: "A professional-grade, multi-asset, multi-language event-driven engine designed for both cloud research and local or institutional deployment",
+    badge: { label: "Production", style: "slate" },
+    tags: [["Lean","slate"], ["QuantConnect","teal"], ["multi-asset","amber"], ["C# / Python",""]],
+    data: [
+      { label: "Languages", value: "C# (core) + Python support", color: "slate" },
+      { label: "Coverage", value: "Equities, futures, options, forex, crypto", color: "teal" },
+      { label: "Model", value: "Cloud IDE + local Lean CLI", color: "amber" },
+    ],
+    body: [
+      `Lean is the open-source engine powering QuantConnect. It is written primarily in C# for performance, with first-class Python interop. The architecture is fully event-driven and supports equities, equity options, futures, forex, CFD and crypto out of the box. Data is point-in-time aware; universe selection, scheduled events, and brokerage models are first-class citizens.`,
+      `Researchers can develop in a browser-based IDE against QuantConnect’s data lake or run Lean locally against their own data. The same strategy code path is intended to move from back-test to paper to live with minimal changes. Sophisticated fill models, margin modelling, and options exercise logic are included.`,
+      `Lean’s institutional orientation shows in its emphasis on determinism, detailed order and fill event logging, and the ability to plug in custom brokerage and data handlers. The learning curve is steeper than lighter Python frameworks, but the payoff is a single engine that can span research and production.`
+    ],
+    keyPoint: "Lean aims to be a complete, multi-asset simulation and execution stack rather than a research-only tool. Its design reflects the requirements of teams that need the same code to survive contact with live markets."
+  },
+  {
+    era: "Bespoke",
+    icon: "🛠️",
+    title: "Custom Backtest Engine Architecture",
+    desc: "Design principles and component boundaries for building an in-house simulator tailored to a firm’s instruments, latency regime and research workflow",
+    badge: { label: "Engineering", style: "amber" },
+    tags: [["custom engine","amber"], ["modularity","teal"], ["determinism","slate"], ["replay",""]],
+    data: [
+      { label: "Drivers", value: "Asset class, frequency, scale", color: "amber" },
+      { label: "Key traits", value: "Deterministic, auditable, fast enough", color: "teal" },
+      { label: "Risk", value: "Over-engineering vs. under-realism", color: "red" },
+    ],
+    body: [
+      `A custom engine is justified when off-the-shelf frameworks cannot represent the firm’s instruments (e.g., complex options, OTC derivatives), latency model, or data volume, or when regulatory auditability demands full control over every assumption. Core modules typically include: a deterministic event scheduler, a market-data replay layer, a strategy API, an order-management and matching engine, portfolio and risk accounting, and a metrics/telemetry bus.`,
+      `Critical design choices are the granularity of time (tick, slice, or hybrid), the representation of order books versus simplified fill models, the degree of parallelism (single-threaded determinism versus multi-threaded speed), and the contract between research code and the engine (callback style versus declarative signals). Determinism—bit-identical results given identical inputs—is non-negotiable for debugging and compliance.`,
+      `Successful internal engines start narrow (one asset class, one frequency) and grow only as research needs demand. Premature generality is the most common cause of multi-year science projects that never become research tools.`
+    ],
+    keyPoint: "A custom simulator should be the simplest machine that still encodes the firm’s true economic constraints. Every additional feature is a liability until it demonstrably improves decision quality."
+  },
+  {
+    era: "Costs",
+    icon: "💸",
+    title: "Slippage and Commission Models",
+    desc: "Functional mappings from order size, volatility, spread and venue to the expected difference between decision price and realized fill price, plus explicit fee schedules",
+    badge: { label: "Realism", style: "red" },
+    tags: [["slippage","red"], ["commission","amber"], ["market impact","teal"], ["fee schedules","slate"]],
+    data: [
+      { label: "Components", value: "Spread, impact, fees, timing", color: "red" },
+      { label: "Simple", value: "Fixed bps or half-spread", color: "amber" },
+      { label: "Advanced", value: "Size- and vol-dependent impact", color: "teal" },
+    ],
+    body: [
+      `Even a perfect signal is worthless if implementation shortfall consumes the edge. Commission models capture explicit exchange, broker and clearing fees (per share, per contract, tiered, maker-taker). Slippage models capture the difference between the price at which the decision was made and the price at which the order is filled—bid–ask bounce, temporary market impact, and adverse selection.`,
+      `Minimal models apply a constant basis-point cost or a half-spread penalty. More realistic models make cost a function of order size relative to average volume, of contemporaneous volatility, of time of day, and of order type. Square-root impact laws and proprietary venue-specific curves are common in institutional settings. The model must be calibrated to live trading data and periodically re-validated.`,
+      `In simulation the cost model is applied at fill time and reduces net PnL. Strategies that look attractive under zero or fixed costs often become marginal or negative once size-dependent impact is introduced—an essential reality check before capital allocation.`
+    ],
+    keyPoint: "Slippage and commission are not accounting afterthoughts; they are first-class components of the strategy’s economic identity. An engine that cannot vary them has limited value for capacity or robustness analysis."
+  },
+  {
+    era: "Fills",
+    icon: "📥",
+    title: "Fill Simulation (Limit vs. Market)",
+    desc: "Rules that decide whether, when and at what price an order is converted into a position, distinguishing immediate marketable orders from resting limit orders",
+    badge: { label: "Microstructure", style: "teal" },
+    tags: [["fill model","teal"], ["limit orders","amber"], ["market orders","red"], ["queue position",""]],
+    data: [
+      { label: "Market", value: "Immediate fill at touch + impact", color: "red" },
+      { label: "Limit", value: "Queue, touch, or volume participation", color: "teal" },
+      { label: "Key risk", value: "Optimistic fill assumptions", color: "amber" },
+    ],
+    body: [
+      `Market orders are usually assumed to fill immediately at the prevailing touch (or at a worse price once impact is applied). Limit orders introduce path dependence: they rest in a simulated queue, improve or are cancelled, and fill only when opposing flow arrives. Simple engines fill a limit order as soon as the market trades through its price; more sophisticated engines track queue position, estimated depth, and the probability of being front-run or of adverse selection.`,
+      `Optimistic fill logic—assuming every limit order that is touched is fully filled at the limit price—systematically overstates the performance of mean-reversion and market-making strategies. Conservative logic that requires the price to trade through the limit by a tick, or that fills only a fraction of displayed size, produces more robust results.`,
+      `The fill model must also respect exchange rules (auction vs. continuous, lot sizes, self-trade prevention) and the strategy’s own order-management logic (replace, cancel, iceberg). Divergence between simulated and live fill ratios is one of the most common sources of live-performance shortfall.`
+    ],
+    keyPoint: "Fill simulation is where abstract signals meet market microstructure. The difference between “touched” and “filled” is often the difference between a back-test that works and a strategy that survives."
+  },
+  {
+    era: "Depth",
+    icon: "📖",
+    title: "Order Book Simulation",
+    desc: "Reconstruction or abstraction of the limit-order book so that simulated orders interact with realistic depth, queues and price-impact dynamics",
+    badge: { label: "Advanced", style: "slate" },
+    tags: [["order book","slate"], ["L2 / L3","teal"], ["queue models","amber"], ["market impact","red"]],
+    data: [
+      { label: "Full L3", value: "Every order & cancel replayed", color: "slate" },
+      { label: "Abstract", value: "Statistical depth & impact curves", color: "teal" },
+      { label: "Use case", value: "HFT, market making, large tickets", color: "amber" },
+    ],
+    body: [
+      `Full order-book (Level-3) simulation replays every add, cancel and trade message, maintaining a complete queue at each price level. A strategy’s own orders are inserted into those queues and experience realistic latency, partial fills and adverse selection. This is the gold standard for high-frequency and market-making research but is data- and compute-intensive and requires careful handling of exchange-specific message semantics.`,
+      `Most medium-frequency engines adopt simplified book models: a statistical representation of depth, a square-root or linear impact function, or a hybrid that uses real top-of-book quotes plus a parametric deeper book. These abstractions capture first-order costs and capacity limits without the engineering burden of full message replay.`,
+      `The choice of fidelity should match the strategy’s holding period and size. A daily equity factor strategy rarely needs L3; a latency-sensitive futures market-maker does. In all cases the book model must be calibrated so that simulated market impact and fill ratios match those observed in live trading.`
+    ],
+    keyPoint: "Order-book simulation is the highest-fidelity—and highest-cost—layer of a back-test engine. Apply it where queue position and depth truly determine edge; elsewhere a well-calibrated impact model is usually sufficient."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 12.2 Queue Priority</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 12 · Section 12.2</div>
+      <h1 class="book-title">Queue<br><em>Priority</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">FIFO · pro-rata · position · latency · venues · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>12.2 Queue Priority</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "FIFO",
+    icon: "⏳",
+    title: "Price-Time Priority (FIFO)",
+    desc: "The dominant matching rule that ranks orders first by price and, at the same price, by the time of arrival — first-in, first-out",
+    badge: { label: "Standard", style: "teal" },
+    tags: [["FIFO","teal"], ["price-time","amber"], ["time priority","slate"], ["queue",""]],
+    data: [
+      { label: "Primary key", value: "Better price executes first", color: "teal" },
+      { label: "Secondary", value: "Earlier timestamp at same price", color: "amber" },
+      { label: "Effect", value: "Race for queue position", color: "slate" },
+    ],
+    body: [
+      `Under pure price-time priority an incoming marketable order is matched against the resting order with the best price; if several orders share that price, the one that arrived earliest is filled first. New limit orders join the back of the queue at their chosen price level. The rule is transparent, easy to implement and creates a strong incentive to be early.`,
+      `FIFO produces a strict linear queue at each price. Fill probability and expected waiting time are monotonic in queue rank. Because time priority is so valuable, participants invest heavily in low-latency connectivity and in strategies that obtain or defend favourable positions (joining early, avoiding unnecessary cancels, using iceberg or synthetic display where allowed).`,
+      `Most major equity and futures venues use price-time as the baseline rule, sometimes modified by pro-rata overlays or by special order types that alter effective priority.`
+    ],
+    keyPoint: "Price-time priority turns the order book into a race against the clock. Being first at a price is often more important than being slightly better on size or fees."
+  },
+  {
+    era: "Pro-Rata",
+    icon: "➗",
+    title: "Pro-Rata Allocation",
+    desc: "A matching rule that distributes incoming volume across all resting orders at the best price in proportion to their displayed size, rather than by arrival time",
+    badge: { label: "Alternative", style: "amber" },
+    tags: [["pro-rata","amber"], ["size priority","teal"], ["allocation","slate"], ["fairness",""]],
+    data: [
+      { label: "Rule", value: "Fill ∝ displayed size at best price", color: "amber" },
+      { label: "Incentive", value: "Show more size to gain share", color: "teal" },
+      { label: "Trade-off", value: "Less value on pure speed", color: "slate" },
+    ],
+    body: [
+      `In a pure pro-rata regime, when a marketable order arrives it is allocated across every resting order at the touch in proportion to the size each order displays. Time of arrival is irrelevant (or secondary). Larger displayed quotes receive a larger share of every fill.`,
+      `The rule changes strategic behaviour dramatically. Participants are rewarded for posting size rather than for arriving first, which can improve displayed depth but also encourages oversizing, rapid cancel-and-replace, and “size games.” Small orders may receive only fractional fills and suffer adverse selection if they cannot compete on quantity.`,
+      `Pure pro-rata is rare; most venues that use pro-rata combine it with a time-priority residual or with a minimum allocation, producing hybrid mechanics that still retain some value for early arrival.`
+    ],
+    keyPoint: "Pro-rata replaces the race for time with a contest for size. It can deepen the book but shifts the competitive advantage from latency to capital and display strategy."
+  },
+  {
+    era: "Hybrid",
+    icon: "⚖️",
+    title: "Size-Pro-Rata",
+    desc: "Hybrid allocation schemes that blend time priority with proportional size allocation, often used to balance fairness and latency incentives",
+    badge: { label: "Hybrid", style: "slate" },
+    tags: [["size-pro-rata","slate"], ["hybrid matching","teal"], ["LMM","amber"], ["residual FIFO",""]],
+    data: [
+      { label: "Typical form", value: "Pro-rata + time residual", color: "slate" },
+      { label: "Goal", value: "Reward size yet keep some FIFO", color: "teal" },
+      { label: "Complexity", value: "Higher for both venue & traders", color: "amber" },
+    ],
+    body: [
+      `Size-pro-rata (and related hybrids) allocate a fraction of each incoming trade according to displayed size and the remainder according to time priority. Variants include “pro-rata with time priority for the residual,” “top-of-queue time priority then pro-rata,” and designated market-maker overlays that guarantee a minimum share.`,
+      `The design tries to capture the depth-enhancing effect of pro-rata while still rewarding participants who arrive early and maintain continuous quotes. The precise parameters (pro-rata percentage, minimum lot, residual rule) materially affect optimal quoting behaviour and the value of co-location.`,
+      `Because the allocation is no longer a pure function of either time or size, queue-position estimation and fill-probability models become more involved and must incorporate the venue’s exact matching algorithm.`
+    ],
+    keyPoint: "Size-pro-rata is an engineering compromise. It softens the pure latency race of FIFO while still giving early, sizable quotes a systematic advantage over pure latecomers."
+  },
+  {
+    era: "Latency",
+    icon: "⚡",
+    title: "Queue Jumping via Co-Location",
+    desc: "The use of exchange co-location and ultra-low-latency infrastructure to improve the probability of obtaining favourable queue position at the moment a price level becomes attractive",
+    badge: { label: "Latency", style: "red" },
+    tags: [["co-location","red"], ["latency","amber"], ["queue race","teal"], ["jitter",""]],
+    data: [
+      { label: "Advantage", value: "Microseconds earlier arrival", color: "red" },
+      { label: "Mechanism", value: "Faster reaction to triggers", color: "amber" },
+      { label: "Limit", value: "Does not override pure FIFO once queued", color: "teal" },
+    ],
+    body: [
+      `In a FIFO book the only way to improve queue position after an order has been accepted is for orders ahead to leave. The practical contest therefore occurs at the instant a new price level is created or becomes the best quote: whoever’s message reaches the matching engine first obtains the front of the new queue. Co-location, short-path networking, FPGA or kernel-bypass stacks, and careful timestamping exist largely to win that race.`,
+      `Co-location does not let a later order “jump” an earlier one that is already resting; it improves the probability of being the earlier order when the level forms or when a mass cancel-replace occurs. In pro-rata regimes the latency edge is smaller but still valuable for reacting to allocation opportunities and for managing size.`,
+      `Regulatory and exchange rules increasingly constrain certain forms of latency arbitrage, yet the economic value of being first at the touch remains large enough that co-location continues to be a standard cost of competing in liquid futures and equities.`
+    ],
+    keyPoint: "Co-location is queue-position insurance. It does not rewrite FIFO; it maximises the chance of being first when a new queue is born."
+  },
+  {
+    era: "Estimation",
+    icon: "🔍",
+    title: "Queue Position Estimation",
+    desc: "Statistical and message-based methods for inferring an order’s rank within an aggregated price level when full order-by-order (Level-3) data are unavailable",
+    badge: { label: "Inference", style: "teal" },
+    tags: [["position estimate","teal"], ["L2 vs L3","amber"], ["trade tracking","slate"], ["probabilistic",""]],
+    data: [
+      { label: "Ideal", value: "Full L3 order-by-order feed", color: "teal" },
+      { label: "Reality", value: "Often only aggregated L2 size", color: "amber" },
+      { label: "Method", value: "Sequence of trades + cancels", color: "slate" },
+    ],
+    body: [
+      `When the exchange disseminates every individual order (Level-3 / market-by-order), queue position can be tracked exactly. Most participants, however, receive only aggregated size per price level (Level-2 / market-by-price). Position must then be estimated from the sequence of trade prints, size changes and own-order acknowledgements.`,
+      `Common techniques include assuming FIFO and subtracting executed volume from the front, maintaining a probabilistic distribution over possible ranks, and using the relative frequency of partial fills versus full level depletion. Estimation error is largest when many orders are cancelled or when hidden / iceberg size is material.`,
+      `Accurate position estimates feed directly into fill-probability models, optimal cancel/replace decisions, and the valuation of the option to remain in queue versus re-joining at the back.`
+    ],
+    keyPoint: "Queue position is only as useful as the ability to know it. In L2 environments that knowledge is an inference problem whose quality determines the edge of any queue-aware strategy."
+  },
+  {
+    era: "Tactics",
+    icon: "💥",
+    title: "Burst Arrival Strategies",
+    desc: "Tactics that submit multiple orders in rapid succession or synchronised bursts to maximise the chance of obtaining favourable priority when a level opens or when pro-rata allocation occurs",
+    badge: { label: "Tactical", style: "amber" },
+    tags: [["burst","amber"], ["spray","teal"], ["multiple orders","slate"], ["priority race",""]],
+    data: [
+      { label: "FIFO use", value: "Race to be first at new level", color: "amber" },
+      { label: "Pro-rata use", value: "Increase expected allocation share", color: "teal" },
+      { label: "Risk", value: "Overfill, fees, self-match", color: "red" },
+    ],
+    body: [
+      `When a price level is about to become the best quote, or when a large opposing order is expected, latency-sensitive participants may fire a burst of orders (sometimes from multiple ports or sessions) to maximise the probability that at least one message is among the first accepted. In pro-rata markets the same idea appears as submitting oversized or multiple quotes to increase expected fill share.`,
+      `Exchanges counter with message-rate limits, self-match prevention, and minimum-time-in-force rules. Bursts also create operational risk: overfills, unintended positions, and elevated cancellation fees. The tactic is therefore most prevalent in the most latency-sensitive and highest-value queues.`,
+      `From a research perspective, burst activity is visible in the message tape as sudden spikes in order entry at specific timestamps and is one of the empirical signatures of a pure queue race.`
+    ],
+    keyPoint: "Burst arrival is the tactical expression of the priority race. It is a rational response to FIFO or pro-rata incentives, constrained by exchange controls and by the cost of being wrong."
+  },
+  {
+    era: "Venue",
+    icon: "🏛️",
+    title: "FIFO Exchange: CME Globex",
+    desc: "CME Globex as the canonical large-scale implementation of price-time priority across major futures and options markets",
+    badge: { label: "Example", style: "slate" },
+    tags: [["CME","slate"], ["Globex","teal"], ["FIFO","amber"], ["futures",""]],
+    data: [
+      { label: "Rule", value: "Price-time (FIFO) baseline", color: "slate" },
+      { label: "Products", value: "ES, NQ, CL, rates, etc.", color: "teal" },
+      { label: "Implication", value: "Extreme value on queue position", color: "amber" },
+    ],
+    body: [
+      `CME Globex matches the great majority of its futures and options via price-time priority. At any price level the order that arrived earliest is filled first. The rule is uniform, transparent and has shaped an entire ecosystem of co-located, latency-optimised trading around the Chicago data centres.`,
+      `Because FIFO makes queue position so valuable, the microstructure of CME products is characterised by intense competition for the top of book, rapid cancel-replace activity when priority is lost, and a well-developed literature on queue estimation and fill-probability modelling specific to Globex message flows.`,
+      `Certain products or order types introduce modest modifications (e.g., implied-order priority, lead-market-maker programs), but the dominant logic remains pure price-time. Strategies that succeed on Globex are therefore, first and foremost, strategies that manage queue priority under FIFO.`
+    ],
+    keyPoint: "CME Globex is the purest large-scale laboratory of FIFO dynamics. Its liquidity, message protocols and co-location complex make queue priority a central, measurable determinant of execution quality."
+  },
+  {
+    era: "Venue",
+    icon: "🏢",
+    title: "Pro-Rata Exchange: ICE",
+    desc: "Intercontinental Exchange markets that employ pro-rata or size-based allocation rules, producing a different strategic equilibrium from pure FIFO venues",
+    badge: { label: "Example", style: "teal" },
+    tags: [["ICE","teal"], ["pro-rata","amber"], ["allocation","slate"], ["energy / softs",""]],
+    data: [
+      { label: "Rule", value: "Pro-rata or hybrid size allocation", color: "teal" },
+      { label: "Incentive", value: "Display size to gain fill share", color: "amber" },
+      { label: "Contrast", value: "Less pure latency race than FIFO", color: "slate" },
+    ],
+    body: [
+      `Several ICE futures markets (notably in energy and soft commodities) have historically used pro-rata or size-pro-rata matching at the best price. Incoming volume is distributed across resting orders in proportion to displayed size, with possible time-priority residuals or market-maker guarantees.`,
+      `The strategic response is to post meaningful size rather than to optimise solely for arrival time. Depth at the touch tends to be larger, but individual fill ratios become stochastic and small participants can be squeezed. Latency still matters for reacting to allocation opportunities and for managing the cancel-replace cycle, yet the marginal value of a microsecond is typically lower than on a pure FIFO book of comparable activity.`,
+      `Traders moving between CME-style FIFO and ICE-style pro-rata markets must re-tune quotation size, inventory control and the economic valuation of queue position; the same physical latency infrastructure yields different returns under the two regimes.`
+    ],
+    keyPoint: "ICE’s pro-rata mechanics illustrate the other pole of matching design. Size, not only speed, becomes the currency of priority, and the resulting market ecology differs systematically from FIFO venues."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
