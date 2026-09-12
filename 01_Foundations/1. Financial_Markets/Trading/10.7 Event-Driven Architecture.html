@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 10.7 Event-Driven Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 10 · Section 10.7</div>
+      <h1 class="book-title">Event-Driven<br><em>Architecture</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Event → handler → state · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>10.7 Event-Driven Architecture</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Design",
+    icon: "🏗️",
+    title: "Event-Driven Trading System Design",
+    desc: "Architecting the entire trading stack around discrete, time-stamped events rather than continuous polling or batch cycles",
+    badge: { label: "Core", style: "teal" },
+    tags: [["event-driven","teal"], ["architecture","amber"], ["reactivity",""], ["decoupling","slate"]],
+    data: [
+      { label: "Principle", value: "Everything is an event", color: "teal" },
+      { label: "Flow", value: "Emit → queue → dispatch → react", color: "" },
+      { label: "Benefit", value: "Loose coupling + natural time ordering", color: "amber" },
+    ],
+    body: [
+      `An event-driven trading system treats every meaningful occurrence — a market-data tick, a signal, an order acknowledgement, a fill, a timer expiry — as an immutable event that is placed onto a queue and processed by registered handlers. Control flow is inverted: instead of the application repeatedly asking “has anything changed?”, components react when something has changed.`,
+      `This design yields natural decoupling. Market-data handlers do not know about strategy logic; strategies do not know about order-routing details; risk checks sit in the path as pure event transformers. New functionality is added by registering additional handlers rather than modifying existing call chains.`,
+      `The same architecture supports both live trading and simulation: a live gateway emits real exchange events; a back-test engine emits historical events from a file or database. The downstream graph of handlers remains identical.`
+    ],
+    keyPoint: "Event-driven design makes time and causality explicit. By turning every change into a first-class event, the system becomes modular, testable and equally usable in research and production."
+  },
+  {
+    era: "Taxonomy",
+    icon: "🏷️",
+    title: "Event Types: Market Data, Signals, Orders, Fills",
+    desc: "The primary categories of events that flow through a trading system and the responsibilities each carries",
+    badge: { label: "Vocabulary", style: "amber" },
+    tags: [["market data","amber"], ["signals","teal"], ["orders","slate"], ["fills",""]],
+    data: [
+      { label: "Market data", value: "Ticks, books, trades, status", color: "amber" },
+      { label: "Signals", value: "Alpha / decision events", color: "teal" },
+      { label: "Orders / Fills", value: "Intent and execution reports", color: "slate" },
+    ],
+    body: [
+      `Market-data events carry the raw or normalised view of the market: top-of-book updates, depth snapshots, trade prints, instrument status changes. They are usually the highest-frequency events and the primary input to pricing and signal logic.`,
+      `Signal events represent internal decisions — “edge detected”, “target position changed”, “risk limit approached”. They are typically lower frequency and richer in semantic content. Order events express intent to the outside world (new, amend, cancel). Fill and execution-report events return the market’s response and drive position and P&L updates.`,
+      `A clean taxonomy, with well-defined schemas and versioning, prevents handlers from making incorrect assumptions and makes it possible to replay or audit any historical sequence with fidelity.`
+    ],
+    keyPoint: "Clear event types are the shared language of the system. When every component agrees on what a MarketDataEvent or a FillEvent contains, composition and debugging become dramatically simpler."
+  },
+  {
+    era: "Infrastructure",
+    icon: "📥",
+    title: "Event Queue Management",
+    desc: "The buffering, ordering and dispatch machinery that sits between event producers and consumers",
+    badge: { label: "Plumbing", style: "slate" },
+    tags: [["queue","slate"], ["ordering","teal"], ["priority",""], ["backpressure","amber"]],
+    data: [
+      { label: "Concerns", value: "Ordering, capacity, latency, fairness", color: "slate" },
+      { label: "Variants", value: "Single queue, priority, partitioned", color: "" },
+      { label: "Risk", value: "Unbounded growth under overload", color: "red" },
+    ],
+    body: [
+      `The event queue is the central nervous system of an event-driven architecture. It must preserve causal order (or a well-defined partial order), bound memory usage, and deliver events to handlers with minimal and predictable latency.`,
+      `Design choices include a single global queue versus per-instrument or per-session queues, strict FIFO versus priority queues (e.g., cancels before new orders), and in-process lock-free rings versus durable external brokers. Each choice trades simplicity, latency and isolation.`,
+      `Under bursty market conditions the queue is the first place overload appears. Bounded capacity, explicit back-pressure and overload policies (drop, sample, or block) are therefore essential production features, not afterthoughts.`
+    ],
+    keyPoint: "The queue determines both the performance and the failure modes of the system. A well-designed queue preserves order, bounds resource use and signals overload before memory is exhausted."
+  },
+  {
+    era: "Wiring",
+    icon: "🔗",
+    title: "Handler Registration",
+    desc: "Dynamically associating processing functions with event types so that new behaviour can be added without rewriting the core loop",
+    badge: { label: "Extensibility", style: "teal" },
+    tags: [["handlers","teal"], ["registration","amber"], ["dispatch",""], ["modularity","slate"]],
+    data: [
+      { label: "Pattern", value: "Subscribe(eventType, handler)", color: "teal" },
+      { label: "Dispatch", value: "Type-based or topic-based lookup", color: "" },
+      { label: "Benefit", value: "Open for extension, closed for modification", color: "amber" },
+    ],
+    body: [
+      `Handlers are the pure or near-pure functions that react to events. At start-up (or even at runtime) each handler registers interest in one or more event types. When an event is dequeued, the dispatcher looks up the registered handlers and invokes them in a defined order.`,
+      `This registration model enables a plugin-style architecture. A new risk check, a new logging sink, or a new signal generator can be introduced simply by registering an additional handler; existing code remains untouched.`,
+      `Advanced designs support handler chains, middleware-style interceptors, and conditional registration based on configuration or feature flags, giving fine-grained control over the processing pipeline.`
+    ],
+    keyPoint: "Handler registration turns the event loop into an extensible bus. New capabilities become additive rather than invasive, which is the hallmark of a maintainable trading architecture."
+  },
+  {
+    era: "Research",
+    icon: "📊",
+    title: "Backtesting in Event-Driven Framework",
+    desc: "Replaying historical events through the same handler graph used in live trading to obtain realistic performance estimates",
+    badge: { label: "Simulation", style: "amber" },
+    tags: [["backtest","amber"], ["replay","teal"], ["fidelity",""], ["look-ahead bias","red"]],
+    data: [
+      { label: "Method", value: "Historical events → same handlers", color: "amber" },
+      { label: "Advantage", value: "Identical logic path as production", color: "teal" },
+      { label: "Pitfall", value: "Look-ahead bias & unrealistic fills", color: "red" },
+    ],
+    body: [
+      `Because an event-driven system already processes a stream of events, back-testing becomes a matter of substituting a historical event source for the live gateway. The identical strategy, risk and portfolio handlers execute in the same order they would in production.`,
+      `High-fidelity back-tests also simulate exchange behaviour: latency, queue position, partial fills, and reject rates. The closer the simulated exchange events match reality, the more trustworthy the resulting performance statistics.`,
+      `The principal dangers are look-ahead bias (accidentally using future information) and overly optimistic fill assumptions. A disciplined event-driven framework makes both easier to avoid, because every piece of data must arrive as an explicit event with a timestamp.`
+    ],
+    keyPoint: "Event-driven back-testing reuses the live code path. That reuse is both a powerful consistency guarantee and a forcing function for clean, timestamp-aware design."
+  },
+  {
+    era: "Behaviour",
+    icon: "🔀",
+    title: "State Machine Design",
+    desc: "Modelling the lifecycle of orders, sessions and strategies as explicit finite-state machines driven by events",
+    badge: { label: "Control", style: "slate" },
+    tags: [["state machine","slate"], ["lifecycle","teal"], ["transitions",""], ["determinism","amber"]],
+    data: [
+      { label: "Components", value: "States, events, transitions, actions", color: "slate" },
+      { label: "Example", value: "Order: New → Live → PartiallyFilled → Filled", color: "" },
+      { label: "Benefit", value: "Explicit, auditable, testable behaviour", color: "teal" },
+    ],
+    body: [
+      `Complex entities inside a trading system — orders, exchange sessions, strategy modes, risk states — are naturally expressed as finite-state machines. Each machine occupies exactly one state at a time; events trigger transitions and optional side-effect actions.`,
+      `Making the state machine explicit eliminates a host of bugs that arise from ad-hoc boolean flags and implicit sequencing. Invalid transitions can be rejected or logged; the full history of states becomes an audit trail; unit tests can drive the machine through every legal path.`,
+      `In an event-driven architecture the state machine is simply another handler: it consumes events, updates its internal state, and may emit new events (for example, “order now fully filled”) for downstream consumers.`
+    ],
+    keyPoint: "State machines turn implicit, error-prone control flow into a declarative, testable diagram. In event-driven systems they are the cleanest way to manage the lifecycle of any long-lived entity."
+  },
+  {
+    era: "Persistence",
+    icon: "📼",
+    title: "Event Sourcing and Replay",
+    desc: "Persisting every state change as an immutable event and reconstructing current state by replaying the log",
+    badge: { label: "History", style: "teal" },
+    tags: [["event sourcing","teal"], ["replay","amber"], ["audit","slate"], ["rebuild",""]],
+    data: [
+      { label: "Store", value: "Append-only event log", color: "teal" },
+      { label: "State", value: "Derived by replaying events", color: "" },
+      { label: "Power", value: "Time-travel, audit, rebuild", color: "amber" },
+    ],
+    body: [
+      `Event sourcing stores the sequence of events rather than (or in addition to) the latest snapshot of state. The current position, order book or strategy state is obtained by replaying the log from the beginning or from a periodic snapshot.`,
+      `The approach yields a perfect audit trail, enables “time-travel” debugging, and allows the system to be rebuilt on new hardware or with corrected handler logic simply by replaying the same events. It also forms a natural foundation for event-driven back-testing.`,
+      `Challenges include managing log growth, ensuring handlers are deterministic, and handling schema evolution of old events. Snapshots and careful versioning are the usual mitigations.`
+    ],
+    keyPoint: "Event sourcing makes history a first-class citizen. When every decision and market update is recorded as an immutable event, the system can be audited, debugged and even rebuilt with complete fidelity."
+  },
+  {
+    era: "Separation",
+    icon: "↔️",
+    title: "CQRS (Command Query Responsibility Segregation)",
+    desc: "Splitting the model that processes commands (writes) from the model that answers queries (reads)",
+    badge: { label: "Pattern", style: "amber" },
+    tags: [["CQRS","amber"], ["commands","teal"], ["queries","slate"], ["scalability",""]],
+    data: [
+      { label: "Command side", value: "Validates & mutates via events", color: "teal" },
+      { label: "Query side", value: "Optimised read models / projections", color: "" },
+      { label: "Benefit", value: "Independent scaling & models", color: "amber" },
+    ],
+    body: [
+      `CQRS recognises that the requirements for handling a command (“place order”, “cancel”, “update target”) are different from the requirements for answering a query (“what is my current position?”, “show me today’s P&L”). The two responsibilities are therefore segregated into separate models.`,
+      `The command side validates business rules and emits events; the query side consumes those events to build denormalised, purpose-built read views. Each side can be scaled, optimised and even implemented with different technologies.`,
+      `In trading systems CQRS appears naturally: the order-management and risk path is command-oriented and latency-critical, while dashboards, reports and analytics consume projections that can tolerate slightly higher latency and richer indexing.`
+    ],
+    keyPoint: "CQRS frees the write path from the needs of the read path. Commands stay lean and fast; queries get the denormalised views they need — both without compromise."
+  },
+  {
+    era: "Safety",
+    icon: "🔁",
+    title: "Idempotency in Event Processing",
+    desc: "Ensuring that processing the same event more than once produces the same result and does not corrupt state",
+    badge: { label: "Reliability", style: "red" },
+    tags: [["idempotency","red"], ["exactly-once","amber"], ["deduplication",""], ["at-least-once","teal"]],
+    data: [
+      { label: "Problem", value: "Duplicate or replayed events", color: "red" },
+      { label: "Solution", value: "Idempotent handlers + dedup keys", color: "" },
+      { label: "Reality", value: "At-least-once delivery is common", color: "amber" },
+    ],
+    body: [
+      `In distributed and restarted systems the same event may be delivered more than once. If a handler is not idempotent, a second execution can double a position, re-send an order, or otherwise corrupt state.`,
+      `Idempotent design means that applying an event a second time leaves the system in the same state as applying it once. Practical techniques include storing the last processed event ID per stream, using natural business keys (ClOrdID, ExecID) as deduplication tokens, and making state transitions themselves idempotent.`,
+      `Because exactly-once delivery is extremely hard to guarantee end-to-end, most robust architectures assume at-least-once delivery and push the idempotency burden onto the handlers. This is especially critical for order and fill processing.`
+    ],
+    keyPoint: "Idempotency is the practical answer to duplicate events. When every handler can safely see the same event twice, the system becomes resilient to retries, replays and network restarts."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

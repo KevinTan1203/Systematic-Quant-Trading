@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 10.8 Data Engineering for Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 10 · Section 10.8</div>
+      <h1 class="book-title">Data Engineering<br><em>for Trading</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Ingest → clean → adjust · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>10.8 Data Engineering for Trading</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Ingestion",
+    icon: "📥",
+    title: "Tick Data Ingestion Pipelines",
+    desc: "Capturing, normalising and storing every trade and quote update at the highest available resolution",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["tick data","teal"], ["ingestion","amber"], ["pipeline",""], ["low-latency","slate"]],
+    data: [
+      { label: "Sources", value: "Exchange feeds, vendors, brokers", color: "teal" },
+      { label: "Challenges", value: "Volume, latency, gaps, schema drift", color: "" },
+      { label: "Storage", value: "Columnar, time-series, or flat files", color: "amber" },
+    ],
+    body: [
+      `Tick data — every trade print and every order-book update — is the raw material of quantitative research and high-frequency strategies. Ingestion pipelines must capture these messages with minimal loss, attach precise timestamps, and land them in durable storage at rates that can exceed millions of messages per second per venue.`,
+      `A robust pipeline typically comprises feed handlers (often co-located), a low-latency transport, optional in-line normalisation, and writers that persist both the original raw messages and a cleaned, research-ready representation. Monitoring for sequence gaps, latency spikes and feed drops is continuous.`,
+      `Design decisions around buffering, back-pressure, and whether to store full depth versus top-of-book determine both the fidelity of downstream research and the operational cost of the system.`
+    ],
+    keyPoint: "Tick ingestion is the foundation of the data stack. Any gap, timestamp error or silent feed drop at this stage permanently corrupts every analytic that depends on the data."
+  },
+  {
+    era: "Aggregation",
+    icon: "📊",
+    title: "OHLCV Bar Construction from Ticks",
+    desc: "Aggregating raw ticks into fixed-interval or volume-based bars that summarise open, high, low, close and volume",
+    badge: { label: "Transform", style: "amber" },
+    tags: [["OHLCV","amber"], ["bars","teal"], ["resampling",""], ["volume bars","slate"]],
+    data: [
+      { label: "Inputs", value: "Trade ticks (± quotes)", color: "" },
+      { label: "Outputs", value: "Time, tick, volume or dollar bars", color: "teal" },
+      { label: "Critical", value: "Correct first/last price & volume sum", color: "amber" },
+    ],
+    body: [
+      `Most research and many live strategies operate on aggregated bars rather than raw ticks. OHLCV bars record the first (open), highest, lowest and last (close) trade price inside an interval together with the sum of traded volume. Intervals may be calendar time, tick count, volume or dollar value.`,
+      `Construction must respect exchange conventions for auction prints, out-of-sequence trades and corrections. The choice of whether to include only regular-session trades or also pre-/post-market activity materially affects bar statistics.`,
+      `Volume and dollar bars often produce more statistically well-behaved series than fixed-time bars because they sample the market in activity time rather than clock time, reducing the impact of overnight gaps and lunch-hour lulls.`
+    ],
+    keyPoint: "Bar construction is a lossy but necessary compression. The rules used to form each bar determine the statistical properties of every model trained on those bars."
+  },
+  {
+    era: "Unification",
+    icon: "🌐",
+    title: "Data Normalization Across Venues",
+    desc: "Converting heterogeneous venue feeds into a single, consistent internal schema and set of conventions",
+    badge: { label: "Consistency", style: "slate" },
+    tags: [["normalization","slate"], ["multi-venue","teal"], ["schema",""], ["conventions","amber"]],
+    data: [
+      { label: "Problem", value: "Different tick sizes, timestamps, statuses", color: "slate" },
+      { label: "Goal", value: "Uniform internal representation", color: "teal" },
+      { label: "Benefit", value: "Venue-agnostic research & execution", color: "amber" },
+    ],
+    body: [
+      `Each exchange and data vendor uses its own symbology, timestamp conventions, order-status codes, auction flags and market-quality indicators. Normalisation maps all of these into a single internal schema so that downstream code never branches on venue-specific quirks.`,
+      `Typical tasks include converting local timestamps to a common UTC clock, mapping vendor symbols to a master security identifier, harmonising trade-condition flags, and aligning lot-size and tick-size conventions.`,
+      `A well-designed normalisation layer is the difference between a research platform that can treat the market as one coherent whole and a patchwork of venue-specific special cases that continually generate subtle bugs.`
+    ],
+    keyPoint: "Normalisation erases venue idiosyncrasies so that research and trading logic can be written once and applied everywhere. It is one of the highest-leverage investments in a multi-venue data stack."
+  },
+  {
+    era: "Completeness",
+    icon: "🕳️",
+    title: "Handling Missing Data and Corporate Actions",
+    desc: "Detecting gaps, deciding on imputation or exclusion policies, and applying corporate-action adjustments correctly",
+    badge: { label: "Integrity", style: "red" },
+    tags: [["missing data","red"], ["gaps","amber"], ["corporate actions","teal"], ["imputation",""]],
+    data: [
+      { label: "Gaps", value: "Feed drops, halts, suspensions", color: "red" },
+      { label: "Actions", value: "Dividends, splits, mergers, spin-offs", color: "" },
+      { label: "Policy", value: "Flag, impute, or exclude — never silent", color: "amber" },
+    ],
+    body: [
+      `Missing data arises from exchange halts, feed failures, or simply periods of zero trading. Corporate actions permanently alter the meaning of a price series. Both must be handled explicitly; silent gaps or unadjusted prices produce biased research and incorrect live signals.`,
+      `Common policies include forward-filling sparse quotes (with strict limits), marking bars as invalid, or excluding instruments from the universe on affected days. Corporate-action processing applies known adjustments on the correct effective dates and maintains an audit trail.`,
+      `The guiding principle is transparency: every decision about a gap or an adjustment should be visible to downstream users so that they can decide whether the resulting series is suitable for their purpose.`
+    ],
+    keyPoint: "Missing data and corporate actions are not edge cases; they are routine features of real markets. Explicit, auditable handling is the only way to keep research honest and production safe."
+  },
+  {
+    era: "Adjustment",
+    icon: "💰",
+    title: "Dividend Adjustments",
+    desc: "Removing or accounting for the mechanical price drop that occurs when a stock goes ex-dividend",
+    badge: { label: "Price Series", style: "teal" },
+    tags: [["dividends","teal"], ["ex-date","amber"], ["total return",""], ["adjustment factor","slate"]],
+    data: [
+      { label: "Effect", value: "Price drops by approx. dividend amount", color: "teal" },
+      { label: "Methods", value: "Additive or multiplicative adjustment", color: "" },
+      { label: "Use", value: "Total-return series for performance", color: "amber" },
+    ],
+    body: [
+      `On the ex-dividend date the stock price typically opens lower by approximately the dividend amount. For pure price-return calculations this drop looks like a loss; for total-return calculations the dividend must be added back.`,
+      `Adjustment methods include subtracting the dividend from all prior prices (additive) or multiplying prior prices by a factor (close / (close + dividend)). Multiplicative adjustment preserves percentage returns and is the market standard for continuous series.`,
+      `Research platforms usually maintain both unadjusted and dividend-adjusted series. Live trading systems must know which version they are consuming so that signals and risk calculations remain consistent.`
+    ],
+    keyPoint: "Dividend adjustment converts a price series into a total-return series. Without it, every back-test of a dividend-paying universe systematically understates true investor returns."
+  },
+  {
+    era: "Adjustment",
+    icon: "✂️",
+    title: "Split Adjustments",
+    desc: "Rescaling historical prices and volumes so that a stock split does not appear as a massive artificial return",
+    badge: { label: "Continuity", style: "amber" },
+    tags: [["splits","amber"], ["adjustment factor","teal"], ["volume","slate"], ["continuity",""]],
+    data: [
+      { label: "Effect", value: "Price changes by split ratio", color: "amber" },
+      { label: "Factor", value: "Cumulative product of split ratios", color: "" },
+      { label: "Also adjust", value: "Volume (inverse factor)", color: "teal" },
+    ],
+    body: [
+      `A 2-for-1 split halves the price and doubles the number of shares. On an unadjusted chart this appears as a 50 % overnight loss. Split adjustment multiplies all prior prices by the split ratio (and divides volumes by the same ratio) so that the series remains continuous.`,
+      `Factors are applied cumulatively; a stock that has split multiple times carries a composite adjustment factor. Reverse splits are handled identically with ratios less than one.`,
+      `As with dividends, both adjusted and unadjusted series are typically retained. Corporate-action files from reliable vendors supply the effective dates and ratios needed to keep the factors current.`
+    ],
+    keyPoint: "Split adjustment is mandatory for any long-term price or return series. An unadjusted split creates a catastrophic outlier that will dominate every statistical estimate it touches."
+  },
+  {
+    era: "Time",
+    icon: "📅",
+    title: "Calendar Management (Exchange Holidays)",
+    desc: "Maintaining accurate trading calendars so that schedules, bars and risk calculations respect market open days",
+    badge: { label: "Schedule", style: "slate" },
+    tags: [["calendar","slate"], ["holidays","amber"], ["sessions","teal"], ["early closes",""]],
+    data: [
+      { label: "Contents", value: "Holidays, early closes, special sessions", color: "slate" },
+      { label: "Scope", value: "Per exchange / per market", color: "" },
+      { label: "Impact", value: "Bar alignment, roll dates, risk", color: "amber" },
+    ],
+    body: [
+      `Each exchange publishes its own holiday schedule, early-close days and special trading sessions. A master calendar service aggregates these schedules and exposes simple queries: “is this date a trading day for venue X?”, “what are the session times on date Y?”.`,
+      `Calendars drive bar construction, strategy scheduling, futures roll logic, settlement calculations and risk-system expectations. An incorrect holiday can cause a strategy to trade when the market is closed or to miss a critical rebalance.`,
+      `Because holiday schedules are announced in advance but occasionally revised, the calendar service must be both authoritative and easily updatable, with clear versioning so that historical research remains reproducible.`
+    ],
+    keyPoint: "The trading calendar is the temporal backbone of the entire stack. Every time-based calculation — from bar formation to risk limits — ultimately depends on knowing when the market is actually open."
+  },
+  {
+    era: "Quality",
+    icon: "🔍",
+    title: "Data Quality Checks (Outlier Detection)",
+    desc: "Automated rules and statistical tests that flag or correct anomalous prices, volumes and timestamps",
+    badge: { label: "Validation", style: "red" },
+    tags: [["outliers","red"], ["quality","teal"], ["validation",""], ["cleaning","amber"]],
+    data: [
+      { label: "Checks", value: "Price jumps, zero volume, bad timestamps", color: "red" },
+      { label: "Methods", value: "Rules, z-scores, robust statistics", color: "" },
+      { label: "Action", value: "Flag, quarantine, or auto-correct", color: "amber" },
+    ],
+    body: [
+      `Even clean feeds contain errors: fat-finger prints, crossed markets, delayed packets, and vendor-side corrections. Quality checks run continuously or at end-of-day to detect values that violate economic or statistical plausibility.`,
+      `Simple rule-based filters catch zero or negative prices, impossible spreads, and timestamps that move backwards. Statistical methods (robust z-scores, median absolute deviation, isolation forests) identify more subtle outliers. Decisions to auto-correct versus merely flag are policy choices that must be documented.`,
+      `High-quality pipelines treat data validation as a first-class stage with its own metrics, alerts and audit logs. Silent corruption is far more dangerous than an occasional rejected bar.`
+    ],
+    keyPoint: "Data quality checks are the immune system of the research platform. They convert raw, error-prone feeds into trustworthy inputs and surface problems before models or live strategies ever see them."
+  },
+  {
+    era: "Identity",
+    icon: "🔖",
+    title: "Reference Data Management (Symbology)",
+    desc: "Maintaining the master mapping between vendor symbols, exchange codes, and continuous security identifiers",
+    badge: { label: "Identity", style: "teal" },
+    tags: [["symbology","teal"], ["reference data","amber"], ["identifiers",""], ["mapping","slate"]],
+    data: [
+      { label: "Problem", value: "Same instrument, many symbols", color: "teal" },
+      { label: "Solution", value: "Master security ID + mappings", color: "" },
+      { label: "Dynamics", value: "Ticker changes, listings, delistings", color: "amber" },
+    ],
+    body: [
+      `A single economic instrument may be identified by dozens of symbols across vendors, exchanges and historical periods. Reference-data management maintains a master security identifier and the many-to-one mappings that link every external symbol to that master.`,
+      `The service must also track corporate events that change identity (ticker changes, mergers, spin-offs, exchange migrations) and maintain point-in-time validity so that historical research uses the correct symbol for any given date.`,
+      `Poor symbology is a leading cause of silent research errors — joining the wrong price series, missing a delisting, or double-counting an instrument after a ticker change. A robust reference-data layer eliminates an entire class of these bugs.`
+    ],
+    keyPoint: "Symbology is the identity layer of the data stack. When every price, position and corporate action is anchored to a stable master identifier, cross-sectional and longitudinal analysis become reliable."
+  },
+  {
+    era: "Expansion",
+    icon: "📡",
+    title: "Alternative Data Ingestion",
+    desc: "Bringing non-traditional datasets — satellite, credit-card, web, sentiment, etc. — into the research and production environment",
+    badge: { label: "Alpha", style: "amber" },
+    tags: [["alt data","amber"], ["ingestion","teal"], ["unstructured",""], ["point-in-time","slate"]],
+    data: [
+      { label: "Sources", value: "Satellite, transaction, web, text, IoT", color: "amber" },
+      { label: "Challenges", value: "Schema variety, latency, point-in-time", color: "" },
+      { label: "Critical", value: "No look-ahead + robust joining", color: "red" },
+    ],
+    body: [
+      `Alternative data expands the information set beyond exchange-traded prices and volumes. Ingestion pipelines must accommodate highly heterogeneous formats (images, JSON dumps, PDFs, streaming APIs), irregular update frequencies, and vendor-specific delivery quirks.`,
+      `Two requirements dominate: point-in-time correctness (the data must be available only as of the timestamp a live strategy would have seen it) and reliable joining to the security master. Violating either introduces look-ahead bias or mismatched entities that invalidate research.`,
+      `Operationally, alternative-data pipelines need the same monitoring, quality checks and versioning discipline as market-data pipelines; the only difference is that the content is more varied and the failure modes less familiar.`
+    ],
+    keyPoint: "Alternative data is only as valuable as its ingestion discipline. Point-in-time integrity and clean security mapping are what separate genuine incremental alpha from elaborate look-ahead bias."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

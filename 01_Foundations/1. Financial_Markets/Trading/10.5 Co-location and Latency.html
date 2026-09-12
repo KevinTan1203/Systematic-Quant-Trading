@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 10.5 Co-location and Latency</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 10 · Section 10.5</div>
+      <h1 class="book-title">Co-location<br><em>& Latency</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Proximity → measure → optimise · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>10.5 Co-location and Latency</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Location",
+    icon: "🏢",
+    title: "Co-location at Exchange Data Centers",
+    desc: "Housing trading servers inside the same facility as the exchange matching engines (NY4, NY5, LD4, etc.)",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["co-lo","teal"], ["NY4","amber"], ["NY5",""], ["LD4","slate"]],
+    data: [
+      { label: "Key sites", value: "NY4/NY5 (Secaucus), LD4 (Slough)", color: "teal" },
+      { label: "Benefit", value: "Minimal physical distance to matching engine", color: "" },
+      { label: "Cost", value: "Rack space + power + cross-connects", color: "amber" },
+    ],
+    body: [
+      `Co-location places a firm’s trading servers in the same data centre that hosts the exchange’s matching engine. Major examples include Equinix NY4 and NY5 in Secaucus (serving multiple US equity and options venues) and LD4 in Slough (a primary hub for London markets). Physical proximity reduces fibre length to tens or hundreds of metres instead of kilometres.`,
+      `Exchanges and data-centre operators offer standardised co-lo products: cabinet space, power, cooling, and equal-length cable runs so that no customer obtains a systematic distance advantage inside the facility. Access is tightly controlled and audited.`,
+      `Co-location is the baseline requirement for any latency-sensitive strategy. Without it, even the fastest software is handicapped by the speed of light over metropolitan or long-haul fibre.`
+    ],
+    keyPoint: "Co-location is the physical starting point of the latency race. Equal cable lengths inside the facility level the playing field; everything after that is engineering."
+  },
+  {
+    era: "Hosting",
+    icon: "📡",
+    title: "Proximity Hosting",
+    desc: "Placing servers in facilities close to, but not necessarily inside, the primary exchange data centre",
+    badge: { label: "Alternative", style: "amber" },
+    tags: [["proximity","amber"], ["near-co-lo","teal"], ["cost/performance",""], ["multi-venue","slate"]],
+    data: [
+      { label: "Difference", value: "Nearby facility, not the exchange cage", color: "amber" },
+      { label: "Use case", value: "Multi-venue access or cost control", color: "" },
+      { label: "Trade-off", value: "Slightly higher latency, often lower cost", color: "teal" },
+    ],
+    body: [
+      `Proximity hosting places equipment in a data centre that is geographically close to the exchange facility but not the official co-location cage itself. The extra distance is typically measured in hundreds of metres to a few kilometres — still far superior to remote hosting, yet usually cheaper and more flexible than full co-lo.`,
+      `Firms often use proximity facilities as aggregation points for multi-venue connectivity, disaster-recovery sites, or for strategies that are latency-sensitive but not at the absolute bleeding edge. Cross-connects or short microwave/fibre links then reach the primary exchange cages.`,
+      `The decision between true co-location and proximity hosting is a classic cost-versus-latency trade-off that depends on the strategy’s edge and the competitive landscape of the venues involved.`
+    ],
+    keyPoint: "Proximity hosting offers a pragmatic middle ground: most of the latency benefit of being nearby at a fraction of the cost and complexity of full exchange co-location."
+  },
+  {
+    era: "Connectivity",
+    icon: "🔌",
+    title: "Cross-Connect Fees",
+    desc: "The recurring charges for physical fibre or copper links between a customer’s cage and the exchange or service provider",
+    badge: { label: "Cost", style: "slate" },
+    tags: [["cross-connect","slate"], ["fibre","amber"], ["recurring fee",""], ["data centre","teal"]],
+    data: [
+      { label: "Type", value: "Physical patch between cages", color: "slate" },
+      { label: "Pricing", value: "Monthly recurring + install", color: "" },
+      { label: "Impact", value: "Material line-item in co-lo budget", color: "amber" },
+    ],
+    body: [
+      `Inside a data centre, a cross-connect is a dedicated fibre or copper cable that links a customer’s rack to an exchange’s meet-me room, a market-data provider, or another service. Operators charge both an installation fee and a monthly recurring fee for each such connection.`,
+      `Because a typical trading deployment requires multiple cross-connects (primary and backup market data, order entry, drop copies, timing feeds, etc.), these fees accumulate into a significant operational cost. Pricing varies by facility and by whether the link is single-mode fibre, multi-mode, or copper.`,
+      `Firms carefully design their connectivity matrices to minimise the number of cross-connects while preserving redundancy. Some negotiate volume discounts or use aggregated service providers to reduce the total bill.`
+    ],
+    keyPoint: "Cross-connect fees are the hidden tax of co-location. Every additional link improves resilience or data access but adds a permanent line-item to the latency infrastructure budget."
+  },
+  {
+    era: "Measurement",
+    icon: "⏱️",
+    title: "Latency Measurement (One-Way, Round-Trip)",
+    desc: "Quantifying the time taken for a packet or message to travel between two points in the trading path",
+    badge: { label: "Metrics", style: "teal" },
+    tags: [["one-way","teal"], ["RTT","amber"], ["measurement",""], ["clock sync","slate"]],
+    data: [
+      { label: "One-way", value: "A → B (requires synchronised clocks)", color: "teal" },
+      { label: "Round-trip", value: "A → B → A (easier to measure)", color: "" },
+      { label: "Precision", value: "Nanoseconds with hardware timestamps", color: "amber" },
+    ],
+    body: [
+      `Latency can be expressed as one-way delay (time from source to destination) or round-trip time (RTT). One-way measurement requires tightly synchronised clocks at both ends (usually via PTP or GPS/PPS); RTT can be measured with a single clock by echoing a packet.`,
+      `In trading, both metrics matter. One-way latency determines how quickly a firm sees a market-data tick or how quickly an order reaches the matching engine. RTT is commonly used for continuous monitoring of link health and for simple network-performance dashboards.`,
+      `Accurate measurement itself depends on high-resolution timestamping and careful avoidance of software-induced jitter. Without trustworthy numbers, optimisation efforts are flying blind.`
+    ],
+    keyPoint: "You cannot improve what you cannot measure. One-way and round-trip latency figures, captured with sufficient precision, are the foundation of every serious performance programme."
+  },
+  {
+    era: "Critical Path",
+    icon: "🎯",
+    title: "Tick-to-Trade Latency",
+    desc: "The elapsed time from receipt of a market-data update to the transmission of a responsive order",
+    badge: { label: "Key Metric", style: "red" },
+    tags: [["tick-to-trade","red"], ["decision path","amber"], ["critical path",""], ["optimisation","teal"]],
+    data: [
+      { label: "Definition", value: "Market-data in → Order out", color: "red" },
+      { label: "Components", value: "Decode, decide, risk, encode, send", color: "" },
+      { label: "Target", value: "Single-digit microseconds or less", color: "teal" },
+    ],
+    body: [
+      `Tick-to-trade (or tick-to-order) latency is the end-to-end time from the moment a market-data packet arrives at the firm’s network interface to the moment the corresponding order packet leaves it. It encompasses parsing, strategy logic, risk checks, order construction and transmission.`,
+      `This metric is the single most important performance number for many latency-sensitive strategies. It is influenced by every layer: network stack, software design, CPU affinity, memory access patterns, and finally the physical network path to the exchange.`,
+      `Leading firms continuously instrument and regress tick-to-trade distributions (median, 99th percentile, worst-case) under realistic message rates. Improvements of even a few hundred nanoseconds can be material in competitive markets.`
+    ],
+    keyPoint: "Tick-to-trade is the scoreboard of the latency race. Every optimisation — from kernel bypass to FPGA — is ultimately judged by how much it reduces this critical-path number."
+  },
+  {
+    era: "Fabric",
+    icon: "🧵",
+    title: "Network Fabric (InfiniBand, 10GbE)",
+    desc: "The high-speed internal networking technologies used inside co-location deployments",
+    badge: { label: "Infrastructure", style: "slate" },
+    tags: [["InfiniBand","slate"], ["10/25/40/100GbE","teal"], ["RDMA","amber"], ["switching",""]],
+    data: [
+      { label: "Ethernet", value: "10/25/40/100 GbE dominant", color: "teal" },
+      { label: "InfiniBand", value: "Ultra-low latency, RDMA", color: "" },
+      { label: "Focus", value: "Determinism + minimal jitter", color: "amber" },
+    ],
+    body: [
+      `Inside the co-location cage the network fabric that interconnects servers, switches and exchange hand-offs must itself be extremely fast and deterministic. 10 GbE was the long-time standard; 25/40/100 GbE are now common. InfiniBand, with its remote direct memory access (RDMA) capabilities, is used in some ultra-low-latency designs for inter-process or inter-server communication.`,
+      `Key design goals are minimal store-and-forward delay, cut-through switching where possible, and the elimination of bufferbloat and jitter. Precision timing and congestion control become critical as message rates rise.`,
+      `The choice of fabric affects both raw latency and the software interfaces available (kernel networking versus kernel-bypass or RDMA verbs), so it is decided early in any high-performance architecture.`
+    ],
+    keyPoint: "The internal network fabric is part of the critical path. A carefully engineered low-jitter Ethernet or InfiniBand design prevents the local network from becoming the new bottleneck once software latency has been reduced."
+  },
+  {
+    era: "Wireless",
+    icon: "📶",
+    title: "Microwave and Millimeter Wave Links",
+    desc: "Line-of-sight wireless paths that beat fibre on long-haul routes by travelling closer to the speed of light in air",
+    badge: { label: "Long-Haul", style: "amber" },
+    tags: [["microwave","amber"], ["mmWave","teal"], ["speed of light",""], ["weather","slate"]],
+    data: [
+      { label: "Advantage", value: "Lower latency than fibre over distance", color: "amber" },
+      { label: "Path", value: "Line-of-sight towers / rooftops", color: "" },
+      { label: "Risk", value: "Weather fade, licensing, shared spectrum", color: "red" },
+    ],
+    body: [
+      `Over distances of tens to hundreds of kilometres, microwave and millimeter-wave links can deliver lower latency than fibre because radio waves in air travel closer to the speed of light than light in optical fibre (which has a refractive-index penalty). Firms and specialist providers have built dedicated networks between major financial centres (e.g., Chicago–New York, London–Frankfurt).`,
+      `These links require clear line-of-sight, spectrum licences, and careful engineering to mitigate rain fade and other atmospheric effects. Redundant paths and automatic failover to fibre are standard.`,
+      `For certain arbitrage and relative-value strategies the microwave advantage is decisive; for others the cost, operational complexity and residual weather risk outweigh the benefit.`
+    ],
+    keyPoint: "Microwave and mmWave links exploit physics: air is faster than glass. Where the geographic distance is large enough, they remain one of the few ways to gain a structural latency edge over fibre-only competitors."
+  },
+  {
+    era: "Time",
+    icon: "🕰️",
+    title: "Hardware Timestamps",
+    desc: "Nanosecond-accurate time stamps applied by the network interface card at the moment a packet is received or transmitted",
+    badge: { label: "Precision", style: "teal" },
+    tags: [["hardware timestamp","teal"], ["PTP","amber"], ["NIC","slate"], ["measurement",""]],
+    data: [
+      { label: "Source", value: "NIC / FPGA at wire time", color: "teal" },
+      { label: "Accuracy", value: "Nanoseconds when PTP-synced", color: "" },
+      { label: "Use", value: "Latency measurement & event ordering", color: "amber" },
+    ],
+    body: [
+      `Software timestamps taken inside the operating system are subject to jitter from interrupts, scheduling and system-call overhead. Hardware timestamps are applied by the network interface card (or an FPGA) at the exact moment a packet hits the wire or is received, providing far higher accuracy and precision.`,
+      `When the NIC clock is synchronised via PTP (Precision Time Protocol) to a grandmaster clock (itself GPS-referenced), timestamps from different machines become comparable at the nanosecond level. This is essential for accurate one-way latency measurement and for reconstructing the true sequence of market events.`,
+      `Modern low-latency NICs expose hardware timestamps to user space with minimal overhead, making them a standard tool in any serious performance-measurement or fairness-analysis toolkit.`
+    ],
+    keyPoint: "Hardware timestamps move time-stamping from the noisy software domain to the deterministic wire domain. They are the prerequisite for trustworthy nanosecond-level latency measurement."
+  },
+  {
+    era: "Software Path",
+    icon: "⚡",
+    title: "Kernel Bypass (DPDK, OpenOnload)",
+    desc: "Techniques that let user-space applications send and receive packets without traversing the operating-system kernel",
+    badge: { label: "Bypass", style: "red" },
+    tags: [["DPDK","red"], ["OpenOnload","teal"], ["kernel bypass","amber"], ["user-space",""]],
+    data: [
+      { label: "DPDK", value: "Poll-mode, multi-vendor", color: "red" },
+      { label: "OpenOnload", value: "Solarflare/Xilinx kernel bypass", color: "teal" },
+      { label: "Gain", value: "Microseconds saved per packet", color: "amber" },
+    ],
+    body: [
+      `The traditional kernel networking stack introduces significant latency and jitter through system calls, interrupts and buffer copying. Kernel-bypass frameworks allow an application to map the NIC’s queues directly into user space and to poll for packets in a tight loop, eliminating most of that overhead.`,
+      `DPDK (Data Plane Development Kit) is a widely used, vendor-agnostic poll-mode driver framework. OpenOnload (originally Solarflare) provides a high-performance kernel-bypass stack that can accelerate existing socket-based applications with minimal code changes.`,
+      `Bypass is not free: it consumes CPU cores for polling, complicates sharing of the NIC, and requires careful design of memory management and flow steering. When applied correctly, however, it routinely shaves multiple microseconds off the tick-to-trade path.`
+    ],
+    keyPoint: "Kernel bypass removes the operating system from the critical packet path. It is one of the highest-leverage software optimisations available once the application is already co-located."
+  },
+  {
+    era: "Hardware",
+    icon: "🔧",
+    title: "FPGA for Ultra-Low Latency",
+    desc: "Field-programmable gate arrays that implement market-data parsing, risk checks and order generation in pure hardware",
+    badge: { label: "Extreme", style: "slate" },
+    tags: [["FPGA","slate"], ["hardware acceleration","teal"], ["nanoseconds","amber"], ["tick-to-trade",""]],
+    data: [
+      { label: "Latency", value: "Hundreds of nanoseconds possible", color: "slate" },
+      { label: "Functions", value: "Parse, book build, risk, order gen", color: "" },
+      { label: "Trade-off", value: "Speed vs. flexibility & development cost", color: "amber" },
+    ],
+    body: [
+      `At the extreme end of the latency spectrum, firms move critical path logic out of software and into FPGAs. A well-designed FPGA can parse market-data feeds, maintain a book, apply risk checks and generate an order with deterministic latency measured in hundreds of nanoseconds — far below what even optimised software on a CPU can achieve.`,
+      `Development cost and time are substantially higher than software, and algorithm changes require careful hardware design cycles. Consequently FPGAs are typically reserved for the most latency-critical strategies and for functions that are relatively stable (feed handling, basic risk, simple arbitrage logic).`,
+      `Many modern deployments use a hybrid model: FPGA for the ultra-low-latency path and software for more complex or frequently changing decision logic, with carefully engineered hand-offs between the two.`
+    ],
+    keyPoint: "FPGAs represent the final frontier of latency reduction: pure hardware determinism. They are expensive and inflexible, but when nanoseconds determine winners and losers they become the rational choice."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

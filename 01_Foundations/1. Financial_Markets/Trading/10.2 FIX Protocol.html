@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 10.2 FIX Protocol</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 10 · Section 10.2</div>
+      <h1 class="book-title">FIX<br><em>Protocol</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Session → tags → execution · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>10.2 FIX Protocol</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Versions",
+    icon: "📚",
+    title: "FIX 4.2, 4.4, 5.0 Versions",
+    desc: "The major protocol releases that still dominate institutional connectivity today",
+    badge: { label: "Standards", style: "teal" },
+    tags: [["FIX 4.2","teal"], ["FIX 4.4","amber"], ["FIX 5.0","slate"], ["FIXT",""]],
+    data: [
+      { label: "4.2", value: "Most widely deployed legacy", color: "teal" },
+      { label: "4.4", value: "Improved repeating groups & FX", color: "" },
+      { label: "5.0 / FIXT", value: "Transport independence + richer semantics", color: "amber" },
+    ],
+    body: [
+      `FIX 4.2 (late 1990s) remains the single most common version in production equity and futures markets. It defined the core message set still used daily. FIX 4.4 added better support for FX, fixed income, repeating groups and more precise execution reporting. FIX 5.0 (and the companion FIXT 1.1 transport) separated the session layer from the application layer and introduced a richer, more extensible data dictionary.`,
+      `In practice a single firm often speaks multiple versions simultaneously: 4.2 to older brokers, 4.4 to FX venues, and 5.0 to newer platforms. Version negotiation occurs at Logon via the BeginString (tag 8) and DefaultApplVerID fields.`,
+      `Choosing a version is rarely a pure technical decision; it is dictated by the counterparty’s offering. Robust engines therefore maintain parallel data dictionaries and message factories for each dialect they must support.`
+    ],
+    keyPoint: "Version choice is driven by counterparty support, not theoretical purity. Production systems must be multi-version fluent and treat each FIX dialect as a first-class citizen."
+  },
+  {
+    era: "Architecture",
+    icon: "🏗️",
+    title: "Session Layer vs. Application Layer",
+    desc: "The clean separation between connection management / reliability and business message content",
+    badge: { label: "Core Design", style: "amber" },
+    tags: [["session","amber"], ["application","teal"], ["FIXT","slate"], ["heartbeats",""]],
+    data: [
+      { label: "Session", value: "Logon, Heartbeat, Sequence, Logout", color: "amber" },
+      { label: "Application", value: "Orders, Executions, Market Data", color: "teal" },
+      { label: "Benefit", value: "Reliable delivery independent of business logic", color: "" },
+    ],
+    body: [
+      `FIX deliberately splits responsibilities. The session layer guarantees ordered, reliable delivery of messages over a persistent TCP connection. It handles Logon/Logout, Heartbeats, sequence-number management, ResendRequests and gap fills. The application layer carries the actual business payloads — NewOrderSingle, ExecutionReport, MarketDataSnapshot, etc.`,
+      `This separation allows the same session infrastructure to transport any application version (the key innovation of FIXT). A dropped connection or sequence gap is recovered by the session layer without the application code having to re-implement reliability.`,
+      `In implementation terms the session layer owns the socket, the sequence counters and the persistence store for sent messages; the application layer only sees in-order, gap-free messages and is free to focus on order state and trading logic.`
+    ],
+    keyPoint: "Session versus application is the architectural heart of FIX. Master the session layer and you obtain reliable, ordered messaging for free; the business logic can then concentrate solely on trading semantics."
+  },
+  {
+    era: "Lifecycle",
+    icon: "🔄",
+    title: "Order Lifecycle in FIX",
+    desc: "The canonical state transitions from NewOrderSingle through ExecutionReports to terminal fill or reject",
+    badge: { label: "Flow", style: "teal" },
+    tags: [["lifecycle","teal"], ["ExecutionReport","amber"], ["OrdStatus",""], ["ExecType","slate"]],
+    data: [
+      { label: "Start", value: "35=D NewOrderSingle", color: "teal" },
+      { label: "Updates", value: "35=8 ExecutionReport", color: "" },
+      { label: "Terminal", value: "Filled / Canceled / Rejected", color: "amber" },
+    ],
+    body: [
+      `An order begins life as a NewOrderSingle (MsgType D). The venue responds with one or more ExecutionReports (MsgType 8). Early reports typically carry ExecType=PendingNew or New and OrdStatus=PendingNew or New. Subsequent reports convey partial fills (ExecType=Trade, OrdStatus=PartiallyFilled), full fills, cancels, or rejects.`,
+      `Critical fields on every ExecutionReport include ClOrdID (the client’s original identifier), OrderID (the venue’s identifier), ExecID, LastQty, LastPx, LeavesQty and CumQty. State must be advanced only by these reports; never by local assumption.`,
+      `Cancel and replace follow the same pattern: OrderCancelRequest (F) or OrderCancelReplaceRequest (G) elicit further ExecutionReports that move the order into PendingCancel or PendingReplace and finally to a terminal state. Correct handling of these transitions is the foundation of any reliable OMS.`
+    ],
+    keyPoint: "In FIX the ExecutionReport is the single source of truth for order state. Every transition — from pending to live to partially filled to terminal — arrives as a typed 35=8 message that the client must process deterministically."
+  },
+  {
+    era: "Building Blocks",
+    icon: "🏷️",
+    title: "FIX Tags",
+    desc: "The numeric tag=value vocabulary that constitutes every FIX message",
+    badge: { label: "Dictionary", style: "slate" },
+    tags: [["tags","slate"], ["35=MsgType","teal"], ["49=SenderCompID","amber"], ["55=Symbol",""]],
+    data: [
+      { label: "35", value: "MsgType (D, 8, A, 0…)", color: "teal" },
+      { label: "49 / 56", value: "SenderCompID / TargetCompID", color: "" },
+      { label: "55 / 11", value: "Symbol / ClOrdID", color: "amber" },
+    ],
+    body: [
+      `Every FIX message is a sequence of tag=value pairs separated by the non-printable SOH character (0x01). Tags are integers defined in the FIX data dictionary. Some of the most frequently encountered are: 8=BeginString, 9=BodyLength, 35=MsgType, 49=SenderCompID, 56=TargetCompID, 34=MsgSeqNum, 52=SendingTime, 11=ClOrdID, 55=Symbol, 54=Side, 38=OrderQty, 44=Price, 39=OrdStatus, 150=ExecType.`,
+      `User-defined tags (usually in the 5000+ or 9000+ ranges) allow venues to extend the protocol. Repeating groups are introduced by a leading count tag (e.g., 453=NoPartyIDs) followed by the repeated block of tags.`,
+      `Because the on-wire format is deliberately simple, parsers are fast and language-agnostic. The complexity lives in the data dictionary that defines which tags are required, which are conditional, and what values are legal for each message type.`
+    ],
+    keyPoint: "Tags are the atoms of FIX. Fluency with the core set (especially 35, 11, 39, 150, 55, 54, 38, 44) is the fastest route to reading any FIX log and diagnosing live trading problems."
+  },
+  {
+    era: "Messages",
+    icon: "📨",
+    title: "FIX Message Types",
+    desc: "The standardised MsgType values that identify the purpose of every message",
+    badge: { label: "Vocabulary", style: "amber" },
+    tags: [["MsgType","amber"], ["D=NewOrder","teal"], ["8=ExecutionReport","slate"], ["A=Logon",""]],
+    data: [
+      { label: "Session", value: "A=Logon, 0=Heartbeat, 5=Logout", color: "" },
+      { label: "Order entry", value: "D=New, F=Cancel, G=Replace", color: "teal" },
+      { label: "Reports", value: "8=ExecutionReport, 9=CancelReject", color: "amber" },
+    ],
+    body: [
+      `Tag 35 (MsgType) is the first field examined by any FIX engine. Session-level types include A (Logon), 0 (Heartbeat), 1 (TestRequest), 2 (ResendRequest), 4 (SequenceReset) and 5 (Logout). Application-level types cover the entire trading workflow: D (NewOrderSingle), F (OrderCancelRequest), G (OrderCancelReplaceRequest), 8 (ExecutionReport), 9 (OrderCancelReject), V/W/X (market-data request and snapshot/full refresh), etc.`,
+      `Each MsgType has a defined set of required and optional tags. Sending a message that omits a required tag or carries an illegal value typically elicits a Reject (session-level 3 or business-level j).`,
+      `Mastery of the message catalogue lets a developer map any trading intention onto the correct FIX conversation and correctly interpret every response that returns from the venue.`
+    ],
+    keyPoint: "MsgType is the routing key of FIX. Knowing the small set of session messages and the core order-entry / execution messages is sufficient to implement the vast majority of institutional trading flows."
+  },
+  {
+    era: "Tooling",
+    icon: "🛠️",
+    title: "QuickFIX/J and QuickFIX/n Libraries",
+    desc: "The open-source engines that dominate Java and .NET FIX implementations",
+    badge: { label: "Libraries", style: "teal" },
+    tags: [["QuickFIX/J","teal"], ["QuickFIX/n","amber"], ["open source",""], ["engine","slate"]],
+    data: [
+      { label: "QuickFIX/J", value: "Java reference implementation", color: "teal" },
+      { label: "QuickFIX/n", value: ".NET / C# counterpart", color: "" },
+      { label: "Features", value: "Session mgmt, persistence, data dict", color: "amber" },
+    ],
+    body: [
+      `QuickFIX/J (Java) and QuickFIX/n (C#) are the most widely used open-source FIX engines. They implement the full session layer (including persistence of sent messages for resend), provide a data-dictionary-driven message model, and expose simple application callbacks (fromApp, fromAdmin, onCreate, onLogon, onLogout).`,
+      `Developers supply a configuration file that defines the session (BeginString, SenderCompID, TargetCompID, ConnectionType, SocketConnectHost/Port, etc.) and implement the business logic inside the application interface. The engine handles heartbeats, sequence numbers, gap fills and reconnection.`,
+      `Both libraries ship with pre-built dictionaries for the major FIX versions and allow custom dictionaries for proprietary tags. They remain the default starting point for most buy-side and sell-side Java/.NET FIX connectivity projects.`
+    ],
+    keyPoint: "QuickFIX/J and QuickFIX/n remove the need to re-implement the session layer. They let developers concentrate on application logic while still retaining full control over dictionaries, persistence and transport."
+  },
+  {
+    era: "Transport",
+    icon: "🌐",
+    title: "FIX over TCP/IP",
+    desc: "The ubiquitous point-to-point transport that carries virtually all classic FIX sessions",
+    badge: { label: "Transport", style: "slate" },
+    tags: [["TCP","slate"], ["point-to-point","amber"], ["persistent","teal"], ["socket",""]],
+    data: [
+      { label: "Model", value: "Persistent TCP socket per session", color: "slate" },
+      { label: "Direction", value: "Initiator or Acceptor", color: "" },
+      { label: "Recovery", value: "Sequence numbers + message store", color: "teal" },
+    ],
+    body: [
+      `Classic FIX runs over a long-lived TCP connection. One side is the Initiator (typically the client) and the other the Acceptor (typically the broker or exchange). After the TCP handshake the FIX Logon message is exchanged; thereafter the socket remains open for the lifetime of the session.`,
+      `Because TCP already provides ordered, reliable byte streams, FIX adds its own sequence numbers and a persistent message store so that, after a disconnect, the two sides can re-synchronise by retransmitting any missed messages. Heartbeats detect silent link failures.`,
+      `While newer transports (FAST over UDP, FIX over WebSocket, gRPC) exist, the overwhelming majority of institutional order flow still travels over plain TCP/IP FIX sessions. Firewall rules, colocation cross-connects and dedicated lines are all designed around this model.`
+    ],
+    keyPoint: "FIX over TCP is deliberately simple and battle-tested. The reliability guarantees come from the combination of TCP’s ordered delivery and FIX’s own sequence-number recovery — a design that has proven robust for three decades."
+  },
+  {
+    era: "Alternative",
+    icon: "📄",
+    title: "FIXML (XML Version)",
+    desc: "The XML encoding of FIX messages intended for easier human readability and web-friendly integration",
+    badge: { label: "XML", style: "amber" },
+    tags: [["FIXML","amber"], ["XML","slate"], ["verbose",""], ["web integration","teal"]],
+    data: [
+      { label: "Format", value: "XML representation of FIX tags", color: "amber" },
+      { label: "Use case", value: "Post-trade, reporting, some APIs", color: "" },
+      { label: "Trade-off", value: "Readability vs. bandwidth & speed", color: "red" },
+    ],
+    body: [
+      `FIXML is an XML Schema representation of the same logical FIX messages. Instead of dense tag=value pairs one sees nested XML elements whose names correspond to the FIX field names. The encoding is far more verbose but can be validated with standard XML tools and is easier for non-FIX specialists to read.`,
+      `FIXML found adoption in post-trade allocation, confirmation and some regulatory reporting workflows. A few venues also offer FIXML as an alternative order-entry interface, especially where integration with existing XML-based middle-office systems is desired.`,
+      `Because of its size and parsing overhead, FIXML is rarely used for high-frequency order entry or market-data distribution; classic tag-value FIX (or binary encodings such as FAST/SBE) remain preferred for latency-sensitive paths.`
+    ],
+    keyPoint: "FIXML trades wire efficiency for human and tooling convenience. It is valuable in post-trade and integration scenarios but is seldom the right choice for the performance-critical order-entry path."
+  },
+  {
+    era: "Reality",
+    icon: "🧩",
+    title: "Proprietary Extensions to FIX",
+    desc: "Venue-specific tags, message types and behavioural rules that every real-world FIX implementation must accommodate",
+    badge: { label: "Dialects", style: "red" },
+    tags: [["proprietary","red"], ["custom tags","amber"], ["user-defined","slate"], ["dialects","teal"]],
+    data: [
+      { label: "Range", value: "Usually tags 5000–9999", color: "red" },
+      { label: "Examples", value: "Custom OrdType, liquidity flags, algo params", color: "" },
+      { label: "Impact", value: "Breaks pure standard clients", color: "amber" },
+    ],
+    body: [
+      `No production FIX interface is pure. Every exchange and broker adds proprietary tags (commonly in the 5000–9999 range), custom values for existing fields, additional message types, or non-standard behavioural rules (e.g., silent truncation of quantities, special handling of OrdStatus, unique cancel semantics).`,
+      `These extensions are documented in venue-specific FIX specifications that must be read alongside the official FIX dictionary. Data dictionaries are extended, message validation rules are relaxed or tightened, and application code acquires venue-specific branches.`,
+      `The practical consequence is that a “FIX engine” is never fully venue-agnostic. Mature systems encapsulate each counterparty’s dialect behind an adapter so that the core OMS sees a normalised interface while still satisfying every proprietary requirement on the wire.`
+    ],
+    keyPoint: "Proprietary extensions are the rule, not the exception. Treating each venue’s FIX dialect as a first-class variant — complete with its own dictionary and adapter — is the only way to achieve reliable multi-venue connectivity."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

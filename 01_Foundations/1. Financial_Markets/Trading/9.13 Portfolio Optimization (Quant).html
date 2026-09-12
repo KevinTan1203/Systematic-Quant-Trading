@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 9.13 Portfolio Optimization (Quant)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 9 · Section 9.13</div>
+      <h1 class="book-title">Portfolio<br><em>Optimization</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>14</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Inputs → constraints → weights · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>9.13 Portfolio Optimization (Quant)</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Foundation",
+    icon: "📐",
+    title: "Markowitz Mean-Variance Optimization",
+    desc: "The classic quadratic program that maximises expected return for a given variance (or minimises variance for a given return)",
+    badge: { label: "Core", style: "teal" },
+    tags: [["Markowitz","teal"], ["quadratic","amber"], ["mean-variance",""], ["quadratic programming","slate"]],
+    data: [
+      { label: "Objective", value: "max μ′w − (λ/2) w′Σw", color: "teal" },
+      { label: "Inputs", value: "Expected returns μ, covariance Σ", color: "" },
+      { label: "Key issue", value: "Estimation error sensitivity", color: "red" },
+    ],
+    body: [
+      `Harry Markowitz’s 1952 framework remains the conceptual foundation of quantitative portfolio construction. The investor chooses weights w that maximise expected portfolio return μ′w subject to a variance constraint w′Σw ≤ σ² (or the dual problem of minimising variance for a target return). With a risk-aversion parameter λ the problem becomes the unconstrained quadratic program max μ′w − (λ/2) w′Σw.`,
+      `In practice the optimisation is solved subject to budget (1′w = 1), long-only (w ≥ 0), and often additional linear constraints. The solution is analytically available in the unconstrained case and numerically via quadratic programming solvers when constraints are present.`,
+      `The framework is elegant and theoretically coherent, yet its practical performance is limited by the extreme sensitivity of the optimal weights to small errors in the estimated means and covariances. This estimation-error problem is the central motivation for virtually every subsequent improvement in the field.`
+    ],
+    keyPoint: "Mean-variance optimisation is the correct mathematical statement of the diversification problem, but its naïve implementation is so estimation-error sensitive that it is rarely used without substantial regularisation or robustification."
+  },
+  {
+    era: "Geometry",
+    icon: "📈",
+    title: "Efficient Frontier",
+    desc: "The set of portfolios that offer the highest expected return for each level of risk (or lowest risk for each level of return)",
+    badge: { label: "Concept", style: "amber" },
+    tags: [["frontier","amber"], ["Pareto","teal"], ["two-fund","slate"], ["capital market line",""]],
+    data: [
+      { label: "Shape", value: "Hyperbola in (σ, μ) space", color: "teal" },
+      { label: "Key portfolios", value: "Min-var & tangency", color: "" },
+      { label: "Implication", value: "Only frontier portfolios are rational", color: "amber" },
+    ],
+    body: [
+      `When the mean-variance problem is solved for every possible target return (or risk aversion), the resulting locus of optimal portfolios traces the efficient frontier — a hyperbola in mean–standard-deviation space. Every rational mean-variance investor will hold a portfolio somewhere on this frontier; any interior portfolio is dominated.`,
+      `Two special points are especially important: the global minimum-variance portfolio (leftmost point) and the maximum-Sharpe (tangency) portfolio that maximises the slope from the risk-free rate. In the presence of a risk-free asset the efficient set collapses to the Capital Market Line connecting the risk-free rate to the tangency portfolio.`,
+      `In practice the estimated frontier is highly unstable: small changes in inputs produce large shifts in the curve and in the composition of the “optimal” portfolios. Visualising the frontier remains useful for understanding the risk–return trade-off, but the exact location of any point on the estimated frontier should be treated with caution.`
+    ],
+    keyPoint: "The efficient frontier is the geometric embodiment of diversification. It tells you the best achievable trade-off, but the estimated frontier is only as reliable as the estimated inputs that generate it."
+  },
+  {
+    era: "Special Case",
+    icon: "🛡️",
+    title: "Minimum Variance Portfolio",
+    desc: "The fully invested portfolio with the lowest possible variance; ignores expected returns entirely",
+    badge: { label: "Robust", style: "teal" },
+    tags: [["min-var","teal"], ["no μ","amber"], ["defensive",""], ["low-vol anomaly","slate"]],
+    data: [
+      { label: "Objective", value: "min w′Σw  s.t. 1′w = 1", color: "teal" },
+      { label: "Advantage", value: "Avoids return estimation error", color: "" },
+      { label: "Behaviour", value: "Concentrates in low-vol assets", color: "amber" },
+    ],
+    body: [
+      `The global minimum-variance (GMV) portfolio is obtained by solving the pure variance-minimisation problem subject only to the budget constraint (and any other linear constraints). Because expected returns do not appear in the objective, the GMV portfolio is far less sensitive to the notoriously noisy estimates of μ.`,
+      `Empirically, minimum-variance portfolios have delivered competitive risk-adjusted returns and often lower drawdowns than capitalisation-weighted or mean-variance optimised portfolios. This is partly explained by the low-volatility anomaly and by the fact that variance estimates are more stable than return estimates.`,
+      `The main practical drawback is that the GMV solution tends to concentrate heavily in the lowest-volatility names or sectors, producing implicit factor bets and potential liquidity or capacity issues. Regularisation, turnover constraints or explicit diversification penalties are commonly added to mitigate this concentration.`
+    ],
+    keyPoint: "By discarding expected-return forecasts entirely, the minimum-variance portfolio sidesteps the largest source of estimation error and often produces more stable, lower-risk outcomes than full mean-variance optimisation."
+  },
+  {
+    era: "Special Case",
+    icon: "⚡",
+    title: "Maximum Sharpe Ratio Portfolio",
+    desc: "The tangency portfolio that maximises (μ − r_f) / σ; the optimal risky portfolio when a risk-free asset exists",
+    badge: { label: "Tangency", style: "amber" },
+    tags: [["Sharpe","amber"], ["tangency","teal"], ["CML",""], ["mean-variance","slate"]],
+    data: [
+      { label: "Objective", value: "max (μ′w − r_f) / √(w′Σw)", color: "amber" },
+      { label: "Also called", value: "Tangency / max-Sharpe portfolio", color: "" },
+      { label: "Sensitivity", value: "High to μ estimation error", color: "red" },
+    ],
+    body: [
+      `When a risk-free asset is available, every mean-variance investor holds a combination of the risk-free asset and a single risky portfolio — the one that maximises the Sharpe ratio. This tangency portfolio is the point where a line drawn from the risk-free rate touches the efficient frontier.`,
+      `In the absence of a risk-free rate one can still maximise the Sharpe ratio relative to a chosen benchmark or zero. The resulting portfolio is attractive in theory but inherits the full estimation-error problems of mean-variance optimisation, because both the numerator (expected excess return) and the denominator (volatility) depend on noisy inputs.`,
+      `In practice the maximum-Sharpe portfolio is often regularised, constrained, or replaced by more robust alternatives (risk parity, minimum variance, Black-Litterman) precisely because small changes in expected-return forecasts can swing the weights dramatically.`
+    ],
+    keyPoint: "The maximum-Sharpe portfolio is the theoretically optimal risky portfolio under mean-variance preferences and a risk-free asset, yet it is among the most estimation-error fragile of all classical solutions."
+  },
+  {
+    era: "Risk-Based",
+    icon: "⚖️",
+    title: "Risk Parity Portfolio",
+    desc: "Equalising the risk contribution of each asset (or risk factor) rather than equalising capital weights",
+    badge: { label: "Popular", style: "teal" },
+    tags: [["risk parity","teal"], ["ERC","amber"], ["risk contribution",""], ["leverage","slate"]],
+    data: [
+      { label: "Target", value: "Equal risk contribution (ERC)", color: "teal" },
+      { label: "Inputs", value: "Primarily Σ (no μ required)", color: "" },
+      { label: "Typical use", value: "Multi-asset / risk-balanced", color: "amber" },
+    ],
+    body: [
+      `Risk parity (or equal-risk-contribution) portfolios allocate so that each asset (or each risk factor) contributes the same amount of portfolio volatility. Formally one solves for weights such that w_i · (Σw)_i is identical for all i. Because the solution depends only on the covariance matrix, it avoids expected-return estimation entirely.`,
+      `The approach naturally over-weights lower-volatility assets and under-weights higher-volatility assets, producing a more balanced risk profile than capitalisation weighting. In multi-asset contexts it is frequently combined with leverage to bring the overall volatility up to a target level.`,
+      `Critics note that pure risk parity can still embed large implicit factor exposures and that the equal-risk target is somewhat arbitrary. Extensions include risk-factor parity, volatility targeting overlays, and hierarchical variants that respect correlation structure.`
+    ],
+    keyPoint: "Risk parity replaces the fragile return forecast with the more stable notion of equal risk contribution, producing portfolios that are typically more diversified in risk space than either equal-weight or mean-variance solutions."
+  },
+  {
+    era: "Benchmark",
+    icon: "📏",
+    title: "Equal Weight Portfolio",
+    desc: "The naïve 1/N allocation that serves as a surprisingly strong benchmark and robustness check",
+    badge: { label: "Benchmark", style: "slate" },
+    tags: [["1/N","slate"], ["naïve","amber"], ["diversification",""], ["DeMiguel","teal"]],
+    data: [
+      { label: "Rule", value: "w_i = 1/N for all i", color: "slate" },
+      { label: "Advantage", value: "Zero estimation, maximum simplicity", color: "" },
+      { label: "Empirical", value: "Often hard to beat out-of-sample", color: "teal" },
+    ],
+    body: [
+      `The equal-weight (1/N) portfolio assigns identical capital to every asset. It requires no forecasts, no covariance matrix, and no optimisation. Despite its extreme simplicity, a large academic literature (notably DeMiguel, Garlappi & Uppal) has shown that many sophisticated optimisers fail to outperform 1/N on a consistent out-of-sample basis once transaction costs and estimation error are taken into account.`,
+      `Equal weighting automatically rebalances toward losers and away from winners, embedding a mild contrarian / value effect. It also guarantees maximum nominal diversification in terms of the number of names, although risk contributions can still be highly unequal if volatilities differ.`,
+      `In quant practice the equal-weight portfolio is an indispensable benchmark: any proposed optimiser must demonstrably beat 1/N after costs and on a realistic out-of-sample basis before it is considered an improvement.`
+    ],
+    keyPoint: "Equal weight is the ultimate robustness check. If a complex optimiser cannot reliably outperform the naïve 1/N rule after costs, the added complexity is not justified."
+  },
+  {
+    era: "Bayesian",
+    icon: "🔮",
+    title: "Black-Litterman Model",
+    desc: "Combining market-equilibrium returns with investor views via Bayesian updating to produce more stable expected returns",
+    badge: { label: "Views", style: "amber" },
+    tags: [["Black-Litterman","amber"], ["Bayesian","teal"], ["views","slate"], ["equilibrium",""]],
+    data: [
+      { label: "Prior", value: "Reverse-optimised equilibrium μ", color: "teal" },
+      { label: "Likelihood", value: "Investor views + confidence", color: "" },
+      { label: "Output", value: "Posterior expected returns", color: "amber" },
+    ],
+    body: [
+      `The Black-Litterman model addresses the most severe problem of mean-variance optimisation — unstable expected-return estimates — by starting from the market-equilibrium returns implied by reverse optimisation and then blending them with the investor’s own views in a Bayesian fashion.`,
+      `The market portfolio (or a chosen benchmark) is assumed to be mean-variance optimal; the implied equilibrium excess returns are recovered as π = δ Σ w_mkt. Investor views are expressed as linear statements about expected returns together with a confidence matrix. The posterior mean is a precision-weighted average of the equilibrium and the views.`,
+      `Because the prior is anchored to a diversified market portfolio, the resulting expected returns are far more stable and the optimised weights remain closer to the benchmark unless the views are strong. The model is widely used in discretionary and quantamental settings where explicit views exist.`
+    ],
+    keyPoint: "Black-Litterman replaces arbitrary return forecasts with a disciplined Bayesian combination of market equilibrium and expressed views, dramatically improving the stability of the resulting optimal portfolios."
+  },
+  {
+    era: "Uncertainty",
+    icon: "🛡️",
+    title: "Robust Optimization",
+    desc: "Explicitly protecting the portfolio against worst-case realisations of uncertain inputs inside an uncertainty set",
+    badge: { label: "Defensive", style: "red" },
+    tags: [["robust","red"], ["uncertainty set","amber"], ["worst-case","slate"], ["min-max",""]],
+    data: [
+      { label: "Idea", value: "Optimise against worst-case inputs", color: "red" },
+      { label: "Sets", value: "Box, ellipsoidal, budgeted", color: "" },
+      { label: "Effect", value: "More conservative, stable weights", color: "teal" },
+    ],
+    body: [
+      `Robust optimisation treats the inputs (especially expected returns and sometimes covariances) as belonging to an uncertainty set rather than as point estimates. The portfolio is chosen to maximise the worst-case objective over that set — a min-max problem.`,
+      `Common uncertainty sets include box (interval) constraints, ellipsoidal sets scaled by estimation error, and budgeted uncertainty that limits the total deviation. The resulting programmes can often be reformulated as tractable convex problems.`,
+      `The approach systematically produces more conservative and more stable weights than classical mean-variance optimisation. The price is a potential reduction in in-sample (and sometimes out-of-sample) expected return; the benefit is material protection against the estimation errors that plague point-estimate optimisers.`
+    ],
+    keyPoint: "Robust optimisation acknowledges that inputs are uncertain and explicitly guards against the worst plausible realisation, trading a degree of optimism for substantially greater stability."
+  },
+  {
+    era: "Resampling",
+    icon: "🔁",
+    title: "Resampling (Michaud)",
+    desc: "Averaging optimised portfolios across many statistically plausible input scenarios to reduce estimation-error instability",
+    badge: { label: "Statistical", style: "slate" },
+    tags: [["Michaud","slate"], ["resampling","amber"], ["Monte Carlo",""], ["averaged frontier","teal"]],
+    data: [
+      { label: "Method", value: "Resample μ, Σ → optimise → average", color: "slate" },
+      { label: "Effect", value: "Smoother, more diversified weights", color: "" },
+      { label: "Critique", value: "Can be viewed as shrinkage", color: "amber" },
+    ],
+    body: [
+      `Michaud’s resampled efficiency procedure recognises that the estimated means and covariances are themselves random. One draws many plausible sets of inputs from the sampling distribution (or a bootstrap), optimises a mean-variance portfolio for each draw, and then averages the resulting weight vectors.`,
+      `The averaged portfolio is typically more diversified and far less extreme than any single optimisation on the original point estimates. The procedure can also be used to construct a “resampled frontier” that better reflects the uncertainty surrounding the classical efficient frontier.`,
+      `While computationally intensive and open to the criticism that it is an ad-hoc form of shrinkage, resampling remains a practical and widely implemented technique for taming the instability of classical optimisers.`
+    ],
+    keyPoint: "By averaging optimisations performed on many statistically plausible input scenarios, resampling converts an unstable point-estimate solution into a more robust, diversified portfolio."
+  },
+  {
+    era: "Modern",
+    icon: "🌳",
+    title: "Hierarchical Risk Parity (HRP)",
+    desc: "A machine-learning-inspired allocator that uses hierarchical clustering to respect correlation structure without matrix inversion",
+    badge: { label: "ML-Inspired", style: "teal" },
+    tags: [["HRP","teal"], ["clustering","amber"], ["Lopez de Prado",""], ["no inversion","slate"]],
+    data: [
+      { label: "Steps", value: "Cluster → quasi-diag → recursive bipartition", color: "teal" },
+      { label: "Advantage", value: "No covariance inversion required", color: "" },
+      { label: "Behaviour", value: "Respects hierarchical correlation", color: "amber" },
+    ],
+    body: [
+      `Hierarchical Risk Parity (Lopez de Prado) replaces the classical quadratic optimiser with a three-step algorithm: (1) hierarchical clustering of the correlation matrix, (2) quasi-diagonalisation that reorders assets so that similar assets are adjacent, and (3) recursive bisection that allocates risk parity weights along the resulting tree.`,
+      `Because the method never inverts the covariance matrix, it sidesteps the numerical instability that arises when Σ is ill-conditioned or singular. It also naturally respects the hierarchical correlation structure of markets (sectors, industries, styles) rather than treating every pairwise correlation in isolation.`,
+      `HRP has become popular in quant practice as a robust, diversification-aware alternative to both naïve risk parity and classical mean-variance optimisation, especially in high-dimensional universes.`
+    ],
+    keyPoint: "HRP uses hierarchical clustering to produce risk-parity-like weights that respect the natural correlation tree of the market and never require a matrix inversion — two major practical advantages."
+  },
+  {
+    era: "Estimation",
+    icon: "📉",
+    title: "Covariance Matrix Shrinkage (Ledoit-Wolf)",
+    desc: "Shrinking the sample covariance toward a structured target to obtain a better-conditioned, lower-variance estimator",
+    badge: { label: "Essential", style: "amber" },
+    tags: [["Ledoit-Wolf","amber"], ["shrinkage","teal"], ["conditioning",""], ["target matrix","slate"]],
+    data: [
+      { label: "Form", value: "Σ̂ = δ F + (1−δ) S", color: "amber" },
+      { label: "Target F", value: "Constant correlation, single factor, identity…", color: "" },
+      { label: "Benefit", value: "Lower MSE, better conditioned", color: "teal" },
+    ],
+    body: [
+      `The sample covariance matrix S is an unbiased but high-variance estimator, especially when the number of assets is large relative to the number of observations. Ledoit-Wolf shrinkage forms a convex combination of S and a structured target matrix F (constant-correlation, single-index, identity, etc.), with the shrinkage intensity δ chosen to minimise expected Frobenius loss.`,
+      `The resulting estimator is biased but has substantially lower mean-squared error and is far better conditioned, making subsequent optimisations more stable. Analytical formulae for the optimal δ exist for several common targets, rendering the method computationally cheap and fully automatic.`,
+      `Covariance shrinkage (or related techniques such as factor-model covariances or denoising via random matrix theory) is now regarded as a near-mandatory pre-processing step before any mean-variance or risk-based optimisation.`
+    ],
+    keyPoint: "Raw sample covariances are too noisy for reliable optimisation. Ledoit-Wolf shrinkage systematically improves the estimator by pulling it toward a structured target, delivering both better numerical conditioning and lower out-of-sample error."
+  },
+  {
+    era: "Constraints",
+    icon: "🔒",
+    title: "Factor-Constrained Optimization",
+    desc: "Imposing explicit constraints or penalties on factor exposures so that the portfolio remains neutral or controlled relative to chosen risk factors",
+    badge: { label: "Control", style: "slate" },
+    tags: [["factor constraints","slate"], ["neutral","teal"], ["exposures","amber"], ["risk model",""]],
+    data: [
+      { label: "Typical", value: "β_market ≈ 0, sector limits, style tilts", color: "slate" },
+      { label: "Purpose", value: "Isolate alpha, control risk", color: "" },
+      { label: "Tools", value: "Linear constraints or quadratic penalties", color: "amber" },
+    ],
+    body: [
+      `Pure optimisation on individual assets often produces large unintended factor bets (market beta, sector concentrations, value/growth, momentum, etc.). Factor-constrained optimisation adds linear equality or inequality constraints (or quadratic penalty terms) that keep the portfolio’s exposures to a chosen set of factors inside prescribed bounds.`,
+      `Common applications include market-neutral long-short equity portfolios, sector-neutral mandates, and controlled active risk relative to a benchmark. The factor model may be fundamental, statistical or hybrid; the optimiser then solves the mean-variance (or other) problem subject to the exposure constraints.`,
+      `The technique is essential for converting raw alpha signals into implementable portfolios that respect risk budgets and investment guidelines. It also reduces the chance that apparent outperformance is simply an unintended factor bet.`
+    ],
+    keyPoint: "Factor constraints turn an otherwise uncontrolled optimisation into a disciplined process that isolates the intended sources of return while keeping unwanted risk exposures within explicit limits."
+  },
+  {
+    era: "Diversification",
+    icon: "🌐",
+    title: "Maximum Diversification Portfolio",
+    desc: "Maximising the ratio of weighted average volatility to portfolio volatility — a pure diversification objective",
+    badge: { label: "Diversify", style: "teal" },
+    tags: [["max diversification","teal"], ["Choueifaty","amber"], ["diversification ratio",""], ["volatility weighting","slate"]],
+    data: [
+      { label: "Ratio", value: "DR = (w′σ) / √(w′Σw)", color: "teal" },
+      { label: "Goal", value: "Maximise DR", color: "" },
+      { label: "Behaviour", value: "Favours low-correlation assets", color: "amber" },
+    ],
+    body: [
+      `The maximum-diversification portfolio (Choueifaty & Coignard) maximises the diversification ratio — the ratio of the weighted average of asset volatilities to the volatility of the portfolio. Equivalently it maximises the distance from the volatility-weighted portfolio to the fully correlated case.`,
+      `The solution tends to overweight assets that have high volatility yet low correlation with the rest of the universe, producing a portfolio that is highly diversified in a precise mathematical sense. Like other risk-based methods it does not require expected-return forecasts.`,
+      `Empirically the approach has shown attractive risk-adjusted performance and is often compared with risk parity and minimum-variance strategies. It can be sensitive to the volatility estimates and may still concentrate in particular low-correlation pockets of the market.`
+    ],
+    keyPoint: "Maximum diversification formalises the intuitive goal of “getting the most diversification per unit of risk,” yielding a portfolio that systematically favours assets whose volatilities do not travel together."
+  },
+  {
+    era: "Implementation",
+    icon: "🔄",
+    title: "Turnover Constraints",
+    desc: "Limiting portfolio turnover to control transaction costs, market impact and tax realisation",
+    badge: { label: "Practical", style: "red" },
+    tags: [["turnover","red"], ["transaction costs","amber"], ["rebalancing",""], ["TC optimisation","slate"]],
+    data: [
+      { label: "Form", value: "Σ |w_i − w_i⁰| ≤ τ  or  penalty term", color: "red" },
+      { label: "Purpose", value: "Control costs & impact", color: "" },
+      { label: "Trade-off", value: "Lower turnover ↔ slower adaptation", color: "amber" },
+    ],
+    body: [
+      `Unconstrained optimisers frequently prescribe large, rapid changes in weights. In the presence of transaction costs, bid–ask spreads and market impact these changes destroy a substantial fraction of theoretical alpha. Turnover constraints (or explicit transaction-cost penalties in the objective) keep the new portfolio close to the current holdings.`,
+      `Constraints may take the form of a hard limit on total two-sided turnover, asset-level maximum trades, or a linear/quadratic penalty proportional to expected cost. Multi-period or dynamic optimisation frameworks can further smooth trades over time.`,
+      `The practical art lies in choosing a turnover budget that balances the benefit of incorporating new information against the cost of trading. Too tight a constraint freezes the portfolio; too loose a constraint incurs unnecessary costs. Realistic back-tests must always incorporate the chosen turnover discipline.`
+    ],
+    keyPoint: "Turnover constraints are the bridge between theoretical optimal weights and live implementation. Without them, even the most sophisticated optimiser can be rendered worthless by trading costs."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

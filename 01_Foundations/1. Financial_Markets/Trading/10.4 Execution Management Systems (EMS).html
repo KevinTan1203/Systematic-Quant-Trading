@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 10.4 Execution Management Systems (EMS)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 10 · Section 10.4</div>
+      <h1 class="book-title">Execution Management<br><em>Systems</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Route → execute → monitor · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>10.4 Execution Management Systems (EMS)</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Routing",
+    icon: "🧭",
+    title: "Smart Order Routing (SOR)",
+    desc: "Real-time logic that fragments parent orders across venues to capture the best available liquidity and price",
+    badge: { label: "Core", style: "teal" },
+    tags: [["SOR","teal"], ["best execution","amber"], ["lit + dark",""], ["fragmentation","slate"]],
+    data: [
+      { label: "Goal", value: "Best price + liquidity access", color: "teal" },
+      { label: "Inputs", value: "Order books, fees, latency, fill prob.", color: "" },
+      { label: "Output", value: "Child orders across multiple venues", color: "amber" },
+    ],
+    body: [
+      `Smart Order Routing is the EMS function that decides, in real time, how to split a parent order across lit exchanges, dark pools, ATSs and other liquidity sources. The router continuously evaluates displayed and estimated hidden liquidity, exchange fees and rebates, expected latency, and historical fill probabilities.`,
+      `Modern SORs combine deterministic rules with short-term predictive models. They may spray immediate-or-cancel (IOC) orders to capture displayed size, post passive liquidity on favourable venues, or route residual quantity to dark pools when information leakage is a concern.`,
+      `Regulatory best-execution obligations make a well-designed and well-documented SOR essential. Performance is measured by implementation shortfall, effective spread capture, and the ability to adapt when venue behaviour or fee schedules change.`
+    ],
+    keyPoint: "SOR is the real-time brain of the EMS. Its quality determines how much of the displayed and hidden liquidity a firm actually captures and at what total cost."
+  },
+  {
+    era: "Algorithms",
+    icon: "⚙️",
+    title: "Algo Integration (TWAP, VWAP, POV)",
+    desc: "Embedding and controlling standard and custom execution algorithms inside the EMS workflow",
+    badge: { label: "Execution", style: "amber" },
+    tags: [["TWAP","amber"], ["VWAP","teal"], ["POV","slate"], ["algo wheel",""]],
+    data: [
+      { label: "TWAP", value: "Time-weighted average price", color: "" },
+      { label: "VWAP", value: "Volume-weighted average price", color: "teal" },
+      { label: "POV", value: "Percentage of volume", color: "amber" },
+    ],
+    body: [
+      `An EMS provides traders with a menu of execution algorithms — both broker-supplied and proprietary. Classic schedule-based algos include TWAP (slice evenly over a time horizon), VWAP (track the volume-weighted average price), and POV / participation-rate strategies that target a percentage of market volume.`,
+      `The EMS is responsible for parameter validation, child-order generation, real-time performance monitoring, and the ability to pause, accelerate or cancel an algo mid-flight. Many platforms also implement “algo wheels” that systematically rotate or score providers to generate best-execution evidence and avoid over-reliance on a single broker.`,
+      `Advanced integration allows custom signals (urgency, short-term alpha, liquidity forecasts) to modulate algo behaviour, turning generic schedules into adaptive, signal-aware execution strategies.`
+    ],
+    keyPoint: "Algo integration turns the EMS from a simple order blaster into a controlled execution desk. The ability to select, parameterise, monitor and compare algorithms is central to consistent execution quality."
+  },
+  {
+    era: "Access",
+    icon: "🔗",
+    title: "DMA (Direct Market Access)",
+    desc: "Sending orders straight to exchange matching engines under the firm’s own market-participant identity",
+    badge: { label: "Direct", style: "slate" },
+    tags: [["DMA","slate"], ["exchange access","teal"], ["sponsored access","amber"], ["control",""]],
+    data: [
+      { label: "Model", value: "Firm’s own session to the venue", color: "slate" },
+      { label: "Benefit", value: "Lowest latency + full control", color: "teal" },
+      { label: "Requirement", value: "Risk controls & exchange membership", color: "amber" },
+    ],
+    body: [
+      `Direct Market Access allows the EMS to place orders directly onto an exchange’s matching engine using the firm’s own membership or a sponsored-access arrangement. There is no intermediate broker desk deciding how the order is handled; the firm retains full control of order type, timing and routing logic.`,
+      `DMA delivers the lowest possible latency and the greatest transparency into fill quality. In return it imposes strict pre-trade risk-control obligations (fat-finger limits, position limits, message throttles) that the EMS must enforce before any order reaches the exchange.`,
+      `Most institutional EMSs support a hybrid model: DMA for liquid names and low-touch flow, and broker algorithms or high-touch desks for larger or more sensitive orders.`
+    ],
+    keyPoint: "DMA gives the firm the shortest path to the matching engine and the highest degree of control — provided the EMS can enforce the necessary risk and compliance gates in real time."
+  },
+  {
+    era: "Connectivity",
+    icon: "🌐",
+    title: "Fragmented Venue Connectivity",
+    desc: "Maintaining simultaneous, reliable links to dozens of lit venues, dark pools and ATSs",
+    badge: { label: "Infrastructure", style: "teal" },
+    tags: [["venues","teal"], ["fragmentation","amber"], ["sessions",""], ["normalisation","slate"]],
+    data: [
+      { label: "Challenge", value: "Many protocols, sessions, behaviours", color: "amber" },
+      { label: "Requirement", value: "Normalised order & market-data interface", color: "" },
+      { label: "Risk", value: "Session drops, sequence gaps, quirks", color: "red" },
+    ],
+    body: [
+      `Equity and listed-derivatives markets are highly fragmented. A comprehensive EMS must maintain persistent sessions to multiple primary exchanges, regional venues, dark pools and alternative trading systems, each with its own protocol dialect, session rules and market-data feed.`,
+      `The system normalises these heterogeneous interfaces into a common internal model so that SOR and algo logic can treat every venue uniformly. It must also handle venue-specific behaviours — lot-size rules, self-match prevention, hidden-order mechanics, and differing cancel-replace semantics.`,
+      `Operational resilience is critical: session monitoring, automatic reconnection, sequence-number recovery and graceful degradation when a venue becomes unavailable are all mandatory features of a production-grade EMS.`
+    ],
+    keyPoint: "Fragmented connectivity is the price of access to modern markets. An EMS that cannot reliably speak to every relevant venue cannot claim to offer best execution."
+  },
+  {
+    era: "Controls",
+    icon: "🛡️",
+    title: "Real-Time Risk Monitoring",
+    desc: "Continuous pre- and post-trade checks that keep trading within capital, position and regulatory limits",
+    badge: { label: "Risk", style: "red" },
+    tags: [["real-time risk","red"], ["limits","amber"], ["kill switch","teal"], ["fat-finger",""]],
+    data: [
+      { label: "Pre-trade", value: "Fat-finger, max order size, exposure", color: "red" },
+      { label: "In-flight", value: "Position, P&L, message rate", color: "" },
+      { label: "Hard stop", value: "Kill switch / auto-cancel", color: "teal" },
+    ],
+    body: [
+      `Because an EMS can generate large volumes of orders in milliseconds, real-time risk controls are non-negotiable. Pre-trade checks reject or hold orders that breach size, price-collar, position or capital limits. Intra-day monitors track cumulative exposure, realised and unrealised P&L, and message rates against exchange-imposed throttles.`,
+      `Most platforms implement a hierarchy of soft warnings, hard blocks and a global kill-switch that can cancel all open orders and prevent new ones. These controls must themselves be low-latency; a risk check that adds tens of milliseconds defeats the purpose of DMA.`,
+      `Regulators increasingly expect documented, tested and independently monitored real-time risk frameworks. The EMS is the natural place to enforce them.`
+    ],
+    keyPoint: "Real-time risk monitoring is the safety net that makes high-speed electronic execution acceptable. Without it, a single software or human error can produce catastrophic losses in seconds."
+  },
+  {
+    era: "Analytics",
+    icon: "📈",
+    title: "Pre-Trade Analytics",
+    desc: "Estimating cost, liquidity and optimal strategy before the first child order is sent",
+    badge: { label: "Decision", style: "amber" },
+    tags: [["TCA","amber"], ["cost models","teal"], ["liquidity forecast",""], ["urgency","slate"]],
+    data: [
+      { label: "Outputs", value: "Expected cost, risk, duration", color: "amber" },
+      { label: "Models", value: "Impact, spread, timing risk", color: "" },
+      { label: "Use", value: "Algo selection & parameterisation", color: "teal" },
+    ],
+    body: [
+      `Before an order is released, the EMS can run pre-trade analytics that estimate market impact, timing risk, expected shortfall and the liquidity available over various horizons. These estimates help the trader choose between passive posting, aggressive taking, a scheduled algo, or a high-touch desk.`,
+      `Models typically combine short-term volume and volatility forecasts with historical impact curves and current order-book imbalance. The results are presented as expected cost distributions or as recommended participation rates and time horizons.`,
+      `Good pre-trade analytics turn execution from a purely reactive activity into a deliberate, quantifiable decision. They also create an audit trail showing that the chosen strategy was reasonable given the information available at the time.`
+    ],
+    keyPoint: "Pre-trade analytics give the trader a forward-looking estimate of cost and risk, enabling rational choice of urgency, algo and venue before any market impact is incurred."
+  },
+  {
+    era: "Speed",
+    icon: "⚡",
+    title: "Latency Optimization",
+    desc: "Engineering the entire order path — from decision to exchange acknowledgement — for minimum delay",
+    badge: { label: "Performance", style: "slate" },
+    tags: [["latency","slate"], ["co-location","teal"], ["tick-to-trade",""], ["FPGA","amber"]],
+    data: [
+      { label: "Metric", value: "Tick-to-trade / order-to-ack", color: "slate" },
+      { label: "Techniques", value: "Co-lo, kernel bypass, FPGA", color: "" },
+      { label: "Trade-off", value: "Speed vs. complexity & cost", color: "amber" },
+    ],
+    body: [
+      `In competitive markets, microseconds matter. Latency optimisation covers every stage of the path: market-data normalisation, decision logic, risk checks, order construction, network stack and physical proximity to the exchange matching engine.`,
+      `Techniques include co-location, kernel-bypass networking (e.g., Solarflare/OpenOnload), carefully tuned software, and, at the extreme, FPGA or hardware-accelerated order gates. The EMS must expose the hooks that allow these optimisations without compromising risk controls or auditability.`,
+      `Not every flow requires nanosecond performance. The art lies in applying the appropriate level of optimisation to each strategy while keeping the overall system maintainable and safe.`
+    ],
+    keyPoint: "Latency optimisation is a continuum. The EMS must support both ultra-low-latency DMA paths and more deliberate algorithmic flows, applying engineering effort where it produces measurable execution improvement."
+  },
+  {
+    era: "Vendors",
+    icon: "🏢",
+    title: "Commercial EMS Platforms",
+    desc: "The principal enterprise systems used by institutions for electronic execution and broker connectivity",
+    badge: { label: "Market", style: "teal" },
+    tags: [["Fidessa","teal"], ["Bloomberg AIM","amber"], ["Portware","slate"], ["enterprise",""]],
+    data: [
+      { label: "Fidessa", value: "Broad multi-asset EMS heritage", color: "teal" },
+      { label: "Bloomberg AIM", value: "Tight integration with Terminal & data", color: "" },
+      { label: "Portware", value: "Flexible, quant-friendly EMS", color: "amber" },
+    ],
+    body: [
+      `Most buy-side firms deploy a commercial EMS rather than building a full multi-venue execution stack in-house. Fidessa (now part of Refinitiv/LSEG) has long been a major player in multi-asset electronic execution. Bloomberg AIM provides an EMS tightly integrated with the Bloomberg Terminal, data and order-management tools. Portware (FactSet) is known for its flexibility and appeal to quantitative and multi-strategy managers.`,
+      `Other notable platforms include FlexTrade, Trading Technologies, and various broker-sponsored EMSs. Selection criteria typically cover asset-class coverage, SOR quality, algo catalogue, latency characteristics, risk-control framework, and the richness of the broker and venue connectivity network.`,
+      `Even with a commercial EMS, firms invest heavily in configuration, custom analytics, proprietary algo integration and rigorous best-execution monitoring to differentiate their execution quality.`
+    ],
+    keyPoint: "Commercial EMS platforms supply the connectivity, SOR and algo infrastructure; competitive advantage comes from how intelligently the firm configures, monitors and overlays its own execution logic on top of that foundation."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

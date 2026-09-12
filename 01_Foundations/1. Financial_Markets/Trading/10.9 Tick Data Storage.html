@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 10.9 Tick Data Storage</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 10 · Section 10.9</div>
+      <h1 class="book-title">Tick Data<br><em>Storage</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Store → partition → retrieve · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>10.9 Tick Data Storage</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Databases",
+    icon: "🗄️",
+    title: "Time-Series Databases",
+    desc: "Specialised engines optimised for high-volume, time-ordered appends and range queries: InfluxDB, TimescaleDB, QuestDB, kdb+",
+    badge: { label: "Core", style: "teal" },
+    tags: [["InfluxDB","teal"], ["TimescaleDB","amber"], ["QuestDB","slate"], ["kdb+",""]],
+    data: [
+      { label: "Strength", value: "Time-ordered writes & queries", color: "teal" },
+      { label: "Examples", value: "Influx, Timescale, QuestDB, kdb+", color: "" },
+      { label: "Trade-off", value: "Specialisation vs. general SQL", color: "amber" },
+    ],
+    body: [
+      `Time-series databases are built for the access patterns of tick data: relentless appends of timestamped records and fast retrieval of contiguous time ranges. InfluxDB popularised the category for metrics and IoT; TimescaleDB extends PostgreSQL with hypertables; QuestDB focuses on high-throughput ingestion and SQL; kdb+ remains the performance benchmark in many HFT environments.`,
+      `These engines typically store data in chronological order, apply aggressive compression, and provide first-class time-based partitioning and retention policies. Query languages emphasise time windows, down-sampling and as-of joins.`,
+      `Choice among them depends on required latency, language ecosystem, operational familiarity and whether the workload is pure research or also serves production low-latency reads.`
+    ],
+    keyPoint: "A purpose-built time-series store turns the natural order of market data into a performance advantage. Generic relational databases can hold ticks, but they rarely match the ingestion rates or range-query speed of a specialised engine."
+  },
+  {
+    era: "Format",
+    icon: "📦",
+    title: "Columnar Storage: Parquet & Arrow",
+    desc: "Column-oriented file and in-memory formats that deliver high compression and vectorised analytics on historical ticks",
+    badge: { label: "Analytics", style: "amber" },
+    tags: [["Parquet","amber"], ["Arrow","teal"], ["columnar",""], ["analytics","slate"]],
+    data: [
+      { label: "Parquet", value: "On-disk columnar, excellent compression", color: "amber" },
+      { label: "Arrow", value: "In-memory columnar, zero-copy sharing", color: "teal" },
+      { label: "Benefit", value: "Fast scans & high compression ratios", color: "" },
+    ],
+    body: [
+      `Columnar formats store each field (timestamp, price, size, flags) contiguously. This layout yields dramatically better compression than row-oriented storage and allows analytical engines to read only the columns required by a query.`,
+      `Apache Parquet is the dominant on-disk format for data-lake style tick archives. Apache Arrow provides a matching in-memory representation that enables zero-copy data exchange between processes and languages. Together they form the backbone of many modern research stacks.`,
+      `For pure historical analysis and batch feature generation, a well-partitioned Parquet lake often outperforms a general-purpose database while remaining inexpensive and portable across cloud providers.`
+    ],
+    keyPoint: "Columnar storage is the natural format for analytical access to tick history. Parquet on disk and Arrow in memory give both compression density and scan speed that row stores struggle to match."
+  },
+  {
+    era: "Industry",
+    icon: "⚡",
+    title: "kdb+ — Industry Standard for HFT Data",
+    desc: "The columnar, in-memory time-series database that remains the de-facto standard for ultra-high-performance tick storage and analytics",
+    badge: { label: "HFT", style: "red" },
+    tags: [["kdb+","red"], ["q language","teal"], ["in-memory","amber"], ["HFT",""]],
+    data: [
+      { label: "Model", value: "Columnar tables + time-series primitives", color: "red" },
+      { label: "Language", value: "q (vector functional language)", color: "" },
+      { label: "Use case", value: "Research & production HFT data", color: "teal" },
+    ],
+    body: [
+      `kdb+ stores data as ordered, columnar tables that can reside entirely in memory or be memory-mapped from disk. Its query language q is terse, vectorised and designed for time-series operations (asof joins, window aggregates, moving statistics).`,
+      `The combination of in-memory speed, excellent compression and a language purpose-built for market data has made kdb+ the dominant choice inside many high-frequency and quantitative trading firms for both research and production capture.`,
+      `Licensing cost and the specialised skill set required are the principal barriers. Where those are acceptable, kdb+ continues to set the performance bar that other time-series systems are measured against.`
+    ],
+    keyPoint: "kdb+ remains the gold standard for latency-sensitive tick storage and analytics. Its design assumptions — columnar layout, memory residency, and a vector language — match the needs of HFT more closely than any general-purpose database."
+  },
+  {
+    era: "Efficiency",
+    icon: "🗜️",
+    title: "Compression Strategies for Tick Data",
+    desc: "Exploiting the high redundancy of timestamps, prices and sizes to shrink storage footprint by orders of magnitude",
+    badge: { label: "Density", style: "teal" },
+    tags: [["compression","teal"], ["delta encoding","amber"], ["dictionary",""], ["bit-packing","slate"]],
+    data: [
+      { label: "Techniques", value: "Delta, dictionary, RLE, bit-packing", color: "teal" },
+      { label: "Typical ratio", value: "5–20× on real tick data", color: "" },
+      { label: "Trade-off", value: "CPU cost vs. storage & I/O savings", color: "amber" },
+    ],
+    body: [
+      `Tick streams are highly compressible. Timestamps increase monotonically and can be delta-encoded; prices move in small increments and benefit from delta or XOR encoding; symbols and condition flags are low-cardinality and compress with dictionaries; runs of identical values yield to run-length encoding.`,
+      `Modern columnar formats and time-series databases apply these techniques automatically. The resulting compression ratios of 5–20× (sometimes higher) turn terabytes of raw ticks into manageable volumes and dramatically reduce I/O during scans.`,
+      `The only material cost is CPU time for compression and decompression. For analytical workloads the I/O savings almost always dominate; for ultra-low-latency in-memory paths the data may be kept uncompressed or lightly compressed.`
+    ],
+    keyPoint: "Compression is not an optional optimisation for tick data — it is a necessity. Domain-aware encoding turns an otherwise intractable volume problem into a practical engineering task."
+  },
+  {
+    era: "Organisation",
+    icon: "📁",
+    title: "Partitioning by Date / Symbol",
+    desc: "Physically organising storage so that the most common query predicates prune large amounts of data without reading it",
+    badge: { label: "Layout", style: "amber" },
+    tags: [["partitioning","amber"], ["date","teal"], ["symbol","slate"], ["pruning",""]],
+    data: [
+      { label: "Primary", value: "Date (or date-hour) partitions", color: "amber" },
+      { label: "Secondary", value: "Symbol or instrument ID", color: "" },
+      { label: "Effect", value: "Query touches only relevant files", color: "teal" },
+    ],
+    body: [
+      `Almost every tick query is constrained by time and, frequently, by instrument. Partitioning the physical storage by date (and often by symbol or a hash of symbol) allows the query engine to open only the files that can possibly contain matching rows.`,
+      `A typical layout stores one directory per day, inside which lie files or sub-directories per symbol or symbol range. Cloud object stores map naturally onto the same scheme. The result is that a query for a single symbol on a single day reads a tiny fraction of the total archive.`,
+      `Poor partitioning is one of the most common reasons historical research feels slow. Good partitioning turns multi-terabyte archives into collections of manageable, independently accessible slices.`
+    ],
+    keyPoint: "Partitioning aligns physical layout with query predicates. When date and symbol are the partition keys, most research workloads touch only a few percent of the total data."
+  },
+  {
+    era: "Access",
+    icon: "🔎",
+    title: "Indexing for Fast Lookups",
+    desc: "Secondary structures that accelerate point lookups, as-of joins and sparse symbol access beyond simple partition pruning",
+    badge: { label: "Speed", style: "slate" },
+    tags: [["indexing","slate"], ["as-of","teal"], ["lookup","amber"], ["B-tree / hash",""]],
+    data: [
+      { label: "Use cases", value: "Point-in-time, as-of, symbol lists", color: "slate" },
+      { label: "Types", value: "Time index, symbol index, composite", color: "" },
+      { label: "Cost", value: "Write overhead + storage", color: "amber" },
+    ],
+    body: [
+      `While partitioning handles coarse range elimination, indexes accelerate finer-grained access: “give me the last trade before time T”, “all quotes for these 50 symbols in a 10-minute window”, or random point lookups during interactive research.`,
+      `Time-series systems often maintain implicit time indexes; additional symbol or composite indexes can be created explicitly. In columnar file formats, statistics and bloom filters stored in footers serve a similar pruning role.`,
+      `Indexes are not free — they consume space and slow ingestion — so they are applied selectively to the access patterns that actually appear in production research and trading workloads.`
+    ],
+    keyPoint: "Indexes turn partition pruning into precise retrieval. For the queries that cannot be answered by date/symbol directories alone, a well-chosen index is the difference between interactive and batch performance."
+  },
+  {
+    era: "Lifecycle",
+    icon: "❄️",
+    title: "Cold Storage Strategies",
+    desc: "Moving older, rarely accessed tick data onto cheaper, higher-latency media while preserving the ability to restore it on demand",
+    badge: { label: "Cost", style: "teal" },
+    tags: [["cold storage","teal"], ["tiering","amber"], ["archive",""], ["restore","slate"]],
+    data: [
+      { label: "Hot", value: "SSD / memory — recent data", color: "teal" },
+      { label: "Cold", value: "Object storage / tape — history", color: "" },
+      { label: "Policy", value: "Age- or access-based migration", color: "amber" },
+    ],
+    body: [
+      `Tick data accumulates relentlessly. Keeping multi-year history on high-performance SSDs is prohibitively expensive. Cold-storage strategies automatically migrate older partitions to cheaper object storage or archival tiers once they fall outside a defined hot window.`,
+      `The migration must preserve the original partitioning scheme and metadata so that a query planner can still locate the data and, if necessary, restore a partition to fast media for analysis. Transparent tiering features in some databases automate this process.`,
+      `A well-implemented hierarchy lets firms retain decades of ticks for compliance and long-horizon research without paying hot-storage prices for data that is touched only occasionally.`
+    ],
+    keyPoint: "Cold storage is how firms keep complete history without complete cost. Automatic tiering and restore paths turn the trade-off between accessibility and expense into a managed policy rather than a crisis."
+  },
+  {
+    era: "Governance",
+    icon: "📜",
+    title: "Data Retention Policies",
+    desc: "Explicit rules that define how long each class of tick data is kept, in what form, and when it may be deleted",
+    badge: { label: "Policy", style: "amber" },
+    tags: [["retention","amber"], ["compliance","teal"], ["lifecycle",""], ["deletion","slate"]],
+    data: [
+      { label: "Drivers", value: "Regulation, cost, research needs", color: "amber" },
+      { label: "Granularity", value: "Per dataset / per venue / per use case", color: "" },
+      { label: "Enforcement", value: "Automated jobs + audit trail", color: "teal" },
+    ],
+    body: [
+      `Retention policies answer three questions: how long must the data be kept, in what fidelity (raw, normalised, aggregated), and who is allowed to delete it. Regulatory requirements (often five to seven years or more for order and trade records) set a floor; cost and research value set the practical ceiling.`,
+      `Policies are usually expressed as rules on partitions (“keep full ticks for 90 days, 1-minute bars for 5 years, delete raw quotes after 2 years”). Enforcement is automated and logged so that compliance can demonstrate adherence.`,
+      `Clear retention rules also prevent the common failure mode in which every dataset is kept forever “just in case”, silently consuming budget and complicating operations.`
+    ],
+    keyPoint: "Retention policy turns an open-ended storage problem into a finite, auditable lifecycle. It balances regulatory duty, research utility and economic reality."
+  },
+  {
+    era: "Cloud",
+    icon: "☁️",
+    title: "Cloud Storage (S3, GCS) for Tick Data",
+    desc: "Using object stores as the durable, scalable backbone for historical tick archives and data-lake architectures",
+    badge: { label: "Scale", style: "slate" },
+    tags: [["S3","slate"], ["GCS","teal"], ["object storage","amber"], ["data lake",""]],
+    data: [
+      { label: "Role", value: "Durable, cheap, virtually unlimited store", color: "slate" },
+      { label: "Layout", value: "Partitioned Parquet / compressed files", color: "" },
+      { label: "Access", value: "Direct, via query engines, or restore", color: "teal" },
+    ],
+    body: [
+      `Amazon S3, Google Cloud Storage and their equivalents provide effectively unlimited, highly durable object storage at a fraction of the cost of block or file storage. Tick archives are typically written as compressed, date- and symbol-partitioned Parquet (or proprietary) files directly into object buckets.`,
+      `Query engines (Spark, Trino, BigQuery, Athena, specialised time-series layers) can read these objects in place, turning the bucket into a queryable data lake. For latency-sensitive work, selected partitions are staged back to local SSDs or memory.`,
+      `Cloud object storage also simplifies replication, disaster recovery and cross-region sharing. The principal design task is to impose a clean partitioning and naming convention so that both humans and engines can locate any slice of history efficiently.`
+    ],
+    keyPoint: "Object storage is the practical foundation of modern tick archives. Combined with columnar formats and thoughtful partitioning, it delivers durability and scale at a cost that makes multi-year, multi-venue history routine rather than exceptional."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

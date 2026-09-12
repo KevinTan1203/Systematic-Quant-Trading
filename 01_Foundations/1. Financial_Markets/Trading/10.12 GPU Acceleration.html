@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 10.12 GPU Acceleration</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 10 · Section 10.12</div>
+      <h1 class="book-title">GPU<br><em>Acceleration</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Parallel → compute → scale · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>10.12 GPU Acceleration</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Simulation",
+    icon: "🎲",
+    title: "GPU for Monte Carlo Simulations",
+    desc: "Massively parallel path generation for option pricing, risk, and scenario analysis",
+    badge: { label: "Classic", style: "teal" },
+    tags: [["Monte Carlo","teal"], ["paths","amber"], ["parallel",""], ["pricing","slate"]],
+    data: [
+      { label: "Strength", value: "Thousands of paths in parallel", color: "teal" },
+      { label: "Use cases", value: "Options, VaR, stress tests", color: "" },
+      { label: "Speed-up", value: "10–100× vs. CPU typical", color: "amber" },
+    ],
+    body: [
+      `Monte Carlo methods generate large numbers of independent random paths. GPUs excel at this pattern: each core can simulate one (or many) paths simultaneously, turning what would be a long sequential loop on a CPU into a single kernel launch.`,
+      `Applications include exotic-option pricing, Value-at-Risk and Expected Shortfall calculations, counterparty exposure, and any scenario analysis that relies on repeated stochastic evolution. Memory layout and random-number generation quality become first-order design concerns.`,
+      `Once the simulation kernel is written, scaling to tens of millions of paths is largely a matter of available GPU memory and the number of devices, making overnight risk runs finish in minutes or seconds.`
+    ],
+    keyPoint: "Monte Carlo is embarrassingly parallel. Mapping each path to a GPU thread converts a classic computational bottleneck into one of the highest-ROI uses of accelerator hardware in quantitative finance."
+  },
+  {
+    era: "Linear Algebra",
+    icon: "📐",
+    title: "GPU for Matrix Operations (Portfolio Optimization)",
+    desc: "Accelerating the dense linear-algebra kernels that dominate mean-variance, risk-parity and factor-model calculations",
+    badge: { label: "Numerics", style: "amber" },
+    tags: [["BLAS","amber"], ["covariance","teal"], ["optimization",""], ["cuBLAS","slate"]],
+    data: [
+      { label: "Kernels", value: "GEMM, Cholesky, eigendecomposition", color: "amber" },
+      { label: "Libraries", value: "cuBLAS, cuSOLVER, Magma", color: "" },
+      { label: "Benefit", value: "Large universe covariance & solves", color: "teal" },
+    ],
+    body: [
+      `Portfolio construction repeatedly forms and factorises covariance matrices, solves linear systems, and evaluates quadratic forms. These operations map directly onto highly optimised GPU BLAS and LAPACK primitives (cuBLAS, cuSOLVER).`,
+      `For universes of several thousand assets the speed-up relative to a multi-core CPU is often dramatic, enabling interactive what-if analysis or higher-frequency re-optimisation that would otherwise be impractical.`,
+      `Careful attention to data transfer, batching of small matrices, and numerical stability (especially with single-precision arithmetic) is required to realise theoretical peak performance in production optimisers.`
+    ],
+    keyPoint: "Matrix-heavy portfolio routines are natural GPU citizens. Once the linear-algebra bottleneck moves to the device, optimisation and risk calculations that once ran overnight can become interactive."
+  },
+  {
+    era: "Programming",
+    icon: "💻",
+    title: "CUDA Programming",
+    desc: "NVIDIA’s parallel computing platform and the low-level language used to write custom GPU kernels",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["CUDA","slate"], ["kernels","teal"], ["threads","amber"], ["SIMT",""]],
+    data: [
+      { label: "Model", value: "Kernels executed by grids of threads", color: "slate" },
+      { label: "Hierarchy", value: "Grid → Block → Warp → Thread", color: "" },
+      { label: "Skill", value: "Memory hierarchy & occupancy critical", color: "amber" },
+    ],
+    body: [
+      `CUDA allows developers to write functions (kernels) that execute on the GPU. Thousands of lightweight threads are organised into blocks and grids; the hardware schedules them in warps of 32. Performance depends on coalesced memory access, minimising divergent branches, and maximising occupancy.`,
+      `While high-level libraries cover many quant use cases, custom CUDA remains necessary for novel algorithms, tight latency constraints, or when the existing primitives do not match the required data layout.`,
+      `Proficiency requires understanding the GPU memory hierarchy (registers, shared, L1/L2, global), stream concurrency, and profiling tools such as Nsight. The investment is substantial but unlocks the full capability of the hardware.`
+    ],
+    keyPoint: "CUDA is the assembly language of NVIDIA GPUs. High-level libraries hide it for common tasks; mastery of it remains essential when the algorithm or the performance target falls outside those libraries."
+  },
+  {
+    era: "DataFrames",
+    icon: "📊",
+    title: "cuDF — GPU-Accelerated DataFrames",
+    desc: "A pandas-like API that executes DataFrame operations on the GPU for dramatic speed-ups on large tabular data",
+    badge: { label: "Analytics", style: "teal" },
+    tags: [["cuDF","teal"], ["pandas","amber"], ["RAPIDS",""], ["ETL","slate"]],
+    data: [
+      { label: "API", value: "Largely pandas-compatible", color: "teal" },
+      { label: "Engine", value: "CUDA kernels under the hood", color: "" },
+      { label: "Gain", value: "10–50× on large joins & group-bys", color: "amber" },
+    ],
+    body: [
+      `cuDF provides a DataFrame abstraction familiar to pandas users but backed by GPU memory and CUDA kernels. Filtering, joins, group-bys, rolling windows and many reductions run entirely on the device, avoiding the Python interpreter and CPU memory bottleneck.`,
+      `For tick-data cleaning, feature generation and large-scale cross-sectional calculations the speed-ups are often an order of magnitude or more once data resides on the GPU. Interoperability with CuPy, Numba and other RAPIDS components allows end-to-end GPU pipelines.`,
+      `The principal constraints are GPU memory size and the still-evolving coverage of the pandas API; not every pandas idiom is supported or equally fast.`
+    ],
+    keyPoint: "cuDF lets quant researchers keep a pandas-style workflow while moving the heavy lifting onto the GPU. For multi-gigabyte tick and feature tables the performance difference is transformative."
+  },
+  {
+    era: "Arrays",
+    icon: "🔢",
+    title: "CuPy — GPU-Accelerated NumPy",
+    desc: "A drop-in replacement for NumPy that executes array operations on NVIDIA GPUs",
+    badge: { label: "Numerics", style: "amber" },
+    tags: [["CuPy","amber"], ["NumPy","teal"], ["arrays",""], ["drop-in","slate"]],
+    data: [
+      { label: "Interface", value: "NumPy-compatible", color: "amber" },
+      { label: "Backend", value: "CUDA / cuBLAS / cuRAND", color: "" },
+      { label: "Migration", value: "Often just change the import", color: "teal" },
+    ],
+    body: [
+      `CuPy re-implements the NumPy API on top of CUDA. Most array creation, arithmetic, linear-algebra and random-number routines can be accelerated simply by swapping import numpy as np for import cupy as np (with attention to device memory and explicit .get() calls when data must return to the host).`,
+      `This low-friction path allows existing scientific Python code — signal processing, statistical estimators, custom Monte-Carlo kernels written in array style — to benefit from GPU acceleration without a full rewrite in CUDA C++.`,
+      `As with any GPU library, performance hinges on keeping data on the device and launching kernels that are large enough to saturate the hardware; tiny arrays still favour the CPU.`
+    ],
+    keyPoint: "CuPy is the shortest route from NumPy code to GPU execution. For array-oriented quant algorithms it often delivers substantial speed-ups with only minimal code changes."
+  },
+  {
+    era: "Ecosystem",
+    icon: "🌊",
+    title: "RAPIDS Ecosystem",
+    desc: "NVIDIA’s open-source suite of GPU-accelerated data-science and analytics libraries built around a common columnar memory format",
+    badge: { label: "Stack", style: "slate" },
+    tags: [["RAPIDS","slate"], ["cuDF","teal"], ["cuML","amber"], ["end-to-end",""]],
+    data: [
+      { label: "Core", value: "cuDF, cuML, cuGraph, cuSpatial…", color: "slate" },
+      { label: "Memory", value: "Apache Arrow on GPU", color: "" },
+      { label: "Goal", value: "Keep data on GPU from ingest to model", color: "teal" },
+    ],
+    body: [
+      `RAPIDS aims to provide a complete GPU-accelerated alternative to the classic PyData stack. cuDF handles DataFrames, cuML supplies many scikit-learn-style algorithms, cuGraph covers graph analytics, and additional libraries address spatial, signal and other domains. All share a common Arrow-based memory format, enabling zero-copy interchange.`,
+      `The strategic value is an end-to-end pipeline that never leaves device memory: ingest → clean → feature → train → infer. Avoiding repeated host–device transfers is often as important as the raw kernel speed-ups.`,
+      `Adoption is strongest where data volumes are large and the existing Python workflow is already pandas / scikit-learn centric; integration with Dask further allows multi-GPU and multi-node scaling.`
+    ],
+    keyPoint: "RAPIDS turns the GPU into a full data-science platform rather than a single-function accelerator. Keeping the entire pipeline on-device maximises both speed and developer productivity."
+  },
+  {
+    era: "Learning",
+    icon: "🧠",
+    title: "GPU for Deep Learning Model Training",
+    desc: "The dominant hardware platform for training neural networks used in signal generation, execution and alternative-data models",
+    badge: { label: "ML", style: "red" },
+    tags: [["deep learning","red"], ["training","teal"], ["PyTorch / TF","amber"], ["backprop",""]],
+    data: [
+      { label: "Dominance", value: "De-facto standard for NN training", color: "red" },
+      { label: "Frameworks", value: "PyTorch, TensorFlow, JAX", color: "" },
+      { label: "Scale", value: "Single GPU → multi-GPU → multi-node", color: "teal" },
+    ],
+    body: [
+      `Modern deep-learning frameworks are built around GPU acceleration. Matrix multiplications, convolutions and attention layers map naturally onto tensor cores; automatic differentiation runs efficiently in parallel. Training times that would be measured in weeks on CPUs shrink to hours or minutes on contemporary GPUs.`,
+      `In finance the same hardware supports models for return prediction, limit-order-book forecasting, execution agents, and alternative-data extraction (NLP, satellite imagery, etc.). Mixed-precision training and multi-GPU data or model parallelism further improve throughput.`,
+      `Once trained, many models can be deployed on GPU for low-latency inference or quantised and moved to CPU / specialised accelerators depending on the latency and cost targets.`
+    ],
+    keyPoint: "GPUs are the reason large-scale deep learning is practical. For any quant team serious about neural models, GPU capacity is as fundamental as market-data access."
+  },
+  {
+    era: "Research",
+    icon: "🔁",
+    title: "GPU for Backtesting Parallelization",
+    desc: "Running thousands of parameter combinations or independent strategy realisations concurrently on the GPU",
+    badge: { label: "Throughput", style: "teal" },
+    tags: [["backtest","teal"], ["parameter sweep","amber"], ["parallel",""], ["vectorisation","slate"]],
+    data: [
+      { label: "Pattern", value: "One thread / block per parameter set", color: "teal" },
+      { label: "Gain", value: "Orders-of-magnitude more trials", color: "" },
+      { label: "Design", value: "Vectorise or batch the strategy logic", color: "amber" },
+    ],
+    body: [
+      `A single back-test is often sequential, but the surrounding research workflow — grid search, walk-forward windows, Monte-Carlo permutation of fills, multi-seed robustness checks — is embarrassingly parallel. GPUs can evaluate thousands of independent realisations in the time a CPU evaluates a handful.`,
+      `Realising the speed-up requires either rewriting the core strategy loop in a data-parallel style (CuPy, Numba CUDA, custom kernels) or batching many independent back-tests so that each GPU thread processes one full path. Memory footprint per trial becomes the limiting factor.`,
+      `When successful, the research cycle compresses dramatically: ideas that previously needed overnight clusters can be explored interactively, improving both productivity and the thoroughness of robustness testing.`
+    ],
+    keyPoint: "GPU parallelisation multiplies the number of back-tests that can be run in a fixed wall-clock time. The result is faster iteration and more rigorous exploration of parameter and scenario space."
+  },
+  {
+    era: "Infrastructure",
+    icon: "🖥️",
+    title: "Cloud GPU Instances (AWS P3/P4, GCP A100)",
+    desc: "On-demand access to high-end NVIDIA GPUs in the public cloud for elastic training and large-scale research",
+    badge: { label: "Elastic", style: "amber" },
+    tags: [["P3 / P4","amber"], ["A100 / H100","teal"], ["cloud GPU",""], ["spot","slate"]],
+    data: [
+      { label: "AWS", value: "P3 (V100), P4 (A100), P5 (H100)", color: "amber" },
+      { label: "GCP", value: "A100 / H100 accelerated VMs", color: "teal" },
+      { label: "Model", value: "On-demand, reserved, or spot", color: "" },
+    ],
+    body: [
+      `Cloud providers rent individual GPUs or multi-GPU machines by the hour (or second). AWS P3 instances popularised V100 access; P4 and P5 brought A100 and H100. Google Cloud and Azure offer equivalent A100/H100 machines. Spot and preemptible pricing can cut costs dramatically for fault-tolerant workloads.`,
+      `Elasticity is the principal advantage: a team can burst to dozens or hundreds of GPUs for a large training run or parameter sweep and then scale back to zero. Data locality, image management and inter-GPU networking (NVLink, InfiniBand) become the new operational concerns.`,
+      `Hybrid patterns are common — persistent on-premise or co-located GPUs for steady workloads, cloud burst capacity for peaks and experimentation.`
+    ],
+    keyPoint: "Cloud GPU instances turn capital expenditure into operating expenditure and give quant teams elastic access to state-of-the-art accelerators. Used with checkpointing and spot pricing, they make large-scale GPU research economically practical."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
