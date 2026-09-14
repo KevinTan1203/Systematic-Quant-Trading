@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 13.2 Implied Volatility</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital,wght@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .formula {
+    margin: 14px 0 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-family: 'Space Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.9;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 13 · Section 13.2</div>
+      <h1 class="book-title">Implied<br><em>Volatility</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Market price → implied distribution → volatility surface · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Quantitative Finance · Revision Notes</span>
+    <span>13.2 Implied Volatility</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Definition",
+    icon: "📌",
+    title: "Definition of Implied Volatility",
+    desc: "The volatility value that makes the Black-Scholes model fit the traded option price",
+    badge: { label: "Core", style: "slate" },
+    tags: [["BS inversion","teal"], ["market price","amber"], ["single-number vol","slate"], ["option quote","red"]],
+    data: [
+      { label: "Definition", value: "Solve C_mkt = C_BS(S, K, T, r, σ_iv)", color: "teal" },
+      { label: "Inputs", value: "Spot, strike, maturity, rate, price", color: "amber" },
+      { label: "Output", value: "σ_iv for that option", color: "slate" },
+    ],
+    body: [
+      `Implied volatility is the volatility parameter that makes the Black-Scholes formula exactly match the observed market option price. In other words, if a call option is quoted at C_mkt, we solve the equation C_BS(S₀, K, T, r, σ_iv) = C_mkt for σ_iv. This is not an estimate of realized variance in the past; it is the market’s current “pricing volatility” for that option, embedded in the option premium.`,
+      `The inversion is done from the Black-Scholes model because the option price is a monotonic function of volatility. For a European call, larger volatility raises the value of the option by increasing the chance of very favorable outcomes. So for any given observed premium, there is a unique volatility level that rationalizes that premium under the model, assuming the option is otherwise well-specified and the rest of the inputs are known.`,
+      `Implied volatility is therefore one of the most important market variables in derivatives. It is the language in which option prices are often quoted, and it reveals how the market is pricing uncertainty. A change in option price does not necessarily mean a change in the underlying; it may instead reflect a change in the market’s view of volatility, skew, or tail risk.`,
+      `This is why the volatility surface is central: each strike and maturity embeds a different implied-vol level, and these levels jointly represent the market’s distributional view of future returns. The Black-Scholes formula is then not “the truth,” but a convenient mapping from option prices to a volatility number.`
+    ],
+    keyPoint: "Implied volatility is the market’s price of uncertainty for a specific option contract: it is the volatility input that makes the observed option premium consistent with the Black-Scholes model."
+  },
+  {
+    era: "Shape",
+    icon: "📉",
+    title: "IV Smile, Skew, and Surface",
+    desc: "The cross-section of implied volatilities across strikes and maturities reveals structured market pricing of risk",
+    badge: { label: "Surface", style: "amber" },
+    tags: [["smile","amber"], ["skew","red"], ["surface","slate"], ["strike dependence","teal"]],
+    data: [
+      { label: "Smile", value: "High IV in deep OTM + ITM wings", color: "amber" },
+      { label: "Skew", value: "IV rises for OTM downside or upside depending on market", color: "red" },
+      { label: "Surface", value: "Function of K and T", color: "slate" },
+    ],
+    body: [
+      `In a perfect Black-Scholes world, implied volatility would be the same across all strikes and maturities. In real markets it is not. The implied-volatility curve across strike is usually not flat. When it is U-shaped, it is called a volatility smile; when it tilts upward or downward with strike, it is called a skew. The smile and skew are evidence that the market is not pricing returns as a single lognormal distribution with constant variance across all outcomes.`,
+      `For equity options, the market often exhibits a volatility skew: out-of-the-money downside puts can trade with higher implied vol than ATM options, reflecting demand for downside protection and a willingness to pay more for hedging against crashes. For index options, the smile is often more symmetric but still shifts with risk regimes. In FX, vol smiles can reflect tail asymmetry or risk premia associated with currency moves.`,
+      `The full object of interest is the volatility surface: σ_iv(K, T). This is a two-dimensional surface over strike and maturity. The shape of the volatility surface contains rich information about the market’s pricing of uncertainty over time. It differs from a scalar “implied vol” because option price depends on both strike and maturity, and these dimensions are jointly informative about the distribution of future returns.`,
+      `The fact that IV varies by strike and maturity is one of the key practical reasons Black-Scholes is not used as a literal market model. A single constant σ is simply too restrictive. Traders and quants calibrate to the full surface rather than a single volatility level.`
+    ],
+    keyPoint: "The implied-volatility smile and skew are the market’s evidence that the distribution of returns is not a flat lognormal distribution: they encode the pricing of tails, asymmetry, and hedging demand."
+  },
+  {
+    era: "Term",
+    icon: "⏳",
+    title: "Term Structure of Implied Volatility",
+    desc: "How implied volatility varies with option maturity and what it says about market expectations and risk regimes",
+    badge: { label: "Term", style: "teal" },
+    tags: [["term structure","teal"], ["maturity effect","amber"], ["risk regime","slate"], ["smile by tenor","red"]],
+    data: [
+      { label: "Pattern", value: "Short-dated IV can be elevated during stress", color: "red" },
+      { label: "Shape", value: "Often upward-sloping or hump-shaped", color: "teal" },
+      { label: "Interpretation", value: "Forward uncertainty by horizon", color: "slate" },
+    ],
+    body: [
+      `The term structure of implied volatility refers to how IV changes with the maturity of the option. In a calm regime, the skew or smile may be modest, but during periods of stress, short-dated options can suddenly display dramatically elevated IV because markets price near-term uncertainty much more aggressively. Longer-dated maturities may react more slowly.`,
+      `The term structure can be upward-sloping, downward-sloping, or hump-shaped depending on the asset class and regime. For equities, IV often exhibits a “vol carry” structure, with longer-dated options retaining a baseline level while near-dated options can move sharply around expected events such as earnings, macro releases, or central-bank meetings.`,
+      `This is economically important because the term structure is not just a statistical curiosity; it contains information about expected changes in uncertainty over time. A steeply upward term structure usually suggests that markets expect volatility to rise over the next several months, while a flat or inverted curve might indicate relative calm or a very different distribution of risk.`,
+      `This is why vol surfaces are often discussed as two-dimensional objects: strike dependence and maturity dependence are both required to understand the market’s view of uncertainty. A single ATM IV number misses both the shape and the time pattern of risk pricing.`
+    ],
+    keyPoint: "The term structure of IV tells us how the market prices uncertainty across multiple horizons; it is a forward-looking map of expected turbulence rather than a single, static volatility estimate."
+  },
+  {
+    era: "Spread",
+    icon: "📊",
+    title: "IV vs. Realized Volatility Spread",
+    desc: "The difference between the market-implied uncertainty and the volatility actually realized over the same period",
+    badge: { label: "Risk Premium", style: "red" },
+    tags: [["vol premium","red"], ["realized vol","amber"], ["variance swap","slate"], ["pricing of uncertainty","teal"]],
+    data: [
+      { label: "Spread", value: "IV − RV", color: "red" },
+      { label: "Interpretation", value: "Risk premium / option demand", color: "amber" },
+      { label: "Typical", value: "Positive in many equity markets", color: "teal" },
+    ],
+    body: [
+      `The realized volatility (RV) of the underlying over a given period is the actual historical standard deviation of returns. Implied volatility is the market’s expectation embedded in option prices. The spread IV − RV is one of the most widely watched risk measures in derivatives. When IV exceeds realized volatility, the market is effectively demanding a premium for bearing uncertainty or for protection.`,
+      `This spread is often interpreted as a volatility risk premium because option sellers receive compensation for taking on risk that may not materialize, while option buyers pay for insurance. In equity markets this premium is often positive on average, especially for broad indexes and downside protection. In other words, the market frequently prices downside and uncertainty more richly than history alone would suggest.`,
+      `However, the interpretation is subtle. The difference between IV and historical volatility can reflect not only risk premia but also the distributional shape of the market (skew, jumps, tail risk), estimation error, and changes in expected volatility regime. So the spread is not a pure arbitrage-free premium; it is a rich statistical signal that must be interpreted carefully.`,
+      `A persistent IV-RV spread can be a sign of structural demand for hedging, but it is also a reminder that options are not priced only by backward-looking measures. They are priced by the market’s view of what may happen next, which is often more demanding than what has happened historically.`
+    ],
+    keyPoint: "The IV-realized-vol spread is a central concept in volatility trading: it captures the market’s willingness to pay for insurance and the risk premium associated with bearing uncertainty."
+  },
+  {
+    era: "Index",
+    icon: "📈",
+    title: "IV Index: VIX",
+    desc: "The widely followed 30-day implied-volatility index for the S&P 500",
+    badge: { label: "Index", style: "slate" },
+    tags: [["VIX","slate"], ["SPX","amber"], ["30-day vol","red"], ["fear gauge","teal"]],
+    data: [
+      { label: "Definition", value: "30-day annualized IV of SPX options", color: "slate" },
+      { label: "Use", value: "Risk sentiment / hedging demand", color: "amber" },
+      { label: "Interpretation", value: "Higher VIX = more stress / uncertainty", color: "red" },
+    ],
+    body: [
+      `The VIX is the market’s benchmark implied-volatility index. It is designed to measure the market’s expectation of 30-day volatility in the S&P 500, based on a weighted portfolio of near- and next-term SPX options. The index is often described as the market’s “fear gauge,” because elevated VIX levels usually accompany heightened uncertainty, sharp downturns, and strong demand for hedging.`,
+      `Its construction is clever: rather than relying on a single option, the VIX synthesizes information from a strip of options across strikes to estimate the market-implied variance expected over the next 30 days. It is thus an option-market-based estimate of aggregate uncertainty, not a simple historical volatility indicator.`,
+      `The VIX plays a vital role in derivative markets because it is tradable via futures, options, and exchange-traded products. It also serves as a benchmark for volatility trading strategies, such as long-volatility, short-volatility, and variance-carry strategies. In this sense, VIX is both an indicator and a tradable asset class.`,
+      `Its power lies in the fact that it captures the market’s forward-looking uncertainty rather than the past. A model or risk team that ignores VIX misses a core object for understanding stress, hedging demand, and market sentiment.`
+    ],
+    keyPoint: "The VIX is the market’s most prominent summary of forward-looking equity volatility: it is a condensed expression of the option market’s estimate of 30-day uncertainty."
+  },
+  {
+    era: "Fitting",
+    icon: "🧰",
+    title: "Vol Surface Fitting: SVI and SABR",
+    desc: "Parametric models for producing smooth, arbitrage-aware implied-volatility curves and surfaces",
+    badge: { label: "Models", style: "amber" },
+    tags: [["SVI","amber"], ["SABR","teal"], ["calibration","slate"], ["arbitrage","red"]],
+    data: [
+      { label: "SVI", value: "Fits skew/smile in strike space", color: "amber" },
+      { label: "SABR", value: "Captures skew & smile with β, ρ, ν", color: "teal" },
+      { label: "Goal", value: "Smooth surface, realistic dynamics", color: "slate" },
+    ],
+    body: [
+      `Because the implied vol surface is not flat, practice often requires parametric models to smooth and interpolate across strikes and maturities. The Stochastic Volatility Inspired (SVI) model is a popular way to fit the volatility smile in strike space. It offers a flexible family of shapes that can reproduce upward and downward skew, steep wings, and a smooth minimum in the ATM region.`,
+      `The SABR model is another widely used parametric form, especially in interest-rate and FX derivatives. It models the forward rate and its stochastic volatility with parameters β, ρ, and ν. The model is particularly effective at capturing the volatility skew observed in many markets, especially around the at-the-money region.`,
+      `These models are used because the raw IV quotes are often noisy, sparse, or inconsistent across strikes and maturities. A calibrated surface allows for interpolation, extrapolation, risk management, and pricing of relatively liquid instruments that do not trade every day.`,
+      `The challenge is that “smooth” is not the same as “correct.” The best-fitting surface should also respect no-arbitrage constraints as much as possible. Otherwise, a model can generate an elegant smile but create unrealistic prices or impossible option relationships. This is why calibration and arbitrage considerations are central in real volatility modelling.`
+    ],
+    keyPoint: "SVI and SABR are practical frameworks for turning discrete option quotes into a coherent, smooth, and usable volatility surface that can be interpolated and risk-managed."
+  },
+  {
+    era: "Surface",
+    icon: "🧭",
+    title: "Sticky Strike vs. Sticky Delta",
+    desc: "Two common conventions for how the implied-volatility surface moves when spot changes",
+    badge: { label: "Convention", style: "teal" },
+    tags: [["sticky strike","teal"], ["sticky delta","amber"], ["surface dynamics","slate"], ["hedging conventions","red"]],
+    data: [
+      { label: "Sticky strike", value: "Strike fixed, IV moves with spot", color: "teal" },
+      { label: "Sticky delta", value: "Delta fixed, IV moves with moneyness", color: "amber" },
+      { label: "Context", value: "Used in hedging and risk models", color: "slate" },
+    ],
+    body: [
+      `A key issue in volatility risk management is how the surface evolves when the underlying moves. The sticky-strike convention assumes that, for a given absolute strike, implied volatility is preserved as spot changes. In effect, the IV at K is treated as a state variable and the smile moves with the underlying through the fixed strike dimension.`,
+      `The sticky-delta convention instead assumes that the option’s delta remains the primary anchor. As spot moves, the surface is reinterpreted by keeping the same delta bucket fixed, which often better reflects how the option market quotes risks in practical trading. Under sticky-delta, the implied volatility of an option at a given delta is more stable than the implied volatility at a fixed absolute strike.`,
+      `These conventions matter because they affect hedging, P&L attribution, and volatility trading forecasts. Different desks and different asset classes tend to prefer different conventions. For equity index options, sticky-delta is often used because option market makers think in terms of delta buckets; in other markets, sticky-strike may be more natural.`,
+      `The difference between the two assumptions is not merely semantic; it changes how you model the path of the volatility surface. In actual markets, vol surfaces are neither perfectly sticky-strike nor perfectly sticky-delta, and the correct convention often depends on the instrument, the trading context, and the regime.`
+    ],
+    keyPoint: "Sticky strike and sticky delta are competing heuristics for how volatility surfaces evolve with spot movement; both are simplifications, but they influence hedging and risk decomposition materially."
+  },
+  {
+    era: "Ranking",
+    icon: "🎯",
+    title: "IV Percentile and IV Rank",
+    desc: "Relative measures that compare current implied volatility to its own history",
+    badge: { label: "Context", style: "red" },
+    tags: [["IV rank","red"], ["percentile","amber"], ["relative value","slate"], ["regime detection","teal"]],
+    data: [
+      { label: "IV rank", value: "Current IV relative to past 1-year distribution", color: "red" },
+      { label: "Percentile", value: "Where IV sits in historical range", color: "amber" },
+      { label: "Use", value: "Assess whether options are rich or cheap", color: "slate" },
+    ],
+    body: [
+      `IV percentile and IV rank are ways to place the current implied volatility in a historical context. Rather than asking whether IV is “high” in an absolute sense, these metrics ask whether it is high relative to its own distribution over the past week, month, or year. This is especially valuable because implied volatility itself is not stationary and can drift with market regime, macro conditions, and variance risk premia.`,
+      `An IV rank of 80% means current IV is higher than 80% of historical observations for the same instrument or tenor. This is a very useful way to judge whether options are expensive or cheap relative to the market’s own recent history. Traders often use IV percentile to decide whether to buy or sell volatility, or whether a given skew or smile is unusual.`,
+      `This is particularly helpful because the same absolute IV can mean very different things in different regimes. A 25% IV in a calm market may be unusually low, whereas in a crisis it may be normal. Relative measures therefore give better context than raw values.`,
+      `Still, IV rank is not a complete model of future realized volatility. It is a contextual metric, not a deterministic forecast. The right comparison depends on the period, the option family, and the market regime being analyzed.`
+    ],
+    keyPoint: "IV percentile and IV rank convert a high-level volatility number into a relative statement about market regime, making it easier to ask whether the option market is particularly expensive or depressed."
+  },
+  {
+    era: "Forward",
+    icon: "🔮",
+    title: "Forward Implied Volatility",
+    desc: "The implied volatility of a forward-starting option, capturing expected future uncertainty over a future period",
+    badge: { label: "Forward", style: "amber" },
+    tags: [["forward IV","amber"], ["future window","slate"], ["variance expectation","teal"], ["time-slice vol","red"]],
+    data: [
+      { label: "Definition", value: "Implied vol of option on future realized variance", color: "amber" },
+      { label: "Use", value: "Measure expected future uncertainty", color: "teal" },
+      { label: "Application", value: "Volatility swaps, variance forwards, hedging", color: "slate" },
+    ],
+    body: [
+      `Forward implied volatility refers to the volatility implied by options on a future period, rather than the spot immediate period. For example, one may ask what the market-implied volatility is for the next three months, conditional on the current date. This is conceptually different from a current ATM IV number because it captures the market’s expectation of volatility over a future window rather than over the near term.`,
+      `This is economically important for traders who care about expected uncertainty over a future horizon. A near-term option may be cheap while the forward-looking three-month volatility is expensive, indicating a different regime expectation. Forward IV is often used to compare current option pricing against future risk expectations and to construct volatility forwards or variance products.`,
+      `The logic is especially useful because the volatility surface is dynamic. If the market is currently calm but the future path of uncertainty is expected to widen, forward IV captures that expectation even when current spot IV does not. This is a central tool for volatility traders seeking to position relative to expected future turbulence rather than just current market mood.`
+    ],
+    keyPoint: "Forward implied volatility is the market’s estimate of uncertainty over a future date range, not merely the option’s immediate volatility level."
+  },
+  {
+    era: "Local",
+    icon: "🧠",
+    title: "Local Volatility Model (Dupire)",
+    desc: "A model that infers a deterministic local variance surface consistent with the observed option surface",
+    badge: { label: "Local vol", style: "slate" },
+    tags: [["Dupire","slate"], ["local variance","amber"], ["surface consistency","red"], ["nonparametric","teal"]],
+    data: [
+      { label: "Idea", value: "Recover volatility field from option prices", color: "slate" },
+      { label: "Equation", value: "Dupire PDE links local vol to option prices", color: "amber" },
+      { label: "Use", value: "Interpolate and price exotics", color: "teal" },
+    ],
+    body: [
+      `The local volatility model, originally derived by Dupire, aims to recover a deterministic local variance function σ_loc(S, t) from a set of option prices or, equivalently, from the implied-volatility surface. The key idea is that if the market-implied prices are arbitrage-free across strikes and maturities, there should exist a local volatility function that reproduces those prices under a diffusion model.`,
+      `This is conceptually powerful because it moves from a flat-vol assumption to a volatility field that depends on both the level of the underlying and time. Local volatility is not the same as instantaneous implied volatility; it is the state-dependent diffusion coefficient required to reproduce a given option surface.`,
+      `Dupire’s formula is one of the landmark results in quantitative finance because it connects the observed option surface to a PDE-based local volatility model. In practice, it underpins the construction of surfaces used for exotic pricing and risk management. It also illustrates an important idea: the option market is not just quoting prices, it is implicitly specifying a distribution of future paths.`,
+      `The local vol model is not a universal answer. It can be unstable in noisy data, and it does not capture stochastic volatility or jumps. But it is an essential bridge between observed option prices and a continuous dynamic model of the underlying risk process.`
+    ],
+    keyPoint: "The local volatility model turns the observed option surface into a state-dependent diffusion process, making it possible to infer the dynamic local variance structure consistent with market prices."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

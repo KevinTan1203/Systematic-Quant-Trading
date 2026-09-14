@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 13.7 Volatility Strategies</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 13 · Section 13.7</div>
+      <h1 class="book-title">Volatility<br><em>Strategies</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Short vol → long vol → spreads → carry · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>13.7 Volatility Strategies</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Short",
+    icon: "📉",
+    title: "Short Volatility (Sell Premium)",
+    desc: "Strategies that collect option premium and profit when realised volatility is lower than the implied volatility sold, or when the underlying stays inside a defined range",
+    badge: { label: "Core", style: "red" },
+    tags: [["sell premium","red"], ["positive carry","teal"], ["short gamma","amber"], ["vol risk premium","slate"]],
+    data: [
+      { label: "Edge source", value: "Volatility risk premium (IV > RV)", color: "teal" },
+      { label: "Risk profile", value: "Limited profit, large tail risk", color: "red" },
+      { label: "Typical tools", value: "Covered calls, puts, condors, strangles", color: "amber" },
+    ],
+    body: [
+      `Short-volatility strategies are founded on the empirical observation that implied volatility has historically exceeded subsequent realised volatility on average—the volatility risk premium. By selling options (or variance), the trader collects this premium and profits if the underlying moves less than the market priced in, or stays within a predetermined range.`,
+      `The defining Greeks are short gamma and short vega: the position loses money when the underlying moves sharply or when implied volatility rises. Profits are limited to the premium received; losses can be many times larger in a crash or volatility spike. Consequently every short-vol strategy is ultimately a trade-off between steady carry and left-tail exposure.`,
+      `Successful short-vol programmes emphasise position sizing, strike selection relative to expected move, diversification across underlyings and expiries, and explicit tail-risk hedges. The strategies below—covered calls, cash-secured puts, iron condors, iron butterflies and short strangles—are the most common retail and institutional expressions of this philosophy.`
+    ],
+    keyPoint: "Short volatility is the harvesting of the volatility risk premium. It is a positive-expectancy strategy only if the premium collected exceeds the cost of the inevitable large adverse moves; without disciplined risk management it is simply picking up nickels in front of a steamroller."
+  },
+  {
+    era: "Covered",
+    icon: "🛡️",
+    title: "Covered Call",
+    desc: "Long the underlying stock (or ETF) and short a call option against it—converting potential upside into immediate premium income",
+    badge: { label: "Income", style: "teal" },
+    tags: [["covered call","teal"], ["buy-write","amber"], ["yield enhancement","slate"], ["upside cap","red"]],
+    data: [
+      { label: "Structure", value: "Long stock + short call", color: "teal" },
+      { label: "Max profit", value: "Strike − stock cost + premium", color: "amber" },
+      { label: "Risk", value: "Full downside of stock (minus premium)", color: "red" },
+    ],
+    body: [
+      `A covered call (or buy-write) consists of owning the underlying and selling a call, typically out-of-the-money or at-the-money. The premium received increases the effective yield of the position and provides a small buffer against declines. In exchange, upside is capped at the strike: if the stock rallies strongly the call is exercised and the shares are called away.`,
+      `The strategy is popular among income-oriented investors and systematic “overwrite” programmes. It performs best in range-bound or gently rising markets where the call expires worthless and the premium is retained. In strong bull markets it underperforms a pure long-stock position; in sharp sell-offs the premium offers only limited protection.`,
+      `Key management decisions include strike selection (how much upside to sell), tenor (weekly, monthly, quarterly), and whether to roll the call when the stock approaches the strike. Many investors treat covered-call writing as a permanent overlay rather than a directional bet, systematically selling calls against a core equity holding.`
+    ],
+    keyPoint: "The covered call is equity ownership with a systematic sale of upside. It is not a low-risk strategy—it retains nearly all downside—but it is one of the most accessible ways to monetise the volatility risk premium while remaining net long the market."
+  },
+  {
+    era: "Put",
+    icon: "💰",
+    title: "Cash-Secured Put",
+    desc: "Selling a put option while holding enough cash to buy the underlying if assigned—effectively a willingness to acquire the asset at a net price equal to the strike minus premium",
+    badge: { label: "Income", style: "teal" },
+    tags: [["cash-secured put","teal"], ["yield","amber"], ["acquisition","slate"], ["assignment risk","red"]],
+    data: [
+      { label: "Structure", value: "Short put + cash reserve", color: "teal" },
+      { label: "Max profit", value: "Premium received", color: "amber" },
+      { label: "Obligation", value: "Buy stock at strike if assigned", color: "red" },
+    ],
+    body: [
+      `A cash-secured put is the sale of a put collateralised by sufficient cash (or margin) to purchase the underlying at the strike if the option is exercised. The seller collects premium and, if the put expires out-of-the-money, keeps the premium as income. If the put finishes in-the-money the seller is assigned and acquires the shares at an effective price of strike minus premium.`,
+      `The strategy is economically equivalent to a covered call on a synthetic long position and is often used by investors who are willing to own the underlying at a lower net price. It is popular for “buying the dip” on high-quality names or indices while being paid to wait. The principal risks are a sharp decline in the underlying (leaving the seller holding a losing stock position) and opportunity cost if the stock rallies strongly without assignment.`,
+      `Position management focuses on strike selection relative to support levels or target entry prices, diversification across names, and the decision to roll or accept assignment when the put moves into the money. Many systematic put-writing programmes target a consistent delta or probability of profit and treat assignment as a routine outcome rather than a failure.`
+    ],
+    keyPoint: "The cash-secured put is a simultaneous income strategy and contingent acquisition plan. It profits from time decay and elevated implied volatility, but only if the seller is genuinely comfortable owning the underlying at the resulting net price."
+  },
+  {
+    era: "Condor",
+    icon: "🦅",
+    title: "Iron Condor & Iron Butterfly",
+    desc: "Defined-risk short-volatility structures that sell a strangle or straddle and buy further OTM wings for protection—profiting when the underlying remains inside a range",
+    badge: { label: "Range", style: "amber" },
+    tags: [["iron condor","amber"], ["iron butterfly","teal"], ["defined risk","slate"], ["short premium","red"]],
+    data: [
+      { label: "Iron Condor", value: "Short OTM strangle + long further wings", color: "amber" },
+      { label: "Iron Butterfly", value: "Short ATM straddle + long wings", color: "teal" },
+      { label: "Risk", value: "Limited to wing width − net credit", color: "red" },
+    ],
+    body: [
+      `An iron condor is constructed by selling an out-of-the-money put and an out-of-the-money call (a short strangle) while simultaneously buying a further out-of-the-money put and call for protection. The result is a defined-risk, short-volatility position that collects a net credit and profits if the underlying expires between the two short strikes. An iron butterfly replaces the short strangle with a short at-the-money straddle, concentrating risk and reward around the current price.`,
+      `Both structures are popular among retail and professional traders because maximum loss is known in advance (the width of the wings minus the credit received). They perform best in low-realised-volatility, range-bound environments. The iron butterfly has higher peak profit potential but a narrower profitable range; the iron condor offers a wider range at the cost of a smaller credit.`,
+      `Management typically involves adjusting or closing the position when one side is threatened, rolling the untested side, or taking profits at a predetermined percentage of maximum credit. Because the position is short gamma near the short strikes, large moves can produce rapid losses even though the ultimate risk is capped.`
+    ],
+    keyPoint: "Iron condors and butterflies convert the short-volatility thesis into a defined-risk package. They trade unlimited tail risk for a known maximum loss, at the price of lower premium income and the need for active management when the underlying approaches the short strikes."
+  },
+  {
+    era: "Strangle",
+    icon: "🔀",
+    title: "Short Strangle",
+    desc: "Simultaneous sale of an OTM put and an OTM call with the same expiry—collecting premium from both wings and profiting if the underlying stays between the strikes",
+    badge: { label: "Premium", style: "red" },
+    tags: [["short strangle","red"], ["undefined risk","amber"], ["high premium","teal"], ["short gamma","slate"]],
+    data: [
+      { label: "Structure", value: "Short OTM put + short OTM call", color: "red" },
+      { label: "Max profit", value: "Total premium received", color: "teal" },
+      { label: "Risk", value: "Theoretically unlimited on both sides", color: "amber" },
+    ],
+    body: [
+      `A short strangle sells both a put and a call, typically equidistant in delta (e.g., 16-delta or 20-delta) or in percentage terms from spot. The position collects the combined premium and reaches maximum profit if the underlying expires between the two strikes. Because both options are out-of-the-money, the credit is smaller than a short straddle but the probability of profit is higher.`,
+      `Unlike the iron condor, the short strangle has undefined risk: a large move in either direction can produce losses far exceeding the premium collected. For this reason it is usually reserved for traders with robust margin capacity, strict position-size limits, and a willingness to hedge or adjust dynamically. Many institutional desks run short-strangle books with continuous delta-hedging, effectively converting the trade into a pure short-volatility (short gamma / short vega) position.`,
+      `Key variables are strike distance (how much “room” to give the underlying), tenor, and the relationship between the implied move and the trader’s forecast of realised volatility. Short strangles are among the purest expressions of a view that implied volatility is too high relative to expected realised volatility.`
+    ],
+    keyPoint: "The short strangle maximises premium collection at the cost of unlimited tail risk. It is the purest short-volatility trade for those who believe the market is overpricing the probability of large moves—and who have the risk infrastructure to survive when that belief is temporarily wrong."
+  },
+  {
+    era: "Long",
+    icon: "📈",
+    title: "Long Volatility (Buy Premium)",
+    desc: "Strategies that pay premium to acquire positive gamma and vega, profiting from large moves or from rises in implied volatility",
+    badge: { label: "Core", style: "teal" },
+    tags: [["buy premium","teal"], ["long gamma","amber"], ["tail hedge","red"], ["negative carry","slate"]],
+    data: [
+      { label: "Edge source", value: "Under-priced tails or vol spikes", color: "teal" },
+      { label: "Cost", value: "Continuous negative carry (theta)", color: "red" },
+      { label: "Typical tools", value: "Straddles, puts, VIX calls, call spreads", color: "amber" },
+    ],
+    body: [
+      `Long-volatility strategies are the mirror image of short-vol programmes. The trader pays premium to own options (or variance) and profits when realised volatility exceeds the implied volatility paid, or when implied volatility itself rises. The defining Greeks are long gamma and long vega: the position benefits from large underlying moves and from expanding implied volatility.`,
+      `Because option buyers suffer from negative theta, long-vol strategies lose money slowly in quiet markets and must be timed or sized carefully. They are most often employed as explicit hedges against existing portfolios, as directional bets on catalysts (earnings, events, macro releases), or as convex overlays that seek to capture rare but large volatility spikes.`,
+      `The classic expressions—long straddles and strangles, protective puts, and VIX call spreads—are examined below. All share the same fundamental trade-off: the cost of continuous premium decay versus the potential for large, positively skewed payoffs when markets become disordered.`
+    ],
+    keyPoint: "Long volatility is insurance and convexity. It is almost always negative-carry; its value lies in the states of the world where linear portfolios suffer and where the ability to buy risk after the fact is either impossible or extremely expensive."
+  },
+  {
+    era: "Earnings",
+    icon: "📢",
+    title: "Long Straddle / Strangle (Earnings Plays)",
+    desc: "Buying a straddle or strangle ahead of a known catalyst—most commonly earnings—to profit from a realised move larger than the one priced into options",
+    badge: { label: "Event", style: "amber" },
+    tags: [["earnings straddle","amber"], ["implied move","teal"], ["long gamma","red"], ["post-event crush","slate"]],
+    data: [
+      { label: "Structure", value: "Long ATM straddle or OTM strangle", color: "amber" },
+      { label: "Key metric", value: "Implied move vs expected / historical", color: "teal" },
+      { label: "Main risk", value: "IV crush after the event", color: "red" },
+    ],
+    body: [
+      `Ahead of earnings (or other binary events) options markets price an “implied move”—the straddle price expressed as a percentage of spot. Traders who believe the actual move will exceed this implied move buy the straddle or a strangle; those who believe the move will be smaller sell it. The long-straddle earnings play is therefore a pure bet on realised versus implied volatility over a short, event-driven window.`,
+      `The dominant risk is not directional: even a large move can produce a loss if implied volatility collapses after the announcement by more than the gamma gain from the move itself (the classic “IV crush”). Successful earnings long-vol traders therefore focus on the relationship between the implied move, the historical distribution of earnings moves for that stock, and the richness of the wings.`,
+      `Position management is typically binary: the trade is entered a few days before the event and exited shortly after the announcement, once the realised move is known and the post-event volatility surface has stabilised. Longer-dated straddles can also be used when the trader wants to retain exposure to subsequent volatility rather than only the event itself.`
+    ],
+    keyPoint: "An earnings straddle is a short-dated, high-conviction bet that the market has under-priced the magnitude of the coming move. The primary adversary is not the stock’s direction but the speed with which implied volatility collapses once the uncertainty is resolved."
+  },
+  {
+    era: "Protect",
+    icon: "🛡️",
+    title: "Protective Puts & VIX Call Spreads as Tail Hedges",
+    desc: "Long-vol overlays designed to protect a portfolio against large equity declines—either by owning puts on the underlying or by owning convex instruments linked to volatility itself",
+    badge: { label: "Hedge", style: "red" },
+    tags: [["protective put","red"], ["VIX call spread","amber"], ["tail hedge","teal"], ["cost of insurance","slate"]],
+    data: [
+      { label: "Protective put", value: "Long put on equity / index holdings", color: "red" },
+      { label: "VIX call spread", value: "Long higher-strike VIX calls, short lower", color: "amber" },
+      { label: "Goal", value: "Convex payoff in equity crashes", color: "teal" },
+    ],
+    body: [
+      `A protective put is simply a long put held against a long equity or index position. It sets a floor on the portfolio value at the cost of continuous premium outlay. Because equity skew is steep, OTM puts are expensive; many investors therefore buy put spreads (financing the long put by selling a further OTM put) or only hedge a fraction of the notional.`,
+      `VIX call spreads offer an alternative, more pure form of tail insurance. By buying a VIX call and selling a higher-strike VIX call, the trader obtains a defined-risk long-volatility position that pays off when equity volatility spikes—precisely the environment in which equity portfolios suffer. Because VIX itself is already a volatility instrument, the hedge is less exposed to the path of the equity market and more directly tied to the volatility spike.`,
+      `Both approaches are negative-carry. Their justification is not positive expected return but the reduction of portfolio drawdowns and the preservation of capital (and emotional capacity) to buy risk when others are forced to sell. The optimal size and structure of the hedge depend on the investor’s risk tolerance, the richness of skew and of VIX futures, and the presence of other convex exposures in the portfolio.`
+    ],
+    keyPoint: "Protective puts and VIX call spreads are insurance, not alpha. Their value is measured not by average return but by how much they improve the portfolio’s behaviour in the left tail—and by whether that improvement is worth the steady premium paid in quiet markets."
+  },
+  {
+    era: "Spread",
+    icon: "⏳",
+    title: "Volatility Spread (Long Near, Short Far)",
+    desc: "Calendar or diagonal structures that are long short-dated volatility and short longer-dated volatility, exploiting differences in the term structure and in the speed of mean reversion",
+    badge: { label: "Relative", style: "amber" },
+    tags: [["calendar spread","amber"], ["long near short far","teal"], ["term structure","slate"], ["vol-of-vol","red"]],
+    data: [
+      { label: "Structure", value: "Long front-month, short back-month", color: "amber" },
+      { label: "Thesis", value: "Front vol too low or back vol too high", color: "teal" },
+      { label: "Risk", value: "Parallel shift or curve inversion", color: "red" },
+    ],
+    body: [
+      `A classic volatility calendar spread buys a nearer-dated option (or variance swap) and sells a longer-dated option (or variance swap) of similar notional. The position is typically vega-neutral or weighted so that the primary exposure is to the slope of the term structure and to the relative speed at which the two legs respond to realised volatility and to new information.`,
+      `The usual thesis is that short-dated implied volatility is mean-reverting faster, or that the market has over-priced longer-dated variance relative to near-term variance. In quiet markets the short far-dated leg suffers less theta decay than the long near-dated leg, producing negative carry; the trade therefore relies on a subsequent steepening or on a volatility spike that lifts the front end more than the back end.`,
+      `Diagonal versions combine different strikes as well as different expiries, adding skew exposure. These spreads are sensitive to the sticky-strike versus sticky-delta behaviour of the surface and to the precise evolution of the term structure of skew. They are a pure relative-value expression of views on the volatility surface rather than on the absolute level of volatility.`
+    ],
+    keyPoint: "Long-near / short-far volatility spreads isolate the term structure. They are bets on the relative pricing of variance across maturities and on the differential impact of realised moves and news on the front versus the back of the curve."
+  },
+  {
+    era: "Dispersion",
+    icon: "🌐",
+    title: "Dispersion Trading & Vol Carry Strategies",
+    desc: "Dispersion trades the difference between index volatility and the weighted volatility of constituents; vol-carry strategies systematically harvest the volatility risk premium across assets and tenors",
+    badge: { label: "Advanced", style: "slate" },
+    tags: [["dispersion","slate"], ["index vs single stock","amber"], ["vol carry","teal"], ["correlation","red"]],
+    data: [
+      { label: "Dispersion", value: "Short index vol / long single-stock vol", color: "slate" },
+      { label: "Edge", value: "Implied correlation often too high", color: "teal" },
+      { label: "Vol carry", value: "Systematic short vol across universe", color: "amber" },
+    ],
+    body: [
+      `Dispersion trading rests on the mathematical relationship that index variance equals the weighted average of constituent variances minus a covariance (correlation) term. By selling index volatility and buying a basket of single-stock volatility (usually on a vega-weighted or variance-weighted basis), the trader is effectively short implied correlation. Historically, implied correlation has tended to exceed subsequent realised correlation, generating a positive expected return for the dispersion book.`,
+      `The trade is sensitive to the level of correlation: in crises correlations rise sharply and the short-index / long-single-stock position can suffer. Execution requires careful management of the residual delta, gamma and vega exposures, as well as attention to corporate events that affect individual names but not the index.`,
+      `Vol-carry strategies generalise the same idea across a broader universe. They systematically sell volatility (or variance) on assets and tenors where the volatility risk premium is estimated to be richest, often with dynamic risk overlays that reduce exposure when realised volatility rises or when the premium compresses. Both dispersion and vol-carry programmes are institutional expressions of the view that the average investor overpays for protection—and that a diversified, risk-managed short-volatility book can harvest that overpayment over time.`
+    ],
+    keyPoint: "Dispersion and vol-carry strategies elevate short volatility from a single-name or single-index bet into a diversified, relative-value programme. Their edge is the same volatility risk premium, now harvested across the correlation surface and across a broad universe of underlyings."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

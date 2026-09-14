@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 13.6 Variance Swaps</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital,wght@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .formula {
+    margin: 14px 0 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-family: 'Space Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.9;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 13 · Section 13.6</div>
+      <h1 class="book-title">Variance<br><em>Swaps</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Realized variance → fair strike → dynamic hedging · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Quantitative Finance · Revision Notes</span>
+    <span>13.6 Variance Swaps</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Payoff",
+    icon: "📉",
+    title: "Variance Swap Payoff",
+    desc: "A direct exposure to realized variance, with payoff proportional to variance realized minus strike variance",
+    badge: { label: "Core", style: "red" },
+    tags: [["realized variance","red"], ["strike variance","amber"], ["payoff","slate"], ["notional","teal"]],
+    data: [
+      { label: "Payoff", value: "(RV − K_var) × Notional", color: "red" },
+      { label: "RV", value: "Annualized realized variance", color: "teal" },
+      { label: "K_var", value: "Variance strike", color: "amber" },
+    ],
+    body: [
+      `A variance swap is a derivative whose payoff is driven by realized variance rather than the level of the asset. The basic cash payoff is:
+      <div class="formula">(Realized Var − Strike Var) × Notional</div>
+      where realized variance is the annualized variance of log returns over the contract period, and the strike variance is the fixed variance level agreed at inception. If realized variance exceeds the strike, the long variance swap receives a positive cash flow; if realized variance is below strike, the long position loses money.`,
+      `This payoff is different from a plain vanilla option. A call or put is nonlinear in the underlying and has convexity with respect to the asset level. A variance swap is instead linear in realized variance, which makes it a more direct instrument for exposure to volatility as a state variable. The instrument effectively trades volatility, not directional market moves.`,
+      `In practice, the realized variance is often computed from daily or intraday log returns using a specified convention, and the contract may include a model for the realized variance estimate, the sampling frequency, and settlement conventions. The notional determines the sensitivity of the cash settlement to each point of variance difference.`,
+      `The striking feature is that variance swaps are especially useful for investors who want pure exposure to volatility without taking a strong view on direction. A long variance swap does not care whether the market goes up or down; it simply profits when volatility is higher than expected.`
+    ],
+    keyPoint: "Variance swaps are direct volatility instruments: they pay based on realized variance relative to a strike rather than on the final asset level, which makes them highly useful for pure variance exposure."
+  },
+  {
+    era: "Fair strike",
+    icon: "⚖️",
+    title: "Fair Strike Determination",
+    desc: "The variance strike chosen so the swap has zero expected value at inception, given market pricing",
+    badge: { label: "Pricing", style: "amber" },
+    tags: [["fair strike","amber"], ["expected variance","teal"], ["risk-neutral","slate"], ["market price","red"]],
+    data: [
+      { label: "Fair strike", value: "K_var = E^Q[RV]", color: "amber" },
+      { label: "Interpretation", value: "Set at inception to make swap fair", color: "teal" },
+      { label: "Inputs", value: "Option smile / variance swap market", color: "slate" },
+    ],
+    body: [
+      `The fair strike of a variance swap is the strike level for which the expected payoff is zero at inception. In a risk-neutral pricing framework, this is approximately the expected realized variance under the pricing measure:
+      <div class="formula">K_var ≈ E^Q[RV]</div>
+      This strike is determined from the market-implied variance curve, typically through the prices of options spanning the life of the variance swap.`,
+      `The reason this works is that the variance swap can be replicated, at least approximately, using a strip of options. The fair strike is therefore the value of variance that is consistent with option prices in the market. If the variance swap is quoted at a level above fair strike, the long side is rich; if below, it is cheap.`,
+      `In practice, the fair strike is often computed using a log-contract or option replication approach. This relation implies that the variance swap’s strike is tightly linked to the implied variance surface and to the market’s distributional view of future volatility. Hence the fair strike is not arbitrary; it is the market-implied variance level consistent with option prices.`,
+      `This is why variance swaps are deeply connected to the option surface. A volatility smile or skew does not just affect the valuation of options; it also governs the fair strike of a variance swap because the entire payoff is effectively a weighted sum of option prices.`
+    ],
+    keyPoint: "The fair strike is the variance level that makes the swap price zero at inception; in practice it is pinned by the market-implied variance curve and the full options surface."
+  },
+  {
+    era: "Replication",
+    icon: "🧩",
+    title: "Replication via the Log Contract",
+    desc: "The variance swap can be approximated by a continuous portfolio of options, leading to the log-contract identity",
+    badge: { label: "Replica", style: "teal" },
+    tags: [["log contract","teal"], ["option strip","amber"], ["variance replication","slate"], ["Heston-like intuition","red"]],
+    data: [
+      { label: "Core idea", value: "Variance = integral of option prices over strikes", color: "teal" },
+      { label: "Log contract", value: "Replicates variance under continuous monitoring", color: "amber" },
+      { label: "Practical use", value: "Fair-strike estimation from options", color: "slate" },
+    ],
+    body: [
+      `The cornerstone of variance swap theory is the log contract. A log contract pays the log of the underlying relative to a fixed reference at maturity, and under continuous monitoring it is closely related to realized variance through the quadratic variation identity. More broadly, the variance swap can be seen as arising from a continuum of options across strikes, making the instrument a weighted integral of option prices.
+      <div class="formula">Variance ≈ \\frac{2}{K^2} \\int_0^\infty \frac{C(K)}{K^2} dK + ...</div>
+      The exact technical expression depends on the chosen payoff convention and the option strip used, but the intuition is crucial: a variance swap is a synthetic combination of out-of-the-money options.`,
+      `This is why option prices and the variance swap are so tightly coupled. A strip of options across strikes contains information about the distribution of returns, and integration of those option prices yields the variance exposure. In other words, a variance swap is not a mysterious derivative—it is the market’s way of packaging a variance exposure built from the option surface.`,
+      `The log-contract interpretation also explains how variance swaps are replicated in practice. A static portfolio of options across strikes can approximate the log contract and hence the variance swap payoff. This makes variance swap pricing highly linked to strike-by-strike option prices and to the shape of the implied-volatility curve.`,
+      `In real trading, the replication is never perfect because strike coverage is discrete, jumps occur, and the market is not frictionless. But the approximation is powerful enough to be the backbone of variance swap fair-value and hedging methodologies.`
+    ],
+    keyPoint: "The variance swap is essentially a packaged exposure to the option surface: under the log-contract view, it is a portfolio of option payoffs aggregated across strikes to recover realized variance."
+  },
+  {
+    era: "Greeks",
+    icon: "📈",
+    title: "Variance Swap Vega Is Constant",
+    desc: "Unlike vanilla options, the sensitivity of a variance swap to variance is approximately linear and constant across the variance level",
+    badge: { label: "Vega", style: "slate" },
+    tags: [["vega","slate"], ["linear variance exposure","amber"], ["not convex","red"], ["constant sensitivity","teal"]],
+    data: [
+      { label: "Key feature", value: "Variance swap vega is roughly constant", color: "slate" },
+      { label: "Contrast", value: "Vanilla option vega changes with S, K, T, σ", color: "red" },
+      { label: "Economic meaning", value: "Direct exposure to variance, not asymmetry", color: "teal" },
+    ],
+    body: [
+      `One of the most striking features of a variance swap is that its vega is roughly constant. In a vanilla option, vega depends strongly on moneyness, maturity, and spot level; it changes as the option moves in and out of the money. A variance swap is different because the payoff is linear in realized variance, so the derivative with respect to variance is approximately fixed over a meaningful range.`,
+      `This means the variance swap behaves more like a fixed exposure to variance than like a classic option with nonlinear sensitivity. That is very useful for traders: a long variance swap is not exposed to directional moves in the underlying so much as to the market’s expected variance realization.`,
+      `The constant-vega property also helps explain the instrument’s appeal in volatility trading. Unlike options, whose values can be extremely sensitive to slight changes in certain parts of the smile, the variance swap offers a more “clean” exposure to total variance. It is a pure variance instrument rather than a strike-specific option instrument.`,
+      `This is also the reason variance swaps are often used to hedge or express views on volatility without taking a directional bet. Their exposure is broad and stable relative to the option curve, which is why they are central to many volatility desks.`
+    ],
+    keyPoint: "Unlike options, variance swaps have a much more linear notion of sensitivity: their value responds approximately proportionally to variance, not to the shape of the underlying payoff."
+  },
+  {
+    era: "Convexity",
+    icon: "🔺",
+    title: "Convexity of Variance Swaps",
+    desc: "Even though the payout is linear in realized variance, the swap is still subject to nonlinear valuation effects through the convexity of variance dynamics",
+    badge: { label: "Convexity", style: "red" },
+    tags: [["convexity","red"], ["nonlinearity","amber"], ["variance dynamics","slate"], ["gamma trading","teal"]],
+    data: [
+      { label: "Observation", value: "Linear payoff, nonlinear valuation risk", color: "red" },
+      { label: "Source", value: "Variance dynamics + replication hedge", color: "slate" },
+      { label: "Risk", value: "Tail events and convexity adjustments", color: "teal" },
+    ],
+    body: [
+      `The variance swap payoff is linear in realized variance, but the instrument is not a purely linear object in all contexts. Its valuation and hedging involve convexity because the fair strike, the replication portfolio, and the variance estimate all depend nonlinearly on the market state. A variance swap therefore contains dynamic exposures that can be materially different from a simple linear instrument.`,
+      `This convexity shows up particularly around large moves in the underlying. When markets move sharply, the realized variance rises disproportionately and the payoff may respond much more dramatically than a simple linear mapping would suggest. Similarly, the option strip used to replicate the variance swap is itself nonlinear in the underlying; the hedging portfolio must respond to large moves with dynamic rebalancing.`,
+      `This is why practitioners talk about the “convexity” of variance swaps even though the final cash payoff formula is linear in variance. The nonlinear effect enters through the replication hedge, the gamma of the options employed in the replication, and the behavior of realized variance under extreme moves.`,
+      `For a volatility trader, this means that a variance swap is not just a static view on variance. It is a dynamic exposure that reacts strongly to tail events and requires careful management of the underlying hedging portfolio.`
+    ],
+    keyPoint: "Variance swaps are linear in realized variance but nonlinear in practice because the replication and hedge involve a gamma-heavy strip of options and the reaction of variance to large market moves."
+  },
+  {
+    era: "Comparison",
+    icon: "🔄",
+    title: "Vol Swap vs. Variance Swap",
+    desc: "The difference between exposing oneself to volatility directly and to variance, which is variance’s square",
+    badge: { label: "Compare", style: "amber" },
+    tags: [["vol swap","amber"], ["variance swap","teal"], ["payoff difference","slate"], ["convexity","red"]],
+    data: [
+      { label: "Variance swap", value: "Pays on realized variance (σ²)", color: "teal" },
+      { label: "Vol swap", value: "Pays on realized volatility (σ)", color: "amber" },
+      { label: "Key difference", value: "Variance is quadratic, vol is square root", color: "slate" },
+    ],
+    body: [
+      `A variance swap pays on realized variance, while a vol swap pays on realized volatility. Since variance is the square of volatility, the two instruments are not equivalent. A variance swap is more sensitive to large moves because squaring magnifies tail events. A vol swap is more linear in the magnitude of volatility, which changes the payoff profile and the implied hedging strategy.`,
+      `This difference is economically significant. If the market is very volatile, variance swaps are more exposed because variance rises more sharply with large returns than volatility does. A variance swap can therefore be thought of as more tail-sensitive than a vol swap.`,
+      `The choice depends on the trader’s desired exposure. Variance swaps are often preferred when one wants pure squared-vol exposure and when the options market is structured around variance as the underlying. Vol swaps may be preferred when the market wants more linear sensitivity to uncertainty, although in most markets the variance instrument is the more common trading form.`,
+      `The distinction is important in risk management: the instruments have different convexity, different practical hedging needs, and different sensitivity to crash scenarios.`
+    ],
+    keyPoint: "Variance swaps and vol swaps are not interchangeable: variance swaps pay on squared volatility, which makes them more sensitive to large moves and tail events than a direct vol payout."
+  },
+  {
+    era: "Hedging",
+    icon: "🛡️",
+    title: "Practical Hedging of Variance Swaps",
+    desc: "How traders manage the exposure of a variance swap using options and the underlying in a dynamic way",
+    badge: { label: "Hedge", style: "slate" },
+    tags: [["hedging","slate"], ["option strip","amber"], ["vol exposure","teal"], ["dynamic rebal","red"]],
+    data: [
+      { label: "Main hedge", value: "Option strip across strikes", color: "amber" },
+      { label: "Secondary hedge", value: "Underlying delta / gamma management", color: "teal" },
+      { label: "Challenge", value: "Smile and convexity distortions", color: "red" },
+    ],
+    body: [
+      `A variance swap is practically hedged using a portfolio of options, often a strip of out-of-the-money calls and puts across strikes, chosen to approximate the log-contract replication. This is because the variance swap is effectively a package of option exposure to the whole distribution of returns.`,
+      `The hedge is not static. As the underlying moves, the market implied-volatility surface shifts, and the option strip must be rebalanced to maintain the desired variance exposure. This requires dynamic tracking of the option positions and careful attention to gamma and vega.`,
+      `Because the variance swap is sensitive to jumped or large moves, the hedging problem is particularly challenging around market stress. In those periods the option strip may become illiquid, gaps appear, and the log-contract replication may become less accurate. One therefore needs both model-based hedging and practical risk limits.`,
+      `The practical goal is not to eliminate all risk, but to reduce the variance-swap exposure to a controlled and monitorable form. That often means managing a basket of options whose combined payoff approximates the variance exposure while keeping an eye on the skew and the tail of the distribution.`
+    ],
+    keyPoint: "The practical hedge of a variance swap is an option strip: a dynamic portfolio across strikes that approximates the variance exposure and adjusts as the surface moves."
+  },
+  {
+    era: "Gamma",
+    icon: "🧠",
+    title: "Gamma Trading in Replication",
+    desc: "Gamma hedging and option replication explain why variance swap hedging is conceptually different from simple spot hedging",
+    badge: { label: "Gamma", style: "teal" },
+    tags: [["gamma trading","teal"], ["replication","amber"], ["dynamic hedge","slate"], ["small moves","red"]],
+    data: [
+      { label: "Mechanism", value: "Option strip gamma offsets variance exposure", color: "teal" },
+      { label: "Observation", value: "Gamma is central to replication accuracy", color: "amber" },
+      { label: "Trade", value: "Continuously rebalance to maintain exposure", color: "slate" },
+    ],
+    body: [
+      `The replication of a variance swap through options is fundamentally a gamma-trading strategy. The option strip is chosen to mimic the payoff of variance, but the position only remains accurate if the underlying and options are dynamically rebalanced as the market moves. This is because a variance swap is not a simple linear exposure to spot; it is a nonlinear exposure to the distribution of returns that is approximated by a portfolio of options.`,
+      `This is where gamma enters. Each option in the strip has its own gamma profile, and the aggregate gamma of the strip determines how the replicating portfolio responds to moves in the underlying. In a stress event, the gamma of the strip can become extremely important because the replication must react to large, fast changes in the market rather than just small incremental moves.`,
+      `This is also why variance swaps are often seen as a “gamma trading” instrument. Traders who are short variance may effectively be short gamma and thus must manage the option portfolio carefully as the market moves. If they fail to rehedge, the variance exposure can drift materially away from the target.`,
+      `In practice, gamma trading is one of the principal reasons variance swaps are particularly interesting to option desks. They are not only a way to take or hedge variance exposure; they also force a deeper relationship between realized variance, option gamma, and dynamic hedging.`
+    ],
+    keyPoint: "Variance swap replication is not a static trade—it is a gamma-driven dynamic hedge, where the strip of options must be managed continuously to maintain exposure to realized variance."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

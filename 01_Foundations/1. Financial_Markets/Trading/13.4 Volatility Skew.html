@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 13.4 Volatility Skew</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 13 · Section 13.4</div>
+      <h1 class="book-title">Volatility<br><em>Skew</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Equity skew → dynamics → cross-asset → trading · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>13.4 Volatility Skew</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Equity",
+    icon: "📉",
+    title: "Equity Skew: Puts Trade at Higher IV than Calls",
+    desc: "The persistent negative slope of the equity implied-volatility smile—OTM puts command substantially higher implied volatilities than OTM calls of equal delta",
+    badge: { label: "Core", style: "red" },
+    tags: [["negative skew","red"], ["OTM puts","amber"], ["equity indices","slate"], ["post-1987","teal"]],
+    data: [
+      { label: "Typical 25Δ RR", value: "−1.5 to −4 vol points (SPX)", color: "red" },
+      { label: "Shape", value: "Steep left wing, milder right wing", color: "amber" },
+      { label: "Origin", value: "Structural since Black Monday 1987", color: "slate" },
+    ],
+    body: [
+      `In equity index markets the implied-volatility smile is almost never symmetric. Plotting IV against strike or delta reveals a pronounced negative skew: out-of-the-money puts trade at markedly higher implied volatilities than out-of-the-money calls of comparable absolute delta. The left wing (low strikes) is elevated and often convex; the right wing (high strikes) is flatter and lower. This pattern has been a permanent feature of equity options since the 1987 crash.`,
+      `The magnitude is conventionally measured by the 25-delta risk reversal (25Δ put IV minus 25Δ call IV) or by the slope of IV versus log-moneyness. For the S&P 500 a 25Δ risk reversal of −2 to −3 volatility points is typical in calm regimes; in stress it can exceed −6 or −8 points. Single-stock smiles inherit the index skew but are usually milder and more symmetric, reflecting idiosyncratic jump risk in both directions.`,
+      `The skew is not a temporary anomaly. It survives across decades, market regimes and geographic regions (Europe, Asia, emerging markets all exhibit negative equity skew). Any model or trading framework that assumes a flat or symmetric smile is therefore misspecified for equities from the outset.`
+    ],
+    keyPoint: "Equity skew is the market’s permanent, structural recognition that downside moves are both more probable and more painful than upside moves of equal magnitude. It is the single most robust empirical regularity in equity option markets."
+  },
+  {
+    era: "Fear",
+    icon: "😨",
+    title: "Fear Premium in Puts",
+    desc: "The excess implied volatility embedded in downside puts that compensates sellers for crash risk, leverage effects and portfolio-insurance demand",
+    badge: { label: "Critical", style: "red" },
+    tags: [["fear premium","red"], ["crash risk","amber"], ["portfolio insurance","slate"], ["leverage effect","teal"]],
+    data: [
+      { label: "Drivers", value: "Jumps, risk aversion, flows", color: "red" },
+      { label: "Buyer", value: "Institutions seeking tail hedges", color: "amber" },
+      { label: "Seller", value: "Receives elevated premium", color: "teal" },
+    ],
+    body: [
+      `The elevated IV of OTM puts is not merely a statistical reflection of historical left-tail events; it contains a genuine risk premium—the fear premium. Investors are willing to pay more than the actuarially fair price for protection against large negative returns because such outcomes coincide with high marginal utility, forced deleveraging and liquidity evaporation.`,
+      `Three reinforcing channels sustain the premium. First, the leverage effect: equity volatility rises when prices fall, so downside moves are naturally larger. Second, jump risk: markets can gap down discontinuously, and pure diffusion models cannot replicate the observed put prices without an explicit jump component. Third, structural demand: pension funds, insurance companies and risk-parity desks systematically buy puts or put spreads for portfolio insurance, while natural sellers (corporates, overwriters) are fewer and more capacity-constrained on the extreme left wing.`,
+      `Empirically the fear premium is visible in the difference between implied and realised skewness, in the returns to selling OTM puts (positive on average but punctuated by rare large losses), and in the steepening of the skew precisely when realised volatility is low—exactly when protection feels cheapest to buyers and most expensive to sellers on a risk-adjusted basis.`
+    ],
+    keyPoint: "The fear premium is the price of insurance against the states of the world in which insurance is most valuable. Selling it is a positive-carry strategy that occasionally experiences catastrophic drawdowns; buying it is expensive insurance that occasionally pays for itself many times over."
+  },
+  {
+    era: "Cost",
+    icon: "🛡️",
+    title: "Skew as Crash-Protection Cost",
+    desc: "Interpreting the level and slope of the skew as the market’s quoted price for crash insurance and tail-risk transfer",
+    badge: { label: "Interpretation", style: "amber" },
+    tags: [["crash protection","amber"], ["tail cost","red"], ["put spreads","teal"], ["insurance pricing","slate"]],
+    data: [
+      { label: "Metric", value: "25Δ or 10Δ put IV / skew slope", color: "amber" },
+      { label: "Cheap/Rich", value: "Relative to realised tail events", color: "teal" },
+      { label: "Use", value: "Sizing and timing of hedges", color: "slate" },
+    ],
+    body: [
+      `Because a put’s price is monotonically increasing in its implied volatility, the skew directly quotes the cost of crash protection. A steeper (more negative) skew means that transferring left-tail risk is more expensive; a flatter skew means protection is relatively cheap. Portfolio managers therefore monitor skew levels both in absolute terms and relative to their own realised-tail experience or to cross-sectional peers.`,
+      `Practical expressions of this cost include the premium of a 90–100 put spread, the price of a 25Δ or 10Δ put normalised by ATM volatility, and the wing curvature (butterfly) that captures the price of extreme tail events beyond the 25Δ point. When skew is unusually steep, systematic put-buying programmes become more costly and may be replaced by cheaper dynamic overlays or by selling upside to finance the downside (collars).`,
+      `Conversely, when skew is unusually flat, the market is offering crash insurance at a discount relative to history; that is often the moment when demand for protection is lowest and the subsequent steepening can be rapid once a catalyst appears. Skew therefore functions as both a price signal and a sentiment gauge for tail-risk appetite.`
+    ],
+    keyPoint: "Skew is the market’s term sheet for crash insurance. Reading it as a pure statistical moment misses its primary economic role: it is the clearing price at which tail risk is transferred from those who cannot bear it to those who are paid to bear it."
+  },
+  {
+    era: "Dynamics",
+    icon: "🔄",
+    title: "Skew Dynamics: Correlation with Market Level",
+    desc: "How the slope and level of the skew co-move with the underlying spot—typically steepening as markets fall and flattening as markets rise",
+    badge: { label: "Dynamics", style: "teal" },
+    tags: [["spot-skew correlation","teal"], ["steepening","red"], ["flattening","amber"], ["sticky regimes","slate"]],
+    data: [
+      { label: "Crash move", value: "Skew steepens sharply", color: "red" },
+      { label: "Rally", value: "Skew tends to flatten", color: "teal" },
+      { label: "Beta", value: "Negative spot–skew correlation", color: "amber" },
+    ],
+    body: [
+      `Equity skew is not static. When the underlying index declines, two effects usually reinforce each other: ATM implied volatility rises, and the skew itself steepens (the 25Δ risk reversal becomes more negative). When the index rallies, ATM volatility falls and the skew tends to flatten. The result is a robust negative correlation between spot level and skew steepness.`,
+      `This co-movement has direct consequences for hedging. A short-risk-reversal position (short put, long call) that is delta-hedged will experience additional losses when markets fall because the put’s IV rises more than the call’s. Conversely, a long-risk-reversal position profits from the steepening. Models that assume a fixed smile (sticky-strike or sticky-delta in pure form) therefore mis-estimate the true P&L of skew-sensitive books.`,
+      `Empirically the relationship is asymmetric and regime-dependent. Moderate sell-offs produce orderly steepening; crash-like moves can cause discontinuous jumps in the left wing that no continuous diffusion can match. After the initial shock, skew often remains elevated for weeks or months even as spot stabilises—an example of sticky-strike behaviour that pure local-vol models struggle to reproduce.`
+    ],
+    keyPoint: "Skew and spot are negatively correlated by construction in equities. Any risk model or trading strategy that treats the smile as fixed when the underlying moves will systematically mis-hedge the very risks the skew was designed to price."
+  },
+  {
+    era: "Term",
+    icon: "📅",
+    title: "Term Structure of Skew",
+    desc: "How the slope of the smile varies with maturity—typically steeper at short expiries and flatter at longer horizons",
+    badge: { label: "Structure", style: "slate" },
+    tags: [["term skew","slate"], ["short-dated steep","red"], ["long-dated flat","teal"], ["mean reversion","amber"]],
+    data: [
+      { label: "Front end", value: "Steepest (jump risk dominates)", color: "red" },
+      { label: "Back end", value: "Flatter (diffusion dominates)", color: "teal" },
+      { label: "Driver", value: "Jump intensity vs vol-of-vol", color: "amber" },
+    ],
+    body: [
+      `Just as ATM volatility possesses a term structure, so does skew. Short-dated equity options almost always display the steepest (most negative) risk reversals; longer-dated options show progressively flatter smiles. The economic intuition is straightforward: discontinuous crash risk is most relevant over short horizons, while over multi-year horizons the central-limit tendency and mean-reverting stochastic volatility dominate, producing more Gaussian-like distributions.`,
+      `The term structure of skew is therefore a direct diagnostic of the relative importance of jumps versus continuous stochastic volatility. A very steep front-end skew that decays rapidly with maturity points to jump risk; a more gradual decay suggests that stochastic-volatility and correlation effects remain important even at longer horizons. Rough-volatility and path-dependent volatility models have been particularly successful at matching the observed term structure of skew across the entire maturity spectrum.`,
+      `Traders exploit the term structure via calendar skew spreads: selling short-dated steep skew and buying longer-dated flatter skew (or vice versa) when the relative pricing appears inconsistent with historical norms or with the output of a calibrated model. Such trades are sensitive to the timing of jumps and to the evolution of the entire surface.`
+    ],
+    keyPoint: "The term structure of skew is the market’s term structure of crash fear. Short-dated steepness prices near-term jump risk; long-dated flatness prices the gradual accumulation of continuous variance. The slope between them is a pure relative-value signal."
+  },
+  {
+    era: "Cross",
+    icon: "🌍",
+    title: "Volatility Smile in FX and Rates",
+    desc: "How the shape of the implied-volatility smile differs across asset classes—symmetric in FX, often reverse or humped in rates—and what those shapes reveal",
+    badge: { label: "Cross-Asset", style: "teal" },
+    tags: [["FX smile","teal"], ["rates smile","amber"], ["risk reversal","slate"], ["butterfly","red"]],
+    data: [
+      { label: "FX typical", value: "Symmetric smile (RR + BF)", color: "teal" },
+      { label: "Rates typical", value: "Reverse skew or hump", color: "amber" },
+      { label: "Equity typical", value: "Strong negative skew", color: "red" },
+    ],
+    body: [
+      `FX markets exhibit a more symmetric smile. Both wings are elevated, producing a classic “U” shape that is conveniently parameterised by the 25-delta risk reversal (skew) and the 25-delta butterfly (curvature). The risk reversal can change sign with the macroeconomic regime: a currency under devaluation pressure develops a put skew (higher IV on the downside for that currency), while a high-yielding currency often shows a call skew. The butterfly remains positive, reflecting demand for volatility in both directions.`,
+      `Interest-rate markets historically displayed a reverse skew (higher IV on higher rates) because rates were bounded below by zero and the principal risk was a sharp rise in yields. After the global financial crisis and the advent of negative rates, many curves developed a more symmetric or even equity-like skew. Swaption smiles are further complicated by the choice of annuity measure and by the presence of a discrete set of liquid expiries and tenors.`,
+      `These cross-asset differences are not cosmetic. They dictate the natural hedging instruments (risk reversals in FX, curve caps/floors in rates, put spreads in equities) and the modelling choices (stochastic-volatility plus jumps for equities, SABR or LMM-SABR for rates, vanna-volga or stochastic-local-vol for FX). A trader who imports equity intuition unchanged into FX or rates will systematically misprice the wings.`
+    ],
+    keyPoint: "The smile is the risk-neutral distribution’s signature. Equity’s left-tail fear, FX’s two-sided jump risk, and rates’ historical upward bias each leave a distinct geometric imprint that any serious cross-asset volatility framework must respect."
+  },
+  {
+    era: "Trade",
+ dual: "⚔️",
+    title: "Skew Trading: Risk Reversals",
+    desc: "The primary liquid instrument for expressing a pure view on skew—long or short a call versus a put of equal delta, delta-hedged",
+    badge: { label: "Trading", style: "amber" },
+    tags: [["risk reversal","amber"], ["25Δ RR","teal"], ["skew view","slate"], ["delta-hedged","red"]],
+    data: [
+      { label: "Long RR", value: "Long call / short put (same Δ)", color: "teal" },
+      { label: "Short RR", value: "Short call / long put", color: "red" },
+      { label: "P&L driver", value: "Change in skew + sticky rule", color: "amber" },
+    ],
+    body: [
+      `A risk reversal (RR) is the simultaneous purchase of a call and sale of a put (or vice versa) of equal absolute delta—most commonly 25-delta. When delta-hedged, the position is approximately neutral to the underlying and to ATM volatility; its dominant exposure is to the slope of the smile. A long risk-reversal (long call, short put) profits when skew flattens or turns positive; a short risk-reversal profits when skew steepens.`,
+      `Because the two options have different vega, volga and vanna profiles, the residual risks are not zero. The short-put leg of a short RR carries significant left-tail exposure; the position therefore embeds a short-crash view in addition to a pure skew view. In FX the risk reversal is quoted directly by market makers and is one of the three pillars of the smile (alongside ATM and butterfly). In equities it is usually synthesised from listed or OTC options.`,
+      `Execution and risk management require continuous delta re-hedging, careful monitoring of the sticky-strike versus sticky-delta behaviour, and an explicit view on whether the anticipated skew change will be accompanied by an ATM volatility move. Risk reversals remain the most liquid and transparent vehicle for transferring skew risk between counterparties.`
+    ],
+    keyPoint: "The risk reversal is skew made tradable. It converts an abstract slope on a chart into a concrete, delta-hedgeable position whose P&L is driven primarily by the evolution of the smile’s asymmetry."
+  },
+  {
+    era: "Change",
+    icon: "📐",
+    title: "Skew-Change Trades: Flatteners & Steepeners",
+    desc: "Relative-value positions that profit from anticipated changes in the slope of the smile—flattening or steepening—across strikes or across the term structure",
+    badge: { label: "Relative Value", style: "slate" },
+    tags: [["flattener","teal"], ["steepener","red"], ["calendar skew","amber"], ["wing vs body","slate"]],
+    data: [
+      { label: "Flattener", value: "Sell steep wing / buy flatter wing", color: "teal" },
+      { label: "Steepener", value: "Buy steep wing / sell flatter wing", color: "red" },
+      { label: "Horizon", value: "Maturity or strike dimension", color: "amber" },
+    ],
+    body: [
+      `Beyond the outright risk reversal, traders construct more nuanced skew-change trades. A skew flattener sells the expensive (steep) part of the smile and buys the cheaper (flatter) part, either across strikes on the same expiry or across the term structure. A skew steepener does the opposite. Typical constructions include long a 25Δ risk reversal versus short a 10Δ risk reversal (wing-versus-body), or long a short-dated RR versus short a longer-dated RR (calendar skew).`,
+      `These trades isolate the curvature or the term-structure slope of skew rather than its absolute level. They are popular when the front-end skew appears excessively steep relative to longer-dated skew after a scare, or when a particular wing looks mis-priced relative to a calibrated stochastic-volatility or rough-volatility model. Because both legs are themselves skew-sensitive, the net vega, vanna and volga exposures must be carefully balanced and re-hedged.`,
+      `Success depends on a clear thesis about the source of the anticipated change—mean reversion of jump risk, supply of structured products, central-bank intervention, or a shift in the sticky regime—and on disciplined risk limits around the residual crash exposure that every skew trade ultimately carries.`
+    ],
+    keyPoint: "Flatteners and steepeners are the relative-value expression of skew. They do not bet that skew exists; they bet that its current shape is temporary and will evolve in a predictable direction—precisely the domain where models and market intuition most often diverge."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 13.5 Gamma Exposure (GEX) and Dealer Positioning</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital,wght@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .formula {
+    margin: 14px 0 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-family: 'Space Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.9;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 13 · Section 13.5</div>
+      <h1 class="book-title">Gamma Exposure<br><em>(GEX)</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Dealer hedging flow → gamma flip → flow-driven volatility · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Quantitative Finance · Revision Notes</span>
+    <span>13.5 Gamma Exposure (GEX) and Dealer Positioning</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Mechanics",
+    icon: "🧮",
+    title: "Market Maker Gamma Exposure Concept",
+    desc: "The hedging flow of dealers creates a feedback loop between option positioning and spot moves",
+    badge: { label: "Core", style: "slate" },
+    tags: [["dealer gamma","slate"], ["hedging flow","teal"], ["spot feedback","amber"], ["market maker","red"]],
+    data: [
+      { label: "Core idea", value: "Gamma drives dealer hedging demand", color: "teal" },
+      { label: "Object", value: "Net option gamma across strikes & maturities", color: "slate" },
+      { label: "Effect", value: "Flow can accelerate or damp spot moves", color: "amber" },
+    ],
+    body: [
+      `Market maker gamma exposure is a way of measuring how dealers are positioned across options and how they must hedge as spot moves. Since dealers are typically short gamma in many option books, their hedging decisions become a mechanical source of flow: when spot rises, they buy or sell the underlying to remain delta neutral, and that trading activity can push the market further in the same direction or damp it depending on the sign of the net gamma.`,
+      `This is the central intuition behind gamma exposure analysis. If dealers are net short gamma, they must hedge by selling after rallies and buying after dips. That behavior tends to amplify moves and can create momentum-like feedback. If dealers are net long gamma, they instead buy dips and sell rallies, which dampens volatility and creates stabilizing flow.`,
+      `The key quantity is not only the option gamma itself, but the aggregate gamma exposure across the live options market. This is why “GEX” is so useful: it compresses a large options book into a market-level measure of how much hedging flow the dealer community would need to supply at different spot levels.`,
+      `Gamma exposure analysis sits at the intersection of derivatives, hedging, and market microstructure. It explains why option positioning is not just a pricing issue—it is a driving force in the spot market itself.`
+    ],
+    keyPoint: "Dealer gamma exposure converts option positioning into a hedging rule: when dealers hedge, their gamma sign determines whether they stabilize or amplify the move in spot."
+  },
+  {
+    era: "Sign",
+    icon: "➕",
+    title: "Positive Gamma: Dealers Buy Dips, Sell Rallies",
+    desc: "Long gamma exposure causes dealers to hedge in a stabilizing fashion, reducing volatility",
+    badge: { label: "Dampening", style: "teal" },
+    tags: [["positive gamma","teal"], ["buy dips","amber"], ["sell rallies","red"], ["stabilizing flow","slate"]],
+    data: [
+      { label: "Dealer behavior", value: "Long gamma → buys weakness, sells strength", color: "teal" },
+      { label: "Market effect", value: "Dampens volatility / supports mean reversion", color: "amber" },
+      { label: "Role", value: "Options market acts as shock absorber", color: "slate" },
+    ],
+    body: [
+      `When dealers are net long gamma, they are effectively long options and thus must buy the underlying when the market falls and sell the underlying when it rises in order to remain delta neutral. This behavior is stabilizing: after a selloff, dealers buy, which helps arrest the decline; after a rally, they sell, which helps cap the advance.`,
+      `This is the classic “buy the dip, sell the rip” logic. Positive gamma does not mean the market necessarily rallies or declines—rather, it means the dealer hedging flow acts in a way that dampens the move and reduces the amplitude of short-term fluctuations. The options market is acting as a shock absorber.`,
+      `In practical terms, a strongly positive gamma environment often exhibits more controlled price behavior around the current spot. Fast moves are met by dealer hedging that offsets the move, reducing the likelihood of uncontrolled acceleration.`
+    ],
+    keyPoint: "Positive gamma creates a stabilizing dealer feedback loop: dealers buy when prices fall and sell when prices rise, dampening volatility around the current level."
+  },
+  {
+    era: "Sign",
+    icon: "➖",
+    title: "Negative Gamma: Dealers Sell Dips, Buy Rallies",
+    desc: "Short gamma exposure creates destabilizing hedging flow that can amplify moves and increase volatility",
+    badge: { label: "Amplifying", style: "red" },
+    tags: [["negative gamma","red"], ["sell dips","amber"], ["buy rallies","teal"], ["momentum flow","slate"]],
+    data: [
+      { label: "Dealer behavior", value: "Short gamma → sells weakness, buys strength", color: "red" },
+      { label: "Market effect", value: "Amplifies volatility / creates trend pressure", color: "amber" },
+      { label: "Role", value: "Options market acts as accelerator", color: "slate" },
+    ],
+    body: [
+      `When dealers are net short gamma, they must hedge in the opposite direction: selling the underlying when spot falls and buying when spot rises. This means that during a drawdown, dealers are selling into weakness, which can accelerate the decline; during a rally, they are buying into strength, which can enhance the upswing.`,
+      `This is a destabilizing feedback loop. Short gamma creates a self-reinforcing market dynamic in which dealer hedging magnifies directional moves rather than offsetting them. The result is often stronger momentum and more pronounced volatility bursts.`,
+      `This is one reason why options markets can behave like a source of “volatility acceleration”: the combination of dealer hedging and concentrated gamma near the strike can create a powerful feedback mechanism between the option book and the spot market.`
+    ],
+    keyPoint: "Negative gamma makes dealers sell into weakness and buy into strength, amplifying spot moves and increasing the probability of volatility bursts."
+  },
+  {
+    era: "Metric",
+    icon: "📊",
+    title: "GEX = Σ (Gamma × Open Interest × 100)",
+    desc: "Gamma Exposure aggregates the net option gamma weighted by open interest, providing a market-level map of dealer hedging pressure",
+    badge: { label: "GEX", style: "amber" },
+    tags: [["GEX","amber"], ["open interest","slate"], ["gamma weighting","teal"], ["dealer pressure","red"]],
+    data: [
+      { label: "Formula", value: "GEX = Σ (Γ × OI × 100)", color: "amber" },
+      { label: "Units", value: "Approximate hedging demand by strike", color: "slate" },
+      { label: "Interpretation", value: "Positive/negative sign indicates stabilizing/accelerating flow", color: "teal" },
+    ],
+    body: [
+      `A practical measure of dealer gamma pressure is the Gamma Exposure, or GEX, where at each strike and maturity we compute the product of option gamma, open interest, and a scaling factor:
+      <div class="formula">GEX = Σ (Gamma × Open Interest × 100)</div>
+      The point is to aggregate the net option positioning into a single map of dealer hedging pressure across the option surface.`,
+      `Open interest matters because gamma exposure is not just about the price of one option—it depends on how many contracts are active in the market. A large amount of short gamma at a given strike implies a large amount of dealer hedging that will be required if spot moves toward that level.`,
+      `In practice, GEX is often displayed as a function of spot. When GEX is heavily positive near a level, dealer hedging should be stabilizing around that level. When GEX is deeply negative, hedging is likely to accelerate the move and push volatility higher.`,
+      `This is why GEX has become a popular market microstructure signal: it turns the option book into a map of where the market is likely to be pushed by dealer hedging.`
+    ],
+    keyPoint: "GEX summarises the market’s option inventory into a single hedging pressure measure: the sign and size of gamma exposure tell us whether dealer flow will stabilize or accelerate price moves."
+  },
+  {
+    era: "Flip",
+    icon: "🔄",
+    title: "GEX Flip Point (Zero Gamma Level)",
+    desc: "The spot level at which derivative hedging shifts from stabilizing to destabilizing behavior",
+    badge: { label: "Flip", style: "red" },
+    tags: [["flip point","red"], ["zero gamma","amber"], ["regime switch","slate"], ["critical level","teal"]],
+    data: [
+      { label: "Definition", value: "Spot where net gamma crosses zero", color: "red" },
+      { label: "Below flip", value: "Dealer may be long gamma / stabilizing", color: "teal" },
+      { label: "Above flip", value: "Dealer may be short gamma / amplifying", color: "amber" },
+    ],
+    body: [
+      `The GEX flip point is the spot level where the aggregate gamma exposure changes sign. It is the point at which the dealers’ hedging behavior transitions from stabilizing to amplifying. This is a crucial concept in market flow analysis because option positioning often creates a natural “attractor” or “repeller” around a certain price level.`,
+      `Below the flip point, dealers may be net long gamma and therefore buy dips, selling rallies to hedge. Above the flip point, the sign may reverse and they become net short gamma, which leads to selling pressure as prices rise and buying pressure as prices fall.`,
+      `This creates a kind of feedback structure: as spot moves toward a flip region, the hedging response can become stronger or weaker depending on the net gamma sign. The market may therefore naturally accelerate when it is on one side of the gamma barrier and stabilize when it is on the other.`,
+      `In practice, a gamma flip point becomes especially important around major strikes or when a concentrated set of option positions sits near the current spot. The market may then act as if it is “pinned” or “attracted” to the levels where dealer hedging turns over.`
+    ],
+    keyPoint: "The gamma flip point is the spot where dealer hedging changes character: below it the market may be stabilizing, above it it may become amplifying."
+  },
+  {
+    era: "OPEX",
+    icon: "🗓️",
+    title: "Options Expiration Effects",
+    desc: "The expiration cycle shapes option gamma concentration and market behavior near the strike cluster",
+    badge: { label: "OPEX", style: "slate" },
+    tags: [["OPEX","slate"], ["expiration","amber"], ["gamma cluster","teal"], ["pinning","red"]],
+    data: [
+      { label: "Effect", value: "Gamma concentration near strike and expiry", color: "slate" },
+      { label: "Risk", value: "Large hedging flow as the date nears", color: "red" },
+      { label: "Outcome", value: "Pinning and accelerated moves near expiry", color: "teal" },
+    ],
+    body: [
+      `Options expiration creates a highly concentrated set of gamma exposures, because many options share the same strike and maturity. As expiration approaches, the net gamma around the strike can become very large. That means dealer hedging demand becomes highly localised around the money, and price action may become more sensitive to that level.`,
+      `This is often described as gamma pinning or strike pinning. If dealers are short gamma near the strike, the market can become increasingly sensitive to moves near that level because hedging flows push the market toward the concentration area. If dealers are long gamma, the strike may act as a stabilizer.`,
+      `The deadline of expiration turns a diffuse options market into a more concentrated position map, which means the spot can behave very differently during the days leading up to expiry. The market may become “pinning” around strikes, or it may experience violent hedging bursts if the gamma is short.`
+    ],
+    keyPoint: "Expiration is when gamma concentration is maximal: dealer hedging becomes local, intense, and highly influential around the strike cluster and near the expiry date."
+  },
+  {
+    era: "OPEX",
+    icon: "🗓️",
+    title: "Monthly vs. Weekly OPEX Dynamics",
+    desc: "The frequency of expiration changes the intensity and duration of gamma-driven market behaviour",
+    badge: { label: "Timing", style: "amber" },
+    tags: [["monthly OPEX","amber"], ["weekly OPEX","teal"], ["gamma intensity","slate"], ["event risk","red"]],
+    data: [
+      { label: "Monthly", value: "Larger, more persistent gamma clusters", color: "amber" },
+      { label: "Weekly", value: "More frequent but shorter-lived flows", color: "teal" },
+      { label: "Effect", value: "Short-dated gamma drives intraday volatility bursts", color: "red" },
+    ],
+    body: [
+      `Monthly expirations tend to produce larger and more persistent gamma concentrations because the option chain is more mature and the open interest around the monthly strike is often larger. Weekly expirations, by contrast, create shorter and more frequent cycles. They can produce sharp, transient gamma-driven moves because the market is repeatedly re-pricing the next near-term contract.`,
+      `This difference matters for both traders and risk managers. A monthly OPEX may create a more sustained pinning or directional squeeze around the relevant strike, while a weekly OPEX may trigger more frequent but shorter bursts of flow. The market often responds differently depending on whether the gamma is concentrated in a slow monthly chain or a fast weekly one.`,
+      `The net result is that OPEX is not only a settlement event; it is a recurring flow event that changes the shape of the option surface, the behavior of dealer hedging, and therefore the short-term dynamics of spot.`
+    ],
+    keyPoint: "Monthly and weekly OPEX differ in duration and intensity: monthly cycles are larger and more persistent, while weekly cycles create more frequent but shorter bursts of gamma-driven flow."
+  },
+  {
+    era: "0DTE",
+    icon: "⏱️",
+    title: "0DTE Gamma Dynamics",
+    desc: "Zero-days-to-expiration options create especially sharp and fast-moving dealer hedging feedback loops",
+    badge: { label: "0DTE", style: "red" },
+    tags: [["0DTE","red"], ["intraday gamma","amber"], ["fast hedging","slate"], ["short-dated vol","teal"]],
+    data: [
+      { label: "Feature", value: "Gamma spikes near current spot", color: "red" },
+      { label: "Behavior", value: "Fast delta hedging creates quick feedback loops", color: "teal" },
+      { label: "Impact", value: "Potentially jagged intraday volatility", color: "amber" },
+    ],
+    body: [
+      `0DTE options are the most extreme expression of gamma-driven spot dynamics. With little time remaining, the gamma around the at-the-money strike becomes extremely large, and dealers must hedge aggressively and continuously as the market moves. The result is a much more immediate relationship between spot and dealer hedging demand.`,
+      `This means that the options market can produce very fast feedback loops in the last minutes of trading. A small move in spot can trigger a burst of delta hedging, which then creates further price movement. Those feedback loops can be large enough to generate very sharp intraday volatility spikes, especially when the option book is highly concentrated near the current spot.`,
+      `This is one of the central reasons 0DTE has become so important in modern market microstructure analysis. It is not simply a question of more options; it is a question of more concentrated gamma near the current spot, which means even modest spot moves can force fast, meaningful hedging.`
+    ],
+    keyPoint: "0DTE turns gamma into an intraday force multiplier: the near-zero time to expiry makes dealer hedging decisions highly sensitive and highly immediate."
+  },
+  {
+    era: "Signals",
+    icon: "📡",
+    title: "SpotGamma, SqueezeMetrics, and Tier1Alpha Data",
+    desc: "Market data providers track dealer gamma pressure and flow regimes using live option-surface metrics",
+    badge: { label: "Data", style: "slate" },
+    tags: [["SpotGamma","slate"], ["SqueezeMetrics","amber"], ["Tier1Alpha","teal"], ["option data","red"]],
+    data: [
+      { label: "SpotGamma", value: "Dealer gamma / hedging pressure by spot", color: "slate" },
+      { label: "SqueezeMetrics", value: "Flow and squeeze analytics across strikes", color: "amber" },
+      { label: "Tier1Alpha", value: "Short-dated gamma and positioning signals", color: "teal" },
+    ],
+    body: [
+      `In the modern market, several vendors package option flow and gamma exposure into useful signals. SpotGamma tracks the market-level gamma environment and maps it across different spot levels, giving traders a view of where dealer hedging is likely to be most aggressive. SqueezeMetrics and Tier1Alpha provide similar views with different analytical lenses, often aggregating option flows and short-dated gamma across time horizons.`,
+      `These datasets are valuable because they distill a complicated derivatives book into a more actionable signal. Traders use them to assess where the “gamma wall,” “flip point,” or “squeeze zone” is located, and how the market is likely to behave when the option book is concentrated around a certain level.`,
+      `These signals are not magic; they are produced from live options data, open interest, and sometimes a model of dealer hedging. But they are widely used because they provide useful context for how spot may react around key option levels. The key is to use them as part of a toolkit, not as a complete description of the market.`
+    ],
+    keyPoint: "Commercial gamma analytics like SpotGamma and SqueezeMetrics translate the option volume surface into actionable positioning signals, making dealer flow visible to the broader market."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

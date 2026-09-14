@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 13.1 Black-Scholes Model</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .formula {
+    margin: 14px 0 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-family: 'Space Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.9;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 13 · Section 13.1</div>
+      <h1 class="book-title">Black-Scholes<br><em>Model</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">No-arbitrage → risk-neutral pricing → sensitivity analysis · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Quantitative Finance · Revision Notes</span>
+    <span>13.1 Black-Scholes Model</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Foundations",
+    icon: "📐",
+    title: "Black-Scholes Assumptions",
+    desc: "Lognormal asset prices, frictionless trading, constant parameters, and no arbitrage",
+    badge: { label: "Core", style: "slate" },
+    tags: [["lognormal","teal"], ["no dividends","amber"], ["constant vol","slate"], ["no arbitrage","red"]],
+    data: [
+      { label: "Underlying", value: "Geometric Brownian motion", color: "teal" },
+      { label: "Volatility", value: "Constant σ, known and stable", color: "amber" },
+      { label: "Drift", value: "Risk-neutral drift = r", color: "slate" },
+    ],
+    body: [
+      `The Black-Scholes model is built on a very specific market architecture. The underlying asset price is assumed to follow geometric Brownian motion, so log returns are normally distributed and prices remain strictly positive. This is the mathematical expression of the familiar idea that asset prices are multiplicative and cannot become negative, which is crucial for option pricing because equity values do not move linearly in the way a bank account might.`,
+      `A second core assumption is that the market is frictionless: there are no transaction costs, no taxes, no bid–ask spreads, and continuous trading is possible. Traders can buy and sell the underlying at any time without cost, which gives rise to continuous hedging. This makes it possible to construct a self-financing portfolio that exactly offsets the option payoff and therefore eliminates risk.`,
+      `The model also assumes the risk-free rate r is constant and known, dividend yield is zero unless explicitly modeled, and volatility σ is constant over the life of the option. The no-arbitrage principle then forces the option’s price to equal the discounted expected payoff under a risk-neutral measure. In other words, the option is priced as if investors are indifferent to risk, not because risk preferences disappear, but because the hedging portfolio removes them.`,
+      `These assumptions are elegant and powerful, but they are also restrictive. Real markets violate them constantly: dividends exist, volatilities vary by strike and maturity, jumps occur in crisis periods, and interest rates are not fixed. The Black-Scholes formula is therefore best understood as a benchmark model rather than a literal description of all market dynamics.`
+    ],
+    keyPoint: "Black-Scholes is not merely a formula; it is a complete arbitrage-based pricing framework built on carefully specified assumptions about price dynamics and market completeness."
+  },
+  {
+    era: "Dynamics",
+    icon: "⚙️",
+    title: "Underlying Price Process",
+    desc: "The diffusion process that underpins option valuation and hedging",
+    badge: { label: "Math", style: "teal" },
+    tags: [["GBM","teal"], ["risk-neutral","slate"], ["martingale","amber"], ["lognormal","red"]],
+    data: [
+      { label: "Process", value: "dS = μS dt + σS dW", color: "teal" },
+      { label: "Log-return", value: "ln(S_T/S_0) ~ N((μ−σ²/2)T, σ²T)", color: "amber" },
+      { label: "No-arbitrage", value: "μ replaced by r under Q", color: "slate" },
+    ],
+    body: [
+      `Under the physical measure, the stock price follows the stochastic differential equation dS = μS dt + σS dW. The drift μ captures the expected return in the real world, while the diffusion term σS dW captures random price fluctuations. Because the volatility multiplies the price, shocks are proportional to the level of the asset, which produces the familiar multiplicative structure of equity prices.`,
+      `The key modeling step is to move from the physical measure to the risk-neutral measure Q. Under Q, the expected growth rate of the traded asset becomes the risk-free rate, so the stock follows dS = rS dt + σS dW^Q. This is the measure under which discounted asset prices are martingales. The option value is then the discounted expected payoff under Q, which is the precise place where the no-arbitrage principle enters the model.`,
+      `This transformation is not a trick. It is a consequence of the ability to replicate the option with a dynamic portfolio of stock and cash. Because the option can be exactly hedged, its price must equal the present value of the expected payoff under the unique risk-neutral distribution. The result is a powerful pricing formula that drastically simplifies valuation under the benchmark assumptions.`
+    ],
+    keyPoint: "The Black-Scholes model is a no-arbitrage model in disguise: the real-world drift is irrelevant for pricing because the derivative is priced under the risk-neutral measure that eliminates risk premia from the asset’s growth rate."
+  },
+  {
+    era: "Pricing",
+    icon: "🧮",
+    title: "Call and Put Pricing Formula",
+    desc: "Closed-form solutions for European call and put options under Black-Scholes",
+    badge: { label: "Formula", style: "red" },
+    tags: [["European option","red"], ["call","amber"], ["put","teal"], ["terminal payoff","slate"]],
+    data: [
+      { label: "Call price", value: "C = S₀N(d₁) − Ke^(−rT)N(d₂)", color: "red" },
+      { label: "Put price", value: "P = Ke^(−rT)N(−d₂) − S₀N(−d₁)", color: "teal" },
+      { label: "Key terms", value: "d₁, d₂, N(·), K, r, T, S₀", color: "amber" },
+    ],
+    body: [
+      `For a European call, the Black-Scholes price is:
+      <div class="formula">C = S₀N(d₁) − Ke^(−rT)N(d₂)</div>
+      with
+      <div class="formula">d₁ = [ln(S₀/K) + (r + σ²/2)T] / (σ√T) <br>d₂ = d₁ − σ√T</div>
+      where S₀ is the current spot price, K is the strike, r is the continuously compounded risk-free rate, T is maturity, σ is volatility, and N(·) is the cumulative standard normal distribution.`,
+      `The interpretation is straightforward. The term S₀N(d₁) represents the present value of being in the money at expiry, weighted by the probability that the option finishes positively; the term Ke^(−rT)N(d₂) is the discounted strike cost that is paid only if the option ends up in the money. The call is therefore the asset-like exposure minus the discounted strike-like obligation.`,
+      `For the put, the symmetric expression is:
+      <div class="formula">P = Ke^(−rT)N(−d₂) − S₀N(−d₁)</div>
+      This is equivalent to using put-call parity and is often numerically convenient when the call price is already known. The structure is the same: the put is the discounted value of delivery at strike less the present value of receiving the stock if the option expires deep in the money.`,
+      `The function N(d) is the normal CDF, which transforms the lognormal distribution of terminal stock prices into the probability of exercise. The premium is therefore a probability-weighted expected payoff under risk neutrality. This is one reason Black-Scholes is viewed as so elegant: complex option values reduce to a few measurable inputs and a normal CDF. `
+    ],
+    keyPoint: "The premium is not a mystical object: it is the discounted risk-neutral expected payoff, with the stock component and strike component weighted by exercise probabilities."
+  },
+  {
+    era: "Parity",
+    icon: "🔄",
+    title: "Put-Call Parity",
+    desc: "The identity linking European call and put prices when no arbitrage is enforced",
+    badge: { label: "Identity", style: "amber" },
+    tags: [["parity","amber"], ["no arbitrage","red"], ["synthetic","slate"], ["forward","teal"]],
+    data: [
+      { label: "Parity", value: "C − P = S − Ke^(−rT)", color: "amber" },
+      { label: "Synthetic call", value: "Long stock + short bond + long put", color: "teal" },
+      { label: "Synthetic put", value: "Long call + short stock + long bond", color: "slate" },
+    ],
+    body: [
+      `Put-call parity states that for European options on the same underlying, strike, and maturity:
+      <div class="formula">C − P = S − Ke^(−rT)</div>
+      This identity is one of the most important relationships in option theory because it ensures that the pricing framework is internally consistent. If the parity relation is violated, traders can construct a riskless arbitrage by combining calls, puts, stock, and cash.`,
+      `The intuition behind the parity relation is simple. A long call plus a short put is equivalent to a long forward position in the stock, with strike K, because the call gives upside above K while the short put creates the opposite obligation below K. Adding the stock and subtracting the present value of K reproduces the same payoff structure. In other words, a call and a put are two ways to express the same exposure when combined with the underlying and bond.`,
+      `This parity relation is not merely a mathematical curiosity. It is a computational and validation tool. If you price a call using Black-Scholes and the put price should satisfy parity, then deviations reveal either an input error, an assumption violation, or a fundamentally different instrument design. It is also an excellent check when building pricing engines and calibration systems in practice.`
+    ],
+    keyPoint: "Put-call parity is the market’s consistency check: if the world remains arbitrage-free, call and put pricing cannot drift apart in a way that admits an easy riskless trade."
+  },
+  {
+    era: "Greeks",
+    icon: "📈",
+    title: "Delta: First Sensitivity to Spot",
+    desc: "The rate of change of the option value with respect to the underlying price",
+    badge: { label: "Delta", style: "red" },
+    tags: [["delta","red"], ["hedging","teal"], ["spot sensitivity","amber"], ["option exposure","slate"]],
+    data: [
+      { label: "Call delta", value: "Δ_call = N(d₁)", color: "red" },
+      { label: "Put delta", value: "Δ_put = N(d₁) − 1 = −N(−d₁)", color: "teal" },
+      { label: "Interpretation", value: "Approx. stock units per option", color: "amber" },
+    ],
+    body: [
+      `Delta is the first derivative of the option value with respect to the underlying spot price. In plain terms, it tells us how much the option premium changes for a small change in the stock price. For a call, the Black-Scholes delta is:
+      <div class="formula">Δ_call = N(d₁)</div>
+      and for a put:
+      <div class="formula">Δ_put = N(d₁) − 1</div>
+      A call delta is between 0 and 1, while a put delta is between −1 and 0.`,
+      `This makes delta the natural object for hedging. If a trader is short one call, they often hedge by buying N(d₁) units of stock to approximate a delta-neutral position. The hedge is only approximate because delta changes as the stock moves, which is why dynamic hedging is required. For at-the-money options, delta is near 0.5 for calls and −0.5 for puts; far out-of-the-money options have delta near zero; deep in-the-money options have delta near one.`,
+      `Delta is also central to option trading because it reveals the option’s price exposure to the underlying. But delta is not static. It evolves continuously with spot, time, and volatility. Therefore, hedging requires updating the position as the market moves. This is one of the main reasons Black-Scholes is practically implemented as a dynamic hedging framework rather than a one-shot pricing problem.`
+    ],
+    keyPoint: "Delta is the market’s first-order hedge ratio: it tells you how many units of the underlying are needed to offset the option’s immediate sensitivity to spot."
+  },
+  {
+    era: "Greeks",
+    icon: "🧠",
+    title: "Gamma, Vega, Theta, and Rho",
+    desc: "Higher-order sensitivities and the principal drivers of option value changes",
+    badge: { label: "Risk", style: "slate" },
+    tags: [["gamma","amber"], ["vega","teal"], ["theta","red"], ["rho","slate"]],
+    data: [
+      { label: "Gamma", value: "Γ = φ(d₁) / (Sσ√T)", color: "amber" },
+      { label: "Vega", value: "V = Sφ(d₁)√T", color: "teal" },
+      { label: "Theta", value: "Θ = −[Sφ(d₁)σ / (2√T)] − rKe^(−rT)N(d₂)", color: "red" },
+      { label: "Rho", value: "ρ = KTe^(−rT)N(d₂)", color: "slate" },
+    ],
+    body: [
+      `Gamma measures the curvature of the option value with respect to the underlying. It is the derivative of delta:
+      <div class="formula">Γ = φ(d₁) / (Sσ√T)</div>
+      where φ(·) is the standard normal density. Gamma is highest for at-the-money options and falls as the option becomes deeply in- or out-of-the-money. This means the hedge ratio changes most rapidly near the strike, which is why near-the-money options require especially careful rebalancing.`,
+      `Vega measures sensitivity to implied volatility:
+      <div class="formula">V = Sφ(d₁)√T</div>
+      Vega is positive for both calls and puts and tends to be greatest near the money. This is physically meaningful: option prices are very sensitive to volatility assumptions, and a small change in inferred volatility can materially alter the option premium. In practice, this is often the most important sensitivity after delta.`,
+      `Theta measures the time decay of the option value:
+      <div class="formula">Θ = −[Sφ(d₁)σ / (2√T)] − rKe^(−rT)N(d₂)</div>
+      for a call, with an analogous expression for a put. It tells us how much value the option loses per unit time when all else is held fixed. Generally, long options decay in value as time passes, unless the price moves favorably enough to offset this effect.`,
+      `Rho measures sensitivity to the risk-free rate:
+      <div class="formula">ρ = KTe^(−rT)N(d₂)</div>
+      for a call. It is usually a smaller effect than delta, gamma, vega, or theta, but it matters in rate-sensitive environments and for long-dated options. The sign is positive for calls and negative for puts, reflecting the effect of discounting and financing costs on the present value of the strike.`
+    ],
+    keyPoint: "These Greeks are the language of option risk management: they convert the Black-Scholes formula into practical hedge and exposure diagnostics across spot, volatility, time, and rates."
+  },
+  {
+    era: "Assumptions",
+    icon: "⚠️",
+    title: "Model Limitations and Violations",
+    desc: "Where Black-Scholes breaks down in real markets and why traders need richer models",
+    badge: { label: "Limits", style: "red" },
+    tags: [["dividends","teal"], ["vol smile","amber"], ["jumps","red"], ["stochastic vol","slate"]],
+    data: [
+      { label: "Violation", value: "Dividends & early exercise", color: "teal" },
+      { label: "Violation", value: "Volatility skew/smile", color: "amber" },
+      { label: "Violation", value: "Jumps, stochastic vol, fat tails", color: "red" },
+    ],
+    body: [
+      `The Black-Scholes model assumes a constant volatility surface, but in real markets the implied volatilities differ by strike and maturity. This produces the famous volatility smile or skew. A single σ cannot fit all strikes at once, which means the model’s “fair value” is often systematically off in the wings. Traders therefore use Black-Scholes as a benchmark and adjust prices via local volatility, stochastic volatility, or jump-diffusion models when required.`,
+      `Another important limitation is the assumption of a continuous, diffusion-only process. Real markets experience jumps—earnings announcements, central-bank decisions, macro shocks, and liquidity crises can produce discontinuous price moves that are not well captured by a diffusion. Under these conditions, the lognormal model underprices tail risk and can misvalue deep out-of-the-money options.`,
+      `Dividend-paying stocks also violate the no-dividend assumption. Standard Black-Scholes is not appropriate for American options on dividend-paying equities without adjustment, because the option may be exercised early to capture the dividend. For equity index options or models with discrete payouts, one often adjusts the spot price by the present value of expected dividends or moves to a more general model.`,
+      `There are also issues with transaction costs, limited liquidity, non-normal returns, stochastic rates, and regime changes. The model remains invaluable as a first-order analytical approximation, but its limitations are not minor. It is a benchmark model, not a universal truth about option prices.`
+    ],
+    keyPoint: "Real option markets contain smiles, skews, jumps, and dividends, so the Black-Scholes formula is best viewed as a transparent starting point rather than a final valuation truth."
+  },
+  {
+    era: "Extensions",
+    icon: "🧩",
+    title: "Practical Adjustments and Extensions",
+    desc: "How professionals modify Black-Scholes to fit the actual market structure",
+    badge: { label: "Use", style: "teal" },
+    tags: [["local vol","teal"], ["stochastic vol","slate"], ["jump-diffusion","red"], ["dividend correction","amber"]],
+    data: [
+      { label: "Adjustments", value: "Dividend yield, carry, skew, smile", color: "teal" },
+      { label: "Extended models", value: "Heston, SABR, Merton, Dupire", color: "slate" },
+      { label: "Goal", value: "Reproduce market prices and hedges", color: "amber" },
+    ],
+    body: [
+      `The practical response to the model’s limitations is not to abandon Black-Scholes, but to augment it. For dividend-paying stocks, a common adjustment is to reduce the forward price by the present value of expected dividends, or to treat the underlying as carrying a dividend yield q. This leads to a modified version of the call price with q replacing r in the drift term. For American options, early exercise considerations require binomial or trinomial lattices or numerical methods.`,
+      `For the volatility smile, one may use local volatility or stochastic volatility models such as Heston or SABR. These models allow variance to move over time and can better capture the empirical shape of the option surface. For jump risk, the Merton jump-diffusion model adds discontinuous price moves that better fit severe downside events.`,
+      `In production, traders often use Black-Scholes as an interpolation or quoting framework around an implied volatility surface. They may quote all options in terms of implied vol rather than direct prices, then use an arbitrage-free surface to derive prices. This is far more realistic than treating volatility as a single constant across all strikes and maturities.`
+    ],
+    keyPoint: "Black-Scholes survives in practice because it is a tractable, interpretable benchmark; it is the starting point from which more realistic option models are built, not the final answer itself."
+  },
+  {
+    era: "Interpretation",
+    icon: "💡",
+    title: "Economic Meaning of the Formula",
+    desc: "What the option price is really saying in economic terms",
+    badge: { label: "Insight", style: "amber" },
+    tags: [["risk-neutral","slate"], ["discounted payoff","red"], ["replication","teal"], ["market price","amber"]],
+    data: [
+      { label: "Price", value: "PV(expected payoff under Q)", color: "amber" },
+      { label: "Hedge", value: "Δ shares + cash account", color: "teal" },
+      { label: "Edge", value: "Model is benchmark, not truth", color: "slate" },
+    ],
+    body: [
+      `When economists say the Black-Scholes price is “the discounted expected payoff under the risk-neutral measure,” they are expressing a deep economic result. The option value is not determined by investors’ subjective preferences for risk; rather, it is pinned down by arbitrage and hedging. In a complete market, any contingent claim can be replicated by a trading strategy in the stock and bond, and the option price must equal the cost of that replicating strategy.`,
+      `This gives the formula a very tangible interpretation. The call is effectively a levered position in the stock combined with a fixed cash obligation tied to the strike. The probability weighting is not arbitrary—it reflects the risk-neutral distribution, which embeds the market price of risk into the drift adjustment rather than leaving it as an unexplained quantity.`,
+      `The derivative’s Greeks can then be interpreted as the quantities that arise from the replicating strategy: delta is the stock hedge ratio, gamma is the hedge adjustment speed, vega is sensitivity to volatility, theta is time decay, and rho is rate sensitivity. These are not separate statistical curiosities. They are the economics of dynamic replication.`,
+      `This is why Black-Scholes remains so influential. It provides a unified theory of option pricing, hedging, and risk management, even though the real-world conditions under which it holds exactly are seldom met. The challenge in practice is not whether to use Black-Scholes, but how to adapt it sensibly to a market that deviates from its assumptions.`
+    ],
+    keyPoint: "At its core, Black-Scholes is a replication story: the option is priced as the cost of synthesizing it with a dynamic portfolio of stock and cash."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

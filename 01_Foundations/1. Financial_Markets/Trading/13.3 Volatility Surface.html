@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 13.3 Volatility Surface</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 13 · Section 13.3</div>
+      <h1 class="book-title">Volatility<br><em>Surface</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Dimensions → metrics → arbitrage → models · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>13.3 Volatility Surface</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Dimensions",
+    icon: "🗺️",
+    title: "Surface Dimensions: Strike (Delta) × Expiry",
+    desc: "The two-dimensional domain on which implied volatility is defined—moneyness or delta on one axis, time to expiry on the other—forming the complete volatility surface",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["strike","slate"], ["delta","teal"], ["expiry","amber"], ["moneyness","red"]],
+    data: [
+      { label: "Axes", value: "Moneyness / Δ  ×  Maturity T", color: "slate" },
+      { label: "Common Δ", value: "10Δ, 25Δ, 50Δ (ATM), 25Δ, 10Δ", color: "teal" },
+      { label: "Quote space", value: "Δ-space (FX) or K-space (equities)", color: "amber" },
+    ],
+    body: [
+      `The implied-volatility surface is the function σ(K,T) or σ(Δ,T) that assigns a Black–Scholes implied volatility to every strike (or delta) and every expiry. It is the fundamental object that summarises the entire vanilla options market. Because raw strikes are not comparable across underlyings or through time, practitioners almost always work in moneyness coordinates—log-moneyness ln(K/F), standardised moneyness ln(K/F)/(σ√T), or delta.`,
+      `Delta-space is especially convenient: a 25-delta put is roughly the same economic object on SPX, EURUSD or a single stock, whereas a fixed strike is not. Market makers in FX quote the surface directly in delta (ATM, 25Δ risk reversal, 25Δ butterfly, etc.). Equity markets still quote many options by strike, but risk systems convert everything to delta or moneyness for interpolation and risk aggregation.`,
+      `The surface is only sparsely observed. Liquid quotes exist at a handful of deltas and a discrete set of expiries; everything else must be interpolated or extrapolated under no-arbitrage constraints. The quality of that interpolation determines the accuracy of exotic pricing, scenario analysis and hedging.`
+    ],
+    keyPoint: "The volatility surface is not a collection of independent numbers; it is a single coherent function of moneyness and maturity. Treating slices in isolation is the most common source of inconsistent risk and phantom arbitrage."
+  },
+  {
+    era: "ATM",
+    icon: "📈",
+    title: "At-the-Money IV Term Structure",
+    desc: "The curve of ATM (or 50-delta) implied volatility against maturity—the backbone of the surface that encodes the term structure of expected variance and risk premia",
+    badge: { label: "Core", style: "teal" },
+    tags: [["ATM vol","teal"], ["term structure","amber"], ["variance","slate"], ["contango","red"]],
+    data: [
+      { label: "Definition", value: "σ(F,T) or 50Δ IV vs T", color: "teal" },
+      { label: "Calm regime", value: "Upward sloping (contango)", color: "amber" },
+      { label: "Crisis", value: "Inverted (backwardation)", color: "red" },
+    ],
+    body: [
+      `The at-the-money term structure is the most liquid and most closely watched slice of the surface. It is conventionally the implied volatility of the option whose strike equals the forward (or the 50-delta option). Because total variance is approximately additive, the square of ATM IV multiplied by time is the market’s price of integrated variance up to that maturity.`,
+      `In normal markets the curve is upward-sloping: longer-dated options embed both the expectation of future volatility and a volatility risk premium. In stress the front end explodes and the curve inverts. The shape therefore simultaneously reflects the market’s forecast of the path of future variance and the price of variance risk.`,
+      `All other surface features—skew, butterfly, wings—are typically expressed relative to this ATM backbone. A parallel shift of the ATM curve moves the entire surface; a change in its slope or curvature alters calendar spreads and the relative pricing of short-dated versus long-dated risk.`
+    ],
+    keyPoint: "The ATM term structure is the spine of the volatility surface. Every skew and butterfly quotation is implicitly measured against it; any model that fails to fit the ATM curve first will misprice everything else."
+  },
+  {
+    era: "Skew",
+    icon: "📉",
+    title: "Skew: 25-Delta Put vs 25-Delta Call",
+    desc: "The difference in implied volatility between the 25-delta put and the 25-delta call—the standard market measure of smile asymmetry",
+    badge: { label: "Metric", style: "red" },
+    tags: [["25Δ skew","red"], ["put-call IV","amber"], ["asymmetry","slate"], ["equity typical","teal"]],
+    data: [
+      { label: "Measure", value: "IV(25Δ put) − IV(25Δ call)", color: "red" },
+      { label: "Equity", value: "Large negative (puts richer)", color: "amber" },
+      { label: "FX", value: "Signed RR, regime-dependent", color: "teal" },
+    ],
+    body: [
+      `Skew quantifies the asymmetry of the smile. The industry-standard metric is the difference between the implied volatility of the 25-delta put and the 25-delta call. A negative number means downside options are more expensive in volatility terms—the classic equity pattern. The same quantity appears in FX as the risk-reversal quotation (with opposite sign convention in some markets).`,
+      `Twenty-five delta is the sweet spot: far enough from ATM to capture genuine skew, yet still liquid enough to be tightly quoted. Ten-delta skew is also monitored for wing behaviour, but is noisier and more sensitive to liquidity. The 25-delta skew is the single most important non-ATM parameter for equity and FX surfaces.`,
+      `Because delta itself depends on volatility, the precise definition of “25-delta” requires a convention (usually the Black–Scholes delta using the option’s own IV, or a fixed ATM volatility). Small differences in convention can move the quoted skew by several tenths of a volatility point—material for tight markets.`
+    ],
+    keyPoint: "25-delta skew is the market’s headline number for smile asymmetry. It compresses the entire left-versus-right wing comparison into a single, liquid, widely understood statistic."
+  },
+  {
+    era: "Butterfly",
+    icon: "🦋",
+    title: "Butterfly (Curvature): 25Δ Put + 25Δ Call − 2 × ATM",
+    desc: "The standard measure of smile convexity—how much the wings are elevated relative to the at-the-money level",
+    badge: { label: "Metric", style: "amber" },
+    tags: [["butterfly","amber"], ["curvature","teal"], ["wing premium","red"], ["BF quote","slate"]],
+    data: [
+      { label: "Formula", value: "½ [IV(25Δp) + IV(25Δc)] − ATM", color: "amber" },
+      { label: "Meaning", value: "Price of pure convexity / kurtosis", color: "teal" },
+      { label: "FX quote", value: "25Δ butterfly (market standard)", color: "slate" },
+    ],
+    body: [
+      `The butterfly isolates the curvature of the smile. Its simplest market definition is the average of the 25-delta put and 25-delta call implied volatilities minus the ATM volatility. A positive butterfly means the wings trade richer than a linear interpolation between them would suggest—i.e., the market is charging for kurtosis or for two-sided jump risk.`,
+      `In FX the 25-delta butterfly is quoted directly alongside the ATM and the risk reversal; the three numbers fully parameterise the smile at that expiry under standard market conventions. In equities the same quantity is computed from listed or OTC quotes and is a key input to wing-arbitrage checks and to the calibration of stochastic-volatility models.`,
+      `Butterfly is far more stable than skew in many regimes, yet it still responds to supply and demand for deep OTM options. Structured-product issuance, tail-hedging programmes and volatility-selling strategies all leave visible footprints in the butterfly level across the term structure.`
+    ],
+    keyPoint: "Butterfly is the price of curvature. While skew measures directional asymmetry, butterfly measures the market’s willingness to pay for pure volatility-of-volatility and for the tails on both sides of the distribution."
+  },
+  {
+    era: "RR",
+    icon: "⚖️",
+    title: "Risk Reversal: 25-Delta Call − 25-Delta Put",
+    desc: "The signed difference between 25-delta call and 25-delta put implied volatilities—the liquid instrument and quotation convention for skew itself",
+    badge: { label: "Instrument", style: "teal" },
+    tags: [["risk reversal","teal"], ["25Δ RR","amber"], ["skew quote","slate"], ["FX standard","red"]],
+    data: [
+      { label: "FX quote", value: "IV(25Δ call) − IV(25Δ put)", color: "teal" },
+      { label: "Equity equiv.", value: "Negative of 25Δ skew", color: "amber" },
+      { label: "Trade", value: "Long RR = long call / short put", color: "slate" },
+    ],
+    body: [
+      `The risk reversal is both a quotation convention and a tradable package. In FX markets it is defined as the implied volatility of the 25-delta call minus the implied volatility of the 25-delta put (or the reverse, depending on currency pair convention). A positive risk reversal means the market assigns higher volatility to upside moves for the base currency.`,
+      `Economically the risk reversal is a pure skew position once delta-hedged: it is long one wing and short the other. Its mark-to-market is driven primarily by changes in the slope of the smile, with residual exposure to ATM volatility, vol-of-vol and the sticky regime. Because it is quoted and traded as a package, it is the most efficient vehicle for transferring skew risk between counterparties.`,
+      `In equities the same exposure is synthesised by buying a 25-delta call and selling a 25-delta put (or vice versa). The risk-reversal level is monitored alongside the butterfly as one of the two primary non-ATM descriptors of each expiry slice.`
+    ],
+    keyPoint: "The risk reversal turns the abstract notion of skew into a concrete, delta-hedgeable market object. Its quotation is the language in which the market communicates directional smile risk."
+  },
+  {
+    era: "Arbitrage",
+    icon: "🚫",
+    title: "Vol Surface Arbitrage Constraints (Calendar & Butterfly)",
+    desc: "Model-independent inequalities that any arbitrage-free implied-volatility surface must satisfy—calendar arbitrage across maturities and butterfly arbitrage across strikes",
+    badge: { label: "Critical", style: "red" },
+    tags: [["calendar arb","red"], ["butterfly arb","amber"], ["no-arb","teal"], ["total variance","slate"]],
+    data: [
+      { label: "Calendar", value: "Total variance non-decreasing in T", color: "red" },
+      { label: "Butterfly", value: "Convex call price vs K (Durrleman)", color: "amber" },
+      { label: "Test", value: "Local-vol existence / density ≥ 0", color: "teal" },
+    ],
+    body: [
+      `An implied-volatility surface is arbitrage-free only if it satisfies two fundamental constraints. Calendar arbitrage is absent when total implied variance w(k,T) = σ²(k,T)·T is non-decreasing in maturity T for every fixed log-moneyness k. Violating this condition allows a calendar spread that is long the longer-dated option and short the shorter-dated option to have non-positive premium yet non-negative payoff.`,
+      `Butterfly arbitrage is absent when the call-price function is convex in strike (or equivalently when the risk-neutral density is non-negative). In terms of total variance the condition can be expressed via Durrleman’s density formula; a negative density at any point creates a static butterfly arbitrage. Both constraints must hold simultaneously across the entire surface.`,
+      `In practice, naïve interpolation of market quotes frequently produces small arbitrage violations. Production systems therefore either enforce the constraints by construction (e.g., via arbitrage-free parameterisations such as SSVI) or project the raw surface onto the nearest arbitrage-free surface before pricing or risk calculations proceed.`
+    ],
+    keyPoint: "Calendar and butterfly arbitrage constraints are not optional modelling preferences; they are model-independent consequences of the absence of static arbitrage. A surface that violates them cannot be the input to any coherent pricing engine."
+  },
+  {
+    era: "SSVI",
+    icon: "📐",
+    title: "SSVI (Surface SVI) Model",
+    desc: "Gatheral & Jacquier’s arbitrage-free extension of the SVI parameterisation that produces a consistent volatility surface across all maturities with simple closed-form conditions",
+    badge: { label: "Model", style: "amber" },
+    tags: [["SSVI","amber"], ["Gatheral","teal"], ["arbitrage-free","slate"], ["total variance","red"]],
+    data: [
+      { label: "Core", value: "w(k,θ) = (θ/2){1+ρφk+√[(φk+ρ)²+(1−ρ²)]}", color: "amber" },
+      { label: "Parameters", value: "θ(T), ρ(T), φ(T) per slice", color: "teal" },
+      { label: "Guarantee", value: "Butterfly + calendar free under conditions", color: "slate" },
+    ],
+    body: [
+      `The original SVI parameterisation fitted each expiry slice independently and could easily generate calendar arbitrage when slices were stacked. Surface SVI (SSVI) remedies this by making the total-variance function of a specially chosen form whose parameters are themselves functions of maturity. Under explicit, easily checked inequalities on those parameter functions, the entire surface is guaranteed to be free of both butterfly and calendar arbitrage.`,
+      `SSVI retains the economic interpretability of classical SVI: θ controls the ATM variance level, ρ the skew, and φ the curvature. Because the functional form is closed-form, calibration is fast and the resulting local-volatility and density calculations remain analytic or semi-analytic. The model has become a standard building block for equity and FX surface construction in both banks and hedge funds.`,
+      `Extensions (eSSVI, natural SSVI, etc.) add further flexibility while preserving the no-arbitrage guarantees. SSVI is ultimately a static surface model; it does not by itself specify dynamics, but it supplies a clean, arbitrage-free input surface on which dynamic models can be calibrated.`
+    ],
+    keyPoint: "SSVI solves the practical problem of building a smooth, arbitrage-free surface from discrete market quotes. It is the modern default parameterisation whenever a robust, fast, and theoretically sound surface representation is required."
+  },
+  {
+    era: "Heston",
+    icon: "🌊",
+    title: "Heston Model for Surface Dynamics",
+    desc: "The classic stochastic-volatility diffusion that generates a realistic implied-volatility surface and, crucially, a coherent evolution of that surface through time",
+    badge: { label: "Dynamics", style: "teal" },
+    tags: [["Heston","teal"], ["stochastic vol","amber"], ["mean reversion","slate"], ["surface dynamics","red"]],
+    data: [
+      { label: "Factors", value: "Spot + variance (CIR)", color: "teal" },
+      { label: "Params", value: "κ, θ, σ_v, ρ, v₀", color: "amber" },
+      { label: "Strength", value: "Analytic characteristic function", color: "slate" },
+    ],
+    body: [
+      `The Heston model specifies a diffusion for the underlying and a mean-reverting square-root diffusion for its instantaneous variance, correlated with the spot. The five parameters—speed of mean reversion κ, long-run variance θ, vol-of-vol σ_v, correlation ρ, and initial variance v₀—together determine both the shape of the implied-volatility surface and how that surface is expected to move when spot and variance evolve.`,
+      `Because the characteristic function is known in closed form, European options can be priced by Fourier inversion with high speed and accuracy. The model naturally produces a negative equity-like skew when ρ < 0, a term structure of ATM volatility governed by mean reversion, and a butterfly controlled by vol-of-vol. Its greatest practical value, however, is dynamic: once calibrated, Heston supplies a risk-neutral evolution of the entire surface, enabling consistent pricing of path-dependent exotics and forward-starting options.`,
+      `Pure Heston is known to understate short-dated skew and the volatility of volatility observed in markets; modern practice therefore embeds it inside local-stochastic-volatility (LSV) hybrids or replaces it with rough-volatility or path-dependent volatility models. Nevertheless Heston remains the pedagogical and practical benchmark for understanding how a low-dimensional stochastic-volatility diffusion generates and moves a volatility surface.`
+    ],
+    keyPoint: "Heston is the minimal continuous model that links a static volatility surface to a dynamic process for that surface. It teaches the essential lesson: surface shape and surface dynamics are two sides of the same stochastic-volatility coin."
+  },
+  {
+    era: "VIX Term",
+    icon: "📊",
+    title: "VIX9D, VIX, VIX3M, VIX6M Term Structure",
+    desc: "The family of Cboe model-free volatility indices that map the S&P 500 variance term structure at constant maturities from 9 days to 6 months",
+    badge: { label: "Benchmark", style: "slate" },
+    tags: [["VIX9D","red"], ["VIX","slate"], ["VIX3M","teal"], ["VIX6M","amber"]],
+    data: [
+      { label: "VIX9D", value: "9-day constant maturity", color: "red" },
+      { label: "VIX", value: "30-day (the flagship)", color: "slate" },
+      { label: "VIX3M / 6M", value: "3-month / 6-month", color: "teal" },
+    ],
+    body: [
+      `Cboe publishes a strip of model-free volatility indices that extract constant-maturity expected variance from the SPX option surface: VIX9D (9 days), VIX (30 days), VIX3M (3 months) and VIX6M (6 months). Each is computed by the same log-contract replication formula used for the classic VIX, merely changing the target maturity and the interpolation between listed expiries.`,
+      `Together they provide a real-time, model-independent reading of the equity variance term structure. In calm markets the curve is upward-sloping (VIX9D < VIX < VIX3M < VIX6M). In stress the front end rises disproportionately, producing a steeply inverted curve. The spreads between these indices are therefore pure, liquid expressions of calendar variance risk and of the volatility risk premium across horizons.`,
+      `Futures and options exist on several of these indices, allowing traders to take direct positions on the level and slope of the variance term structure without having to assemble and delta-hedge strips of SPX options. The VIX-family term structure has become one of the most widely watched barometers of equity-market risk appetite and of the price of short-dated versus longer-dated crash protection.`
+    ],
+    keyPoint: "VIX9D–VIX–VIX3M–VIX6M translate the abstract ATM variance term structure into a set of publicly quoted, investable indices. Their relative levels are the market’s purest real-time statement of how variance risk is priced across the maturity spectrum."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
