@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 14.3 CVaR (Expected Shortfall)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 14 · Section 14.3</div>
+      <h1 class="book-title">CVaR<br><em>(Expected Shortfall)</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>6</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Definition → coherence → optimization → regulation · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>14.3 CVaR (Expected Shortfall)</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Definition",
+    icon: "📉",
+    title: "CVaR = E[Loss | Loss > VaR]",
+    desc: "The expected loss given that the loss has already exceeded the VaR threshold — the average of the tail beyond VaR",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["cvar","slate"], ["expected shortfall","teal"], ["tail expectation","amber"], ["conditional","teal"]],
+    data: [
+      { label: "Also called", value: "Expected Shortfall (ES), TailVaR, AVaR", color: "teal" },
+      { label: "Formal", value: "E[L | L ≥ VaR<sub>α</sub>]", color: "amber" },
+      { label: "Interpretation", value: "Average loss in the worst α tail", color: "slate" },
+    ],
+    body: [
+      `Conditional Value-at-Risk (CVaR), also known as Expected Shortfall (ES), answers the question that VaR deliberately ignores: “If we do breach the VaR threshold, how bad is the loss on average?” Formally it is the expected value of the loss distribution conditional on the loss exceeding (or equalling) the VaR at confidence level α.`,
+      `Because it averages the entire tail rather than stopping at a single quantile, CVaR is sensitive to the severity of extreme outcomes. Two portfolios with identical VaR can have very different CVaRs; the one with the heavier or longer tail will show the larger CVaR. This is precisely the information a risk manager needs when capital or limits must cover actual shortfall magnitudes.`,
+      `For continuous loss distributions CVaR coincides with the average of all VaRs beyond the threshold (an integral representation). For discrete or empirical distributions a careful definition using the lower partial moment or the Rockafellar–Uryasev formulation is required to preserve coherence and avoid ambiguity at atoms.`
+    ],
+    keyPoint: "CVaR is the average of all losses beyond VaR. Where VaR only marks a threshold, CVaR measures the expected severity once that threshold has been crossed — the quantity that actually determines capital shortfall."
+  },
+  {
+    era: "Coherence",
+    icon: "✅",
+    title: "Coherent Risk Measure (Unlike VaR)",
+    desc: "CVaR satisfies the four axioms of coherence — translation invariance, subadditivity, positive homogeneity and monotonicity — while VaR fails subadditivity",
+    badge: { label: "Theory", style: "teal" },
+    tags: [["coherence","teal"], ["subadditivity","amber"], ["axioms","slate"], ["diversification","teal"]],
+    data: [
+      { label: "Key axiom", value: "Subadditivity: ρ(X+Y) ≤ ρ(X)+ρ(Y)", color: "teal" },
+      { label: "VaR failure", value: "Can penalise diversification", color: "red" },
+      { label: "CVaR", value: "Always rewards diversification", color: "teal" },
+    ],
+    body: [
+      `Artzner et al. (1999) defined a coherent risk measure as one that satisfies four axioms: translation invariance, subadditivity, positive homogeneity and monotonicity. Subadditivity is the mathematically precise statement that “diversification cannot increase risk.” VaR can violate it; CVaR never does.`,
+      `The practical consequence is immediate. Under a VaR constraint a desk may be incentivised to split a portfolio into separate books whose individual VaRs sum to less than the VaR of the combined book. Under a CVaR constraint that arbitrage disappears: the risk of the sum is always less than or equal to the sum of the risks.`,
+      `Coherence also guarantees that CVaR is consistent with first-order stochastic dominance and with the acceptance sets used in modern capital-allocation theory. These properties make CVaR the preferred building block for both regulatory capital and internal economic-capital models.`
+    ],
+    keyPoint: "Coherence is not an academic nicety. It is the guarantee that measured risk will never punish diversification and will never create incentives to game the metric by artificial portfolio splitting — the precise failure mode of VaR."
+  },
+  {
+    era: "Optimization",
+    icon: "⚙️",
+    title: "CVaR Optimization (Rockafellar–Uryasev)",
+    desc: "The seminal reformulation that turns CVaR minimisation into a convex programme solvable by linear programming when scenarios are discrete",
+    badge: { label: "Core", style: "amber" },
+    tags: [["rockafellar-uryasev","amber"], ["convex","teal"], ["linear programming","slate"], ["scenario-based","teal"]],
+    data: [
+      { label: "Key insight", value: "CVaR as minimisation of an auxiliary function", color: "amber" },
+      { label: "Benefit", value: "Convex → global optimum, LP solvable", color: "teal" },
+      { label: "Input", value: "Discrete scenarios of portfolio loss", color: "slate" },
+    ],
+    body: [
+      `Rockafellar and Uryasev (2000) showed that CVaR can be expressed as the minimum of a simple auxiliary function F<sub>α</sub>(w, ζ) = ζ + (1/(1−α)) E[(L(w) − ζ)<sup>+</sup>], where ζ is a free scalar (which turns out to be the VaR at the optimum) and w are the portfolio weights. Minimising F with respect to both w and ζ simultaneously yields the minimum-CVaR portfolio and its VaR as a by-product.`,
+      `When the expectation is replaced by a finite set of scenarios, the positive-part operator becomes a set of linear inequalities. The resulting programme is a linear programme (or a convex quadratic programme if a quadratic objective term is added). This insight transformed CVaR from a diagnostic statistic into a computationally tractable optimisation objective.`,
+      `The formulation extends naturally to constraints on CVaR, to multi-period problems, and to combinations with other convex risk measures. It is the algorithmic foundation of virtually all modern CVaR-based portfolio construction engines.`
+    ],
+    keyPoint: "The Rockafellar–Uryasev representation is the reason CVaR is usable in large-scale portfolio optimisation: it converts a non-smooth tail expectation into a convex (often linear) programme whose solution is globally optimal and numerically reliable."
+  },
+  {
+    era: "Portfolio",
+    icon: "📊",
+    title: "CVaR-Based Portfolio Optimization",
+    desc: "Constructing portfolios that minimise CVaR (or constrain it) subject to return targets, producing allocations that explicitly control tail risk",
+    badge: { label: "Application", style: "teal" },
+    tags: [["portfolio construction","teal"], ["tail risk","amber"], ["mean-cvar","slate"], ["constraints","teal"]],
+    data: [
+      { label: "Objective", value: "Min CVaR s.t. E[R] ≥ target", color: "teal" },
+      { label: "Dual", value: "Max return s.t. CVaR ≤ limit", color: "amber" },
+      { label: "Output", value: "Weights + implied VaR + CVaR", color: "slate" },
+    ],
+    body: [
+      `Mean-CVaR optimisation replaces the variance term of classical mean-variance analysis with CVaR. The resulting efficient frontier is expressed in the space of expected return versus expected tail loss. Because CVaR is coherent and convex, the optimisation remains tractable and the frontier is well-behaved.`,
+      `In practice the loss scenarios are generated either from historical returns, from a parametric model, or from Monte Carlo simulation of risk factors. Transaction costs, position limits, leverage constraints and multiple CVaR constraints at different horizons or confidence levels can be added without destroying convexity.`,
+      `Relative to mean-variance, mean-CVaR portfolios typically reduce concentration in assets that contribute disproportionately to the extreme left tail, even if those assets have modest volatility. The method therefore systematically de-emphasises “lottery-ticket” risks that variance treats symmetrically.`
+    ],
+    keyPoint: "CVaR portfolio optimisation does not merely re-label mean-variance; it changes the objective from ‘minimise average squared deviation’ to ‘minimise the expected severity of the worst outcomes,’ producing materially different and more tail-aware allocations."
+  },
+  {
+    era: "Regulation",
+    icon: "🏦",
+    title: "Regulatory Shift from VaR to ES (FRTB)",
+    desc: "The Basel Fundamental Review of the Trading Book replaces 99 % VaR with 97.5 % Expected Shortfall as the primary internal-models capital metric",
+    badge: { label: "Regulatory", style: "slate" },
+    tags: [["frtb","slate"], ["expected shortfall","teal"], ["97.5%","amber"], ["liquidity horizons","red"]],
+    data: [
+      { label: "Old metric", value: "99 % 10-day VaR", color: "amber" },
+      { label: "New metric", value: "97.5 % ES with liquidity horizons", color: "teal" },
+      { label: "Motivation", value: "Capture tail severity + varying liquidity", color: "red" },
+    ],
+    body: [
+      `After the 2008 crisis it became clear that VaR-based capital had been both procyclical and blind to the magnitude of tail losses. The Fundamental Review of the Trading Book (FRTB) therefore substitutes Expected Shortfall calibrated at the 97.5 % confidence level for the previous 99 % VaR. Under normality the two measures are numerically close; under fat tails the ES number is materially larger and more conservative.`,
+      `FRTB further differentiates liquidity horizons by risk-factor class (10, 20, 40, 60 or 120 days). The ES calculation is performed at each horizon and then aggregated, recognising that equity prices can be exited faster than, for example, certain credit or exotic risk factors. This is a structural improvement over the uniform 10-day assumption of the old regime.`,
+      `Banks must also pass stringent modellability and back-testing tests. Non-modellable risk factors are capitalised under a separate stressed stress-scenario framework. The overall effect is a higher, more risk-sensitive and less easily gamed capital requirement for market risk.`
+    ],
+    keyPoint: "The regulatory replacement of VaR by Expected Shortfall is the official acknowledgement that a coherent, tail-sensitive measure is required for capital adequacy. FRTB’s 97.5 % ES plus liquidity horizons is the concrete embodiment of that principle."
+  },
+  {
+    era: "Levels",
+    icon: "📏",
+    title: "CVaR at Different Confidence Levels",
+    desc: "How the choice of α changes both the numerical value of CVaR and the set of scenarios that enter the tail average",
+    badge: { label: "Parameter", style: "amber" },
+    tags: [["confidence level","amber"], ["97.5%","teal"], ["99%","red"], ["tail depth","slate"]],
+    data: [
+      { label: "Regulatory", value: "97.5 % ES (FRTB)", color: "teal" },
+      { label: "Common internal", value: "99 % or 99.5 % CVaR", color: "amber" },
+      { label: "Effect of ↑α", value: "Deeper tail, larger & noisier estimate", color: "red" },
+    ],
+    body: [
+      `Raising the confidence level α moves the conditioning threshold further into the left tail. Consequently the CVaR number increases and the set of scenarios that contribute to the average becomes smaller and more extreme. Estimation error grows rapidly because fewer observations (or simulated paths) inform the expectation.`,
+      `Under a normal distribution the ratio of 99 % CVaR to 95 % CVaR is modest; under realistic fat-tailed distributions the ratio can be dramatically larger. This sensitivity is informative: a large gap between CVaRs at adjacent confidence levels signals that the extreme tail is heavy and that capital results will be driven by a handful of scenarios.`,
+      `In optimisation and limit-setting it is common to monitor CVaR at several levels simultaneously (e.g., 95 %, 97.5 %, 99 %). Consistency across levels provides a robustness check; divergence highlights model or data weaknesses in the far tail.`
+    ],
+    keyPoint: "The confidence level is not a free cosmetic parameter. It determines how deep into the tail the average is taken, how many scenarios inform the estimate, and how sensitive the resulting capital or limit will be to the most extreme observations."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

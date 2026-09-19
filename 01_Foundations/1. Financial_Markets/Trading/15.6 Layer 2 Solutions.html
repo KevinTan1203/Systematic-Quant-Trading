@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 15.6 Layer 2 Solutions</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 15 · Section 15.6</div>
+      <h1 class="book-title">Layer 2<br><em>Solutions</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Optimistic → ZK → DA → fees → fragmentation · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>15.6 Layer 2 Solutions</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Optimistic",
+    icon: "⏳",
+    title: "Optimistic Rollups",
+    desc: "L2s that post transaction data to L1 and assume correctness unless a fraud proof succeeds within a challenge window — Arbitrum, Optimism, Base",
+    badge: { label: "Dominant", style: "slate" },
+    tags: [["optimistic","slate"], ["arbitrum","teal"], ["optimism","amber"], ["base","teal"]],
+    data: [
+      { label: "Security", value: "Fraud proofs + challenge period", color: "amber" },
+      { label: "Withdrawal", value: "Typically ~7 days to L1 finality", color: "red" },
+      { label: "Examples", value: "Arbitrum One, OP Mainnet, Base, others", color: "teal" },
+    ],
+    body: [
+      `Optimistic rollups execute transactions off-chain (or on a separate chain), post compressed data to Ethereum L1, and publish state roots that are accepted as valid unless challenged. A dispute window allows anyone to submit a fraud proof; if the proof succeeds, the invalid root is rejected and the responsible party is slashed.`,
+      `The model is operationally mature and EVM-compatible in its leading implementations, which is why it hosts the majority of L2 DeFi and consumer activity. The cost of that simplicity is withdrawal latency to L1 and a security assumption that at least one honest party will challenge fraud.`,
+      `Sequencers order transactions and provide fast soft confirmations; finality in the L1 sense arrives only after the challenge period (or after a validity mechanism is added). Fast bridges and liquidity providers compress that wait for users who accept extra trust or fee.`
+    ],
+    keyPoint: "Optimistic rollups scale by assuming honesty and punishing fraud after the fact. They deliver EVM familiarity and low fees at the price of delayed L1 finality and a live fraud-proof ecosystem."
+  },
+  {
+    era: "ZK",
+    icon: "📐",
+    title: "ZK Rollups",
+    desc: "L2s that post validity proofs (SNARKs or STARKs) of state transitions so that L1 can verify correctness without re-executing — zkSync Era, StarkNet, Scroll",
+    badge: { label: "Validity", style: "teal" },
+    tags: [["zk rollup","teal"], ["zksync","amber"], ["starknet","slate"], ["scroll","teal"]],
+    data: [
+      { label: "Security", value: "Validity proof verified on L1", color: "teal" },
+      { label: "Finality", value: "Once proof lands — no long challenge wait", color: "amber" },
+      { label: "Cost drivers", value: "Proving + DA + L1 verification", color: "slate" },
+    ],
+    body: [
+      `ZK rollups execute off-chain and submit a cryptographic proof that the new state root follows correctly from the previous one. Ethereum verifies the proof; it does not re-run the transactions. Because invalid transitions cannot produce a valid proof, there is no multi-day challenge window for correctness.`,
+      `EVM-equivalence and proving cost have been the historical hurdles. zkSync Era, Scroll, and others pursue zkEVM designs; StarkNet uses a different VM (Cairo) with its own tooling path. Prover infrastructure, latency to proof submission, and gas for verification shape fee economics and UX.`,
+      `As proving becomes cheaper and faster, ZK rollups aim to combine strong finality with competitive fees. Data availability remains a separate axis: the proof attests to correct execution of some data; that data must still be available for full trustlessness.`
+    ],
+    keyPoint: "ZK rollups replace the social security of fraud proofs with mathematical validity proofs. Finality can be fast; the remaining bottlenecks are proving cost, DA, and ecosystem maturity."
+  },
+  {
+    era: "Legacy",
+    icon: "📡",
+    title: "Plasma and State Channels",
+    desc: "Earlier L2 families: Plasma for committed off-chain chains with Merkle roots on L1, and state channels for locked two-party (or n-party) update protocols",
+    badge: { label: "Historical", style: "amber" },
+    tags: [["plasma","amber"], ["state channels","slate"], ["exit games","red"], ["limited generality","slate"]],
+    data: [
+      { label: "Plasma", value: "Child chain + commitments; complex exits", color: "amber" },
+      { label: "Channels", value: "Off-chain signed updates; on-chain settle", color: "teal" },
+      { label: "Limitation", value: "Data availability / generality constraints", color: "red" },
+    ],
+    body: [
+      `Plasma publishes Merkle roots of off-chain blocks to L1 and relies on users to exit with proofs if the operator misbehaves. Data availability and mass-exit scenarios proved difficult; general-purpose Plasma largely lost mindshare to rollups, which post data (or blobs) so users can reconstruct state without trusting the operator for availability.`,
+      `State channels lock funds in a multisig contract and allow participants to update balances by exchanging signatures. Only the final state need hit L1. Channels excel at high-frequency interaction among a fixed set of parties (payments, turn-based games) but do not generalise easily to open, composable DeFi.`,
+      `Both designs remain relevant as conceptual ancestors and for niche use cases. The industry’s centre of gravity for general computation moved to optimistic and ZK rollups.`
+    ],
+    keyPoint: "Plasma and channels taught the industry that scalability without data availability or open participation hits hard limits. Rollups are the synthesis that kept L1 security assumptions while opening the design space."
+  },
+  {
+    era: "DA",
+    icon: "📦",
+    title: "Data Availability: Calldata vs. Blobs",
+    desc: "How L2s publish transaction data to L1 — historically expensive calldata, and after EIP-4844 dedicated blob space that sharply lowers DA cost",
+    badge: { label: "Infrastructure", style: "teal" },
+    tags: [["data availability","teal"], ["eip-4844","amber"], ["blobs","slate"], ["calldata","red"]],
+    data: [
+      { label: "Pre-4844", value: "Calldata on L1 — costly at scale", color: "red" },
+      { label: "Post-4844", value: "Blob-carrying transactions — cheaper DA", color: "teal" },
+      { label: "Effect", value: "Material drop in L2 fees when blobs used", color: "amber" },
+    ],
+    body: [
+      `A rollup is only trust-minimised if users can reconstruct state from data posted to L1 (or to a DA layer with comparable guarantees). Posting that data as calldata competed with ordinary L1 execution for blockspace and was expensive under congestion.`,
+      `EIP-4844 introduced blob-carrying transactions: data that is available long enough for security but is not stored forever in the execution-accessible state trie. Blob fees have their own market, typically much cheaper than equivalent calldata. Most major rollups migrated DA to blobs, which is the main reason L2 fees fell after the upgrade.`,
+      `DA remains the binding constraint on rollup throughput. Further gains come from better compression, alternative DA layers, and eventual danksharding-style expansions of blob capacity.`
+    ],
+    keyPoint: "Data availability is the hidden cost centre of rollups. Blobs decoupled DA from execution gas and reset L2 fee economics; capacity and pricing of DA still set the ceiling on scale."
+  },
+  {
+    era: "Fees",
+    icon: "💸",
+    title: "L2 Fee Economics",
+    desc: "The composition of an L2 transaction fee: L1 data cost, L2 execution, sequencer margin, and occasional proving cost — and how those components move with demand",
+    badge: { label: "Economics", style: "amber" },
+    tags: [["l2 fees","amber"], ["l1 data cost","red"], ["sequencer","slate"], ["fee market","teal"]],
+    data: [
+      { label: "Components", value: "DA + L2 gas + sequencer tip/margin", color: "amber" },
+      { label: "Dominant term", value: "Often L1 DA when activity is high", color: "red" },
+      { label: "User view", value: "One fee; internally a stacked market", color: "slate" },
+    ],
+    body: [
+      `Users pay a single fee on an L2, but that fee must cover (1) the cost of posting data to L1 or a DA layer, (2) L2 execution resources, and (3) whatever margin the sequencer or network takes. On optimistic rollups the first term has historically dominated during L1 congestion; blobs reduced but did not eliminate it.`,
+      `L2s may run their own base-fee style mechanisms or simpler posted prices. Priority within a block is often first-come or sequencer-determined rather than a full EIP-1559-style auction, which changes MEV and inclusion dynamics relative to Ethereum L1.`,
+      `When L1 blob fees spike, L2 fees rise even if L2 blockspace is idle. Understanding fee composition is essential for routing, for UX expectations, and for evaluating whether an L2’s “cheap” periods are structural or cyclical.`
+    ],
+    keyPoint: "L2 fees are a stack: you always pay for security data on L1 (or equivalent DA) plus local execution. Blobs lowered the floor; they did not remove the link to L1 demand."
+  },
+  {
+    era: "Revenue",
+    icon: "🏦",
+    title: "Sequencer Revenue & L2 Tokens",
+    desc: "How centralized or semi-centralized sequencers earn from ordering and fees, and how L2 native tokens interact with governance, alignment, and eventual decentralisation",
+    badge: { label: "Business", style: "slate" },
+    tags: [["sequencer","slate"], ["revenue","amber"], ["l2 token","teal"], ["decentralisation","red"]],
+    data: [
+      { label: "Sequencer income", value: "Fees + MEV/ordering advantages", color: "amber" },
+      { label: "Token roles", value: "Governance, gas, staking, incentives", color: "teal" },
+      { label: "Tension", value: "Revenue vs. roadmap to shared sequencing", color: "red" },
+    ],
+    body: [
+      `Most production L2s still use a single sequencer (or a small set) to order transactions and produce blocks. That role earns the net fee margin after L1 DA costs and can capture sequencing-related MEV. Sequencer revenue is therefore one of the clearest business models in the L2 stack.`,
+      `L2 native tokens are used for governance, sometimes for gas, for incentivising liquidity or developers, and as a path toward decentralised sequencing or fraud-proof participation. Token value is tied to narrative, governance power, and expected claim on future network cash flows — which may or may not be explicitly committed.`,
+      `The strategic tension is clear: sequencers are profitable when centralised; roadmaps promise decentralisation that redistributes or reduces that rent. Market structure analysis must track both the current cash flows and the credibility of the decentralisation path.`
+    ],
+    keyPoint: "Sequencer revenue is the L2’s operating business; the native token is often the governance and alignment layer. Whether those converge into a sustainable, decentralised fee market is still an open design problem."
+  },
+  {
+    era: "Structure",
+    icon: "🏛️",
+    title: "L2 vs. L1 Market Structure",
+    desc: "How trading, MEV, and liquidity provision differ when execution is fast and cheap but finality, bridges, and sequencers introduce new intermediaries",
+    badge: { label: "Microstructure", style: "teal" },
+    tags: [["market structure","teal"], ["sequencer meV","amber"], ["fast finality","slate"], ["bridge risk","red"]],
+    data: [
+      { label: "Speed", value: "Soft confirmations in seconds", color: "teal" },
+      { label: "MEV locus", value: "Sequencer / builder, not public L1 mempool", color: "amber" },
+      { label: "Exit risk", value: "Bridge latency and bridge security", color: "red" },
+    ],
+    body: [
+      `On L1, users compete in a global fee market and face public-mempool MEV. On L2, inclusion is often determined by a sequencer with its own policy: priority queues, private order flow, or first-seen rules. Latency falls; the counterparty for ordering fairness becomes the sequencer operator until sequencing is decentralised.`,
+      `Liquidity can be deeper per unit of capital because fees are lower and block times are shorter, supporting tighter spreads and more active market-making. Cross-domain MEV (L2 ↔ L1, L2 ↔ L2) adds routes that did not exist in a single-chain world.`,
+      `Settlement asset quality still points back to L1. A position that cannot exit cheaply or safely through a bridge is only as good as the L2’s ongoing liveness and the bridge’s security model. Market structure is therefore dual: fast local execution, slower global exit.`
+    ],
+    keyPoint: "L2 market structure is L1 security with a sequencer-shaped inclusion market. Trading feels like a fast chain; exiting still feels like a bridge problem."
+  },
+  {
+    era: "Fragmentation",
+    icon: "🧩",
+    title: "Cross-L2 Liquidity Fragmentation",
+    desc: "The splitting of users, liquidity, and composability across many rollups — deeper local markets, thinner global ones, and a permanent role for bridges and intents",
+    badge: { label: "Systemic", style: "red" },
+    tags: [["fragmentation","red"], ["liquidity islands","amber"], ["intents","teal"], ["shared sequencing","slate"]],
+    data: [
+      { label: "Symptom", value: "Same pair, many pools, weaker depth each", color: "red" },
+      { label: "User cost", value: "Bridging, extra swaps, failed composability", color: "amber" },
+      { label: "Responses", value: "Aggregators, intents, shared sequencers, L3s", color: "teal" },
+    ],
+    body: [
+      `Every new L2 is a new execution environment with its own pools, collateral, and order flow. Capital that would have concentrated on L1 is spread across Arbitrum, Base, Optimism, zkSync, StarkNet, and others. Local fees fall; global depth for any single pool often falls with them.`,
+      `Composability suffers: a flash loan on one L2 cannot atomically repay on another without messaging and trust assumptions. Protocols deploy multiple times; users hold many representations of the “same” asset. Bridging and intent-based routing become mandatory infrastructure rather than optional convenience.`,
+      `Industry responses include better aggregators, cross-chain intent solvers, shared sequencing experiments, and liquidity that sits at a hub (L1 or a canonical bridge network). Fragmentation is not a temporary bug; it is the default outcome of permissionless L2 deployment unless coordination mechanisms counteract it.`
+    ],
+    keyPoint: "L2 success multiplies execution environments and splits liquidity. The scalability gain is real; the cost is permanent fragmentation that bridges, intents, and shared sequencing must continually fight."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

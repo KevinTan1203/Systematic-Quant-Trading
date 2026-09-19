@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 14.9 Tail Risk Management</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 14 · Section 14.9</div>
+      <h1 class="book-title">Tail Risk<br><em>Management</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Fat tails → black swans → hedges → convexity · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>14.9 Tail Risk Management</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Fat Tails",
+    icon: "📉",
+    title: "Fat Tails in Financial Returns",
+    desc: "The empirical reality that extreme returns occur far more frequently than a normal distribution predicts — excess kurtosis is the rule, not the exception",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["fat tails","slate"], ["kurtosis","amber"], ["non-normal","red"], ["extreme returns","teal"]],
+    data: [
+      { label: "Evidence", value: "Daily equity returns: kurtosis ≫ 3", color: "red" },
+      { label: "Implication", value: "VaR & Gaussian models understate extremes", color: "amber" },
+      { label: "Consequence", value: "Tail events dominate long-run risk", color: "slate" },
+    ],
+    body: [
+      `Financial returns exhibit excess kurtosis: the probability of moves beyond three or four standard deviations is materially higher than the normal distribution implies. This is not a rare pathology of emerging markets or crisis periods; it is a pervasive feature of equities, FX, commodities and credit across decades and geographies.`,
+      `Fat tails arise from volatility clustering, jumps, leverage effects and the occasional cascade of forced selling. Their practical consequence is that risk measures calibrated under normality systematically understate the frequency and severity of large losses. Capital, limits and hedges sized to a Gaussian world are therefore chronically insufficient.`,
+      `Any serious tail-risk framework begins by discarding the comfort of normality and by treating the historical frequency of extreme moves as a lower bound on what can occur in the future.`
+    ],
+    keyPoint: "Fat tails are not a statistical curiosity; they are the central empirical fact that makes ordinary volatility-based risk management incomplete. Extreme losses happen more often than the bell curve allows."
+  },
+  {
+    era: "Black Swan",
+    icon: "🦢",
+    title: "Black Swan Events (Taleb Framework)",
+    desc: "Rare, high-impact, retrospectively explainable events that lie outside the realm of regular expectations and that dominate long-term outcomes",
+    badge: { label: "Framework", style: "red" },
+    tags: [["black swan","red"], ["taleb","amber"], ["unpredictable","slate"], ["impact","red"]],
+    data: [
+      { label: "Three traits", value: "Outlier, extreme impact, ex-post rationalisable", color: "red" },
+      { label: "Domain", value: "Mediocristan vs. Extremistan", color: "amber" },
+      { label: "Response", value: "Robustness & antifragility, not prediction", color: "teal" },
+    ],
+    body: [
+      `Nassim Taleb’s Black Swan framework distinguishes events that are so rare and so consequential that they cannot be reliably forecast from historical data, yet that shape the entire distribution of outcomes once they occur. Financial markets belong to “Extremistan”: a single day or week can erase years of steady gains.`,
+      `The intellectual error is not the existence of such events but the belief that they can be predicted or that their probability can be usefully estimated from the recent past. Models that assign vanishingly small probabilities to crises are not conservative; they are structurally blind.`,
+      `The operational response is therefore not better forecasting but better positioning: portfolios and institutions that can survive, and ideally benefit from, large unexpected shocks. Tail-risk management is the practical expression of that stance.`
+    ],
+    keyPoint: "Black Swans cannot be reliably priced or predicted; they can only be prepared for. The correct posture is robustness (and where possible antifragility), not the illusion of a precise probability."
+  },
+  {
+    era: "Programs",
+    icon: "🛡️",
+    title: "Tail-Risk Hedging Programs",
+    desc: "Dedicated, ongoing allocations whose sole purpose is to deliver large positive payoffs in extreme market declines, accepting steady costs in quiet periods",
+    badge: { label: "Core", style: "teal" },
+    tags: [["tail hedge program","teal"], ["dedicated allocation","amber"], ["crisis alpha","slate"], ["budget","red"]],
+    data: [
+      { label: "Typical size", value: "0.5–3 % of portfolio per year in premium", color: "amber" },
+      { label: "Objective", value: "Offset a defined fraction of equity drawdown", color: "teal" },
+      { label: "Discipline", value: "Maintain through long quiet periods", color: "red" },
+    ],
+    body: [
+      `A tail-risk hedging programme is a permanent or semi-permanent sleeve of the portfolio that is expected to lose small amounts of money most of the time and to make large amounts of money in rare, violent sell-offs. It is explicitly not a volatility-reduction overlay; its correlation with the rest of the book is designed to be near zero in normal markets and strongly negative in crises.`,
+      `Governance is the hardest part. Because the programme bleeds premium or carry in quiet years, there is constant pressure to reduce or eliminate it precisely when the next crisis is closest. Successful programmes therefore embed rules that make abandonment difficult and that size the hedge relative to a pre-agreed protection target rather than to recent performance.`,
+      `Implementation choices — which instruments, which strikes, which tenors, how to roll — determine both the cost and the reliability of the payoff. No single instrument is perfect; most institutional programmes combine several.`
+    ],
+    keyPoint: "A tail-risk programme is an insurance policy, not a trading strategy. Its success is measured by whether it is still in place when the crisis arrives, not by its year-by-year P&L."
+  },
+  {
+    era: "Puts",
+    icon: "📉",
+    title: "OTM Put Options as Disaster Insurance",
+    desc: "Purchasing out-of-the-money index or single-name puts that pay off only in severe declines — the purest form of explicit tail insurance",
+    badge: { label: "Classic", style: "amber" },
+    tags: [["otm puts","amber"], ["disaster insurance","red"], ["premium bleed","slate"], ["convexity","teal"]],
+    data: [
+      { label: "Structure", value: "Buy puts 10–30 % OTM, roll periodically", color: "amber" },
+      { label: "Payoff", value: "Large, bounded only by strike depth", color: "teal" },
+      { label: "Cost", value: "Continuous premium decay in calm markets", color: "red" },
+    ],
+    body: [
+      `Out-of-the-money put options on equity indices (or on the most dangerous single names) are the most direct way to buy explicit downside protection. Their value explodes when the underlying falls through the strike; in quiet markets they decay toward zero. The asymmetry is precisely the convexity that tail-risk managers seek.`,
+      `Strike and maturity selection embody the trade-off between cost and attachment point. Deeper OTM puts are cheaper but protect only against more extreme moves; closer-to-the-money puts cost more but begin paying earlier. Rolling schedules must balance the desire to stay protected against the cumulative cost of repeated purchases.`,
+      `Basis risk remains: an index put may not fully offset a portfolio that is concentrated in particular sectors or factors. Nevertheless, liquid index puts remain the benchmark instrument against which other tail hedges are judged.`
+    ],
+    keyPoint: "OTM puts are the cleanest disaster insurance available in listed markets. They convert a known, recurring premium cost into an open-ended claim on the left tail — the definition of explicit convexity."
+  },
+  {
+    era: "VIX",
+    icon: "📊",
+    title: "VIX Call Spreads",
+    desc: "Using call options or call spreads on the VIX to gain exposure to volatility spikes that accompany equity market crashes, at a lower net premium than outright VIX calls",
+    badge: { label: "Volatility", style: "teal" },
+    tags: [["vix","teal"], ["call spread","amber"], ["vol spike","red"], ["basis risk","slate"]],
+    data: [
+      { label: "Rationale", value: "VIX spikes when equities crash", color: "teal" },
+      { label: "Structure", value: "Long lower-strike call, short higher-strike call", color: "amber" },
+      { label: "Limit", value: "Payoff capped; term-structure & basis risk", color: "red" },
+    ],
+    body: [
+      `The VIX index tends to rise sharply when equity markets fall, making long-volatility positions a natural tail hedge. Outright VIX calls are expensive because the VIX futures curve is usually in contango and because implied volatility of volatility is itself high. Call spreads (long a lower-strike call, short a higher-strike call) reduce the net premium at the cost of capping the maximum payoff.`,
+      `The hedge works best when the spike in the VIX is large and rapid. It works less well when equities fall slowly or when the VIX term structure and the relationship between spot VIX and the traded futures diverge. Basis risk between the VIX complex and the equity portfolio is therefore first-order.`,
+      `Sizing is usually expressed as a percentage of the equity book that the expected VIX-spread payoff is intended to offset under a defined stress scenario. Because the payoff is capped, VIX call spreads are often combined with uncapped instruments such as OTM equity puts.`
+    ],
+    keyPoint: "VIX call spreads buy a slice of the volatility spike that accompanies crashes. They are cheaper than outright long-vol positions but introduce a hard cap and non-trivial basis risk relative to the equity portfolio."
+  },
+  {
+    era: "Long Vol",
+    icon: "📈",
+    title: "Long Volatility Positions",
+    desc: "Maintaining a structural long exposure to realised or implied volatility through variance swaps, volatility futures, options portfolios or systematic long-vol strategies",
+    badge: { label: "Structural", style: "amber" },
+    tags: [["long vol","amber"], ["variance swap","slate"], ["vol futures","teal"], ["carry cost","red"]],
+    data: [
+      { label: "Instruments", value: "Variance swaps, VIX futures, option overlays", color: "amber" },
+      { label: "Edge case", value: "Profits when realised vol ≫ implied", color: "teal" },
+      { label: "Drag", value: "Contango & volatility risk premium", color: "red" },
+    ],
+    body: [
+      `A structural long-volatility position is designed to profit whenever realised volatility exceeds the level that was implied by the market at inception. In equity markets this tends to occur precisely during the violent sell-offs that define tail events. The position is therefore a natural, if imperfect, tail hedge.`,
+      `Implementation ranges from variance swaps and volatility futures to dynamic portfolios of options that maintain a target vega or gamma profile. All of these instruments embed a volatility risk premium: on average, implied volatility exceeds subsequent realised volatility, so a naïve long-vol position loses money most of the time.`,
+      `The art is to structure the long-vol exposure so that the bleed in normal markets is tolerable and the payoff in crises is large enough to matter. Pure passive long-vol is usually too expensive; selective, rules-based or opportunistically timed long-vol programmes have a better chance of surviving the quiet years.`
+    ],
+    keyPoint: "Long volatility is the purest expression of ‘I want to own the thing that explodes when everything else collapses.’ The price of that ownership is a persistent negative carry that must be deliberately budgeted."
+  },
+  {
+    era: "Gold",
+    icon: "🥇",
+    title: "Gold as Tail Hedge",
+    desc: "Holding physical or financial gold as a crisis asset that has historically retained value or appreciated when confidence in financial claims collapses",
+    badge: { label: "Real Asset", style: "slate" },
+    tags: [["gold","slate"], ["crisis asset","amber"], ["store of value","teal"], ["opportunity cost","red"]],
+    data: [
+      { label: "Role", value: "Monetary / confidence hedge", color: "slate" },
+      { label: "Behaviour", value: "Often rises in systemic risk-off episodes", color: "teal" },
+      { label: "Cost", value: "No yield; can lag for long periods", color: "red" },
+    ],
+    body: [
+      `Gold has no coupon and no earnings; its value is largely the market’s collective assessment of it as a monetary or confidence asset. In episodes of systemic financial stress, geopolitical shock or loss of faith in fiat claims, gold has frequently risen or held its value while risk assets fell. That behaviour makes it a candidate tail hedge.`,
+      `The relationship is not mechanical. Gold can fall alongside equities when liquidity is the dominant constraint, and it can stagnate for years when real rates are rising and confidence is high. Its diversification benefit is therefore episodic rather than continuous.`,
+      `Allocation sizes are typically modest (a few percent of portfolio) because of the opportunity cost of holding a non-yielding asset. Gold is best viewed as one component of a broader tail-hedge mix rather than as a complete solution on its own.`
+    ],
+    keyPoint: "Gold is a confidence hedge, not a volatility hedge. It tends to matter most when the crisis is about the credibility of financial or monetary systems rather than about ordinary cyclical risk."
+  },
+  {
+    era: "Treasuries",
+    icon: "📜",
+    title: "Treasury Bonds as Tail Hedge",
+    desc: "Using high-quality government duration as a flight-to-quality asset that typically rallies when equity and credit markets sell off violently",
+    badge: { label: "Classic", style: "teal" },
+    tags: [["treasuries","teal"], ["flight to quality","amber"], ["duration","slate"], ["negative correlation","teal"]],
+    data: [
+      { label: "Mechanism", value: "Safe-haven flows + rate-cut expectations", color: "teal" },
+      { label: "Reliability", value: "Strong in deflationary / risk-off crashes", color: "amber" },
+      { label: "Failure mode", value: "Inflationary or rates-driven crises (e.g. 2022)", color: "red" },
+    ],
+    body: [
+      `Long-duration government bonds have historically been the most reliable diversifier for equity risk in deflationary or pure risk-off crises. When investors flee risky assets, they bid up the prices of the safest nominal claims; simultaneously, central banks often cut rates, amplifying the rally in duration.`,
+      `The hedge failed, or at least disappointed, in the 2022 inflationary shock when both equities and bonds fell together. That episode underlined that Treasuries are a hedge against growth and confidence shocks, not against inflation or fiscal-credibility shocks.`,
+      `Within a tail-risk framework, long Treasuries (or bond futures) remain a core, low-cost component for the scenarios in which they work, supplemented by instruments that can perform when the crisis is inflationary rather than deflationary.`
+    ],
+    keyPoint: "Treasuries are the default flight-to-quality hedge for equity and credit risk — until the crisis is about inflation or sovereign credibility, at which point they can become part of the problem rather than the solution."
+  },
+  {
+    era: "Convexity",
+    icon: "📐",
+    title: "Convexity as Feature (Long Gamma)",
+    desc: "Deliberately positioning to be long gamma — benefiting from large moves in either direction — so that the portfolio’s payoff profile is itself a form of tail protection",
+    badge: { label: "Structural", style: "red" },
+    tags: [["long gamma","red"], ["convexity","amber"], ["positive skew","teal"], ["payoff shape","slate"]],
+    data: [
+      { label: "Meaning", value: "P&L accelerates as underlying moves grow", color: "red" },
+      { label: "Source", value: "Long options, certain systematic strategies", color: "amber" },
+      { label: "Cost", value: "Theta / carry drag in low-vol regimes", color: "slate" },
+    ],
+    body: [
+      `Convexity (positive gamma) means that the portfolio’s value rises at an increasing rate as the underlying moves away from its current level. A long-gamma position therefore profits from large moves in either direction and loses small amounts when markets are quiet. That payoff shape is intrinsically protective of the left tail of a broader portfolio.`,
+      `Long gamma can be obtained by holding options, by running certain systematic strategies that behave like options (e.g., trend-following at intermediate horizons), or by structuring products whose embedded optionality is long volatility. The common element is a payoff that is curved upward rather than linear or concave.`,
+      `The price of convexity is negative carry in calm markets. A portfolio that is structurally long gamma will underperform a linear portfolio in low-volatility regimes and outperform when volatility expands. Accepting that trade-off is the essence of using convexity as a deliberate tail-risk management tool rather than as an occasional tactical overlay.`
+    ],
+    keyPoint: "Long gamma is the purest structural expression of tail-risk management: the portfolio is built so that large moves themselves generate gains. The cost is continuous underperformance in the quiet regimes that dominate most calendar years."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

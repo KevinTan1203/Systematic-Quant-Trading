@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 15.3 Liquidity Pools</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 15 · Section 15.3</div>
+      <h1 class="book-title">Liquidity<br><em>Pools</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">LP tokens → deposit/withdraw → depth → incentives · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>15.3 Liquidity Pools</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "LP Token",
+    icon: "🎫",
+    title: "LP Token Mechanics",
+    desc: "Fungible (or NFT) claims issued to liquidity providers that represent proportional ownership of the pool’s reserves and accrued fees",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["lp token","slate"], ["erc-20","teal"], ["claim","amber"], ["composable","teal"]],
+    data: [
+      { label: "Form", value: "ERC-20 (v2-style) or NFT (v3-style)", color: "slate" },
+      { label: "Represents", value: "Share of reserves + unclaimed fees", color: "teal" },
+      { label: "Use", value: "Transferable, stakeable, composable in DeFi", color: "amber" },
+    ],
+    body: [
+      `When a user deposits assets into a classic constant-product pool, the protocol mints LP tokens in proportion to the share of the pool the deposit represents. Those tokens are the user’s claim on the underlying reserves and on fees that accumulate while the position is open. Burning the LP tokens returns the corresponding share of the current reserves.`,
+      `Because the tokens are usually fungible ERC-20s, they can be transferred, used as collateral, or staked in gauge and farming contracts. That composability is a core DeFi primitive: LP tokens become yield-bearing building blocks for other protocols.`,
+      `Concentrated-liquidity designs (Uniswap v3 and successors) often replace fungible LP tokens with non-fungible positions, because each range is unique. The economic claim is the same; the interface and secondary-market liquidity of the claim differ.`
+    ],
+    keyPoint: "The LP token is the portable claim on a share of the pool. Everything else — yield, governance weight, secondary use as collateral — is built on top of that claim."
+  },
+  {
+    era: "Share",
+    icon: "📊",
+    title: "Pool Share Representation",
+    desc: "How ownership is measured: the ratio of a position’s liquidity to total pool liquidity, which determines the fraction of reserves and fees the LP is entitled to",
+    badge: { label: "Core", style: "teal" },
+    tags: [["pool share","teal"], ["proportional claim","amber"], ["dilution","slate"], ["reserves","teal"]],
+    data: [
+      { label: "Metric", value: "LP_i / LP_total  or  L_i / L_total", color: "teal" },
+      { label: "Entitlement", value: "Same fraction of each reserve (at withdraw)", color: "amber" },
+      { label: "Dilution", value: "New deposits mint more shares at current price", color: "slate" },
+    ],
+    body: [
+      `Pool share is the fraction of the pool’s total liquidity units that a given position owns. On withdrawal, the LP receives that fraction of whatever the reserves currently are — not of what they originally deposited. Fees that have been retained in the pool increase the value of every share; impermanent loss and withdrawals by others change the composition of the reserves under those shares.`,
+      `New liquidity is added at the current marginal price, minting new shares so that existing LPs are not diluted in value terms (though their percentage ownership falls). The accounting identity is that the sum of all shares always claims 100 % of the reserves.`,
+      `In concentrated-liquidity AMMs the same idea applies inside each tick range: share is relative to the liquidity active in that range, not to the global pool.`
+    ],
+    keyPoint: "Pool share is a percentage claim on the living reserves, not a fixed basket of the assets originally deposited. That distinction is the root of both fee accrual and impermanent loss."
+  },
+  {
+    era: "Deposit",
+    icon: "➕",
+    title: "Adding and Removing Liquidity",
+    desc: "The deposit and withdrawal flows that mint or burn LP claims and that must respect the pool’s current price and invariant",
+    badge: { label: "Operations", style: "amber" },
+    tags: [["add liquidity","amber"], ["remove liquidity","slate"], ["mint/burn","teal"], ["balanced deposit","teal"]],
+    data: [
+      { label: "Add", value: "Deposit assets → mint LP shares at current price", color: "teal" },
+      { label: "Remove", value: "Burn LP shares → receive pro-rata reserves", color: "amber" },
+      { label: "Constraint", value: "Must match pool ratio (or pay swap cost)", color: "red" },
+    ],
+    body: [
+      `To add liquidity to a balanced constant-product pool, the depositor must supply both assets in the ratio of the current reserves. The protocol mints LP tokens proportional to the value added. Supplying an unbalanced basket effectively requires an implicit swap, which incurs price impact and fees.`,
+      `Removing liquidity burns LP tokens and returns the corresponding share of each reserve. The amounts received depend on the current pool composition, which may differ substantially from the amounts originally deposited. There is no “return my original tokens” option in a standard AMM.`,
+      `Concentrated-liquidity positions add the further step of choosing a price range. Adding or removing liquidity then affects only the reserves active inside that range, and the position may be partially or fully converted to a single asset if price has moved outside the range.`
+    ],
+    keyPoint: "Adding liquidity is a purchase of pool share at the current price; removing liquidity is a redemption of that share for whatever the pool now holds. Both operations are mechanical consequences of the invariant."
+  },
+  {
+    era: "Sided",
+    icon: "单向",
+    title: "Single-Sided vs. Dual-Sided Liquidity",
+    desc: "Whether an LP must deposit both assets in the pool’s ratio (dual-sided) or can deposit only one asset and let the protocol or a router balance the position",
+    badge: { label: "UX / Risk", style: "slate" },
+    tags: [["single-sided","slate"], ["dual-sided","teal"], ["zap","amber"], ["inventory risk","red"]],
+    data: [
+      { label: "Dual-sided", value: "Deposit both assets in current ratio", color: "teal" },
+      { label: "Single-sided", value: "Deposit one asset; protocol swaps the rest", color: "amber" },
+      { label: "Cost", value: "Single-sided pays implicit swap + impact", color: "red" },
+    ],
+    body: [
+      `Classic AMM deposits are dual-sided: the LP must provide both tokens in the proportions the pool currently holds. That requirement is awkward when the LP holds only one of the assets or does not want to sell half of a long-term holding.`,
+      `Single-sided entry (often via a “zap”) lets the user deposit one asset; a router swaps a portion into the other asset and then deposits both. The user pays swap fees and price impact for the convenience. Single-sided exit works symmetrically.`,
+      `Some designs (e.g., certain Balancer pools, protocol-owned liquidity programmes, or bonding curves) natively accept single-sided liquidity and manage the inventory themselves. The economic risk does not disappear; it is simply borne by a different party or amortised over time.`
+    ],
+    keyPoint: "Dual-sided liquidity preserves the pool’s ratio without a swap; single-sided liquidity outsources the balancing trade to the router or the protocol — and the user pays for that service."
+  },
+  {
+    era: "LBP",
+    icon: "🚀",
+    title: "Liquidity Bootstrapping Pools (LBPs)",
+    desc: "Pools whose weights change over time according to a pre-set schedule, used to launch tokens with anti-snipe price discovery and controlled distribution",
+    badge: { label: "Launch", style: "amber" },
+    tags: [["lbp","amber"], ["bootstrapping","teal"], ["weight shift","slate"], ["fair launch","teal"]],
+    data: [
+      { label: "Mechanism", value: "Project token weight falls; collateral weight rises", color: "amber" },
+      { label: "Effect", value: "Price declines over time if no demand pressure", color: "slate" },
+      { label: "Purpose", value: "Discourage snipers, discover price gradually", color: "teal" },
+    ],
+    body: [
+      `A liquidity bootstrapping pool begins with a high weight on the project token and a low weight on the collateral (e.g., ETH or a stablecoin). Over a fixed period the weights are updated so that the project-token weight falls and the collateral weight rises. The automatic weight shift exerts continuous downward pressure on the project-token price unless buyers absorb the supply.`,
+      `The design makes it expensive to snipe the launch at a low price and hold: early buyers pay a premium, and the price path is transparent. Capital required from the project team is modest because the pool can start with a small amount of collateral relative to the token supply.`,
+      `LBPs are a distribution and price-discovery tool rather than a long-term liquidity solution. After the bootstrapping period, liquidity is typically migrated to a conventional AMM pool or to a market-making programme.`
+    ],
+    keyPoint: "LBPs turn the pool’s weight schedule into a time-based price ceiling. They optimise for fairer launches and calmer price discovery, not for permanent deep liquidity."
+  },
+  {
+    era: "Depth",
+    icon: "🌊",
+    title: "Deep vs. Shallow Pool Dynamics",
+    desc: "How total value locked and its distribution across the price curve determine slippage, resilience to large trades, and the attractiveness of the pool to informed flow",
+    badge: { label: "Microstructure", style: "teal" },
+    tags: [["depth","teal"], ["tvl","amber"], ["slippage","red"], ["resilience","slate"]],
+    data: [
+      { label: "Deep", value: "Low impact, attracts size, more fee income", color: "teal" },
+      { label: "Shallow", value: "High impact, easy to move, vulnerable to MEV", color: "red" },
+      { label: "Metric", value: "Active liquidity near price, not just TVL", color: "amber" },
+    ],
+    body: [
+      `A deep pool can absorb large trades with modest price impact; a shallow pool cannot. Depth is not identical to total value locked: in concentrated-liquidity designs, only the capital sitting near the current price is “active.” A pool with high TVL spread over a wide range can still be shallow where it matters.`,
+      `Deep pools attract more volume, which generates more fees, which can attract more LPs — a virtuous circle. Shallow pools suffer the opposite dynamic and are more exposed to sandwich attacks and to permanent price dislocation after a large trade.`,
+      `For traders, pool depth at the relevant price is a first-class input to routing and size decisions. For LPs, contributing to an already-deep pool earns a smaller share of fees but typically bears less adverse-selection risk per unit of capital than being the bulk of a thin pool.`
+    ],
+    keyPoint: "Depth is the liquidity that is actually available at the current price. TVL is a headline; active depth is what determines execution quality and LP risk."
+  },
+  {
+    era: "POL",
+    icon: "🏛️",
+    title: "Protocol-Owned Liquidity (POL)",
+    desc: "Liquidity owned by the protocol treasury rather than by mercenary LPs — intended to provide permanent, aligned depth that cannot flee when incentives end",
+    badge: { label: "Structural", style: "slate" },
+    tags: [["pol","slate"], ["treasury","teal"], ["permanent liquidity","amber"], ["olympus-style","slate"]],
+    data: [
+      { label: "Idea", value: "Protocol owns the LP position itself", color: "slate" },
+      { label: "Benefit", value: "Depth that does not exit when rewards stop", color: "teal" },
+      { label: "Cost", value: "Treasury capital locked; opportunity cost", color: "amber" },
+    ],
+    body: [
+      `Protocol-owned liquidity is acquired when a project spends treasury assets (or newly minted tokens) to become an LP in its own pools. The protocol then earns the trading fees and, more importantly, retains a baseline of depth that is not subject to the whims of hired liquidity.`,
+      `The model rose to prominence as a reaction to mercenary capital that farmed token emissions and then withdrew, leaving pools thin. POL aims to replace that transient liquidity with a permanent core. It does not eliminate the need for external LPs; it reduces dependence on them for minimum viable depth.`,
+      `The trade-off is capital efficiency at the treasury level. Funds locked in LP positions cannot be used for development, grants, or other strategic purposes, and the protocol still bears impermanent loss on its own liquidity.`
+    ],
+    keyPoint: "POL is the protocol’s answer to flighty liquidity. It buys permanent depth with treasury capital and accepts IL and opportunity cost as the price of independence from mercenary LPs."
+  },
+  {
+    era: "Mining",
+    icon: "⛏️",
+    title: "Liquidity Mining & Mercenary Capital",
+    desc: "Token emissions paid to LPs to bootstrap depth — effective at attracting capital quickly, but often temporary and expensive once incentives decline",
+    badge: { label: "Incentives", style: "red" },
+    tags: [["liquidity mining","red"], ["emissions","amber"], ["mercenary capital","red"], ["bootstrap","teal"]],
+    data: [
+      { label: "Mechanism", value: "Extra token rewards for staking LP tokens", color: "amber" },
+      { label: "Effect", value: "Rapid TVL inflow while rewards are high", color: "teal" },
+      { label: "Risk", value: "Capital leaves when APR falls; sell pressure", color: "red" },
+    ],
+    body: [
+      `Liquidity mining programmes pay protocol tokens to users who deposit into designated pools and stake their LP tokens. The advertised APR can be very high, attracting large inflows of capital that would not otherwise tolerate the pool’s organic fee yield and IL risk.`,
+      `Much of that capital is “mercenary”: it allocates purely on the basis of current incentive APR and exits as soon as a better farm appears or emissions decline. The result is a boom–bust pattern in TVL and a persistent sell pressure on the reward token as farmers liquidate emissions.`,
+      `Well-designed programmes taper emissions, combine them with longer-term locks or ve-tokenomics, or transition toward POL and organic fee demand. Poorly designed programmes simply rent liquidity at an escalating cost and leave the protocol weaker when the programme ends.`
+    ],
+    keyPoint: "Liquidity mining can rent depth; it rarely owns it. Unless paired with mechanisms that retain capital after emissions fall, it is a temporary and often expensive bootstrap."
+  },
+  {
+    era: "Yield",
+    icon: "📈",
+    title: "Real vs. Sustainable Yield",
+    desc: "Distinguishing fee income and other cash flows generated by actual economic activity from yield that is merely the recycling of token emissions",
+    badge: { label: "Critical", style: "red" },
+    tags: [["real yield","red"], ["sustainable","teal"], ["emissions","amber"], ["fee revenue","slate"]],
+    data: [
+      { label: "Real yield", value: "Swap fees, lending interest, protocol revenue", color: "teal" },
+      { label: "Emission yield", value: "Newly minted tokens paid to LPs/stakers", color: "amber" },
+      { label: "Test", value: "Does yield survive if token rewards → 0?", color: "red" },
+    ],
+    body: [
+      `“Real yield” denotes returns that come from external economic activity: trading fees paid by swappers, interest paid by borrowers, or protocol revenue shared with stakeholders. “Emission yield” is the distribution of newly created tokens. Both can produce a high headline APR; only the former is sustainable without continuous dilution.`,
+      `A pool that earns 2 % annualised from fees and 50 % from emissions is not a 52 % yield product; it is a 2 % fee business temporarily wrapped in a high-inflation reward scheme. When emissions drop, the sustainable yield is the fee component (net of IL).`,
+      `Evaluating pools therefore requires separating the sources of return, estimating IL, and asking what the residual yield would be under a zero-emission scenario. That residual is the only figure that can be compared across protocols and across time.`
+    ],
+    keyPoint: "If the yield disappears when token rewards stop, it was never yield — it was a transfer from future token holders to present LPs. Sustainable pool returns are fee (and real revenue) net of impermanent loss."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

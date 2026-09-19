@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 15.1 CEX vs. DEX</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 15 · Section 15.1</div>
+      <h1 class="book-title">CEX vs.<br><em>DEX</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>11</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Centralized → decentralized → hybrid · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>15.1 CEX vs. DEX</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "CEX",
+    icon: "🏦",
+    title: "Centralized Exchanges (Binance, Coinbase, OKX)",
+    desc: "Intermediated trading venues that match buyers and sellers through a central operator, holding customer assets and operating a traditional order book",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["cex","slate"], ["binance","amber"], ["coinbase","teal"], ["okx","slate"]],
+    data: [
+      { label: "Model", value: "Central operator + order book", color: "slate" },
+      { label: "Examples", value: "Binance, Coinbase, OKX, Bybit, Kraken", color: "teal" },
+      { label: "Dominance", value: "Still majority of crypto spot & derivatives volume", color: "amber" },
+    ],
+    body: [
+      `Centralized exchanges (CEXs) are the crypto analogue of traditional broker-dealers and exchanges. A single legal entity operates the matching engine, the custody of customer assets, the fiat on-ramps, and the regulatory interface. Price discovery occurs on an off-chain order book; settlement is an internal ledger update until a user withdraws to an external wallet.`,
+      `The model delivers high throughput, deep liquidity, sophisticated order types, and familiar user experience. It also concentrates counterparty, operational and regulatory risk in the exchange itself. The history of crypto is littered with CEX failures (Mt. Gox, FTX, etc.) that erased customer funds.`,
+      `For professional and algorithmic traders, CEXs remain the primary venue for size, leverage and low-latency execution. Understanding their microstructure — maker-taker fees, API rate limits, liquidation engines — is therefore still mandatory.`
+    ],
+    keyPoint: "A CEX is a trusted intermediary that trades speed, depth and convenience for custody risk and regulatory dependency. Most crypto volume still lives here."
+  },
+  {
+    era: "Custody",
+    icon: "🔐",
+    title: "Custodial Model",
+    desc: "The defining feature of CEXs: the exchange holds private keys and customer assets, so users trade claims on the exchange rather than on-chain tokens",
+    badge: { label: "Critical", style: "red" },
+    tags: [["custody","red"], ["counterparty risk","amber"], ["withdrawal","slate"], ["proof of reserves","teal"]],
+    data: [
+      { label: "Reality", value: "You do not hold the keys → not your coins", color: "red" },
+      { label: "Risk", value: "Exchange insolvency, hack, freeze, fraud", color: "amber" },
+      { label: "Mitigant", value: "Proof-of-reserves, insurance, regulation", color: "teal" },
+    ],
+    body: [
+      `On a CEX, deposited assets are credited to an internal account. The exchange controls the private keys; the user holds a balance entry. Trading is therefore the transfer of claims, not the movement of tokens on a blockchain. Withdrawal is the only moment at which on-chain settlement occurs.`,
+      `This architecture enables instant matching, cross-margin, and complex derivatives, but it creates a single point of failure. Hacks, insider theft, poor risk management or regulatory seizure can render balances unrecoverable. “Not your keys, not your coins” is the community’s shorthand for this risk.`,
+      `Post-FTX, many venues publish proof-of-reserves attestations and segregate client assets. These measures reduce but do not eliminate the structural dependency on the operator’s solvency and honesty.`
+    ],
+    keyPoint: "Custodial trading is a loan of assets to the exchange. Every CEX balance is an unsecured claim until it is successfully withdrawn on-chain."
+  },
+  {
+    era: "Order Book",
+    icon: "📖",
+    title: "Order Book Model",
+    desc: "Central limit order books that aggregate bids and offers, enabling price-time priority matching familiar from traditional finance",
+    badge: { label: "Microstructure", style: "teal" },
+    tags: [["order book","teal"], ["clob","slate"], ["price-time priority","amber"], ["depth","teal"]],
+    data: [
+      { label: "Matching", value: "Price-time priority (usually)", color: "teal" },
+      { label: "Visibility", value: "Full or partial depth via API/WebSocket", color: "amber" },
+      { label: "Advantage", value: "Tight spreads, complex order types", color: "slate" },
+    ],
+    body: [
+      `CEXs almost universally run central limit order books (CLOBs). Makers post resting limit orders; takers hit or lift liquidity. Matching follows price-time priority (or occasional pro-rata variants). The result is a continuous, transparent price-discovery process that supports market, limit, stop, iceberg and other order types.`,
+      `Depth and resilience vary dramatically by pair and by venue. Major BTC and ETH books on top CEXs can absorb large size with modest impact; long-tail altcoin books can be thin and easily manipulated. Professional traders monitor book shape, queue, and cancellation rates as first-class signals.`,
+      `Because the book lives off-chain, latency is measured in microseconds to milliseconds rather than in block times. That speed is both the CEX’s core advantage and the reason high-frequency strategies concentrate there.`
+    ],
+    keyPoint: "The CEX order book is traditional market microstructure transplanted to crypto. Its speed and expressiveness remain unmatched by pure on-chain designs."
+  },
+  {
+    era: "Compliance",
+    icon: "📋",
+    title: "KYC / AML Requirements",
+    desc: "Identity verification and anti-money-laundering controls that gate access to regulated CEXs and shape the geographic and user distribution of volume",
+    badge: { label: "Regulatory", style: "amber" },
+    tags: [["kyc","amber"], ["aml","slate"], ["compliance","red"], ["access control","teal"]],
+    data: [
+      { label: "Requirement", value: "Identity docs, address, sometimes source of funds", color: "amber" },
+      { label: "Effect", value: "Permissioned access, geo-blocking, account freezes", color: "red" },
+      { label: "Trade-off", value: "Legitimacy & banking rails vs. privacy & permissionlessness", color: "slate" },
+    ],
+    body: [
+      `Licensed CEXs must collect and verify customer identity (KYC) and monitor transactions for suspicious activity (AML). Failure to do so risks loss of banking relationships, regulatory fines, or criminal liability. The result is a permissioned environment: users in sanctioned jurisdictions are blocked, and accounts can be frozen pending review.`,
+      `KYC creates a sharp divide between regulated “fiat-friendly” venues and offshore or lightly regulated platforms. It also creates a data honeypot: breaches of KYC databases expose real-world identities linked to trading activity.`,
+      `For institutions and many retail users the compliance overhead is the price of reliable fiat on/off-ramps and legal clarity. For privacy-focused or sanctioned users it is a hard barrier that pushes activity toward DEXs and non-KYC venues.`
+    ],
+    keyPoint: "KYC/AML is the regulatory price of CEX legitimacy. It buys banking access and legal cover at the cost of permissionless entry and user privacy."
+  },
+  {
+    era: "Fees",
+    icon: "💰",
+    title: "Maker-Taker Fee Model",
+    desc: "Differential pricing that rewards liquidity provision (maker) and charges liquidity consumption (taker), shaping order-book dynamics and HFT behaviour",
+    badge: { label: "Economics", style: "teal" },
+    tags: [["maker-taker","teal"], ["fee tier","amber"], ["rebate","slate"], ["volume discount","teal"]],
+    data: [
+      { label: "Maker", value: "Often low fee or rebate for adding liquidity", color: "teal" },
+      { label: "Taker", value: "Higher fee for removing liquidity", color: "amber" },
+      { label: "Tiers", value: "Volume-based discounts; VIP programs", color: "slate" },
+    ],
+    body: [
+      `Most CEXs charge takers more than makers, and some pay makers a rebate. The structure incentivises resting liquidity and compensates market makers for adverse selection. Fee schedules are typically tiered by 30-day volume, so large traders enjoy materially lower costs.`,
+      `The maker-taker spread influences optimal strategy: high-frequency makers compete for rebates; takers optimise between immediate execution and waiting. Changes in the fee schedule can reorder the entire ecology of participants on a given book.`,
+      `Hidden fees (withdrawal charges, stablecoin conversion spreads, funding rates on perpetual futures) often matter more than the headline maker-taker schedule. Full cost analysis must include the entire fee stack.`
+    ],
+    keyPoint: "Maker-taker fees are the primary price signal that organises CEX liquidity. They turn the order book into a market for immediacy with explicitly priced supply and demand sides."
+  },
+  {
+    era: "API",
+    icon: "⚙️",
+    title: "API Access for Algo Trading",
+    desc: "Programmatic interfaces (REST, WebSocket, FIX) that allow automated strategies to submit orders, stream market data and manage risk in real time",
+    badge: { label: "Infrastructure", style: "slate" },
+    tags: [["api","slate"], ["websocket","teal"], ["algo trading","amber"], ["rate limits","red"]],
+    data: [
+      { label: "Interfaces", value: "REST, WebSocket, sometimes FIX", color: "teal" },
+      { label: "Data", value: "Trades, L2/L3 book, user fills, balances", color: "amber" },
+      { label: "Constraints", value: "Rate limits, co-location, VIP tiers", color: "red" },
+    ],
+    body: [
+      `Professional trading on CEXs is almost entirely API-driven. REST endpoints handle order placement, cancellation and account queries; WebSocket streams deliver low-latency trade and book updates. Some venues offer FIX for institutional connectivity and co-location for minimum latency.`,
+      `Rate limits, authentication schemes, and VIP tiering create a stratified access environment. High-volume accounts receive higher rate limits, better fill priority, or dedicated matching-engine access. Latency arbitrage and market-making strategies are therefore sensitive to the precise quality of the API relationship.`,
+      `Operational risk is material: API outages, unexpected schema changes, and authentication failures can leave strategies unable to cancel or hedge. Robust systems treat the CEX API as an unreliable dependency and maintain kill-switches and secondary venues.`
+    ],
+    keyPoint: "CEX APIs are the production interface of crypto market microstructure. Algo trading quality is bounded by the latency, reliability and privilege level of that interface."
+  },
+  {
+    era: "DEX",
+    icon: "🔓",
+    title: "Decentralized Exchanges (Uniswap, Curve, dYdX)",
+    desc: "On-chain or hybrid protocols that enable token swaps without a central custodian, using smart contracts as the matching and settlement layer",
+    badge: { label: "Foundation", style: "teal" },
+    tags: [["dex","teal"], ["uniswap","amber"], ["curve","slate"], ["dydx","teal"]],
+    data: [
+      { label: "Core idea", value: "Trade via smart contract, not intermediary", color: "teal" },
+      { label: "Archetypes", value: "AMM (Uniswap, Curve) vs. on-chain/hybrid CLOB", color: "amber" },
+      { label: "Promise", value: "Self-custody + permissionless access", color: "slate" },
+    ],
+    body: [
+      `Decentralized exchanges replace the central operator with smart contracts. Users retain custody of their assets until the moment of trade; settlement occurs on-chain. The two dominant designs are automated market makers (AMMs) that price according to a bonding curve, and on-chain or hybrid order books that recreate CLOB mechanics in a non-custodial setting.`,
+      `DEXs eliminate exchange counterparty risk and enable permissionless listing and access. They introduce new risks: smart-contract bugs, oracle failures, MEV extraction, and variable gas costs. Liquidity is often thinner than on top CEXs, especially for long-tail pairs and for large size.`,
+      `The DEX landscape is fragmented across chains and across protocol designs. Composability with the rest of DeFi (lending, derivatives, structured products) is the strategic advantage that pure CEXs cannot replicate.`
+    ],
+    keyPoint: "A DEX substitutes code and consensus for institutional trust. Users trade custody risk for smart-contract, MEV and liquidity risk."
+  },
+  {
+    era: "Non-Custodial",
+    icon: "🔑",
+    title: "Non-Custodial Design",
+    desc: "Users retain control of private keys at all times; the protocol never takes possession of assets except atomically within a transaction",
+    badge: { label: "Core Property", style: "teal" },
+    tags: [["non-custodial","teal"], ["self-custody","amber"], ["atomic settlement","slate"], ["wallet","teal"]],
+    data: [
+      { label: "Principle", value: "Keys stay with the user", color: "teal" },
+      { label: "Settlement", value: "Atomic swap inside one transaction", color: "amber" },
+      { label: "Implication", value: "No exchange insolvency risk", color: "slate" },
+    ],
+    body: [
+      `Non-custodial architecture means that assets leave the user’s wallet only when a smart-contract call executes a trade, and that the trade either completes entirely or reverts. There is no intermediate state in which the protocol “holds” user funds in the CEX sense. This atomicity is the source of the self-custody guarantee.`,
+      `The user experience cost is real: wallet signatures, gas estimation, failed transactions, and the need to manage private keys or seed phrases. Institutional adoption further requires careful operational security, multi-sig or MPC setups, and insurance against key compromise.`,
+      `Non-custodial does not mean risk-free. Smart-contract vulnerabilities, malicious approvals, phishing, and bridge exploits have caused large losses. The risk surface simply moves from the exchange operator to the user’s own security and to the quality of the audited code.`
+    ],
+    keyPoint: "Non-custodial design removes the exchange as a credit counterparty. The remaining risks are technical and operational rather than institutional."
+  },
+  {
+    era: "AMM / Book",
+    icon: "🌊",
+    title: "AMM or On-Chain Order Book",
+    desc: "The two primary DEX market structures: constant-function automated market makers versus on-chain (or hybrid) central limit order books",
+    badge: { label: "Design", style: "amber" },
+    tags: [["amm","amber"], ["bonding curve","teal"], ["on-chain clob","slate"], ["liquidity pools","teal"]],
+    data: [
+      { label: "AMM", value: "x·y=k and variants; passive LPs", color: "amber" },
+      { label: "On-chain CLOB", value: "Limit orders stored and matched on-chain", color: "slate" },
+      { label: "Hybrid", value: "Off-chain matching, on-chain settlement", color: "teal" },
+    ],
+    body: [
+      `Automated market makers replace the order book with a liquidity pool and a deterministic pricing function (constant product, concentrated liquidity, stableswap curves, etc.). Liquidity providers deposit assets and earn fees; traders swap against the pool. The design is simple, always-on, and permissionless, but suffers from impermanent loss and from price impact that scales with trade size relative to pool depth.`,
+      `On-chain order books store bids and offers in contract storage and match them according to price-time priority. They offer familiar microstructure and potentially tighter spreads, at the cost of higher gas consumption and more complex incentive design for market makers.`,
+      `Hybrid designs (off-chain order book, on-chain settlement) attempt to combine CEX-like speed with non-custodial guarantees. They reintroduce a degree of operator dependence for the matching layer while keeping custody and final settlement on-chain.`
+    ],
+    keyPoint: "AMM versus order book is the central design fork in DEX microstructure. AMMs optimise for simplicity and passive liquidity; order books optimise for precision and professional market-making."
+  },
+  {
+    era: "Access",
+    icon: "🚪",
+    title: "Permissionless Access & Gas Fees",
+    desc: "Anyone with a wallet and gas can trade; every interaction pays network transaction fees that vary with congestion and chain design",
+    badge: { label: "Open", style: "slate" },
+    tags: [["permissionless","slate"], ["gas","red"], ["wallet","teal"], ["congestion","amber"]],
+    data: [
+      { label: "Access", value: "No KYC; only a funded wallet required", color: "teal" },
+      { label: "Gas", value: "Paid per transaction; spikes with demand", color: "red" },
+      { label: "Implication", value: "Small trades can be uneconomic on busy chains", color: "amber" },
+    ],
+    body: [
+      `Permissionless access is the political and technical core of DEXs: there is no account opening, no identity check, and no geographic gate (beyond the reach of the underlying chain). A wallet and sufficient gas token are the only prerequisites.`,
+      `Gas fees are the price of that openness. On congested networks, simple swaps can cost tens of dollars; complex routes or failed transactions waste gas with no fill. Layer-2 rollups, alternative L1s, and gas-abstraction schemes exist largely to reduce this friction.`,
+      `For strategies, gas is a first-class cost alongside spread and impact. Batching, private relay submission, and careful route selection become part of the execution edge. On high-fee chains, DEXs are structurally biased toward larger trade sizes.`
+    ],
+    keyPoint: "Permissionless access removes gatekeepers; gas fees re-introduce an economic gate. The net effect is open entry with a variable, sometimes prohibitive, per-trade cost."
+  },
+  {
+    era: "MEV",
+    icon: "⚡",
+    title: "MEV Exposure",
+    desc: "Maximal extractable value: the profit that block producers and searchers can capture by reordering, inserting or censoring transactions — a structural cost of on-chain trading",
+    badge: { label: "Critical", style: "red" },
+    tags: [["mev","red"], ["sandwich","amber"], ["frontrun","slate"], ["priority fee","teal"]],
+    data: [
+      { label: "Forms", value: "Sandwich, frontrun, backrun, liquidation", color: "red" },
+      { label: "Who pays", value: "Ordinary users via worse execution", color: "amber" },
+      { label: "Mitigations", value: "Private relays, batch auctions, intent systems", color: "teal" },
+    ],
+    body: [
+      `Because pending transactions sit in a public mempool, sophisticated actors can observe a user’s swap, insert their own transactions before and after it (a “sandwich”), and extract value equal to the user’s price impact. Similar techniques apply to liquidations, arbitrage and NFT mints. The aggregate of such profits is maximal extractable value (MEV).`,
+      `MEV is not a bug in a particular DEX; it is a consequence of transparent, ordered execution on a blockchain. It functions as an invisible tax on users and as a revenue source for validators and searchers. On some chains it has become large enough to influence consensus incentives.`,
+      `Mitigations include private order flow (Flashbots Protect, MEV Blocker), batch auctions, encrypted mempools, and intent-based architectures that outsource execution to competitive solvers. None eliminates MEV entirely; they redistribute or reduce it.`
+    ],
+    keyPoint: "MEV is the on-chain analogue of latency arbitrage and toxic flow. Every DEX user pays it unless protected by private submission or alternative execution designs."
+  },
+  {
+    era: "Hybrid",
+    icon: "🔀",
+    title: "Hybrid Models (e.g. dYdX)",
+    desc: "Architectures that keep order matching off-chain for speed while settling trades and custody on-chain for non-custodial guarantees",
+    badge: { label: "Synthesis", style: "amber" },
+    tags: [["hybrid","amber"], ["dydx","teal"], ["off-chain matching","slate"], ["on-chain settlement","teal"]],
+    data: [
+      { label: "Pattern", value: "Off-chain CLOB + on-chain settlement", color: "amber" },
+      { label: "Benefit", value: "CEX-like speed, DEX-like custody", color: "teal" },
+      { label: "Trade-off", value: "Operator dependence for matching & liveness", color: "red" },
+    ],
+    body: [
+      `Hybrid DEXs attempt to capture the best of both worlds. An off-chain matching engine provides high throughput, sophisticated order types and low latency; final balances and trade settlement are written to a blockchain (or a rollup) so that users can exit without the operator’s permission.`,
+      `dYdX’s evolution — from an Ethereum L2 perpetuals market with off-chain order books to a purpose-built chain — is the canonical example. Similar patterns appear in other perpetuals and spot protocols that prioritise professional trading UX while retaining self-custody.`,
+      `The residual trust assumption is that the operator (or the sequencer) will not censor, front-run, or halt matching indefinitely. Escape hatches, forced-withdrawal mechanisms and decentralised sequencer sets are the design responses to that residual risk. Hybrid models therefore sit on a spectrum rather than at a single pure point.`
+    ],
+    keyPoint: "Hybrid designs are the pragmatic compromise: CEX performance with an on-chain settlement backstop. They reduce custody risk while reintroducing a thinner, more constrained form of operator dependence."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

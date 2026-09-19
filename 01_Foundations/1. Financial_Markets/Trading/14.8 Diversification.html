@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 14.8 Diversification</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 14 · Section 14.8</div>
+      <h1 class="book-title">Diversification</h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Naïve → risk-based → true → crisis · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>14.8 Diversification</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Naïve",
+    icon: "⚖️",
+    title: "Naïve Diversification (Equal Weight)",
+    desc: "Allocating identical capital weights to every asset or position — the simplest rule that still captures most of the free lunch of diversification",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["equal weight","slate"], ["1/n","teal"], ["naïve","amber"], ["robust","teal"]],
+    data: [
+      { label: "Rule", value: "wᵢ = 1/N for all i", color: "slate" },
+      { label: "Advantage", value: "No estimation, hard to beat out-of-sample", color: "teal" },
+      { label: "Weakness", value: "Ignores volatility & correlation differences", color: "amber" },
+    ],
+    body: [
+      `Equal-weight (or “1/N”) allocation is the oldest and most robust form of diversification. By giving every asset the same capital weight, the portfolio automatically reduces the impact of any single name and requires no forecasts of return, volatility or correlation. Empirical studies repeatedly show that 1/N is surprisingly difficult to beat out-of-sample once transaction costs and estimation error are taken into account.`,
+      `The method’s blindness to risk differences is also its limitation: a high-volatility asset receives the same capital as a low-volatility one, so risk contributions can be highly unequal. In a universe that mixes equities, bonds and alternatives, pure equal weighting can produce an unintentionally equity-dominated risk profile.`,
+      `Nevertheless, naïve diversification remains the natural benchmark. Any more sophisticated scheme must demonstrably improve on 1/N after costs and after realistic parameter uncertainty; many fail that test.`
+    ],
+    keyPoint: "Equal weighting is the diversification strategy that needs no model. Its enduring competitiveness is the clearest empirical reminder that estimation error is often larger than the edge claimed by optimised alternatives."
+  },
+  {
+    era: "Risk-Based",
+    icon: "📊",
+    title: "Risk-Based Diversification",
+    desc: "Allocating so that each asset, factor or strategy contributes equally (or proportionally) to total portfolio risk rather than to total capital",
+    badge: { label: "Core", style: "teal" },
+    tags: [["risk parity","teal"], ["equal risk contribution","amber"], ["volatility targeting","slate"], ["risk budgeting","teal"]],
+    data: [
+      { label: "Principle", value: "Equalise marginal risk contributions", color: "teal" },
+      { label: "Common form", value: "Inverse-volatility or full risk-parity", color: "amber" },
+      { label: "Requires", value: "Covariance estimates (and their errors)", color: "red" },
+    ],
+    body: [
+      `Risk-based diversification replaces capital weights with risk weights. In its simplest inverse-volatility form, each asset’s capital weight is proportional to 1/σᵢ; in full risk-parity the weights are chosen so that every asset’s marginal contribution to portfolio volatility is identical. More general risk-budgeting schemes allow unequal but deliberately chosen risk contributions.`,
+      `The approach automatically down-weights volatile assets and up-weights stable ones, producing a more balanced risk profile than equal capital weighting. It is the intellectual foundation of risk-parity funds and of many institutional multi-asset allocation processes.`,
+      `The cost is dependence on the covariance matrix. Noisy or regime-dependent correlation estimates can produce unstable weights and unintended concentrations. Robust estimators, shrinkage, and regular re-estimation with turnover penalties are therefore essential practical companions.`
+    ],
+    keyPoint: "Risk-based diversification asks ‘how much risk does each position contribute?’ rather than ‘how much capital does it receive?’ When correlations are well-behaved it yields more genuine balance; when they are not, it can still be fooled."
+  },
+  {
+    era: "True",
+    icon: "🔗",
+    title: "True Diversification (Low-Correlation Assets)",
+    desc: "The only diversification that materially reduces portfolio variance — combining assets whose returns are genuinely imperfectly correlated",
+    badge: { label: "Essential", style: "amber" },
+    tags: [["low correlation","amber"], ["true diversifiers","teal"], ["covariance","slate"], ["free lunch","teal"]],
+    data: [
+      { label: "Condition", value: "Average pairwise ρ meaningfully < 1", color: "amber" },
+      { label: "Effect", value: "Portfolio σ ≪ weighted average of asset σ", color: "teal" },
+      { label: "Search", value: "Assets driven by different economic forces", color: "slate" },
+    ],
+    body: [
+      `Markowitz’s fundamental insight is that portfolio variance depends on covariances, not merely on individual variances. Two assets with identical volatility can produce a dramatically lower portfolio volatility if their correlation is low. “True” diversification is therefore the deliberate combination of return streams that are driven by different economic, geographic or structural forces.`,
+      `The practical search is for assets whose correlation with the existing portfolio is stably low or negative: different equity regions, duration, credit, commodities, managed futures, certain alternative premia, etc. Adding a tenth highly correlated equity does almost nothing; adding a modest allocation to an uncorrelated return stream can change the efficient frontier materially.`,
+      `Correlation is itself unstable. The same pair of assets can look like excellent diversifiers in calm markets and near-perfect substitutes in a crisis. Any claim of true diversification must therefore be stress-tested under elevated-correlation regimes.`
+    ],
+    keyPoint: "Diversification is not ‘owning many things’; it is owning things that do not move together. Only low or unstable correlations deliver the variance reduction that the textbooks promise."
+  },
+  {
+    era: "Crisis",
+    icon: "🌪️",
+    title: "Diversification in Crises (Correlation Spike)",
+    desc: "The well-documented tendency for correlations among risk assets to rise sharply toward one precisely when diversification is most needed",
+    badge: { label: "Critical", style: "red" },
+    tags: [["correlation spike","red"], ["crisis","amber"], ["diversification failure","red"], ["flight to quality","slate"]],
+    data: [
+      { label: "Pattern", value: "ρ → 1 among equities, credit, most risk assets", color: "red" },
+      { label: "Survivors", value: "Duration, some commodities, trend, cash", color: "teal" },
+      { label: "Implication", value: "Calm-period diversification is overstated", color: "amber" },
+    ],
+    body: [
+      `In normal markets a multi-asset portfolio can display comfortably low average correlations. In systemic crises those correlations frequently jump toward one: equities, high-yield credit, emerging markets and many alternatives fall together as investors de-risk and liquidity evaporates. The diversification that looked robust on a five-year look-back can disappear in a few weeks.`,
+      `Assets that have historically retained low or negative correlation with risk assets during such episodes — high-quality government duration, certain defensive commodities, trend-following strategies, and cash — become disproportionately valuable. Their inclusion is less about average-case variance reduction and more about crisis-case survival.`,
+      `Any diversification analysis that reports only full-sample or expanding-window correlations systematically overstates the protection the portfolio will enjoy when it is most needed. Conditional or stress correlations are the more relevant metric.`
+    ],
+    keyPoint: "The correlation spike is the central empirical challenge to diversification. Strategies and asset classes that remain diversifying when correlations go to one are rare — and correspondingly precious."
+  },
+  {
+    era: "Alternatives",
+    icon: "🧩",
+    title: "Alternative Assets for Diversification",
+    desc: "Using non-traditional return streams — commodities, real assets, hedge-fund styles, private markets, insurance-linked securities — to expand the opportunity set beyond stocks and bonds",
+    badge: { label: "Expand", style: "teal" },
+    tags: [["alternatives","teal"], ["commodities","amber"], ["hedge funds","slate"], ["real assets","teal"]],
+    data: [
+      { label: "Candidates", value: "CTA, macro, commodities, real estate, ILS", color: "teal" },
+      { label: "Promise", value: "Lower correlation with traditional 60/40", color: "amber" },
+      { label: "Caveats", value: "Liquidity, fees, valuation, capacity", color: "red" },
+    ],
+    body: [
+      `Once the traditional stock–bond mix has been exhausted, further diversification requires return streams that are contractually or economically distinct: commodity futures, managed-futures / CTA programmes, global macro, real-estate and infrastructure, insurance-linked securities, and certain private-market strategies. Their average correlations with public equities and bonds are typically lower than the correlations among equity sectors.`,
+      `The diversification benefit is real but comes with frictions. Many alternatives are less liquid, carry higher fees, rely on smoothed or model-based valuations, and can exhibit their own crowding and drawdown regimes. Illiquidity itself can create an artificial appearance of low correlation that vanishes when the positions must be exited.`,
+      `Sizing must therefore respect both the statistical diversification and the practical constraints of liquidity, transparency and operational complexity. A small allocation to a genuinely uncorrelated alternative can improve the portfolio more than a large allocation to a semi-correlated one.`
+    ],
+    keyPoint: "Alternative assets expand the diversification frontier only to the extent that their return drivers are truly distinct and that their liquidity and fee characteristics do not erase the benefit when it is needed."
+  },
+  {
+    era: "International",
+    icon: "🌍",
+    title: "International Diversification",
+    desc: "Spreading equity and fixed-income exposure across countries and regions to reduce dependence on any single national market or policy regime",
+    badge: { label: "Geographic", style: "slate" },
+    tags: [["international","slate"], ["home bias","amber"], ["currency","teal"], ["global","teal"]],
+    data: [
+      { label: "Benefit", value: "Lower correlation across national markets", color: "teal" },
+      { label: "Obstacle", value: "Home bias remains large in most portfolios", color: "amber" },
+      { label: "Extra risk", value: "Currency, political, legal, settlement", color: "red" },
+    ],
+    body: [
+      `National equity markets are imperfectly correlated because of differences in economic structure, monetary policy, sector composition and investor bases. Allocating across developed and emerging markets therefore reduces the portfolio’s dependence on any single country’s business cycle or policy error.`,
+      `In practice most investors remain heavily home-biased. The diversification benefit of international equities has also fluctuated: in some decades it has been large; in others, globalisation and common risk-factor exposures have kept correlations elevated. Currency risk adds a further layer — it can amplify or offset local-market moves depending on the path of the exchange rate.`,
+      `Effective international diversification therefore requires deliberate currency policy (hedge, partial hedge, or active overlay) and an awareness that country risk is not fully captured by equity-index correlations alone.`
+    ],
+    keyPoint: "International diversification is the geographic expression of ‘do not concentrate in one regime.’ Its value is greatest when national markets are driven by genuinely different forces — and smallest when a common global factor dominates."
+  },
+  {
+    era: "Strategy",
+    icon: "🎯",
+    title: "Strategy Diversification",
+    desc: "Combining multiple trading or investment systems whose returns are weakly correlated so that the aggregate equity curve is smoother than any single component",
+    badge: { label: "Process", style: "amber" },
+    tags: [["strategy allocation","amber"], ["uncorrelated alpha","teal"], ["multi-strategy","slate"], ["capacity","red"]],
+    data: [
+      { label: "Goal", value: "Low correlation among strategy P&Ls", color: "teal" },
+      { label: "Examples", value: "Trend + relative value + event + carry", color: "amber" },
+      { label: "Limit", value: "Capacity, crowding, common risk factors", color: "red" },
+    ],
+    body: [
+      `Even within a single asset class, different trading styles can exhibit low correlation with one another. A trend-following system, a mean-reversion system, an event-driven book and a carry strategy may all lose money at different times. Allocating capital across such systems produces a more stable aggregate return stream than concentrating in the single best historical performer.`,
+      `The key is genuine return-driver diversity, not merely different labels. Two “different” equity long-short books that both load on momentum and liquidity will correlate highly in a factor shock. True strategy diversification requires distinct information sources, holding periods, or market segments.`,
+      `Capacity and crowding impose natural limits. As more capital pursues the same set of uncorrelated strategies, their correlations tend to rise and their expected returns tend to fall. Monitoring pairwise strategy correlations and capacity utilisation is therefore part of the ongoing diversification process.`
+    ],
+    keyPoint: "Strategy diversification is the recognition that no single edge is reliable in every regime. Combining genuinely distinct return streams is often a more robust path to a smoother equity curve than searching for the single highest-Sharpe system."
+  },
+  {
+    era: "Time",
+    icon: "⏳",
+    title: "Time Diversification",
+    desc: "Spreading risk across multiple holding periods, rebalancing frequencies or entry/exit horizons so that the portfolio is not hostage to a single time scale",
+    badge: { label: "Temporal", style: "teal" },
+    tags: [["time diversification","teal"], ["holding period","amber"], ["multi-horizon","slate"], ["rebalancing","teal"]],
+    data: [
+      { label: "Idea", value: "Edges exist at different horizons", color: "teal" },
+      { label: "Method", value: "Blend short-, medium- and long-term signals", color: "amber" },
+      { label: "Benefit", value: "Smoother aggregate, less regime risk", color: "slate" },
+    ],
+    body: [
+      `Just as assets and strategies can be imperfectly correlated, so can returns measured over different time scales. A signal that works on a five-day horizon may be uncorrelated with one that works on a six-month horizon. Combining them reduces the portfolio’s dependence on any single frequency of market behaviour.`,
+      `Practical implementations include multi-horizon trend systems, ensembles of mean-reversion models with different look-backs, and explicit allocation across short-term trading, intermediate swing and long-term investment books. Rebalancing frequency itself becomes a diversification parameter: too frequent and costs dominate; too infrequent and the portfolio drifts into unwanted concentrations.`,
+      `Time diversification also interacts with liquidity. Short-horizon strategies require deeper markets; long-horizon strategies can tolerate more illiquidity. Matching horizon to capacity is part of making the diversification real rather than theoretical.`
+    ],
+    keyPoint: "Time diversification treats the holding period as a dimension of risk, not merely a parameter of a single strategy. Spreading exposure across horizons is one of the few ways to reduce dependence on any particular market tempo."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

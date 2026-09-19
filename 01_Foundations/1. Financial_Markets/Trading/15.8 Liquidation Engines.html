@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 15.8 Liquidation Engines</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 15 · Section 15.8</div>
+      <h1 class="book-title">Liquidation<br><em>Engines</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Price → margin → process → backstops · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>15.8 Liquidation Engines</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Price",
+    icon: "📉",
+    title: "Liquidation Price Calculation",
+    desc: "The mark or index level at which a leveraged position’s equity falls to the maintenance-margin requirement and the engine is allowed to force-close it",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["liquidation price","slate"], ["mark price","teal"], ["leverage","amber"], ["margin","teal"]],
+    data: [
+      { label: "Inputs", value: "Entry, leverage, mmr, fees, side", color: "slate" },
+      { label: "Reference", value: "Usually mark price, not last trade", color: "teal" },
+      { label: "Output", value: "Price where equity ≈ maintenance margin", color: "amber" },
+    ],
+    body: [
+      `A position’s liquidation price is the underlying level at which remaining margin equals the exchange’s maintenance requirement (after fees and funding). For an isolated long, higher leverage and a higher maintenance-margin rate both pull that price closer to entry; for a short, the symmetric logic applies above entry.`,
+      `Exchanges almost always trigger on mark price (a fair-price index) rather than last traded price, to reduce manipulation via a single aggressive print. Cross-margin accounts use portfolio equity, so one position’s liquidation price depends on the P&L of all others sharing the margin pool.`,
+      `Displayed liquidation prices are estimates. Realised triggers can differ slightly because of fee schedules, funding, tiered maintenance rates, and partial-liquidation logic. Treating the quoted number as exact is a common retail error.`
+    ],
+    keyPoint: "Liquidation price is where the exchange’s risk engine is contractually allowed to seize the position. It is defined on mark equity versus maintenance margin — not on the trader’s hope that the last price will bounce."
+  },
+  {
+    era: "Threshold",
+    icon: "🚧",
+    title: "Maintenance Margin Threshold",
+    desc: "The minimum equity, as a fraction of notional (or as a tiered schedule), that must remain or the position becomes eligible for liquidation",
+    badge: { label: "Core", style: "teal" },
+    tags: [["maintenance margin","teal"], ["mmr","amber"], ["initial margin","slate"], ["tiers","teal"]],
+    data: [
+      { label: "Initial margin", value: "Required to open (sets max leverage)", color: "slate" },
+      { label: "Maintenance", value: "Lower floor; breach → liquidation", color: "teal" },
+      { label: "Tiers", value: "Larger notional → higher MMR on many venues", color: "amber" },
+    ],
+    body: [
+      `Initial margin determines how large a position can be opened. Maintenance margin is the lower threshold that must be sustained while the position is open. The gap between them is the buffer against ordinary volatility before forced closure.`,
+      `Many venues use notional tiers: as position size grows, maintenance-margin rates increase, effectively reducing max leverage for large accounts and protecting the insurance fund from concentrated blow-ups. Isolated and cross modes apply the same idea at position or portfolio level.`,
+      `Understanding the exact MMR schedule — including how it changes with size and with coin — is as important as knowing the headline max leverage. Two accounts with the same “20×” label can face very different liquidation distances.`
+    ],
+    keyPoint: "Maintenance margin is the hard floor under leveraged equity. Initial margin sets ambition; maintenance margin sets survival."
+  },
+  {
+    era: "Process",
+    icon: "⚙️",
+    title: "Partial vs. Full Liquidation",
+    desc: "Whether the engine reduces size only until margin is healthy again, or closes the entire position in one step",
+    badge: { label: "Mechanism", style: "amber" },
+    tags: [["partial liquidation","amber"], ["full liquidation","red"], ["size reduction","teal"], ["waterfall","slate"]],
+    data: [
+      { label: "Partial", value: "Cut size until MMR satisfied", color: "teal" },
+      { label: "Full", value: "Close entire remaining position", color: "red" },
+      { label: "Practice", value: "Many venues partial first, then escalate", color: "amber" },
+    ],
+    body: [
+      `Partial liquidation closes only enough notional to restore the account above maintenance margin, leaving a smaller position intact. Full liquidation wipes the entire position. Partial methods reduce unnecessary damage to the trader and can lower immediate market impact; they also create a sequence of forced sells (or buys) as price continues to move.`,
+      `Engines often follow a waterfall: attempt limit or market liquidation of a slice, charge a penalty, re-check margin, and repeat. If the book is thin or the move is violent, partial attempts fail and the residual is handed to backstop systems (insurance fund, ADL).`,
+      `From a market-structure view, partial liquidations turn one large forced order into a trail of smaller ones — sometimes smoother, sometimes a prolonged cascade if many accounts sit near the same price.`
+    ],
+    keyPoint: "Partial liquidation is damage control; full liquidation is triage. The engine’s choice shapes both the trader’s residual equity and the footprint left on the order book."
+  },
+  {
+    era: "Penalty",
+    icon: "💰",
+    title: "Liquidation Penalty Fees",
+    desc: "Extra charges levied on liquidated accounts — funding the insurance fund and discouraging brinkmanship with maintenance margin",
+    badge: { label: "Cost", style: "red" },
+    tags: [["liquidation fee","red"], ["penalty","amber"], ["insurance contribution","teal"], ["disincentive","slate"]],
+    data: [
+      { label: "Form", value: "% of notional or of maintenance margin", color: "amber" },
+      { label: "Destination", value: "Often insurance fund / exchange backstop", color: "teal" },
+      { label: "Effect", value: "Liquidation costs more than a voluntary close", color: "red" },
+    ],
+    body: [
+      `Beyond ordinary taker fees, liquidated positions typically pay a penalty. The penalty compensates the platform for risk and operational cost and is a primary inflow to the insurance fund. It also makes “riding to liquidation” strictly worse than closing voluntarily a tick earlier.`,
+      `Penalty design varies: flat rates, rates that scale with leverage tier, or amounts tied to the maintenance-margin requirement. In stressed markets the effective cost of liquidation can be several times a normal round-trip fee.`,
+      `Traders who model only mark-to-market distance to liquidation understate true loss: the penalty and slippage on the forced close are part of the realised outcome.`
+    ],
+    keyPoint: "The liquidation penalty is a deliberate tax on forced exits. It funds the backstop and punishes the choice to let the engine close you out."
+  },
+  {
+    era: "Insurance",
+    icon: "🛡️",
+    title: "Insurance Fund Mechanics",
+    desc: "The exchange-held pool that absorbs losses when a liquidated account’s equity is insufficient to cover the counterparty’s gains at the fill price",
+    badge: { label: "Backstop", style: "teal" },
+    tags: [["insurance fund","teal"], ["bad debt","red"], ["backstop","amber"], ["solven cy","slate"]],
+    data: [
+      { label: "Inflows", value: "Liquidation penalties, sometimes fees", color: "teal" },
+      { label: "Outflows", value: "Cover shortfalls on bankrupt positions", color: "red" },
+      { label: "Failure mode", value: "Fund depleted → ADL or socialized loss", color: "amber" },
+    ],
+    body: [
+      `If a position is liquidated at a price worse than its remaining margin can support, the account is bankrupt relative to its counterparty. The insurance fund pays the difference so that winning traders still receive their due. Penalties harvested from successful liquidations replenish the fund in quieter times.`,
+      `Fund size relative to open interest and tail risk is a key solvency metric for a derivatives venue. Rapid growth of OI without matching fund growth, or a single outsized gap move, can stress the backstop.`,
+      `Transparency of fund balances and of historical drawdowns varies by exchange. Professional users treat the fund as a real but finite resource, not as an unlimited guarantee.`
+    ],
+    keyPoint: "The insurance fund is the first institutional shock absorber after individual margin fails. When it runs dry, the next mechanisms — ADL and socialized loss — socialise the damage."
+  },
+  {
+    era: "ADL",
+    icon: "⚡",
+    title: "Auto-Deleveraging (ADL)",
+    desc: "Forced reduction of profitable opposing positions when liquidation cannot be filled in the market and the insurance fund cannot cover the residual loss",
+    badge: { label: "Critical", style: "red" },
+    tags: [["adl","red"], ["auto-deleveraging","amber"], ["priority ranking","slate"], ["last resort","red"]],
+    data: [
+      { label: "Trigger", value: "Failed liquidation + insufficient insurance", color: "red" },
+      { label: "Target", value: "Winning positions on the other side", color: "amber" },
+      { label: "Ranking", value: "Typically leverage × profit priority", color: "slate" },
+    ],
+    body: [
+      `Auto-deleveraging steps in when the engine cannot close a bankrupt position at a price the margin and insurance fund can support. Instead of letting bad debt float, the exchange forcibly closes or reduces highly profitable, high-leverage positions on the opposite side at the bankruptcy price of the failed account.`,
+      `Priority queues usually rank counterparties by a score that increases with unrealised profit and effective leverage, so the most aggressive winners are deleveraged first. Those traders see positions closed without their consent — the cost of participating in a market that guarantees system solvency over individual runways.`,
+      `ADL is rare on deep, well-capitalised books and more common in thin or extreme markets. Its mere existence caps the tail gain of leveraged winners in a catastrophe and is part of the true payoff profile of crypto perps.`
+    ],
+    keyPoint: "ADL is the rule that profitable traders can be forcibly flattened to plug a hole the insurance fund cannot fill. It is solvency by socialisation of the winners."
+  },
+  {
+    era: "Socialized",
+    icon: "👥",
+    title: "Socialized Loss Mechanism",
+    desc: "Spreading residual bad debt across all (or a subset of) winning positions when even ADL-style assignment is insufficient or by explicit venue design",
+    badge: { label: "Last Resort", style: "red" },
+    tags: [["socialized loss","red"], ["clawback","amber"], ["mutualisation","slate"], ["systemic","red"]],
+    data: [
+      { label: "Idea", value: "Pro-rata haircut on winners’ profits", color: "red" },
+      { label: "When", value: "Backstops exhausted or policy choice", color: "amber" },
+      { label: "Effect", value: "System survives; individual PnL rewritten", color: "slate" },
+    ],
+    body: [
+      `Socialized loss allocates remaining shortfalls across profitable accounts, typically as a proportional reduction in gains rather than as an equal headcount tax. Some historical and smaller venues used pure socialisation more readily; large modern CEXs prefer insurance funds and ADL first, with socialisation as an extreme fallback or as a defined clause in the rulebook.`,
+      `The mechanism preserves the matching of positions on the ledger when market liquidity and backstops fail. It breaks the intuition that a closed profitable trade is final — under socialisation, realised gains can be clawed back after the fact.`,
+      `For strategy design, socialized loss is a tail dependence between your gains and other traders’ bankruptcies. High-leverage markets in thin names embed more of this risk than deep BTC books on major venues.`
+    ],
+    keyPoint: "Socialized loss is mutualisation of default: when margin, insurance, and ADL are not enough, winners pay. It is the final line in the exchange’s solvency hierarchy."
+  },
+  {
+    era: "Cascade",
+    icon: "🌊",
+    title: "Liquidation Cascade Dynamics",
+    desc: "Self-reinforcing sequences in which forced closures move price into the next cluster of liquidation levels, amplifying the original shock",
+    badge: { label: "Systemic", style: "amber" },
+    tags: [["cascade","amber"], ["forced flow","red"], ["oi clusters","slate"], ["feedback","red"]],
+    data: [
+      { label: "Fuel", value: "High OI near similar liq prices", color: "amber" },
+      { label: "Mechanism", value: "Liquidation → impact → more liquidations", color: "red" },
+      { label: "Stop", value: "Exhaustion of crowded side / deeper liquidity", color: "teal" },
+    ],
+    body: [
+      `Cascades occur when open interest is concentrated at nearby liquidation prices. A modest move triggers the first wave of forced orders; those orders walk the book; mark price updates; the next cohort becomes eligible; and the process feeds on itself until the crowded side is largely cleared or until resting liquidity absorbs the flow.`,
+      `Cross-margin and multi-venue positioning can synchronise cascades: the same shock hits correlated accounts on several exchanges within seconds. Funding that has already drained long or short buffers makes the structure more fragile before the first print.`,
+      `Maps of aggregate liquidation levels (estimated from OI and leverage distributions) are widely watched precisely because they forecast where cascades are likely to ignite or exhaust.`
+    ],
+    keyPoint: "A liquidation cascade is leverage meeting a thin book at a cliff of similar stop prices. The engine does not cause the fragility — it is the mechanism that reveals it at high speed."
+  },
+  {
+    era: "Oracle",
+    icon: "manip",
+    title: "Oracle Manipulation & Forced Liquidations",
+    desc: "Attacks that move the mark or index price so that healthy positions appear under-margined and are liquidated for the attacker’s profit",
+    badge: { label: "Attack", style: "red" },
+    tags: [["oracle","red"], ["manipulation","amber"], ["mark price","slate"], ["thin markets","red"]],
+    data: [
+      { label: "Target", value: "Index / mark used for margin checks", color: "red" },
+      { label: "Method", value: "Spike thin spot or index constituents", color: "amber" },
+      { label: "Defence", value: "Robust indices, TWAP, venue diversity", color: "teal" },
+    ],
+    body: [
+      `Because liquidation engines trust a mark or index, an attacker who can move that reference can push solvent accounts through the maintenance threshold. On thin assets, buying or selling a small amount of spot on index constituents may be enough to print a temporary mark that triggers liquidations; the attacker then profits from those liquidations or from related positions.`,
+      `Defences include multi-venue indices, time-weighted averages, deviation circuits, and careful listing standards that exclude easily manipulated markets. On-chain lending and perps face analogous risks when a single pool or low-liquidity oracle update defines collateral value.`,
+      `For traders, the practical lesson is that liquidation risk is not only “price went against me” but also “the reference price was temporarily distorted.” Position size in illiquid names must respect oracle quality as much as volatility.`
+    ],
+    keyPoint: "Oracle manipulation weaponises the liquidation engine: move the mark, force the close, harvest the chaos. Robust mark design is therefore a first-order security control, not a detail of the UI."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    // Fix the oracle icon - used text by mistake
+    const icon = e.icon === 'manip' ? '🎯' : e.icon;
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

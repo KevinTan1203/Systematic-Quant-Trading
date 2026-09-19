@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 14.5 Stress Testing</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 14 · Section 14.5</div>
+      <h1 class="book-title">Stress<br><em>Testing</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Historical → hypothetical → reverse → regulatory · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>14.5 Stress Testing</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Historical",
+    icon: "📜",
+    title: "Historical Scenario Analysis",
+    desc: "Re-valuing the current portfolio under the actual market moves observed in past crises — 2008, 2020, 2022 and other defining episodes",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["2008","red"], ["2020","amber"], ["2022","slate"], ["crisis replay","teal"]],
+    data: [
+      { label: "2008", value: "Credit + equity crash, correlation spike", color: "red" },
+      { label: "2020", value: "COVID dash-for-cash, vol explosion", color: "amber" },
+      { label: "2022", value: "Rates shock, inflation regime shift", color: "slate" },
+    ],
+    body: [
+      `Historical scenario analysis takes a defined crisis window (e.g., Lehman week, March 2020, or the 2022 rates sell-off) and applies the observed returns, spread changes and volatility shifts of every risk factor to the current portfolio. The resulting P&L is the loss the book would have suffered had it been held unchanged through that episode.`,
+      `The method’s strength is realism: the scenarios actually occurred, so joint moves, liquidity evaporation and correlation breakdowns are already embedded. Its limitation is that the next crisis will not be a perfect replay of the last. Concentrating only on 2008, 2020 and 2022 leaves the portfolio untested against novel combinations of shocks.`,
+      `Best practice maintains a library of well-documented historical scenarios, each with clear start and end dates, and re-runs them whenever the portfolio composition changes materially. Results are reported both in absolute P&L and as a multiple of ordinary VaR or expected shortfall to highlight concentration risk.`
+    ],
+    keyPoint: "Historical scenarios answer the concrete question ‘what would this portfolio have lost in 2008 / 2020 / 2022?’ They are indispensable for credibility, yet they remain silent on crises that have never been seen before."
+  },
+  {
+    era: "Hypothetical",
+    icon: "🔮",
+    title: "Hypothetical Scenario Analysis",
+    desc: "Forward-looking, artificially constructed market shocks designed to probe vulnerabilities that historical episodes may not have revealed",
+    badge: { label: "Core", style: "teal" },
+    tags: [["hypothetical","teal"], ["forward-looking","amber"], ["custom shocks","slate"], ["narrative","teal"]],
+    data: [
+      { label: "Design", value: "Narrative + quantified factor moves", color: "teal" },
+      { label: "Advantage", value: "Can explore never-observed combinations", color: "amber" },
+      { label: "Risk", value: "Subjectivity in scenario construction", color: "red" },
+    ],
+    body: [
+      `Hypothetical scenarios begin with a narrative — “China hard landing,” “sudden 200 bp parallel rates rise plus equity crash,” “cyber-attack on major clearing house” — and then translate that narrative into a coherent set of risk-factor shocks. Unlike historical replay, the moves need never have occurred together in the past.`,
+      `The quality of the exercise depends on the coherence of the assumed joint distribution. Ad-hoc shocks that ignore second-order effects (volatility, basis, liquidity) produce misleadingly mild results. Good hypothetical scenarios therefore specify not only primary factor moves but also the accompanying changes in volatilities, correlations and market depth.`,
+      `Governance requires that scenarios be reviewed periodically by both risk and front-office staff so that they remain relevant to the current portfolio and to emerging geopolitical or macroeconomic risks. A static library of hypothetical scenarios quickly becomes stale.`
+    ],
+    keyPoint: "Hypothetical scenarios free the risk manager from the constraint of history. Their value is proportional to the seriousness with which the underlying narrative and the implied joint factor moves are constructed."
+  },
+  {
+    era: "Factor",
+    icon: "⚡",
+    title: "Factor Shock Scenarios",
+    desc: "Isolated or combined instantaneous moves in the key systematic risk factors to which the portfolio is exposed",
+    badge: { label: "Analytical", style: "amber" },
+    tags: [["factor shocks","amber"], ["systematic","slate"], ["instantaneous","teal"], ["risk factors","red"]],
+    data: [
+      { label: "Typical factors", value: "Equity, rates, credit, FX, commodity", color: "amber" },
+      { label: "Size", value: "Often 1–3 historical standard deviations", color: "teal" },
+      { label: "Use", value: "Rapid sensitivity map of the book", color: "slate" },
+    ],
+    body: [
+      `Factor shock scenarios apply instantaneous displacements to a small set of systematic drivers — equity indices, key swap rates, credit spreads, FX rates, commodity prices — while holding other variables constant or adjusting them according to simple rules. The portfolio is then fully re-valued under the shocked factor set.`,
+      `These scenarios are computationally cheap and easy to communicate. They answer questions such as “what is the P&L impact of a simultaneous 20 % equity drop and 50 bp credit-spread widening?” They are less suited to capturing path-dependent or liquidity effects that unfold over days or weeks.`,
+      `In multi-asset books the art lies in choosing economically coherent combinations rather than independent worst-case moves for every factor. Unconstrained “all factors move adversely” scenarios tend to overstate risk and lose credibility with traders.`
+    ],
+    keyPoint: "Factor shocks provide a fast, transparent map of first-order sensitivities. They are the natural complement to full historical or Monte-Carlo stress tests when speed and interpretability matter most."
+  },
+  {
+    era: "Sensitivity",
+    icon: "📏",
+    title: "Sensitivity Analysis (1σ & 2σ Shocks)",
+    desc: "Standardised parallel or factor-specific moves expressed in units of recent or long-term volatility, used for rapid risk reporting",
+    badge: { label: "Standard", style: "teal" },
+    tags: [["1-sigma","teal"], ["2-sigma","amber"], ["standardised","slate"], ["reporting","teal"]],
+    data: [
+      { label: "1σ", value: "Approx. 16 % probability under normality", color: "teal" },
+      { label: "2σ", value: "Approx. 2.5 % probability under normality", color: "amber" },
+      { label: "Purpose", value: "Comparable, volatility-normalised shocks", color: "slate" },
+    ],
+    body: [
+      `Sensitivity analysis expresses shocks in units of standard deviation rather than absolute percentages. A “1σ equity shock” or “2σ rates shock” automatically scales with the current or historical volatility of the factor, making results comparable across assets and across time.`,
+      `Under a normal distribution a 1σ move is expected roughly one day in six and a 2σ move roughly one day in forty. In fat-tailed markets the actual frequencies are higher, so the labels should be treated as conventional rather than probabilistic. Nevertheless the standardisation remains useful for internal reporting and for limit monitoring.`,
+      `Many risk systems generate a matrix of 1σ and 2σ shocks for every major risk factor and for selected combinations. The resulting grid gives an immediate visual impression of where the portfolio’s largest exposures lie and how non-linear instruments respond to larger moves.`
+    ],
+    keyPoint: "1σ and 2σ sensitivity shocks convert raw factor exposures into a common volatility-normalised language. They are the quickest way to answer ‘how much does the book move when markets move by a typical or a large amount?’"
+  },
+  {
+    era: "Correlation",
+    icon: "🔗",
+    title: "Correlation Shock Scenarios",
+    desc: "Stressing the dependence structure itself — raising or breaking correlations — to reveal concentration risk that appears only when diversification fails",
+    badge: { label: "Critical", style: "red" },
+    tags: [["correlation shock","red"], ["diversification failure","amber"], ["contagion","slate"], ["joint tails","red"]],
+    data: [
+      { label: "Classic move", value: "All correlations → 1 (or to crisis levels)", color: "red" },
+      { label: "Effect", value: "Destroys assumed diversification", color: "amber" },
+      { label: "Use case", value: "Multi-asset & relative-value books", color: "slate" },
+    ],
+    body: [
+      `In normal markets many strategies rely on imperfect correlation among positions for risk reduction. In crises those correlations often rise sharply toward one, converting a diversified book into a single concentrated bet. Correlation shock scenarios explicitly re-value the portfolio under elevated or fully coupled correlation matrices.`,
+      `A common implementation replaces the current correlation matrix with the matrix observed during a historical stress period, or simply sets all pairwise correlations to a high uniform value (e.g., 0.9 or 1.0). More refined versions shock only the correlations among specific sectors or risk-factor blocks that are judged most vulnerable to contagion.`,
+      `The difference between the unstressed and correlation-stressed P&L is a direct measure of how much of the portfolio’s risk reduction is “borrowed” from the assumption of moderate dependence. Large differences signal dangerous concentration once markets enter a risk-off regime.`
+    ],
+    keyPoint: "Correlation shocks test the one assumption that most quietly underwrites multi-asset risk models: that diversification will still be there when it is needed most. When correlations go to one, many apparent hedges disappear."
+  },
+  {
+    era: "Reverse",
+    icon: "🔄",
+    title: "Reverse Stress Testing",
+    desc: "Working backwards from a pre-defined unacceptable loss or failure point to identify the scenarios that would cause it",
+    badge: { label: "Diagnostic", style: "amber" },
+    tags: [["reverse stress","amber"], ["break points","red"], ["failure modes","slate"], ["vulnerability map","teal"]],
+    data: [
+      { label: "Starting point", value: "Defined loss or capital breach", color: "red" },
+      { label: "Output", value: "Set of factor moves that produce it", color: "amber" },
+      { label: "Value", value: "Reveals hidden concentrations", color: "teal" },
+    ],
+    body: [
+      `Conventional stress testing asks “what is the loss under scenario X?” Reverse stress testing asks the opposite: “what scenarios would produce a loss of size Y or would render the firm non-viable?” The process therefore begins with a severity threshold and searches the space of risk-factor moves for combinations that breach it.`,
+      `The search can be performed by optimisation (maximise or minimise a factor subject to the loss constraint), by grid search over a reduced factor set, or by statistical techniques that identify the most likely paths to the failure region under a given model. The resulting scenarios often expose concentrations or second-order exposures that forward scenarios had missed.`,
+      `Regulators increasingly expect reverse stress tests as part of ICAAP and recovery planning. Internally they are one of the most effective tools for challenging the risk department’s and the front office’s shared assumptions about what “cannot happen.”`
+    ],
+    keyPoint: "Reverse stress testing inverts the usual question. Instead of measuring the damage from known shocks, it discovers the shocks that would cause unacceptable damage — and in doing so frequently reveals the portfolio’s true Achilles’ heels."
+  },
+  {
+    era: "Regulatory",
+    icon: "🏦",
+    title: "Regulatory Stress Tests (CCAR, EBA)",
+    desc: "Supervisory exercises that impose common, severely adverse macroeconomic and market scenarios on banks’ balance sheets and trading books",
+    badge: { label: "Supervisory", style: "slate" },
+    tags: [["ccar","slate"], ["eba","teal"], ["supervisory","amber"], ["capital adequacy","red"]],
+    data: [
+      { label: "CCAR", value: "U.S. Federal Reserve annual exercise", color: "slate" },
+      { label: "EBA", value: "European Banking Authority EU-wide test", color: "teal" },
+      { label: "Output", value: "Capital ratios under stress → constraints", color: "red" },
+    ],
+    body: [
+      `The U.S. Comprehensive Capital Analysis and Review (CCAR) and the European Banking Authority (EBA) stress tests require banks to project capital, earnings and losses under baseline and severely adverse scenarios supplied by the supervisor. Trading-book and banking-book exposures are both in scope, and the results directly influence capital distributions and supervisory ratings.`,
+      `Scenarios typically include sharp declines in GDP, house prices and equity markets, spikes in unemployment and credit spreads, and sometimes idiosyncratic shocks. Banks must use their own models (subject to supervisory challenge) to translate the macro paths into portfolio losses, while also applying prescribed market-risk shocks for the trading book.`,
+      `Beyond the formal capital numbers, the exercises force institutions to maintain data, modelling and governance infrastructure capable of producing credible results under extreme but plausible conditions. Failure to do so carries both capital and reputational consequences.`
+    ],
+    keyPoint: "Regulatory stress tests are not merely diagnostic; they are binding constraints on capital and dividends. Their scenarios define the minimum severity that every major bank must be able to survive on paper."
+  },
+  {
+    era: "Liquidity",
+    icon: "💧",
+    title: "Liquidity Stress Testing",
+    desc: "Assessing the ability to meet cash outflows and to liquidate or hedge positions under conditions of reduced market depth and elevated funding costs",
+    badge: { label: "Critical", style: "red" },
+    tags: [["liquidity","red"], ["funding","amber"], ["market depth","slate"], ["liquidation","teal"]],
+    data: [
+      { label: "Market liquidity", value: "Can positions be exited without collapse?", color: "red" },
+      { label: "Funding liquidity", value: "Can cash needs be met under stress?", color: "amber" },
+      { label: "Horizon", value: "Intraday to 30-day+ survival horizon", color: "slate" },
+    ],
+    body: [
+      `Market-risk stress tests often assume that positions can be re-valued or closed at stressed mid-market prices. Liquidity stress testing relaxes that assumption. It asks how much additional loss would be incurred if the same positions had to be liquidated in a market with wider spreads, thinner depth and possible one-way flow, and whether the firm can fund the resulting cash needs.`,
+      `Typical exercises combine (1) accelerated outflows of customer deposits or margin calls, (2) draws on committed facilities, (3) loss of secured funding capacity, and (4) simultaneous widening of liquidation costs for the trading inventory. The output is a projected cash-flow timeline and a set of survival horizons under different severity assumptions.`,
+      `Because liquidity and solvency interact — forced sales crystallise losses that further impair capital — integrated liquidity-and-capital stress tests are increasingly expected by both internal risk committees and regulators. Siloed analysis of the two risks systematically understates the true vulnerability.`
+    ],
+    keyPoint: "Liquidity stress testing closes the gap between ‘mark-to-market loss’ and ‘cash loss under fire-sale conditions.’ In a real crisis the ability to fund and to exit often matters more than the pure valuation shock."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

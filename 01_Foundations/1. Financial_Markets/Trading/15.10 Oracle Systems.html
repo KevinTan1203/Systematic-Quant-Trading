@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 15.10 Oracle Systems</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 15 · Section 15.10</div>
+      <h1 class="book-title">Oracle<br><em>Systems</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Networks → attacks → latency → aggregation · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>15.10 Oracle Systems</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Chainlink",
+    icon: "🔗",
+    title: "Chainlink Decentralized Oracle Network",
+    desc: "The dominant push-based oracle network: independent node operators source off-chain data, aggregate it, and publish on-chain feeds consumed by DeFi protocols",
+    badge: { label: "Industry Standard", style: "slate" },
+    tags: [["chainlink","slate"], ["don","teal"], ["price feeds","amber"], ["push oracle","teal"]],
+    data: [
+      { label: "Model", value: "Decentralized oracle network (DON)", color: "slate" },
+      { label: "Update style", value: "Push on deviation / heartbeat", color: "teal" },
+      { label: "Use cases", value: "Lending, derivatives, stablecoins, insurance", color: "amber" },
+    ],
+    body: [
+      `Smart contracts cannot natively read the outside world. Chainlink’s design answers that with a network of independent node operators that fetch data from APIs and exchanges, sign reports, and reach consensus before writing a price (or other data) on-chain. Consumers read a single aggregator contract rather than trusting one node.`,
+      `Feeds typically update when price moves beyond a deviation threshold or when a maximum time (heartbeat) elapses. That balances gas cost against staleness. Security rests on node diversity, staking/reputation, data-source quality, and the aggregation rule (often a median).`,
+      `Chainlink’s breadth of integrations made it the default reference for major lending markets and synthetic protocols. Concentration risk — many protocols reading the same feed — is the counterpart of that success.`
+    ],
+    keyPoint: "Chainlink turns off-chain market data into an on-chain primitive via a decentralized node network. Most of DeFi’s risk engines ultimately depend on the integrity of those feeds."
+  },
+  {
+    era: "Pyth",
+    icon: "⚡",
+    title: "Pyth Network (Pull-Based, Low-Latency)",
+    desc: "An oracle design oriented toward first-party publishers and on-demand updates: consumers pull the latest price when they need it, optimising for speed and freshness",
+    badge: { label: "Low Latency", style: "teal" },
+    tags: [["pyth","teal"], ["pull oracle","amber"], ["first-party","slate"], ["low latency","teal"]],
+    data: [
+      { label: "Publishers", value: "Exchanges, market makers, trading firms", color: "teal" },
+      { label: "Consumption", value: "Pull / update-on-use rather than constant push", color: "amber" },
+      { label: "Strength", value: "Freshness for perps and high-frequency DeFi", color: "slate" },
+    ],
+    body: [
+      `Pyth emphasises publishers who are themselves close to the market — trading firms and venues — and a pull model where applications or keepers submit the latest signed price on-chain when a transaction needs it. That avoids paying continuous gas for unused updates and can deliver tighter latency for derivatives and fast lending markets.`,
+      `Confidence intervals and aggregate methodology are part of the published payload, giving consumers more than a single point estimate. Solana and other high-throughput chains were early natural homes; EVM deployments extended the same ideas.`,
+      `Trust assumptions shift toward the publisher set and the integrity of the aggregation. As with any oracle, a thin or captured publisher set becomes a systemic risk for protocols that treat the feed as ground truth.`
+    ],
+    keyPoint: "Pyth optimises for low-latency, pull-based consumption of first-party market data. Speed and freshness improve; security still collapses to who publishes and how reports are aggregated."
+  },
+  {
+    era: "TWAP",
+    icon: "📈",
+    title: "TWAP Oracles (Uniswap v3 On-Chain)",
+    desc: "Time-weighted average prices derived from on-chain AMM observations — no external nodes, but dependent on the pool’s own liquidity and trade flow",
+    badge: { label: "On-Chain", style: "amber" },
+    tags: [["twap","amber"], ["uniswap v3","teal"], ["on-chain oracle","slate"], ["manipulation cost","red"]],
+    data: [
+      { label: "Source", value: "AMM cumulative price observations", color: "teal" },
+      { label: "Parameter", value: "Window length (e.g. 30 min, hours)", color: "amber" },
+      { label: "Limit", value: "Cost to move TWAP ∝ liquidity × time", color: "red" },
+    ],
+    body: [
+      `Uniswap v3 stores cumulative price ticks that let any contract compute a geometric TWAP over an arbitrary past window. The oracle is “free” in the sense that it needs no external nodes — only the pool’s existing trading activity and observation cardinality.`,
+      `Security is economic: manipulating a long TWAP requires moving the pool price against deep liquidity for a sustained period, which is expensive on major pairs and cheaper on thin ones. Short windows are easier to nudge; long windows are slower to reflect genuine market moves.`,
+      `Protocols that rely solely on a single pool TWAP inherit that pool’s liquidity risk. Combining TWAPs, using multiple pools, or pairing with external feeds is standard hardening.`
+    ],
+    keyPoint: "TWAP oracles turn AMM history into a price reference. They minimise trust in external operators and maximise dependence on on-chain liquidity depth and window design."
+  },
+  {
+    era: "Manipulation",
+    icon: "🎯",
+    title: "Oracle Manipulation Attacks",
+    desc: "Deliberately distorting the price a protocol reads so that liquidations, mints, or payouts execute at artificial levels that benefit the attacker",
+    badge: { label: "Attack", style: "red" },
+    tags: [["manipulation","red"], ["spot vs twap","amber"], ["thin liquidity","slate"], ["protocol design","teal"]],
+    data: [
+      { label: "Targets", value: "Spot reads, short TWAPs, single-source feeds", color: "red" },
+      { label: "Profit path", value: "Borrow, mint, liquidate, or claim at bad price", color: "amber" },
+      { label: "Defence", value: "Robust aggregation, delay, depth, circuit breakers", color: "teal" },
+    ],
+    body: [
+      `If a lending protocol treats a manipulable spot price as collateral value, an attacker can inflate that price, borrow against overstated collateral, and leave bad debt. Similar patterns hit synthetic mints, options settlement, and reward calculations. The oracle is the control surface; the protocol’s risk engine is the payload.`,
+      `Classic weak points include reading a single thin pool’s instantaneous price, using a very short TWAP, or trusting one off-chain reporter. Historical exploits repeatedly combined these weaknesses with atomic transaction composition.`,
+      `Good protocol design assumes the oracle can be wrong for short periods and limits damage via collateral factors, TWAP length, multi-source checks, and pause guardians.`
+    ],
+    keyPoint: "Oracle manipulation is not primarily about “hacking the feed” — it is about making the protocol act on a price the attacker temporarily owns. Defence is protocol architecture, not only oracle branding."
+  },
+  {
+    era: "Frontrun",
+    icon: "🏃",
+    title: "Oracle Front-Running",
+    desc: "Trading or positioning in anticipation of a known upcoming oracle update that will change on-chain valuations, liquidations, or funding triggers",
+    badge: { label: "MEV-Adjacent", style: "amber" },
+    tags: [["oracle frontrun","amber"], ["update race","red"], ["keeper","slate"], ["latency","teal"]],
+    data: [
+      { label: "Signal", value: "Pending or predictable feed update", color: "amber" },
+      { label: "Action", value: "Position before protocol consumes new price", color: "red" },
+      { label: "Context", value: "Overlaps with liquidation and arb MEV", color: "slate" },
+    ],
+    body: [
+      `When an oracle update is visible in the mempool or arrives on a fixed schedule, sophisticated actors can transact immediately before or after the update lands. Liquidators race to be first once a new price makes accounts eligible; arbitrageurs rebalance pools; attackers may sandwich protocol actions that depend on the new value.`,
+      `Push oracles create discrete update events; pull oracles shift the race to whoever submits the price in the same transaction bundle as their profitable action. Both models have ordering games; they differ in who pays gas and who controls timing.`,
+      `Mitigations include update batching with protocol logic, priority rules for liquidations, and reducing the economic value of being first through continuous accrual rather than cliff thresholds.`
+    ],
+    keyPoint: "Oracle updates are scheduled information events. Front-running them is the MEV of risk-parameter changes — profitable because protocols must eventually read the new truth."
+  },
+  {
+    era: "Flash",
+    icon: "💥",
+    title: "Flash Loan + Oracle Manipulation",
+    desc: "Atomic attacks that borrow large uncollateralised size, move a weak on-chain price, exploit a protocol reading that price, and repay within one transaction",
+    badge: { label: "Critical", style: "red" },
+    tags: [["flash loan","red"], ["atomic exploit","amber"], ["single tx","slate"], ["price skew","red"]],
+    data: [
+      { label: "Pattern", value: "Borrow → skew pool/feed → exploit → repay", color: "red" },
+      { label: "Enabler", value: "Protocol reads manipulable spot in-tx", color: "amber" },
+      { label: "Counter", value: "TWAP, external DON, multi-block checks", color: "teal" },
+    ],
+    body: [
+      `Flash loans remove capital constraints from manipulation. In one transaction an attacker can borrow tens of millions, trade against a shallow pool to move its spot price, interact with a victim protocol that reads that spot (or a short TWAP), extract value, restore the pool, and repay the loan — keeping the profit.`,
+      `This is why “use the pool price” without safeguards became an anti-pattern. Attacks on lending platforms, vaults, and poorly designed synthetic systems repeatedly followed the same template in DeFi’s history.`,
+      `Defences are structural: never value collateral from a single thin spot, prefer multi-block TWAPs or decentralised off-chain aggregates, and assume atomic adversaries with unbounded temporary capital.`
+    ],
+    keyPoint: "Flash loans turn oracle manipulation from a balance-sheet problem into a pure smart-contract design problem. If your price can be bought for one block, an attacker only needs one block of credit."
+  },
+  {
+    era: "Latency",
+    icon: "⏱️",
+    title: "Update Frequency and Latency",
+    desc: "The trade-off between freshness, gas cost, and manipulation surface: how often prices move on-chain and how stale they may be when protocols act",
+    badge: { label: "Design", style: "slate" },
+    tags: [["heartbeat","slate"], ["deviation threshold","amber"], ["staleness","red"], ["gas cost","teal"]],
+    data: [
+      { label: "Push levers", value: "Deviation % + maximum heartbeat", color: "amber" },
+      { label: "Pull levers", value: "Who updates and when in the tx path", color: "teal" },
+      { label: "Risk", value: "Too slow → bad liquidations; too fast → cost", color: "red" },
+    ],
+    body: [
+      `A feed that updates every second is expensive on L1 and may still be gamed around each print. A feed that updates once a day is cheap and dangerously stale for leveraged markets. Production systems combine a price-deviation trigger with a maximum quiet period so that calm markets stay cheap and violent markets stay current.`,
+      `Latency also includes the path from true market move → publisher observation → consensus → on-chain inclusion. During congestion, oracle transactions compete with liquidations and user flow; prioritisation and L2 deployment change the practical lag.`,
+      `Protocol risk parameters (collateral factors, liquidation penalties) must be calibrated to worst-case staleness, not to average-case heartbeat marketing.`
+    ],
+    keyPoint: "Oracle latency is a risk parameter. Fresher prices cost gas and can create more update races; staler prices save gas and can liquidate the wrong people at the wrong time."
+  },
+  {
+    era: "Aggregation",
+    icon: "🧮",
+    title: "Multiple Oracle Aggregation",
+    desc: "Combining several independent sources — DONs, TWAPs, and publisher sets — so that no single feed or pool can unilaterally define protocol truth",
+    badge: { label: "Hardening", style: "teal" },
+    tags: [["aggregation","teal"], ["median","amber"], ["multi-source","slate"], ["robustness","teal"]],
+    data: [
+      { label: "Methods", value: "Median, trimmed mean, min of sources", color: "teal" },
+      { label: "Sources", value: "Chainlink, Pyth, pool TWAPs, others", color: "amber" },
+      { label: "Goal", value: "Raise cost of corrupting the composite", color: "slate" },
+    ],
+    body: [
+      `Aggregation is defence in depth. A protocol might require a median of several Chainlink-style feeds, or the more conservative of an external feed and a Uniswap TWAP, or a bound that pauses if sources diverge beyond a threshold. Each extra independent source raises the cost and coordination required for manipulation.`,
+      `Poor aggregation can still fail: correlating sources that all read the same thin exchange, taking a mean that one outlier dominates, or pausing so rarely that bad prices still execute. Divergence rules and circuit breakers are as important as the average itself.`,
+      `Operational complexity grows with each source — heartbeat monitoring, failover, and governance of what “independent” means. For high-TVL risk engines, that complexity is usually cheaper than a single-point oracle failure.`
+    ],
+    keyPoint: "Multiple-oracle aggregation is how serious protocols refuse to let one feed become a single point of failure. The composite is only as robust as the independence of its inputs and the honesty of its combination rule."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

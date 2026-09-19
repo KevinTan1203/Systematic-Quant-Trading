@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 14.2 Value at Risk (VaR)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 14 · Section 14.2</div>
+      <h1 class="book-title">Value at<br><em>Risk (VaR)</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>9</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Definition → methods → horizons → limits → regulation · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>14.2 Value at Risk (VaR)</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Definition",
+    icon: "📉",
+    title: "VaR Definition",
+    desc: "The maximum loss that is not expected to be exceeded with a stated confidence level over a fixed time horizon",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["definition","slate"], ["confidence level","teal"], ["horizon","amber"], ["quantile","teal"]],
+    data: [
+      { label: "Statement", value: "Loss ≤ VaR with probability X%", color: "teal" },
+      { label: "Typical X", value: "95 % or 99 %", color: "amber" },
+      { label: "Horizon T", value: "1-day, 10-day (regulatory)", color: "slate" },
+    ],
+    body: [
+      `Value at Risk answers a single, operationally useful question: “How much can I lose, with probability no greater than α, over the next T days?” Formally, VaR<sub>α,T</sub> is the α-quantile of the loss distribution (or the negative of the (1−α)-quantile of the P&L distribution). A 99 % one-day VaR of $10 m means that, under the model’s assumptions, losses larger than $10 m are expected to occur only one day in a hundred.`,
+      `VaR is a threshold, not an expectation. It says nothing about the size of losses beyond that threshold. It is therefore silent on the very outcomes that matter most in a crisis. This distinction is the root of almost every subsequent criticism of the measure.`,
+      `Because VaR is a pure quantile, its numerical value depends critically on the choice of confidence level and horizon. Changing either parameter can alter the reported number by a factor of two or more, even when the underlying risk is unchanged.`
+    ],
+    keyPoint: "VaR is the loss threshold that is breached only with probability α. It is deliberately simple, deliberately silent on tail severity, and deliberately sensitive to the two parameters that define it: confidence level and horizon."
+  },
+  {
+    era: "Historical",
+    icon: "📜",
+    title: "Historical Simulation VaR",
+    desc: "Non-parametric estimation that re-values the current portfolio under the actual returns observed in a rolling window of past days",
+    badge: { label: "Core", style: "teal" },
+    tags: [["historical sim","teal"], ["non-parametric","slate"], ["window length","amber"], ["empirical quantile","teal"]],
+    data: [
+      { label: "Method", value: "Re-price under past return vectors", color: "teal" },
+      { label: "Window", value: "Typically 1–5 years of daily data", color: "amber" },
+      { label: "Strength", value: "No distributional assumption", color: "slate" },
+    ],
+    body: [
+      `Historical simulation takes the current portfolio weights, applies each of the last N daily (or multi-day) return vectors observed in the market, and constructs an empirical distribution of hypothetical P&L. The VaR is simply the appropriate empirical quantile of that distribution. No parametric form is imposed; the data themselves define the loss distribution.`,
+      `The method automatically incorporates whatever fat tails, skewness and correlation patterns existed in the sample window. Its principal weakness is that the window must be long enough to contain relevant stress episodes yet short enough to remain representative of current market conditions. A five-year window that ends just before a crisis will systematically understate risk; a window that begins inside a crisis may overstate it for years.`,
+      `Variants include volatility-weighted historical simulation (more weight to recent high-vol days) and filtered historical simulation (standardise residuals, then re-scale by current volatility). Both attempt to mitigate the “stale-window” problem while preserving the non-parametric character of the approach.`
+    ],
+    keyPoint: "Historical simulation is the simplest and most transparent VaR method: it asks only “what would this portfolio have lost on each of the last N days?” Its accuracy is entirely hostage to the representativeness of that historical window."
+  },
+  {
+    era: "Parametric",
+    icon: "🔔",
+    title: "Parametric VaR (Normal Assumption)",
+    desc: "Closed-form VaR obtained by assuming portfolio returns are Gaussian and scaling the standard deviation by the appropriate normal quantile",
+    badge: { label: "Analytic", style: "amber" },
+    tags: [["parametric","amber"], ["normal","red"], ["δ-normal","slate"], ["closed form","teal"]],
+    data: [
+      { label: "Formula", value: "VaR ≈ μ − z<sub>α</sub> · σ · √T", color: "amber" },
+      { label: "z<sub>95%</sub>", value: "1.645", color: "teal" },
+      { label: "z<sub>99%</sub>", value: "2.326", color: "teal" },
+    ],
+    body: [
+      `Under the assumption that portfolio P&L is normally distributed with mean μ and volatility σ, VaR collapses to a simple multiple of σ. For a one-day horizon the 95 % and 99 % VaRs are approximately 1.65σ and 2.33σ below the mean. Multi-day VaR is obtained by scaling volatility by √T (the square-root-of-time rule).`,
+      `The method is computationally trivial and analytically tractable, which made it the industry standard in the 1990s. Its fatal flaw is the normality assumption itself: real returns exhibit excess kurtosis, so the normal distribution systematically understates the probability of extreme losses. The higher the confidence level, the larger the understatement.`,
+      `In practice the parametric approach is often implemented as “delta-normal” VaR: linearise all instruments with respect to risk factors, map the portfolio onto a covariance matrix of those factors, and compute the resulting portfolio variance. Non-linear instruments (options, mortgages) are poorly handled unless higher-order (delta-gamma) approximations are introduced.`
+    ],
+    keyPoint: "Parametric VaR is elegant precisely because it assumes away the fat tails that dominate real risk. It remains useful for rough sizing and for instruments that are nearly linear, but it is structurally optimistic at high confidence levels."
+  },
+  {
+    era: "Monte Carlo",
+    icon: "🎲",
+    title: "Monte Carlo VaR",
+    desc: "Simulation-based VaR that generates thousands of synthetic market scenarios from a chosen stochastic model and re-values the full portfolio under each",
+    badge: { label: "Flexible", style: "teal" },
+    tags: [["monte carlo","teal"], ["full revaluation","slate"], ["scenario generation","amber"], ["computational","red"]],
+    data: [
+      { label: "Strength", value: "Handles non-linearity & path dependence", color: "teal" },
+      { label: "Cost", value: "Computationally intensive", color: "amber" },
+      { label: "Key risk", value: "Model risk in the scenario engine", color: "red" },
+    ],
+    body: [
+      `Monte Carlo VaR draws a large number of possible future states of the risk-factor vector from a specified joint distribution (or from a more elaborate stochastic process), re-values every position under each draw, and reads the desired quantile from the resulting simulated P&L histogram. Because the valuation can be exact (or arbitrarily accurate), non-linear and path-dependent instruments are handled without approximation.`,
+      `The method’s flexibility is also its vulnerability. Every modelling choice—marginal distributions, dependence structure, volatility dynamics, jump processes—embeds assumptions that may or may not hold on the day a large loss materialises. Model risk is therefore first-order; the quality of the VaR number is only as good as the quality of the scenario generator.`,
+      `Computational cost scales with the number of simulations, the size of the book, and the complexity of the pricing functions. Variance-reduction techniques, GPU acceleration and intelligent scenario selection are routinely employed to keep run-times acceptable for overnight risk reports.`
+    ],
+    keyPoint: "Monte Carlo VaR is the most general of the three classical methods, but it shifts the burden from statistical estimation onto model specification. The number it produces is only as trustworthy as the stochastic engine that generated the scenarios."
+  },
+  {
+    era: "Confidence",
+    icon: "📊",
+    title: "95 % VaR vs. 99 % VaR",
+    desc: "How the choice of confidence level changes both the magnitude of the reported number and the frequency with which it is expected to be breached",
+    badge: { label: "Parameter", style: "amber" },
+    tags: [["95%","amber"], ["99%","red"], ["exception frequency","teal"], ["tail sensitivity","slate"]],
+    data: [
+      { label: "95 % VaR", value: "Breached ~1 day in 20", color: "amber" },
+      { label: "99 % VaR", value: "Breached ~1 day in 100", color: "red" },
+      { label: "Ratio", value: "Often 1.3–1.6× under normality", color: "slate" },
+    ],
+    body: [
+      `A 95 % VaR is expected to be exceeded on roughly five days out of every hundred; a 99 % VaR on only one day out of a hundred. The higher confidence level therefore probes deeper into the left tail and produces a larger absolute number. Under normality the ratio of 99 % to 95 % VaR is approximately 2.33 / 1.65 ≈ 1.41; under fat-tailed distributions the ratio is typically larger.`,
+      `From a risk-management perspective the two measures serve different purposes. 95 % VaR is more frequently observable and therefore easier to back-test, yet it still ignores the most extreme outcomes. 99 % VaR is closer to the regulatory standard and more conservative, but exceptions are rare enough that statistical validation becomes noisy.`,
+      `Many desks compute both. The spread between them is itself informative: a large gap signals that the loss distribution is heavy-tailed or that the model is sensitive to the extreme quantile.`
+    ],
+    keyPoint: "Moving from 95 % to 99 % is not a cosmetic change; it is a deliberate decision to look further into the tail. The numerical increase and the reduction in expected exception frequency must both be understood before the number is used for limit-setting."
+  },
+  {
+    era: "Horizon",
+    icon: "📅",
+    title: "1-Day vs. 10-Day VaR & Basel Scaling",
+    desc: "The regulatory convention of scaling one-day VaR by √10 to obtain a ten-day horizon measure, and the assumptions that underlie it",
+    badge: { label: "Regulatory", style: "slate" },
+    tags: [["1-day","teal"], ["10-day","amber"], ["√10 scaling","slate"], ["basel","red"]],
+    data: [
+      { label: "Basel rule", value: "10-day VaR ≈ 1-day VaR × √10", color: "slate" },
+      { label: "√10 ≈", value: "3.16", color: "amber" },
+      { label: "Assumption", value: "i.i.d. returns, no serial correlation", color: "red" },
+    ],
+    body: [
+      `Market-risk capital under the Basel internal-models approach is based on a 10-day VaR at the 99 % confidence level. Because most risk engines produce daily P&L distributions, regulators historically allowed banks to compute a one-day 99 % VaR and multiply by √10 ≈ 3.16. The square-root-of-time rule is exact only when returns are i.i.d. and the portfolio is static.`,
+      `In reality returns exhibit volatility clustering, autocorrelation of absolute returns, and liquidity horizons that differ by asset class. Scaling by √10 therefore tends to understate risk when volatility is mean-reverting over short horizons and can overstate it when positions can be liquidated faster than ten days. Nevertheless the rule remains the regulatory default for many calculations.`,
+      `Modern practice increasingly computes true multi-day VaR by overlapping or non-overlapping 10-day returns, or by Monte Carlo simulation of the full path. The √10 shortcut is retained mainly for legacy systems and for approximate scaling when computational budgets are tight.`
+    ],
+    keyPoint: "The Basel √10 scaling is a convenient fiction that converts a one-day number into a ten-day capital figure. It is exact only under idealised conditions that markets rarely satisfy; treating the scaled number as precise is a common source of both over- and under-capitalisation."
+  },
+  {
+    era: "Limits",
+    icon: "⚠️",
+    title: "VaR Limitations",
+    desc: "The two fundamental theoretical defects—lack of subadditivity and silence about tail severity—that motivated the development of coherent risk measures",
+    badge: { label: "Critical", style: "red" },
+    tags: [["not subadditive","red"], ["ignores tail","red"], ["coherent risk","teal"], ["expected shortfall","slate"]],
+    data: [
+      { label: "Subadditivity", value: "VaR can discourage diversification", color: "red" },
+      { label: "Tail silence", value: "Says nothing beyond the quantile", color: "red" },
+      { label: "Remedy", value: "Expected Shortfall (CVaR)", color: "teal" },
+    ],
+    body: [
+      `VaR is not subadditive: the VaR of a sum of portfolios can exceed the sum of their individual VaRs. This violates the elementary risk-management principle that diversification should not increase measured risk. In extreme cases the non-subadditivity can create regulatory arbitrage incentives to split portfolios artificially.`,
+      `More importantly, VaR is completely silent about the magnitude of losses beyond the threshold. Two portfolios can have identical 99 % VaRs yet radically different expected losses in the remaining 1 % of outcomes. After the 2008 crisis this blindness to tail severity became the central practical criticism of the measure.`,
+      `These defects led to the axiomatic development of coherent risk measures and to the regulatory shift toward Expected Shortfall (also called CVaR or TailVaR), which averages all losses beyond the VaR threshold and is both subadditive and sensitive to the extreme tail.`
+    ],
+    keyPoint: "VaR’s two original sins—non-subadditivity and indifference to the size of tail losses—are not minor technicalities. They are the reasons the industry and regulators have progressively supplemented or replaced VaR with Expected Shortfall."
+  },
+  {
+    era: "Basel",
+    icon: "🏦",
+    title: "Regulatory VaR (Basel III)",
+    desc: "The evolving role of VaR inside the Basel market-risk framework, from the original internal-models approach to the Fundamental Review of the Trading Book",
+    badge: { label: "Regulation", style: "slate" },
+    tags: [["basel iii","slate"], ["internal models","amber"], ["FRTB","teal"], ["capital","red"]],
+    data: [
+      { label: "Legacy", value: "99 % 10-day VaR + multipliers", color: "amber" },
+      { label: "FRTB", value: "Expected Shortfall at 97.5 %", color: "teal" },
+      { label: "Back-testing", value: "Exceptions drive capital multipliers", color: "red" },
+    ],
+    body: [
+      `Under the original Basel II/III internal-models approach, banks could use their own 99 % 10-day VaR models to determine market-risk capital, subject to a multiplier (minimum 3) that increased with the number of back-testing exceptions. The framework therefore placed heavy weight on both the absolute VaR number and on the model’s empirical performance.`,
+      `The Fundamental Review of the Trading Book (FRTB) replaces VaR with Expected Shortfall calibrated to a 97.5 % confidence level, introduces liquidity horizons that vary by risk factor, and imposes stricter modellability tests. The intent is to correct VaR’s indifference to tail severity and to recognise that different assets cannot be liquidated at the same speed.`,
+      `Even under FRTB, VaR remains relevant for back-testing and for certain standardised calculations. Understanding the old VaR-based regime is therefore still necessary for interpreting historical capital numbers and for institutions that have not yet fully transitioned.`
+    ],
+    keyPoint: "Regulatory VaR was never a pure risk measure; it was a capital-allocation device whose parameters (99 %, 10 days, multiplier) were chosen for supervisory convenience. FRTB’s move to Expected Shortfall is the formal recognition of VaR’s theoretical shortcomings."
+  },
+  {
+    era: "Stressed",
+    icon: "🌪️",
+    title: "Stressed VaR",
+    desc: "VaR computed on a deliberately chosen historical window of extreme market stress rather than on the most recent data",
+    badge: { label: "Crisis", style: "red" },
+    tags: [["stressed var","red"], ["crisis window","amber"], ["basel","slate"], ["conservative","teal"]],
+    data: [
+      { label: "Purpose", value: "Capture risk under crisis conditions", color: "red" },
+      { label: "Window", value: "12-month period of significant stress", color: "amber" },
+      { label: "Use", value: "Basel stressed-VaR capital charge", color: "slate" },
+    ],
+    body: [
+      `Ordinary historical or parametric VaR reflects the volatility and correlation regime of the recent past. In calm markets the resulting number can be dangerously low. Stressed VaR replaces the recent window with a continuous 12-month period of significant financial stress—typically the 2007–09 crisis or an equivalent episode relevant to the bank’s portfolio—and recomputes VaR under those returns.`,
+      `The regulatory motivation is clear: capital should not evaporate simply because markets have been quiet. By anchoring the calculation to a known crisis, stressed VaR provides a more stable and conservative capital floor. The choice of stress window is itself a modelling decision; supervisors retain the right to challenge a bank’s selection.`,
+      `Stressed VaR is not a substitute for forward-looking stress testing. It is a backward-looking, quantile-based measure that happens to be evaluated on a bad historical sample. Its value lies in preventing capital from becoming procyclically low, not in discovering new risks that have never been observed.`
+    ],
+    keyPoint: "Stressed VaR is ordinary VaR computed on a deliberately hostile historical window. It is a regulatory antidote to the procyclicality of recent-window VaR, not a crystal ball for unprecedented future crises."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
