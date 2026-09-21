@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantitative Methods — 16.6 Deep Learning for Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 16 · Section 16.6</div>
+      <h1 class="book-title">Deep Learning<br><em>for Trading</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">LSTM · GRU · CNN · attention · TCN · N-BEATS · TFT · multi-task · transfer · overfitting · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Quantitative Methods · Revision Notes</span>
+    <span>16.6 Deep Learning for Trading</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Recurrent",
+    icon: "🔄",
+    title: "LSTM for Sequences",
+    desc: "Long Short-Term Memory networks that capture long-range temporal dependencies in market data",
+    badge: { label: "Core", style: "teal" },
+    tags: [["LSTM","teal"], ["sequences","amber"], ["memory gates",""], ["time series","slate"]],
+    data: [
+      { label: "Key idea", value: "Gated cell state that selectively remembers", color: "teal" },
+      { label: "Gates", value: "Forget · input · output", color: "" },
+      { label: "Finance use", value: "Return sequences · volatility · order flow", color: "amber" },
+    ],
+    body: [
+      `LSTMs address the vanishing-gradient problem of vanilla RNNs by introducing a cell state that runs through the sequence with only minor linear interactions. Forget, input and output gates control what information is discarded, written and read at each time step, allowing the network to maintain relevant memory over dozens or hundreds of steps.`,
+      `In trading, LSTMs have been applied to raw return sequences, order-book snapshots, and multi-variate feature streams. They can model regime persistence, volatility clustering and lagged cross-asset effects that fixed-window statistical models miss.`,
+      `Despite their historical popularity, LSTMs are computationally heavier than convolutional or attention-based alternatives and can still overfit noisy financial series unless regularised aggressively and validated with strict walk-forward schemes.`
+    ],
+    keyPoint: "LSTMs give neural networks a controllable long-term memory. They remain a strong baseline for sequential market data, though newer architectures often match or exceed them with less complexity."
+  },
+  {
+    era: "Recurrent",
+    icon: "⚡",
+    title: "GRU (Gated Recurrent Unit)",
+    desc: "A streamlined recurrent architecture with fewer gates and comparable performance to LSTM",
+    badge: { label: "Core", style: "teal" },
+    tags: [["GRU","teal"], ["gated","amber"], ["efficient",""], ["RNN","slate"]],
+    data: [
+      { label: "Gates", value: "Reset · update (no separate output gate)", color: "teal" },
+      { label: "Advantage", value: "Fewer parameters · faster training", color: "" },
+      { label: "Trade-off", value: "Slightly less expressive than LSTM on some tasks", color: "amber" },
+    ],
+    body: [
+      `The Gated Recurrent Unit simplifies the LSTM design by combining the forget and input gates into a single update gate and merging the cell and hidden states. The resulting model has fewer parameters, trains faster, and often matches LSTM accuracy on many sequence tasks.`,
+      `For financial time series the practical difference is frequently small; GRU is therefore a pragmatic default when compute budget or latency matters. Stacked or bidirectional GRUs can still capture complex temporal structure.`,
+      `As with LSTMs, success hinges more on feature quality, regularisation and honest temporal validation than on the precise choice between the two gated architectures.`
+    ],
+    keyPoint: "GRUs offer most of the benefit of LSTMs at lower computational cost. They are often the preferred recurrent building block when speed and simplicity are priorities."
+  },
+  {
+    era: "Convolutional",
+    icon: "📊",
+    title: "1D CNNs for Time Series",
+    desc: "Convolutional filters that detect local temporal patterns and hierarchical features in sequential data",
+    badge: { label: "Core", style: "teal" },
+    tags: [["1D CNN","teal"], ["convolution","amber"], ["local patterns",""], ["hierarchical","slate"]],
+    data: [
+      { label: "Strength", value: "Translation-equivariant local detectors", color: "teal" },
+      { label: "Stacking", value: "Larger receptive fields via depth / dilation", color: "" },
+      { label: "Finance fit", value: "Motifs in returns · volume · order-book shape", color: "amber" },
+    ],
+    body: [
+      `One-dimensional convolutions slide learned filters along the time axis, detecting local motifs regardless of where they occur. Early layers capture short patterns (spikes, reversals); deeper layers combine them into longer motifs. Pooling or striding progressively aggregates information.`,
+      `In markets, 1D CNNs excel at recognising characteristic shapes in price, volume or order-book imbalance series. They train faster than recurrent networks, parallelise easily, and can be combined with residual connections or attention.`,
+      `Pure CNNs have a finite receptive field determined by kernel sizes and depth; capturing very long dependencies usually requires dilation, stacking, or hybridisation with recurrence or attention.`
+    ],
+    keyPoint: "1D CNNs efficiently extract local temporal patterns. They are fast, parallelisable and form a strong building block for hybrid deep-learning trading models."
+  },
+  {
+    era: "Attention",
+    icon: "👁️",
+    title: "Attention Mechanisms",
+    desc: "Learned weighting of past time steps or features that lets the model focus on the most relevant context",
+    badge: { label: "Core", style: "teal" },
+    tags: [["attention","teal"], ["self-attention","amber"], ["context",""], ["transformers","slate"]],
+    data: [
+      { label: "Idea", value: "Soft selection of relevant past information", color: "teal" },
+      { label: "Forms", value: "Additive · dot-product · multi-head", color: "" },
+      { label: "Benefit", value: "Long-range dependence without recurrence", color: "amber" },
+    ],
+    body: [
+      `Attention computes a weighted sum of value vectors, where the weights are derived from the compatibility of a query with a set of keys. In time-series models this allows every prediction to draw directly from any past time step, sidestepping the sequential bottleneck of RNNs.`,
+      `Self-attention (as used in Transformers) lets each position attend to all others; multi-head attention runs several such operations in parallel, capturing different types of relationships. Positional encodings inject order information that pure attention would otherwise lack.`,
+      `In finance, attention weights can highlight which past returns, news events or order-book states the model deems important — offering a degree of interpretability alongside improved long-range modelling.`
+    ],
+    keyPoint: "Attention replaces fixed recurrence with learned, content-based focus. It is the key ingredient that allows modern sequence models to capture long dependencies efficiently."
+  },
+  {
+    era: "Convolutional",
+    icon: "⏳",
+    title: "Temporal Convolutional Networks",
+    desc: "Dilated causal convolutions that achieve large receptive fields while preserving temporal order",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["TCN","amber"], ["dilated","teal"], ["causal",""], ["receptive field","slate"]],
+    data: [
+      { label: "Core ops", value: "Causal + dilated convolutions + residuals", color: "teal" },
+      { label: "Advantage", value: "Parallel training · stable gradients · long memory", color: "" },
+      { label: "Vs RNN", value: "Often faster and more accurate on sequences", color: "amber" },
+    ],
+    body: [
+      `Temporal Convolutional Networks apply one-dimensional convolutions that are strictly causal (no future leakage) and dilated (gaps between kernel taps). Exponentially increasing dilation factors give an exponentially growing receptive field with depth, while residual connections ease training.`,
+      `TCNs combine the parallelisation and gradient stability of CNNs with the ability to look far into the past. On many sequence benchmarks they have outperformed LSTMs and GRUs while training substantially faster.`,
+      `For trading they are attractive when both long history and low-latency inference matter. Careful choice of kernel size, dilation schedule and normalisation remains necessary to avoid overfitting limited financial samples.`
+    ],
+    keyPoint: "TCNs deliver long effective memory through dilated causal convolutions. They often match or beat recurrent models with simpler, more parallelisable computation."
+  },
+  {
+    era: "Forecasting",
+    icon: "📐",
+    title: "N-BEATS",
+    desc: "Neural basis-expansion analysis for interpretable time-series forecasting",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["N-BEATS","amber"], ["basis expansion","teal"], ["interpretable",""], ["forecasting","slate"]],
+    data: [
+      { label: "Structure", value: "Stacks of fully-connected blocks with backcast/forecast", color: "teal" },
+      { label: "Inductive bias", value: "Trend + seasonality basis functions (optional)", color: "" },
+      { label: "Strength", value: "Strong pure-forecasting performance · no covariates needed", color: "amber" },
+    ],
+    body: [
+      `N-BEATS decomposes the forecasting problem into a sequence of fully-connected blocks that each produce a backcast (estimate of the input window) and a forecast. Residual links iteratively refine the representation. An optional interpretable configuration constrains the blocks to polynomial trend and Fourier seasonality bases.`,
+      `The architecture has achieved state-of-the-art results on pure univariate forecasting benchmarks without requiring exogenous variables or heavy feature engineering. Its modular design also yields partial interpretability when the trend/seasonality constraints are used.`,
+      `In finance N-BEATS can serve as a strong statistical baseline for return or volatility forecasting; combining it with market-specific covariates usually requires hybrid or extended variants.`
+    ],
+    keyPoint: "N-BEATS performs pure neural forecasting via iterative basis expansion. It is a powerful, relatively interpretable alternative when the task is classic time-series prediction."
+  },
+  {
+    era: "Transformer",
+    icon: "🔮",
+    title: "TFT (Temporal Fusion Transformer)",
+    desc: "Attention-based multi-horizon model that fuses static, known and observed time-varying inputs",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["TFT","amber"], ["multi-horizon","teal"], ["variable selection",""], ["interpretable","slate"]],
+    data: [
+      { label: "Inputs", value: "Static · past-observed · future-known covariates", color: "teal" },
+      { label: "Components", value: "Variable selection · gating · multi-head attention", color: "" },
+      { label: "Output", value: "Multi-horizon forecasts + interpretability weights", color: "amber" },
+    ],
+    body: [
+      `The Temporal Fusion Transformer is designed for multi-horizon forecasting with rich covariates. It employs variable-selection networks to emphasise the most relevant features at each step, gated residual networks for adaptive depth, and a self-attention layer that learns long-term dependencies across time.`,
+      `Static metadata (e.g., asset identity), past observed series, and a-priori known future inputs (calendar events, scheduled releases) are handled distinctly. The model produces quantile forecasts and exposes attention and selection weights that aid interpretation.`,
+      `TFT has become a popular off-the-shelf deep architecture for financial forecasting tasks that involve mixed data types and multiple prediction horizons, provided sufficient data and careful regularisation are available.`
+    ],
+    keyPoint: "TFT unifies static and time-varying inputs inside an attention-based multi-horizon architecture. It is one of the most complete deep-learning toolkits currently available for structured financial forecasting."
+  },
+  {
+    era: "Training",
+    icon: "🎯",
+    title: "Multi-Task Learning",
+    desc: "Jointly optimising several related prediction heads to improve generalisation and data efficiency",
+    badge: { label: "Core", style: "teal" },
+    tags: [["multi-task","teal"], ["shared backbone","amber"], ["auxiliary","",""], ["transfer","slate"]],
+    data: [
+      { label: "Setup", value: "Shared encoder + task-specific heads", color: "teal" },
+      { label: "Finance examples", value: "Return + volatility + direction + volume", color: "" },
+      { label: "Benefit", value: "Regularisation · better representations · data efficiency", color: "amber" },
+    ],
+    body: [
+      `Multi-task learning trains a single model on several related objectives simultaneously. A shared backbone extracts common features while lightweight heads specialise for each task. Auxiliary tasks act as regularisers and can improve the representation learned for the primary trading objective.`,
+      `Typical combinations include predicting next-period return together with realised volatility, trade direction, or volume. Hard-parameter sharing is most common; soft sharing or cross-stitch units offer more flexibility at higher complexity.`,
+      `Success depends on task relatedness: conflicting objectives can degrade performance. Dynamic loss weighting or uncertainty-based schemes help balance gradients when tasks have different scales or noise levels.`
+    ],
+    keyPoint: "Multi-task learning turns related prediction problems into mutual regularisers. In data-scarce financial settings it is a practical way to extract more signal from every sample."
+  },
+  {
+    era: "Transfer",
+    icon: "🔗",
+    title: "Transfer Learning in Finance",
+    desc: "Re-using representations learned on large or related datasets to improve performance on a target market or asset",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["transfer","amber"], ["pre-train","teal"], ["fine-tune",""], ["domain adaptation","slate"]],
+    data: [
+      { label: "Strategies", value: "Pre-train then fine-tune · feature extraction · adapters", color: "teal" },
+      { label: "Sources", value: "Cross-asset · cross-market · synthetic · alternate horizons", color: "" },
+      { label: "Risk", value: "Negative transfer when domains differ too much", color: "red" },
+    ],
+    body: [
+      `Financial datasets for any single instrument are often short or noisy. Transfer learning mitigates this by first training on a larger corpus (many assets, longer history, or related markets) and then adapting the model to the target series with limited fine-tuning.`,
+      `Common patterns include pre-training a universal encoder on a broad equity universe and fine-tuning per sector or ticker, or transferring volatility models across asset classes. Adapter modules and partial freezing reduce the number of parameters that must be re-estimated.`,
+      `Negative transfer is a real danger: features useful for liquid large-caps may harm prediction on small-caps or emerging-market names. Careful validation and, when necessary, explicit domain-adversarial training are required.`
+    ],
+    keyPoint: "Transfer learning leverages data from related assets or markets to compensate for the chronic scarcity of clean samples on any single series. Domain similarity remains the decisive factor."
+  },
+  {
+    era: "Risk",
+    icon: "⚠️",
+    title: "Overfitting Challenges",
+    desc: "The fundamental tension between model capacity and the limited, noisy, non-stationary nature of financial data",
+    badge: { label: "Critical", style: "red" },
+    tags: [["overfitting","red"], ["limited data","amber"], ["regularisation",""], ["non-stationarity","slate"]],
+    data: [
+      { label: "Root causes", value: "Low SNR · short histories · regime shifts", color: "red" },
+      { label: "Defences", value: "Strong regularisation · early stopping · ensembling · simplicity", color: "teal" },
+      { label: "Validation", value: "Strict walk-forward · purged CV · paper trading", color: "amber" },
+    ],
+    body: [
+      `Deep networks contain orders of magnitude more parameters than classical models. Financial targets have extremely low signal-to-noise ratios, exhibit structural breaks, and rarely provide the millions of independent observations that deep learning typically assumes. The result is a severe overfitting risk.`,
+      `Mitigation strategies include aggressive dropout and weight decay, early stopping on a realistic validation scheme, data augmentation (when justifiable), multi-task and transfer learning, and a deliberate preference for architectures whose inductive bias matches the problem. Ensembling diverse models further stabilises predictions.`,
+      `Ultimately the most reliable safeguard is methodological humility: any claimed edge must survive strict walk-forward testing, realistic transaction costs, and out-of-sample periods that include unseen regimes. Complexity that does not demonstrably improve economic performance should be discarded.`
+    ],
+    keyPoint: "In finance the binding constraint is almost never model capacity — it is the scarcity of trustworthy signal. Overfitting is the default outcome unless every stage of the pipeline actively fights it."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

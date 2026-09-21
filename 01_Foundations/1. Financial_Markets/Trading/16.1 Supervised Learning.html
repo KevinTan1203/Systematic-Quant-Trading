@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantitative Methods — 16.1 Supervised Learning</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 16 · Section 16.1</div>
+      <h1 class="book-title">Supervised<br><em>Learning</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Regression · classification · validation · regularisation · ensembles · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Quantitative Methods · Revision Notes</span>
+    <span>16.1 Supervised Learning</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Task",
+    icon: "📈",
+    title: "Regression",
+    desc: "Predict continuous returns or expected values from features",
+    badge: { label: "Core", style: "teal" },
+    tags: [["regression","teal"], ["continuous target","amber"], ["returns",""], ["MSE","slate"]],
+    data: [
+      { label: "Target", value: "Continuous (e.g. next-period return)", color: "teal" },
+      { label: "Loss", value: "MSE · MAE · Huber · quantile", color: "" },
+      { label: "Risk", value: "Overfitting to noise in financial series", color: "red" },
+    ],
+    body: [
+      `Regression is the workhorse supervised task for predicting continuous quantities such as expected returns, volatility, or residual alpha. Features (order-book imbalance, lagged returns, technical indicators, alternative data) are mapped to a real-valued output via linear models, trees, or neural nets.`,
+      `In finance the signal-to-noise ratio is notoriously low. Even a model with statistically significant in-sample R² can produce economically useless out-of-sample predictions once transaction costs and slippage are included. Careful loss design (e.g. Huber or quantile loss) and rigorous walk-forward evaluation are therefore essential.`,
+      `The practical goal is rarely perfect point forecasts; it is ranking assets or generating position sizes whose expected value after costs is positive.`
+    ],
+    keyPoint: "Regression predicts continuous returns. Success is measured not by R² alone but by economic edge after costs and realistic capacity constraints."
+  },
+  {
+    era: "Task",
+    icon: "↕️",
+    title: "Classification",
+    desc: "Predict discrete market direction: up / down / flat",
+    badge: { label: "Core", style: "teal" },
+    tags: [["classification","teal"], ["direction","amber"], ["up-down-flat",""], ["cross-entropy","slate"]],
+    data: [
+      { label: "Target", value: "Categorical (up / down / flat)", color: "teal" },
+      { label: "Metrics", value: "Accuracy · F1 · AUC · log-loss", color: "" },
+      { label: "Trap", value: "Class imbalance & look-ahead bias", color: "red" },
+    ],
+    body: [
+      `Classification reframes the prediction problem as forecasting the sign or regime of the next move rather than its magnitude. Labels are typically constructed by thresholding future returns (e.g. > +τ → up, < −τ → down, else flat).`,
+      `Because markets spend long periods in low-volatility regimes, class imbalance is common. Accuracy can be misleading; precision-recall, AUC, and cost-sensitive metrics that incorporate transaction costs are more informative. Probability calibration is often as important as raw class prediction.`,
+      `Many production systems combine a classification filter (trade only when confidence exceeds a threshold) with a regression size model. The two tasks are complementary rather than mutually exclusive.`
+    ],
+    keyPoint: "Classification predicts direction. It is useful when the economic value lies more in being right about the sign than in estimating exact magnitude."
+  },
+  {
+    era: "Validation",
+    icon: "✂️",
+    title: "Train / Validation / Test Split",
+    desc: "Partitioning data so that model selection and final evaluation remain honest",
+    badge: { label: "Core", style: "teal" },
+    tags: [["split","teal"], ["train","amber"], ["validation",""], ["test","slate"]],
+    data: [
+      { label: "Train", value: "Fit parameters & learn patterns", color: "teal" },
+      { label: "Validation", value: "Tune hyperparameters & select models", color: "amber" },
+      { label: "Test", value: "Final unbiased performance estimate", color: "red" },
+    ],
+    body: [
+      `A clean three-way split is the minimum safeguard against overfitting. The training set is used to estimate model parameters; the validation set guides hyperparameter search and early stopping; the test set is touched only once, at the very end, to report expected generalisation performance.`,
+      `In time-series settings a random shuffle is catastrophic: it leaks future information into the past. Chronological splits (or purged/embargoed variants) are mandatory. The test period should be long enough to contain multiple market regimes.`,
+      `Any repeated peeking at the test set, even for “just one more experiment,” converts it into a second validation set and destroys the statistical integrity of the reported results.`
+    ],
+    keyPoint: "Train–validation–test is the basic hygiene of supervised learning. In finance the temporal order of the split is as important as the proportions."
+  },
+  {
+    era: "Validation",
+    icon: "🚶",
+    title: "Cross-Validation for Time Series",
+    desc: "Walk-forward and purged schemes that respect temporal dependence",
+    badge: { label: "Critical", style: "amber" },
+    tags: [["walk-forward","amber"], ["purged CV","teal"], ["time series",""], ["embargo","slate"]],
+    data: [
+      { label: "Method", value: "Expanding or rolling window walk-forward", color: "teal" },
+      { label: "Purge / Embargo", value: "Remove overlapping labels & post-event data", color: "amber" },
+      { label: "Goal", value: "Unbiased estimate under serial dependence", color: "" },
+    ],
+    body: [
+      `Standard k-fold cross-validation assumes i.i.d. observations and therefore fails for financial time series. Walk-forward validation trains on all data up to time t and tests on a subsequent window, then rolls or expands the training set forward.`,
+      `When labels are constructed from future returns that span multiple bars, a purge gap must remove training observations whose labels overlap the test period. An embargo after the test window further prevents leakage from autocorrelated features.`,
+      `Combinatorial purged cross-validation (CPCV) and similar advanced schemes provide multiple non-overlapping test paths while still respecting temporal structure, giving more stable performance estimates than a single walk-forward path.`
+    ],
+    keyPoint: "Time-series cross-validation must never shuffle the future into the past. Walk-forward with purge and embargo is the practical standard."
+  },
+  {
+    era: "Regularisation",
+    icon: "🎚️",
+    title: "Regularization (L1, L2, ElasticNet)",
+    desc: "Penalising model complexity to improve out-of-sample generalisation",
+    badge: { label: "Core", style: "teal" },
+    tags: [["L1","teal"], ["L2","amber"], ["ElasticNet",""], ["sparsity","slate"]],
+    data: [
+      { label: "L1 (Lasso)", value: "Sparsity · automatic feature selection", color: "teal" },
+      { label: "L2 (Ridge)", value: "Shrinkage · stable coefficients", color: "amber" },
+      { label: "ElasticNet", value: "Combines both penalties", color: "" },
+    ],
+    body: [
+      `Regularisation adds a penalty term to the loss that discourages large or numerous coefficients. L2 (Ridge) shrinks all coefficients toward zero, stabilising estimates when features are correlated. L1 (Lasso) drives many coefficients exactly to zero, performing implicit feature selection.`,
+      `ElasticNet mixes both penalties and is often the most robust choice for high-dimensional financial feature sets. The strength of the penalty is itself a hyperparameter that must be tuned on a validation set or via cross-validation.`,
+      `In low-signal environments the optimal regularisation is typically strong; models that look under-fit in-sample frequently generalise better than richly parameterised alternatives.`
+    ],
+    keyPoint: "Regularisation trades a little in-sample fit for substantially better out-of-sample behaviour. In noisy markets it is not optional."
+  },
+  {
+    era: "Interpretability",
+    icon: "🔍",
+    title: "Feature Importance (SHAP Values)",
+    desc: "Attributing predictions to individual features in a consistent, model-agnostic way",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["SHAP","amber"], ["importance","teal"], ["explainability",""], ["attribution","slate"]],
+    data: [
+      { label: "Method", value: "Shapley values from cooperative game theory", color: "teal" },
+      { label: "Scope", value: "Global ranking & local instance explanations", color: "" },
+      { label: "Caveat", value: "Correlated features can share credit ambiguously", color: "red" },
+    ],
+    body: [
+      `SHAP (SHapley Additive exPlanations) values quantify how much each feature contributes to a particular prediction relative to a baseline. Because they satisfy desirable axioms (efficiency, symmetry, dummy, additivity), they provide a theoretically grounded alternative to simple gain- or permutation-based importance scores.`,
+      `Global SHAP summaries reveal which features drive the model on average; local explanations diagnose individual trades or regime shifts. TreeSHAP and KernelSHAP make the computation tractable for gradient-boosted trees and black-box models respectively.`,
+      `Importance rankings should still be interpreted with caution when features are highly collinear; complementary analysis (e.g. conditional importance or ablation) is often required.`
+    ],
+    keyPoint: "SHAP values turn a black-box model into a transparent attribution of every prediction. They are now the de-facto standard for feature-level interpretability."
+  },
+  {
+    era: "Ensemble",
+    icon: "🚀",
+    title: "Gradient Boosting",
+    desc: "XGBoost, LightGBM, CatBoost — sequential residual learners that dominate tabular data",
+    badge: { label: "Core", style: "teal" },
+    tags: [["XGBoost","teal"], ["LightGBM","amber"], ["CatBoost",""], ["boosting","slate"]],
+    data: [
+      { label: "XGBoost", value: "Exact & approx tree methods · highly tunable", color: "teal" },
+      { label: "LightGBM", value: "Leaf-wise growth · histogram bins · fast", color: "amber" },
+      { label: "CatBoost", value: "Ordered boosting · native categorical handling", color: "" },
+    ],
+    body: [
+      `Gradient boosting builds an additive ensemble of weak learners (usually shallow trees) by successively fitting the residual errors of the current model. Modern implementations—XGBoost, LightGBM and CatBoost—add regularisation, parallelisation, missing-value handling and categorical encodings that make them extremely effective on structured financial data.`,
+      `They routinely outperform linear models and random forests on medium-sized tabular problems when properly regularised and validated. The main practical costs are hyperparameter sensitivity and the risk of overfitting noisy targets if early stopping and column/row subsampling are neglected.`,
+      `In quant research they are often the first non-linear baseline; subsequent work focuses on feature engineering, target construction and robust validation rather than inventing new algorithms.`
+    ],
+    keyPoint: "Gradient boosting libraries are the current workhorses of supervised learning on tabular market data. Mastery of their regularisation knobs is more valuable than inventing new architectures."
+  },
+  {
+    era: "Ensemble",
+    icon: "🌲",
+    title: "Random Forests",
+    desc: "Bagged ensembles of decorrelated decision trees with built-in variance reduction",
+    badge: { label: "Classic", style: "slate" },
+    tags: [["random forest","slate"], ["bagging","teal"], ["trees",""], ["OOB","amber"]],
+    data: [
+      { label: "Mechanism", value: "Bootstrap samples + random feature subsets", color: "teal" },
+      { label: "Strength", value: "Robust · low tuning burden · OOB estimate", color: "" },
+      { label: "Limitation", value: "Weaker on pure extrapolation vs boosting", color: "amber" },
+    ],
+    body: [
+      `A random forest averages many deep decision trees, each grown on a bootstrap sample of the data and restricted at every split to a random subset of features. The resulting decorrelation reduces variance while retaining the low bias of individual trees.`,
+      `Out-of-bag (OOB) predictions supply a nearly free estimate of generalisation error. Feature-importance scores (permutation or impurity decrease) are straightforward, though less theoretically grounded than SHAP.`,
+      `Random forests remain attractive when interpretability, robustness to outliers, and minimal hyperparameter fuss matter more than squeezing the last basis point of predictive power. They are also useful as a strong baseline against which more complex models must demonstrably improve.`
+    ],
+    keyPoint: "Random forests trade a little peak performance for simplicity, robustness and built-in validation. They are still a sensible default for many tabular problems."
+  },
+  {
+    era: "Classic",
+    icon: "📐",
+    title: "SVMs for Classification",
+    desc: "Maximum-margin classifiers that remain relevant for smaller or kernelised problems",
+    badge: { label: "Classic", style: "slate" },
+    tags: [["SVM","slate"], ["margin","teal"], ["kernel","amber"], ["classification",""]],
+    data: [
+      { label: "Idea", value: "Maximise margin between classes", color: "teal" },
+      { label: "Kernels", value: "Linear · RBF · polynomial", color: "" },
+      { label: "Scaling", value: "Best on modest sample sizes", color: "amber" },
+    ],
+    body: [
+      `Support-vector machines seek the hyperplane that maximises the geometric margin between classes. Soft-margin variants tolerate a controlled number of violations; the dual formulation permits kernel tricks that implicitly map data into higher-dimensional spaces.`,
+      `On small-to-medium datasets with carefully engineered features, a well-tuned SVM can still compete with modern ensembles. Scaling to millions of observations is less practical; training time grows roughly quadratically (or worse) with sample size for non-linear kernels.`,
+      `In contemporary quant pipelines SVMs are more often used as interpretable linear baselines or as components inside larger stacking ensembles than as the primary workhorse.`
+    ],
+    keyPoint: "SVMs maximise the margin. They remain useful for smaller classification problems and as transparent linear or kernel baselines."
+  },
+  {
+    era: "Tuning",
+    icon: "🎛️",
+    title: "Hyperparameter Tuning",
+    desc: "Bayesian optimisation and other sequential methods for efficient search of model configuration",
+    badge: { label: "Critical", style: "amber" },
+    tags: [["Bayesian opt","amber"], ["hyperparameters","teal"], ["search",""], ["early stopping","slate"]],
+    data: [
+      { label: "Naive", value: "Grid or random search", color: "" },
+      { label: "Modern", value: "Bayesian optimisation · Hyperband · Optuna", color: "teal" },
+      { label: "Finance note", value: "Must still respect temporal validation", color: "red" },
+    ],
+    body: [
+      `Most modern learners expose dozens of hyperparameters (tree depth, learning rate, regularisation strengths, subsample ratios, etc.). Exhaustive grid search quickly becomes prohibitive; random search is surprisingly competitive but still wasteful.`,
+      `Bayesian optimisation builds a probabilistic surrogate (usually a Gaussian process or tree-structured Parzen estimator) of the validation objective and chooses the next configuration by maximising an acquisition function that balances exploration and exploitation. Successive-halving and Hyperband further accelerate the process by early-stopping poor trials.`,
+      `Whatever search method is used, every candidate evaluation must itself employ proper time-series validation. Otherwise the “optimal” hyperparameters simply overfit the particular validation window that was used for tuning.`
+    ],
+    keyPoint: "Hyperparameter tuning is itself a supervised learning problem under a limited evaluation budget. Bayesian methods and early-stopping schemes make the search tractable while temporal integrity keeps it honest."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

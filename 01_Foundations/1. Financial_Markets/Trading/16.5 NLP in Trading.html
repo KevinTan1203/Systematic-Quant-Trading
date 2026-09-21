@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantitative Methods — 16.5 NLP in Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 68px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 16 · Section 16.5</div>
+      <h1 class="book-title">NLP in<br><em>Trading</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core elements
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Sentiment · transcripts · filings · Fed · tone · embeddings · NER · events · vendors · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Quantitative Methods · Revision Notes</span>
+    <span>16.5 NLP in Trading</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Sentiment",
+    icon: "📰",
+    title: "Sentiment Analysis from News & Filings",
+    desc: "Extracting bullish or bearish polarity from news articles, press releases and corporate documents",
+    badge: { label: "Core", style: "teal" },
+    tags: [["sentiment","teal"], ["news","amber"], ["polarity",""], ["filings","slate"]],
+    data: [
+      { label: "Sources", value: "Newswires · press releases · filings · social", color: "teal" },
+      { label: "Output", value: "Polarity score · confidence · relevance", color: "" },
+      { label: "Horizon", value: "Minutes to days after release", color: "amber" },
+    ],
+    body: [
+      `Sentiment analysis maps unstructured text to a scalar or categorical measure of positive, negative or neutral tone with respect to an asset or the market. Early systems relied on domain-specific dictionaries (Loughran–McDonald, Harvard IV); modern pipelines use fine-tuned transformers that capture context and negation.`,
+      `In trading the signal is typically the surprise component — sentiment relative to its recent average or to analyst expectations — rather than the raw level. Relevance filtering (is the article actually about the target company?) and entity-level aggregation are critical to reduce noise.`,
+      `Alpha from pure news sentiment has compressed as adoption has grown; residual edge increasingly comes from faster processing, better disambiguation, or combination with price and volume confirmation.`
+    ],
+    keyPoint: "News and filing sentiment convert text into a tradable polarity signal. The economic value now lies more in speed, relevance and surprise than in the raw polarity score itself."
+  },
+  {
+    era: "Transcripts",
+    icon: "🎙️",
+    title: "Earnings Call Transcript NLP",
+    desc: "Parsing management language, Q&A dynamics and soft information from quarterly calls",
+    badge: { label: "Core", style: "teal" },
+    tags: [["earnings calls","teal"], ["transcripts","amber"], ["soft info",""], ["Q&A","slate"]],
+    data: [
+      { label: "Signals", value: "Tone shift · uncertainty · evasion · positivity", color: "teal" },
+      { label: "Sections", value: "Prepared remarks vs. Q&A vs. analyst tone", color: "" },
+      { label: "Edge", value: "Information not fully reflected in numbers", color: "amber" },
+    ],
+    body: [
+      `Earnings-call transcripts contain soft information that numerical statements omit. Changes in management tone, increases in uncertainty language, hedging, or evasive answers to analyst questions have been shown to predict subsequent returns and volatility beyond the earnings surprise itself.`,
+      `Practical pipelines separate prepared remarks from the Q&A section, apply domain-adapted sentiment or uncertainty classifiers, and track speaker-level statistics (CEO vs. CFO, length of answers, interruption frequency). Year-over-year or quarter-over-quarter deltas are often more informative than absolute levels.`,
+      `Because transcripts are released shortly after the call, low-latency processing can capture a short-lived window before the information is fully impounded in prices.`
+    ],
+    keyPoint: "Earnings-call NLP extracts soft signals — tone, uncertainty, evasion — that complement the hard earnings numbers and can move prices in the hours and days after the call."
+  },
+  {
+    era: "Filings",
+    icon: "📑",
+    title: "SEC Filing Analysis (10-K, 10-Q)",
+    desc: "Systematic extraction of risk factors, MD&A tone and structural changes from mandatory reports",
+    badge: { label: "Core", style: "teal" },
+    tags: [["10-K","teal"], ["10-Q","amber"], ["MD&A",""], ["risk factors","slate"]],
+    data: [
+      { label: "Key sections", value: "Risk Factors · MD&A · Legal Proceedings", color: "teal" },
+      { label: "Techniques", value: "Similarity · tone · topic drift · length", color: "" },
+      { label: "Signal type", value: "Slow-moving · often risk or quality oriented", color: "amber" },
+    ],
+    body: [
+      `Annual (10-K) and quarterly (10-Q) filings are legally required disclosures. Quantitative readers track changes in the Risk Factors section, shifts in Management’s Discussion & Analysis tone, additions or deletions of language, and document-length or complexity metrics.`,
+      `Cosine similarity between successive filings, Loughran–McDonald tone counts, and topic-model drift have all been linked to future returns, volatility and credit outcomes. Because the documents are long and formulaic, section-level and change-based features outperform naïve whole-document sentiment.`,
+      `The information is lower-frequency than news, yet it can still generate medium-horizon signals, especially when combined with earnings and price momentum.`
+    ],
+    keyPoint: "SEC filings embed persistent soft information about risk and management outlook. Measuring change relative to prior filings is usually more powerful than analysing any single document in isolation."
+  },
+  {
+    era: "Policy",
+    icon: "🏛️",
+    title: "Fed Minutes & FOMC Statement NLP",
+    desc: "Reading central-bank language for policy stance, hawkish/dovish shifts and market-moving nuance",
+    badge: { label: "Core", style: "teal" },
+    tags: [["FOMC","teal"], ["Fed minutes","amber"], ["hawkish-dovish",""], ["policy","slate"]],
+    data: [
+      { label: "Documents", value: "Statements · minutes · speeches · press conferences", color: "teal" },
+      { label: "Focus", value: "Hawkish / dovish tilt · uncertainty · guidance", color: "" },
+      { label: "Impact", value: "Rates · FX · equity risk premium", color: "amber" },
+    ],
+    body: [
+      `Central-bank communications move interest-rate expectations, the yield curve and risk assets. NLP systems score FOMC statements and minutes for hawkish versus dovish language, track the introduction or removal of key phrases, and measure uncertainty or disagreement among participants.`,
+      `Because the statement is short and highly scrutinised, even small wording changes are informative. Minutes released three weeks later provide a richer view of the discussion and can still affect prices. Speaker-level analysis of subsequent speeches adds a continuous stream of policy signals.`,
+      `Markets react within seconds of the release; therefore production systems emphasise ultra-low-latency parsing and pre-computed phrase dictionaries alongside deeper transformer models.`
+    ],
+    keyPoint: "Fed and FOMC NLP quantifies policy stance and its evolution. In rates and FX the marginal word can be as important as the marginal data release."
+  },
+  {
+    era: "Nuance",
+    icon: "🎭",
+    title: "Tone Analysis vs. Pure Sentiment",
+    desc: "Distinguishing optimism/pessimism from certainty, urgency, confusion and other linguistic dimensions",
+    badge: { label: "Conceptual", style: "slate" },
+    tags: [["tone","slate"], ["sentiment","teal"], ["uncertainty","amber"], ["dimensions",""]],
+    data: [
+      { label: "Sentiment", value: "Positive ↔ negative polarity", color: "teal" },
+      { label: "Tone dimensions", value: "Certainty · urgency · confusion · constraint", color: "" },
+      { label: "Value", value: "Orthogonal information beyond polarity", color: "amber" },
+    ],
+    body: [
+      `Pure sentiment reduces text to a single polarity axis. Tone analysis recognises that language carries multiple simultaneous attributes: a statement can be positive yet uncertain, or negative yet highly confident. Dictionaries and classifiers have been developed for certainty, numerical specificity, forward-looking statements, and modal verbs.`,
+      `In financial contexts, rising uncertainty language in filings or calls often predicts higher subsequent volatility even when overall sentiment is stable. Evasive or non-answer responses in Q&A sessions convey information that a simple positive/negative score misses.`,
+      `Multi-dimensional tone features therefore complement polarity and frequently survive in models after pure sentiment has been controlled for.`
+    ],
+    keyPoint: "Tone is richer than sentiment. Certainty, urgency and evasiveness supply orthogonal signals that polarity alone cannot capture."
+  },
+  {
+    era: "Representation",
+    icon: "🧮",
+    title: "Bag of Words vs. Embeddings",
+    desc: "Sparse count-based representations versus dense contextual vector representations of text",
+    badge: { label: "Core", style: "teal" },
+    tags: [["bag-of-words","teal"], ["TF-IDF","amber"], ["embeddings",""], ["transformers","slate"]],
+    data: [
+      { label: "BoW / TF-IDF", value: "Sparse · interpretable · fast", color: "teal" },
+      { label: "Embeddings", value: "Dense · contextual · capture semantics", color: "amber" },
+      { label: "Modern default", value: "Domain-adapted transformers (FinBERT etc.)", color: "" },
+    ],
+    body: [
+      `Bag-of-words and TF-IDF represent documents as high-dimensional sparse vectors of token counts or weighted frequencies. They are simple, fast, and surprisingly competitive when vocabulary is carefully curated for finance. They cannot, however, handle synonymy, negation scope or word order.`,
+      `Dense embeddings (Word2Vec, GloVe, and especially contextual models such as BERT and its finance-specific variants) map tokens or sentences into continuous vectors that reflect semantic similarity and context. Fine-tuning on financial corpora materially improves downstream sentiment and event tasks.`,
+      `In production many pipelines still combine both: sparse features for interpretable dictionary hits and dense embeddings for nuanced classification, with the final model selecting or blending them.`
+    ],
+    keyPoint: "Bag-of-words is fast and transparent; embeddings capture meaning and context. Most modern financial NLP systems rely on domain-adapted transformers while retaining sparse features for interpretability."
+  },
+  {
+    era: "Entities",
+    icon: "🏷️",
+    title: "Named Entity Recognition (NER)",
+    desc: "Identifying and linking company names, tickers, people, locations and other entities in text",
+    badge: { label: "Core", style: "teal" },
+    tags: [["NER","teal"], ["entity linking","amber"], ["tickers",""], ["disambiguation","slate"]],
+    data: [
+      { label: "Entities", value: "Companies · tickers · persons · orgs · locations", color: "teal" },
+      { label: "Challenge", value: "Ambiguity · abbreviations · new listings", color: "red" },
+      { label: "Downstream", value: "Accurate sentiment attribution & event linking", color: "amber" },
+    ],
+    body: [
+      `Named Entity Recognition locates spans of text that refer to real-world entities and classifies them by type. In finance the critical step is entity linking: mapping the recognised mention to a unique identifier (ticker, FIGI, CIK) so that sentiment or events can be correctly attributed.`,
+      `Ambiguity is pervasive — “Apple” may be the company or the fruit, “BA” may be Boeing or a country code. Maintenance of a high-quality entity knowledge base, handling of tickers and name changes, and continuous updates for IPOs and delistings are operational necessities.`,
+      `Without reliable NER and linking, even a perfect sentiment classifier produces noisy features because scores are assigned to the wrong assets.`
+    ],
+    keyPoint: "NER and entity linking are the plumbing of financial NLP. Incorrect attribution destroys the value of otherwise accurate sentiment or event signals."
+  },
+  {
+    era: "Events",
+    icon: "⚡",
+    title: "Event Extraction from Text",
+    desc: "Detecting structured corporate and macro events — M&A, earnings, guidance, lawsuits, policy changes",
+    badge: { label: "Advanced", style: "amber" },
+    tags: [["event extraction","amber"], ["M&A","teal"], ["guidance",""], ["structured","slate"]],
+    data: [
+      { label: "Event types", value: "Earnings · M&A · guidance · lawsuits · ratings", color: "teal" },
+      { label: "Output", value: "Event type · polarity · entities · timestamp", color: "" },
+      { label: "Use", value: "Trading triggers · risk alerts · knowledge graphs", color: "amber" },
+    ],
+    body: [
+      `Event extraction goes beyond sentiment to identify that a specific type of event has occurred, who the participants are, and often a directional implication. Templates, sequence-labelling models and, increasingly, large language models are used to turn free text into structured records.`,
+      `In markets, detected events can serve as direct trading triggers (e.g., unexpected M&A, guidance cuts) or as features that condition other models. Linking events across news, filings and transcripts builds a coherent event stream for each company.`,
+      `Precision is paramount: false-positive event detections generate costly false trades. Many production systems therefore combine model scores with rule-based confirmation and human-in-the-loop review for high-impact categories.`
+    ],
+    keyPoint: "Event extraction converts narrative into structured, machine-readable facts. It supplies both discrete trading catalysts and rich conditioning features for broader models."
+  },
+  {
+    era: "Vendor",
+    icon: "📡",
+    title: "Bloomberg / Refinitiv News Sentiment",
+    desc: "Institutional-grade, low-latency sentiment feeds derived from newswires and web sources",
+    badge: { label: "Practical", style: "slate" },
+    tags: [["Bloomberg","slate"], ["Refinitiv","teal"], ["news feed","amber"], ["low latency",""]],
+    data: [
+      { label: "Providers", value: "Bloomberg · Refinitiv (LSEG) · others", color: "teal" },
+      { label: "Content", value: "Scored stories · entity tags · relevance", color: "" },
+      { label: "Advantage", value: "Coverage · latency · entity resolution", color: "amber" },
+    ],
+    body: [
+      `Major data vendors supply pre-computed sentiment scores attached to news stories, often with entity-level relevance and confidence measures. These feeds arrive with very low latency and benefit from the vendors’ extensive entity-resolution and story-clustering infrastructure.`,
+      `Quant teams use them either as ready-made features or as a baseline against which internal NLP models must demonstrate incremental value. Because the same scores are available to many clients, the pure alpha has diminished; residual value lies in creative aggregation, cross-asset application, or combination with proprietary signals.`,
+      `Integration requires careful handling of story revisions, duplicate detection, and the precise timestamp at which the score became available to the market.`
+    ],
+    keyPoint: "Vendor news-sentiment feeds offer institutional coverage and latency at the cost of crowdedness. They are infrastructure, not a unique source of alpha."
+  },
+  {
+    era: "Alt Data",
+    icon: "📦",
+    title: "RavenPack Alternative Data",
+    desc: "Specialised NLP-derived event and sentiment analytics widely used in systematic strategies",
+    badge: { label: "Practical", style: "slate" },
+    tags: [["RavenPack","slate"], ["alt data","amber"], ["events","teal"], ["analytics",""]],
+    data: [
+      { label: "Products", value: "Event detection · sentiment · relevance · novelty", color: "teal" },
+      { label: "Coverage", value: "Equities · macro · entities across global markets", color: "" },
+      { label: "Typical use", value: "Signal research · risk monitoring · event studies", color: "amber" },
+    ],
+    body: [
+      `RavenPack is a prominent alternative-data provider that applies NLP and machine learning to news and other textual sources, producing structured analytics: event categories, sentiment scores, relevance, novelty and entity-level aggregates. The data are delivered in forms designed for quantitative consumption.`,
+      `Systematic funds have long used RavenPack factors for short-horizon return prediction, volatility forecasting and event-driven strategies. As with most commercial sentiment products, capacity and crowding are practical constraints; many users now treat the data as one input among many rather than a stand-alone alpha source.`,
+      `Evaluation still requires point-in-time versions of the history and careful alignment with tradable timestamps to avoid look-ahead bias in research.`
+    ],
+    keyPoint: "RavenPack packages news into quant-ready event and sentiment factors. It remains a widely adopted alternative-data source, subject to the usual caveats of crowding and the need for rigorous point-in-time testing."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataArray = e.data || e.dual || [];
+    const dataHtml = dataArray.length ? `
+      <div class="data-strip">
+        ${dataArray.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color || ''}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
