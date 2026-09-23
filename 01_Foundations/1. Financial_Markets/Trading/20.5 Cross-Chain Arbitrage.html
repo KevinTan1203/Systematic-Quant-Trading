@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quantitative Methods — 20.5 Cross-Chain Arbitrage</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:wght@400;700&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f4f1eb;
+        --bg2: #ede9e0;
+        --surface: #fff;
+        --surface2: #faf8f4;
+        --border: #d8d2c4;
+        --border2: #c4bdb0;
+        --ink: #1c1814;
+        --ink2: #3a342c;
+        --muted: #7a7268;
+        --faint: #b0a898;
+        --red: #b03020;
+        --red-bg: #fdf2f0;
+        --red-border: #e8c4be;
+        --teal: #1a6b5a;
+        --teal-bg: #f0f8f6;
+        --teal-border: #b4ddd6;
+        --amber: #9a6010;
+        --amber-bg: #fdf6e8;
+        --amber-border: #e8d4a4;
+        --slate: #2a4a6a;
+        --slate-bg: #f0f4f8;
+        --slate-border: #b4c8dc;
+        --accent: #c04828;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Source Serif 4", serif;
+        font-size: 15px;
+        line-height: 1.75;
+      }
+      body:after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.04;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+      .page {
+        position: relative;
+        z-index: 1;
+        max-width: 940px;
+        margin: auto;
+        padding: 52px 40px 100px;
+      }
+      .book-header {
+        margin-bottom: 44px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 24px;
+        align-items: end;
+        border-bottom: 2px solid var(--ink);
+        padding-bottom: 22px;
+      }
+      .chapter-eyebrow,
+      .header-stat,
+      .entry-era,
+      .entry-desc,
+      .entry-badge,
+      .entry-toggle,
+      .compare-label,
+      .data-cell-label,
+      .data-cell-value,
+      .tag,
+      .ctrl-btn,
+      .ctrl-right,
+      .footer-note {
+        font-family: "Space Mono", monospace;
+      }
+      .chapter-eyebrow {
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 10px;
+      }
+      .book-title {
+        font:
+          clamp(30px, 5vw, 52px)/1.05 "DM Serif Display",
+          serif;
+        letter-spacing: -0.02em;
+      }
+      .book-title em {
+        color: var(--accent);
+      }
+      .header-right {
+        text-align: right;
+        padding-bottom: 4px;
+      }
+      .header-stat {
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1.8;
+        letter-spacing: 0.05em;
+      }
+      .header-stat strong {
+        display: block;
+        font:
+          28px/1 "DM Serif Display",
+          serif;
+        color: var(--ink);
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .ctrl-btn {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 7px 16px;
+        border: 1px solid var(--border2);
+        background: var(--surface);
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .ctrl-btn:hover {
+        background: var(--ink);
+        color: var(--bg);
+      }
+      .ctrl-right {
+        margin-left: auto;
+        font-size: 10px;
+        color: var(--faint);
+        letter-spacing: 0.08em;
+      }
+      .timeline {
+        position: relative;
+        padding-left: 36px;
+      }
+      .timeline:before {
+        content: "";
+        position: absolute;
+        left: 11px;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        background: repeating-linear-gradient(
+          to bottom,
+          var(--border2) 0 6px,
+          transparent 6px 12px
+        );
+      }
+      .entry {
+        position: relative;
+        margin-bottom: 6px;
+      }
+      .entry:before {
+        content: "";
+        position: absolute;
+        left: -29px;
+        top: 20px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--bg2);
+        border: 2px solid var(--border2);
+        z-index: 2;
+      }
+      .entry.open:before {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .entry-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+      }
+      .entry.open .entry-card {
+        border-color: var(--border2);
+        box-shadow: 3px 3px 0 var(--bg2);
+      }
+      .entry-header {
+        display: grid;
+        grid-template-columns: 76px 42px 1fr auto 42px;
+        align-items: center;
+        min-height: 58px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .entry-header:hover {
+        background: var(--surface2);
+      }
+      .entry-era {
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+        padding-left: 16px;
+        border-right: 1px solid var(--border);
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .entry-icon {
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        border-right: 1px solid var(--border);
+        font-size: 16px;
+      }
+      .entry-title-block {
+        padding: 12px 16px;
+      }
+      .entry-title {
+        font:
+          16.5px/1.25 "DM Serif Display",
+          serif;
+      }
+      .entry-desc {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 9.5px;
+        letter-spacing: 0.04em;
+      }
+      .entry-badge {
+        margin-right: 14px;
+        padding: 3px 9px;
+        border: 1px solid;
+        white-space: nowrap;
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .badge-red {
+        color: var(--red);
+        border-color: var(--red-border);
+        background: var(--red-bg);
+      }
+      .badge-teal {
+        color: var(--teal);
+        border-color: var(--teal-border);
+        background: var(--teal-bg);
+      }
+      .badge-amber {
+        color: var(--amber);
+        border-color: var(--amber-border);
+        background: var(--amber-bg);
+      }
+      .badge-slate {
+        color: var(--slate);
+        border-color: var(--slate-border);
+        background: var(--slate-bg);
+      }
+      .entry-toggle {
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-left: 1px solid var(--border);
+        color: var(--faint);
+        transition:
+          transform 0.25s,
+          color 0.15s;
+      }
+      .entry.open .entry-toggle {
+        transform: rotate(90deg);
+        color: var(--accent);
+      }
+      .entry-body {
+        display: none;
+        border-top: 1px solid var(--border);
+        background: var(--surface2);
+        padding: 22px 24px 24px;
+      }
+      .entry.open .entry-body {
+        display: block;
+        animation: bodyIn 0.2s ease;
+      }
+      @keyframes bodyIn {
+        from {
+          opacity: 0;
+          transform: translateY(-5px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .entry-body p {
+        margin-bottom: 13px;
+        color: var(--ink2);
+        font-size: 13.5px;
+        line-height: 1.84;
+        font-weight: 300;
+      }
+      .entry-body p:last-of-type {
+        margin-bottom: 0;
+      }
+      .key-insight {
+        display: grid;
+        grid-template-columns: 3px 1fr;
+        gap: 14px;
+        margin-top: 18px;
+      }
+      .key-insight-bar {
+        background: var(--accent);
+        border-radius: 2px;
+      }
+      .key-insight-text {
+        padding: 2px 0;
+        color: var(--ink);
+        font:
+          italic 15px/1.6 "DM Serif Display",
+          serif;
+      }
+      .compare-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .compare-box {
+        padding: 13px 15px;
+        border: 1px solid var(--border);
+      }
+      .compare-box.left {
+        background: var(--red-bg);
+        border-color: var(--red-border);
+      }
+      .compare-box.right {
+        background: var(--teal-bg);
+        border-color: var(--teal-border);
+      }
+      .compare-label {
+        margin-bottom: 7px;
+        font-size: 9px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .compare-box.left .compare-label {
+        color: var(--red);
+      }
+      .compare-box.right .compare-label {
+        color: var(--teal);
+      }
+      .compare-box p {
+        margin: 0;
+        font-size: 12.5px;
+        line-height: 1.6;
+      }
+      .data-strip {
+        display: flex;
+        flex-wrap: wrap;
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+      }
+      .data-cell {
+        flex: 1;
+        min-width: 140px;
+        padding: 9px 14px;
+        border-right: 1px solid var(--border);
+      }
+      .data-cell:last-child {
+        border-right: 0;
+      }
+      .data-cell-label {
+        margin-bottom: 3px;
+        color: var(--muted);
+        font-size: 9px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .data-cell-value {
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .red {
+        color: var(--red);
+      }
+      .teal {
+        color: var(--teal);
+      }
+      .amber {
+        color: var(--amber);
+      }
+      .slate {
+        color: var(--slate);
+      }
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 16px;
+      }
+      .tag {
+        padding: 3px 8px;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .tag.accent {
+        background: var(--red-bg);
+        border-color: var(--red-border);
+        color: var(--accent);
+      }
+      .tag.teal {
+        background: var(--teal-bg);
+        border-color: var(--teal-border);
+        color: var(--teal);
+      }
+      .tag.amber {
+        background: var(--amber-bg);
+        border-color: var(--amber-border);
+        color: var(--amber);
+      }
+      .tag.slate {
+        background: var(--slate-bg);
+        border-color: var(--slate-border);
+        color: var(--slate);
+      }
+      .foot-rule {
+        border: 0;
+        height: 2px;
+        background: var(--ink);
+        margin: 64px 0 20px;
+      }
+      .footer-note {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      @media (max-width: 640px) {
+        .page {
+          padding: 32px 20px 60px;
+        }
+        .book-header {
+          grid-template-columns: 1fr;
+        }
+        .header-right {
+          text-align: left;
+        }
+        .timeline {
+          padding-left: 24px;
+        }
+        .entry-header {
+          grid-template-columns: 52px 36px 1fr auto;
+        }
+        .entry-badge {
+          display: none;
+        }
+        .entry-era {
+          padding-left: 10px;
+          font-size: 8.5px;
+        }
+        .compare-grid {
+          grid-template-columns: 1fr;
+        }
+        .ctrl-right {
+          width: 100%;
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="book-header">
+        <div>
+          <div class="chapter-eyebrow">Chapter 20 · Section 20.5</div>
+          <h1 class="book-title">Cross-Chain<br /><em>Arbitrage</em></h1>
+        </div>
+        <div class="header-right">
+          <div class="header-stat"><strong>6</strong>core fronts</div>
+        </div>
+      </header>
+      <div class="controls">
+        <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button
+        ><button class="ctrl-btn" onclick="toggleAll(false)">
+          Collapse All
+        </button>
+        <div class="ctrl-right">
+          price gaps · bridges · flash loans · aggregators · latency · failure
+          risk
+        </div>
+      </div>
+      <div class="timeline" id="entries-root"></div>
+      <div
+        style="height: 1px; background: var(--border); margin: 8px 0 0"
+      ></div>
+      <hr class="foot-rule" style="margin-top: 48px" />
+      <div class="footer-note">
+        <span>Quantitative Methods · Revision Notes</span
+        ><span>20.5 Cross-Chain Arbitrage</span>
+      </div>
+    </div>
+    <script>
+      const entries = [
+        {
+          era: "Markets",
+          icon: "🌐",
+          title: "Price Differences Across L1 / L2 Ecosystems",
+          desc: "Liquidity fragmentation creates spreads between otherwise related markets",
+          badge: { label: "Core", style: "teal" },
+          tags: [
+            ["L1 / L2", "teal"],
+            ["spreads", "amber"],
+            ["liquidity", ""],
+            ["price discovery", "slate"],
+          ],
+          data: [
+            {
+              label: "Source",
+              value: "Fragmented liquidity and flow",
+              color: "teal",
+            },
+            {
+              label: "Trade",
+              value: "Buy on cheap venue, sell on rich venue",
+              color: "amber",
+            },
+            {
+              label: "Constraint",
+              value: "Spread must exceed total costs",
+              color: "red",
+            },
+          ],
+          body: [
+            "Cross-chain arbitrage begins with the same or closely related assets trading at different prices across Ethereum, rollups, sidechains, and alternative L1s. Differences can reflect uneven liquidity, delayed information, bridge inventory, or local demand.",
+            "A valid opportunity is not simply the largest displayed spread. The calculation must include slippage, gas, bridge fees, execution probability, and the time required for capital to move or settle on the destination chain.",
+          ],
+          keyPoint:
+            "A cross-chain price gap is an opportunity only after the spread survives every cost between observation and settlement.",
+        },
+        {
+          era: "Bridges",
+          icon: "🌉",
+          title: "Bridge Speed and Cost Constraints",
+          desc: "Capital mobility determines whether a visible spread can be captured in time",
+          badge: { label: "Constraint", style: "amber" },
+          tags: [
+            ["bridge fee", "amber"],
+            ["finality", "teal"],
+            ["liquidity", ""],
+            ["capital routing", "slate"],
+          ],
+          data: [
+            {
+              label: "Fast path",
+              value: "Higher fee · lower exposure window",
+              color: "teal",
+            },
+            {
+              label: "Slow path",
+              value: "Lower fee · more stale risk",
+              color: "amber",
+            },
+            {
+              label: "Need",
+              value: "Destination liquidity before the trade",
+              color: "red",
+            },
+          ],
+          body: [
+            "Bridges vary widely in finality, fees, throughput, and liquidity. A fast bridge may charge more for speed; a cheaper canonical bridge may take minutes or longer. During that interval, the price gap can close while the arbitrageur is still moving capital.",
+            "Professional systems often pre-position inventory on both chains and rebalance later. This reduces execution latency but ties up capital and introduces an inventory-management problem: the trade is fast, while the hedge may be slow.",
+          ],
+          keyPoint:
+            "The fastest cross-chain arbitrage is often funded before the opportunity appears; the bridge is then a rebalancing rail, not the execution rail.",
+        },
+        {
+          era: "Capital",
+          icon: "⚡",
+          title: "Flash Loan Cross-Chain Arbitrage",
+          desc: "Atomic borrowing amplifies capital efficiency, but atomicity stops at the chain boundary",
+          badge: { label: "Mechanism", style: "teal" },
+          tags: [
+            ["flash loans", "teal"],
+            ["atomicity", "amber"],
+            ["capital efficiency", ""],
+            ["settlement", "slate"],
+          ],
+          data: [
+            {
+              label: "Within one chain",
+              value: "Borrow, trade, repay atomically",
+              color: "teal",
+            },
+            {
+              label: "Across chains",
+              value: "No universal atomic settlement",
+              color: "red",
+            },
+            {
+              label: "Practical model",
+              value: "Pre-funded destination inventory",
+              color: "amber",
+            },
+          ],
+          body: [
+            "Flash loans allow an arbitrageur to borrow substantial capital without collateral, execute a sequence of swaps, and repay within one transaction. They are powerful for same-chain opportunities where the entire trade can revert atomically if repayment fails.",
+            "A conventional flash loan cannot make two independent chains atomic. Cross-chain strategies therefore combine flash liquidity on one side with pre-positioned inventory, credit, intents, or a later rebalance on the other side. The bridge and destination execution remain exposed to failure.",
+          ],
+          keyPoint:
+            "Flash loans remove a capital constraint, not a cross-chain settlement constraint. The missing atomicity is the central limitation.",
+        },
+        {
+          era: "Routing",
+          icon: "🧮",
+          title: "DEX Aggregators: 1inch and Paraswap",
+          desc: "Route orders across fragmented pools to improve execution and reduce slippage",
+          badge: { label: "Execution", style: "teal" },
+          tags: [
+            ["1inch", "teal"],
+            ["Paraswap", "amber"],
+            ["routing", ""],
+            ["slippage", "slate"],
+          ],
+          data: [
+            {
+              label: "Function",
+              value: "Compare pools and split an order",
+              color: "teal",
+            },
+            {
+              label: "Input",
+              value: "Price · depth · gas · route risk",
+              color: "amber",
+            },
+            { label: "Output", value: "Best executable swap path", color: "" },
+          ],
+          body: [
+            "DEX aggregators such as 1inch and ParaSwap search across liquidity venues and can split an order among pools. In an arbitrage system, this routing layer helps estimate the true execution price rather than relying on a single quoted pool.",
+            "Aggregation does not remove execution risk. Quotes can become stale, routes can consume more gas than expected, and a multi-hop transaction may fail or suffer adverse price movement. Cross-chain strategies must also coordinate the route on each network.",
+          ],
+          keyPoint:
+            "An aggregator finds the best route available now; an arbitrageur must still decide whether that route will remain executable through settlement.",
+        },
+        {
+          era: "Latency",
+          icon: "⏱️",
+          title: "Cross-Chain Messaging Latency",
+          desc: "Messages, attestations, and finality windows create a race against stale information",
+          badge: { label: "Timing", style: "amber" },
+          tags: [
+            ["messaging", "amber"],
+            ["finality", "teal"],
+            ["relayers", ""],
+            ["stale quotes", "slate"],
+          ],
+          data: [
+            {
+              label: "Signal",
+              value: "Observe an imbalance on chain A",
+              color: "teal",
+            },
+            {
+              label: "Message",
+              value: "Relay intent or proof to chain B",
+              color: "amber",
+            },
+            {
+              label: "Risk",
+              value: "State changes before execution",
+              color: "red",
+            },
+          ],
+          body: [
+            "Cross-chain protocols communicate through messaging layers, relayers, light clients, or validator committees. Each adds a delay between observing a state on one chain and acting on a dependent state on another. Finality rules also differ: a transaction may be economically settled before it is cryptographically final.",
+            "Latency changes the expected value of the trade. A system must model message delivery distributions, reorg or rollback assumptions, nonce handling, and the chance that a destination transaction executes after the spread has disappeared.",
+          ],
+          keyPoint:
+            "In cross-chain arbitrage, latency is not just an operational metric; it is part of the pricing model for the opportunity itself.",
+        },
+        {
+          era: "Risk",
+          icon: "⚠️",
+          title: "Bridge Failures During Arbitrage Execution",
+          desc: "The most dangerous trade is one that completes on only one side of the bridge",
+          badge: { label: "Critical", style: "red" },
+          tags: [
+            ["bridge risk", "red"],
+            ["reverts", "amber"],
+            ["insurance", "teal"],
+            ["circuit breakers", "slate"],
+          ],
+          data: [
+            {
+              label: "Failure modes",
+              value: "Hack · halt · delay · message loss",
+              color: "red",
+            },
+            {
+              label: "Exposure",
+              value: "Unhedged asset or stranded capital",
+              color: "amber",
+            },
+            {
+              label: "Defence",
+              value: "Limits · monitoring · fallback routes",
+              color: "teal",
+            },
+          ],
+          body: [
+            "A bridge can pause, lose validator quorum, suffer an exploit, or deliver a message after market conditions have changed. If the source-side sale succeeds but the destination-side purchase or repayment fails, the arbitrage is no longer a market-neutral trade; it is an unhedged directional position.",
+            "Robust systems cap bridge exposure, maintain liquidity buffers, monitor bridge health, use circuit breakers, and price the probability of failure into the trade. Some strategies avoid live bridging altogether by keeping inventory on both sides and rebalancing only through trusted paths.",
+          ],
+          keyPoint:
+            "Bridge risk is asymmetric: one leg can settle successfully while the other is delayed, leaving the arbitrageur with the loss and no atomic unwind.",
+        },
+      ];
+      function render() {
+        document.getElementById("entries-root").innerHTML = entries
+          .map(
+            (e, i) =>
+              `<article class="entry ${i === 0 ? "open" : ""}"><div class="entry-card"><div class="entry-header" onclick="toggleEntry(this.parentElement.parentElement)"><div class="entry-era">${e.era}</div><div class="entry-icon">${e.icon}</div><div class="entry-title-block"><div class="entry-title">${e.title}</div><div class="entry-desc">${e.desc}</div></div><div class="entry-badge badge-${e.badge.style}">${e.badge.label}</div><div class="entry-toggle">›</div></div><div class="entry-body">${e.body.map((p) => `<p>${p}</p>`).join("")}<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div><div class="data-strip">${e.data.map((d) => `<div class="data-cell"><div class="data-cell-label">${d.label}</div><div class="data-cell-value ${d.color}">${d.value}</div></div>`).join("")}</div><div class="tags">${e.tags.map((t) => `<span class="tag ${t[1] || ""}">${t[0]}</span>`).join("")}</div></div></div></article>`,
+          )
+          .join("");
+      }
+      function toggleEntry(entry) {
+        entry.classList.toggle("open");
+      }
+      function toggleAll(open) {
+        document
+          .querySelectorAll(".entry")
+          .forEach((entry) => entry.classList.toggle("open", open));
+      }
+      render();
+    </script>
+  </body>
+</html>

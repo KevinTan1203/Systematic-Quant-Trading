@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 18.8 Capital Allocation</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 18 · Section 18.8</div>
+      <h1 class="book-title">Capital<br><em>Allocation</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>6</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Strategies → risk budgets → reallocation → liquidity · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>18.8 Capital Allocation</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Allocation",
+    icon: "📐",
+    title: "Allocating Capital to Strategies / PMs",
+    desc: "The decision process that sizes each strategy or portfolio manager’s book — the firm’s meta-portfolio construction problem",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["capital allocation","slate"], ["strategy sizing","teal"], ["pm capital","amber"], ["portfolio of portfolios","teal"]],
+    data: [
+      { label: "Inputs", value: "Edge, capacity, correlation, confidence", color: "slate" },
+      { label: "Outputs", value: "Notional or risk capital per sleeve", color: "teal" },
+      { label: "Owners", value: "CIO / capital committee / multi-manager core", color: "amber" },
+    ],
+    body: [
+      `Capital allocation answers how much of the firm’s balance sheet each strategy or PM may use. It is portfolio construction one level up: sleeves are treated as assets with expected return, risk, capacity, and correlation to the rest of the complex.`,
+      `Methods range from judgemental CIO overlays to formal optimisers that target risk parity across pods, equal Sharpe contributions, or constrained mean–variance. Qualitative factors — operational readiness, key-person risk, mandate novelty — still bind.`,
+      `Poor allocation concentrates the firm in one crowded idea dressed as diversification. Good allocation is dynamic, evidence-based, and willing to starve underperforming or capacity-constrained books.`
+    ],
+    keyPoint: "Allocating capital to strategies is the firm’s highest-leverage portfolio decision. You are not only picking trades — you are picking which decision-makers get the balance sheet."
+  },
+  {
+    era: "Risk Budget",
+    icon: "📊",
+    title: "Risk Budget Allocation",
+    desc: "Distributing a firm-wide risk appetite — VaR, volatility, stress loss, or factor limits — across desks so that local limits add up to a coherent global profile",
+    badge: { label: "Core", style: "teal" },
+    tags: [["risk budget","teal"], ["var allocation","amber"], ["limit cascade","slate"], ["aggregation","teal"]],
+    data: [
+      { label: "Firm limit", value: "Total risk appetite set by committee / board", color: "slate" },
+      { label: "Decomposition", value: "Budgets by strategy, factor, region", color: "teal" },
+      { label: "Enforcement", value: "Hard limits + utilisation reporting", color: "amber" },
+    ],
+    body: [
+      `A dollar of capital is not the same as a unit of risk. Risk-budget allocation assigns each sleeve a maximum contribution to firm VaR, expected shortfall, or stress loss, so that leverage is comparable across different volatilities and instruments.`,
+      `Budgets may be fixed shares or floating with performance and realised correlation. Cross-margining and netting mean the sum of standalone risks exceeds diversified firm risk — allocation rules must state whether limits are standalone or marginal.`,
+      `When every desk runs “only a bit over” its budget, the firm is over its appetite. Real-time utilisation and automatic blocks matter more than quarterly intention.`
+    ],
+    keyPoint: "Risk budgets translate capital into comparable units of danger. Without them, high-vol strategies silently consume the firm’s tail while low-vol strategies look “underused.”"
+  },
+  {
+    era: "Efficiency",
+    icon: "⚙️",
+    title: "Capital Efficiency Optimization",
+    desc: "Maximising expected return per unit of scarce resource — equity, margin, stress budget, or borrow — through structure, netting, and instrument choice",
+    badge: { label: "Optimization", style: "amber" },
+    tags: [["capital efficiency","amber"], ["margin","teal"], ["netting","slate"], ["roe on risk","teal"]],
+    data: [
+      { label: "Scarce inputs", value: "Equity, PB margin, stress limits, HTB borrow", color: "amber" },
+      { label: "Levers", value: "Netting, synthetics, hedges, venue choice", color: "teal" },
+      { label: "Metric", value: "Return on risk capital / margin consumed", color: "slate" },
+    ],
+    body: [
+      `Two trades with identical economic exposure can consume very different amounts of margin or regulatory capital. Capital efficiency work chooses expressions — cash vs. swap, listed vs. OTC, gross vs. spread books — that preserve edge while lowering resource use.`,
+      `Cross-strategy netting, central clearing, and portfolio margining improve efficiency at firm level when systems can actually recognise offsets. Fake efficiency that ignores basis and gap risk simply relocates the problem to the tail.`,
+      `Optimisation is continuous: financing spreads, haircut changes, and new product access shift the efficient frontier for the same alpha ideas.`
+    ],
+    keyPoint: "Capital efficiency is return per unit of scarce constraint. The goal is not maximum gross — it is maximum durable edge per unit of margin, stress, and equity consumed."
+  },
+  {
+    era: "Drawdown",
+    icon: "📉",
+    title: "Drawdown-Triggered Reallocation",
+    desc: "Rules that automatically cut or shift capital when a strategy, pod, or the firm breaches predefined loss thresholds from peak or from plan",
+    badge: { label: "Critical", style: "red" },
+    tags: [["drawdown","red"], ["reallocation","amber"], ["de-risk","slate"], ["stop policy","red"]],
+    data: [
+      { label: "Trigger", value: "Peak-to-trough or YTD loss beyond X%", color: "red" },
+      { label: "Actions", value: "Cut risk, freeze adds, transfer capital out", color: "amber" },
+      { label: "Design", value: "Pre-committed — not negotiated in pain", color: "slate" },
+    ],
+    body: [
+      `Drawdown-triggered reallocation institutionalises the refusal to double down emotionally. When a sleeve hits a soft limit, risk is reduced; at a hard limit, capital is withdrawn and may be offered to other strategies or held in cash until review.`,
+      `Multi-manager platforms use this as the core survival mechanism: one pod’s failure must not absorb the franchise. Single-manager firms use firm-level versions tied to investor high-water marks and business continuity.`,
+      `Credibility depends on applying the rule to winners-turned-losers without exception theatre. Pre-committed grids beat ad hoc CIO discretion under stress.`
+    ],
+    keyPoint: "Drawdown-triggered reallocation is capital allocation’s circuit breaker. It converts a loss path into an automatic change in who still has the right to risk the firm’s equity."
+  },
+  {
+    era: "Opportunity",
+    icon: "⏱️",
+    title: "Opportunity Cost of Capital",
+    desc: "The foregone return from deploying scarce capital in one use rather than the next-best strategy, hedge, or cash alternative",
+    badge: { label: "Economics", style: "teal" },
+    tags: [["opportunity cost","teal"], ["scarce capital","amber"], ["hurdle","slate"], ["deployment","teal"]],
+    data: [
+      { label: "Idea", value: "Every allocation blocks an alternative use", color: "teal" },
+      { label: "Benchmark", value: "Next-best strategy / risk-free / hurdle rate", color: "amber" },
+      { label: "Practice", value: "Kill low-edge books even if not losing", color: "slate" },
+    ],
+    body: [
+      `Capital sitting in a mediocre strategy is not “safe” — it is expensive relative to a higher-Sharpe use of the same margin. Opportunity cost framing forces committees to justify not only absolute P&L but comparative deployment.`,
+      `Hurdle rates, internal cost-of-capital charges, and competitive reallocation cycles make opportunity cost explicit. Without them, legacy books accumulate because nobody wants a political fight.`,
+      `In crises, opportunity cost flips: preserving dry powder can dominate forced deployment. The same concept governs both aggressive scaling and disciplined cash buffers.`
+    ],
+    keyPoint: "Opportunity cost of capital is the hidden P&L of allocation. A strategy that makes money can still be the wrong use of a constrained balance sheet."
+  },
+  {
+    era: "Liquidity",
+    icon: "💧",
+    title: "Lock-Ups and Liquidity Management",
+    desc: "Aligning capital duration with asset liquidity — fund lock-ups, gates, notice periods, and internal rules so allocated capital cannot flee faster than positions can be exited",
+    badge: { label: "Structure", style: "amber" },
+    tags: [["lock-up","amber"], ["gates","slate"], ["liquidity management","teal"], ["asset-liability","red"]],
+    data: [
+      { label: "LP side", value: "Lock-ups, gates, notice, side pockets", color: "amber" },
+      { label: "Internal", value: "Capital tenor matched to strategy liquidity", color: "teal" },
+      { label: "Failure", value: "Liquid promises on illiquid assets", color: "red" },
+    ],
+    body: [
+      `Allocation is incomplete without a duration decision. Capital granted to an illiquid credit or activist book must be sticky; capital for a liquid stat-arb book can be more flexible. Mismatch creates forced sales and contagion across sleeves.`,
+      `At fund level, lock-ups and gates stabilise the liability side so the allocation plan can survive redemptions. Internally, multi-strategy firms assign “capital classes” with different unlock schedules by strategy type.`,
+      `Liquidity management under stress — who funds margin calls, which sleeve liquidates first — should be pre-planned. Ad hoc rationing in a drawdown is capital allocation by panic.`
+    ],
+    keyPoint: "Lock-ups and liquidity rules are the time dimension of capital allocation. Edge that cannot be held for its required horizon is not edge — it is a future fire sale."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

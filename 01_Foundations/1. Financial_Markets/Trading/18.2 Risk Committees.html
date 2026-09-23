@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 18.2 Risk Committees</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 18 · Section 18.2</div>
+      <h1 class="book-title">Risk<br><em>Committees</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Mandate → reporting → escalation → approvals · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>18.2 Risk Committees</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Mandate",
+    icon: "⚖️",
+    title: "Composition and Mandate",
+    desc: "Who sits on the risk committee, what authority it holds, and how its decisions bind portfolio managers, the CRO, and senior firm leadership",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["risk committee","slate"], ["mandate","teal"], ["governance","amber"], ["independence","teal"]],
+    data: [
+      { label: "Typical members", value: "CRO, CIO/PMs, COO, sometimes independent", color: "slate" },
+      { label: "Authority", value: "Limits, exceptions, strategy approval, stop-outs", color: "teal" },
+      { label: "Cadence", value: "Weekly to monthly; ad hoc in stress", color: "amber" },
+    ],
+    body: [
+      `A risk committee is the formal forum where firm-wide risk appetite is translated into enforceable limits and exceptions. Composition balances front-office expertise with independent risk and control functions; in larger managers, an independent or non-PM chair strengthens challenge culture.`,
+      `The mandate usually covers market, credit, liquidity, and operational risk policies; approval of new products and material strategy changes; review of limit frameworks; and escalation of breaches. Minutes and documented decisions matter for regulators, investors, and internal accountability.`,
+      `A committee without real authority — one that only “notes” breaches after the fact — is theatre. Effective mandates include the power to cut risk, block launches, and require remediation with deadlines.`
+    ],
+    keyPoint: "The risk committee is where risk appetite becomes binding policy. Its value is measured by independence of challenge and by whether its decisions actually change positions."
+  },
+  {
+    era: "Reporting",
+    icon: "📊",
+    title: "Daily P&L and Risk Reporting",
+    desc: "The recurring information set the committee and desk heads rely on: attributed P&L, exposures, limit utilisation, and exceptions — produced on a reliable daily cycle",
+    badge: { label: "Core Process", style: "teal" },
+    tags: [["daily pnl","teal"], ["risk report","amber"], ["attribution","slate"], ["limit utilisation","teal"]],
+    data: [
+      { label: "P&L", value: "Flash vs. official; factor / book attribution", color: "teal" },
+      { label: "Risk", value: "Greeks, VaR/ES, exposures, concentration", color: "amber" },
+      { label: "Discipline", value: "Same time, same definitions, every day", color: "slate" },
+    ],
+    body: [
+      `Daily P&L and risk packs are the nervous system of a trading organisation. Flash P&L gives managers early visibility; official P&L from the administrator or finance locks the books. Attribution by strategy, factor, and desk explains whether results came from intended risk or from drift.`,
+      `Risk reporting sits beside P&L: gross/net exposure, sector and factor concentrations, liquidity buckets, stress results, and percentage of limit used. Without standardised definitions, committees debate data instead of decisions.`,
+      `Operational excellence means the pack arrives on time even on volatile days. Late or incomplete reporting is itself a risk-committee issue.`
+    ],
+    keyPoint: "Daily P&L and risk reports are not paperwork — they are the shared facts the committee uses to govern. If the facts are late or contested, governance is already impaired."
+  },
+  {
+    era: "Escalation",
+    icon: "🚨",
+    title: "Limit Breach Escalation",
+    desc: "The predefined path from detection of a limit breach to notification, temporary exception or forced reduction, and committee review",
+    badge: { label: "Critical", style: "red" },
+    tags: [["limit breach","red"], ["escalation","amber"], ["exception","slate"], ["remediation","teal"]],
+    data: [
+      { label: "Detect", value: "Automated monitors + end-of-day checks", color: "amber" },
+      { label: "Act", value: "Notify CRO/PM; cut or formal exception", color: "red" },
+      { label: "Review", value: "Committee post-mortem and limit redesign", color: "teal" },
+    ],
+    body: [
+      `Limits only work if breaches trigger a known playbook. Soft limits may require explanation; hard limits require immediate reduction or a documented, time-bound exception approved at the right seniority. Ambiguity (“we’ll discuss Monday”) is how large losses compound.`,
+      `Escalation matrices specify who is called for market-risk, credit, and operational breaches, including after-hours contacts. Repeat breaches against the same limit are a committee topic even when each event was small.`,
+      `Healthy culture reports breaches early. Cultures that punish the messenger create hidden limit violations and sudden blow-ups.`
+    ],
+    keyPoint: "Escalation converts a limit from a number on a page into an operational circuit breaker. Speed and clarity of the path matter as much as the limit level itself."
+  },
+  {
+    era: "Models",
+    icon: "🧮",
+    title: "Risk Model Review Cadence",
+    desc: "Scheduled challenge of VaR, stress engines, factor models, and valuation methodologies — ensuring models still fit the book and the market regime",
+    badge: { label: "Methodology", style: "amber" },
+    tags: [["model review","amber"], ["var","slate"], ["validation","teal"], ["regime change","red"]],
+    data: [
+      { label: "Cadence", value: "Quarterly / semi-annual formal reviews", color: "amber" },
+      { label: "Triggers", value: "New products, regime shifts, backtest fails", color: "red" },
+      { label: "Owners", value: "Risk + quant; committee signs off changes", color: "teal" },
+    ],
+    body: [
+      `Risk models drift as portfolios and markets change. A formal review calendar examines assumptions (distributional, liquidity, correlation), backtests against realised P&L, and benchmark comparisons. Material model changes should be approved at committee level, not only inside the quant team.`,
+      `Ad hoc reviews are mandatory after structural breaks — volatility regime shifts, new asset classes, or large strategy pivots. Waiting for the annual cycle after a failed backtest is negligence.`,
+      `Documentation of model versions, known limitations, and compensating controls (extra stress tests, harder limits) is part of institutional memory and investor due diligence.`
+    ],
+    keyPoint: "Models govern limits; reviewing models is therefore governance of governance. Cadence plus event-driven triggers keep the map aligned with the territory."
+  },
+  {
+    era: "CRO",
+    icon: "👔",
+    title: "Chief Risk Officer Role",
+    desc: "The senior executive accountable for the risk framework, independent challenge of the front office, and credible reporting to the committee, board, and investors",
+    badge: { label: "Leadership", style: "slate" },
+    tags: [["cro","slate"], ["independence","teal"], ["challenge","amber"], ["accountability","slate"]],
+    data: [
+      { label: "Mandate", value: "Framework, limits, monitoring, escalation", color: "slate" },
+      { label: "Independence", value: "Reports outside pure P&L line where possible", color: "teal" },
+      { label: "Failure mode", value: "CRO as rubber stamp for the CIO", color: "red" },
+    ],
+    body: [
+      `The CRO designs and owns the risk policy, ensures measurement systems work, escalates breaches, and presents an independent view to the risk committee and often to the board or LP advisory context. Hiring, compensation, and reporting lines determine whether the role can truly challenge revenue producers.`,
+      `In smaller firms the CRO may wear multiple hats; in larger ones the role is full-time with market, credit, and operational risk deputies. Either way, access to positions, P&L, and the authority to demand reductions is non-negotiable.`,
+      `Investors increasingly diligence the CRO’s background, turnover, and real influence — a paper CRO is a known red flag in operational due diligence.`
+    ],
+    keyPoint: "The CRO is the institutionalised second opinion on risk. If that opinion cannot change the book, the title is cosmetic."
+  },
+  {
+    era: "Stress",
+    icon: "📉",
+    title: "Stress Test Presentation to Committee",
+    desc: "How scenario results are packaged for decision-makers: clear shocks, P&L impact by book, liquidity implications, and recommended actions",
+    badge: { label: "Analysis", style: "amber" },
+    tags: [["stress test","amber"], ["scenarios","slate"], ["committee pack","teal"], ["actionable","teal"]],
+    data: [
+      { label: "Content", value: "Historical + hypothetical + reverse stress", color: "amber" },
+      { label: "Lens", value: "P&L, limits, funding, counterparties", color: "slate" },
+      { label: "Output", value: "Decisions: cut, hedge, hold, re-limit", color: "teal" },
+    ],
+    body: [
+      `Committees do not need raw risk-engine dumps; they need interpretable stories: what happens to the firm in a 2008-style credit shock, a 2020 liquidity freeze, or a custom factor break. Results should be shown by strategy and in aggregate, with clarity on which positions drive the tail.`,
+      `Good presentations link stress outcomes to actionable levers — reduce gross, tighten concentration, pre-empt margin calls, or adjust hedges. Bad presentations stop at a single VaR number.`,
+      `Reverse stress tests (“what would break our capital or liquidity plan?”) often provoke better discussion than yet another mild parallel shift.`
+    ],
+    keyPoint: "Stress tests inform the committee only when they are decision-ready: named scenarios, attributed impact, and explicit choices about risk to take or cut."
+  },
+  {
+    era: "Approval",
+    icon: "✅",
+    title: "New Strategy Approval Process",
+    desc: "The gated path from idea to live capital: thesis, risk profile, operational readiness, limits, and formal committee sign-off before material deployment",
+    badge: { label: "Control", style: "teal" },
+    tags: [["new strategy","teal"], ["approval gate","amber"], ["pilot","slate"], ["risk budget","teal"]],
+    data: [
+      { label: "Inputs", value: "Thesis, capacity, risks, ops, compliance", color: "teal" },
+      { label: "Gates", value: "Risk, ops, legal; then committee vote", color: "amber" },
+      { label: "Ramp", value: "Pilot limits → scale with track record", color: "slate" },
+    ],
+    body: [
+      `New strategies change the firm’s risk surface. A disciplined approval process requires a written mandate, expected return and risk characteristics, data and system needs, valuation methodology, and proposed hard limits. Risk, operations, and compliance sign before the committee allocates a risk budget.`,
+      `Pilots with small capital and tight stops reduce the cost of being wrong. Scaling should be contingent on realised behaviour matching the prospectus to the committee — not only on optimistic backtests.`,
+      `Skipping approval for “just a small sleeve” is a classic path to unmanaged tail exposure and internal conflict when losses appear.`
+    ],
+    keyPoint: "New strategy approval is how the firm refuses to invent risk in the dark. Thesis, limits, and ops readiness precede capital — not the other way around."
+  },
+  {
+    era: "Credit",
+    icon: "🤝",
+    title: "Counterparty Credit Risk Review",
+    desc: "Periodic assessment of brokers, banks, clearing firms, and OTC counterparties — exposures, collateral terms, concentration, and replacement plans",
+    badge: { label: "Counterparty", style: "red" },
+    tags: [["counterparty risk","red"], ["pb review","amber"], ["csa","slate"], ["concentration","red"]],
+    data: [
+      { label: "Scope", value: "PBs, ISDA dealers, custodians, CCPs", color: "amber" },
+      { label: "Metrics", value: "CE, collateral, wrong-way risk, ratings", color: "slate" },
+      { label: "Actions", value: "Limits, diversification, term renegotiation", color: "teal" },
+    ],
+    body: [
+      `Market risk is not the only way a fund dies; prime-broker or dealer failure, sudden margin re-pricing, and collateral disputes can halt the strategy. The committee should see counterparty exposures alongside market risk — who holds the assets, who finances them, and how painful replacement would be.`,
+      `Reviews cover credit quality, legal terms (ISDA/CSA, rehypothecation), concentration caps per counterparty, and stress on margin calls. Multi-PB and multi-dealer setups are often the mitigation, at the cost of operational complexity.`,
+      `Credit review intensifies when markets stress or when a counterparty’s own CDS and equity signal trouble. Waiting for a default notice is not a process.`
+    ],
+    keyPoint: "Counterparty credit risk is the risk that your infrastructure fails under you. Committee oversight of PBs and dealers is as essential as oversight of portfolio VaR."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

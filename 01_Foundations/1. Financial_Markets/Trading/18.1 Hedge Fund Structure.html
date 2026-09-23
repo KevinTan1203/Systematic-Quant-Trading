@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 18.1 Hedge Fund Structure</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 18 · Section 18.1</div>
+      <h1 class="book-title">Hedge Fund<br><em>Structure</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>13</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">GP/LP → fees → liquidity → infrastructure · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>18.1 Hedge Fund Structure</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "GP / LP",
+    icon: "🏛️",
+    title: "General Partner vs. Limited Partner",
+    desc: "The fundamental split of control and capital: the GP manages the fund and bears unlimited liability in classic form; LPs contribute capital with liability capped at their investment",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["gp","slate"], ["lp","teal"], ["partnership","amber"], ["control","slate"]],
+    data: [
+      { label: "GP", value: "Manager; investment authority; fiduciary duties", color: "slate" },
+      { label: "LP", value: "Passive capital; limited liability", color: "teal" },
+      { label: "Vehicle", value: "Typically LP / LLC with GP as manager entity", color: "amber" },
+    ],
+    body: [
+      `A hedge fund is usually organised as a limited partnership (or LLC analogue). The general partner — often a management company owned by the portfolio managers — makes investment decisions, hires staff, and interfaces with brokers and administrators. Limited partners supply the bulk of the capital and do not participate in day-to-day management.`,
+      `LPs’ downside is contractually limited to committed capital; the GP’s legal exposure depends on jurisdiction and entity design (many GPs sit behind corporate or LLC shields). Economically, the GP is paid through fees; LPs earn the residual net performance after fees.`,
+      `Side letters, advisory committees, and co-invest rights can modify the pure GP/LP template for large or strategic investors without rewriting the core partnership agreement.`
+    ],
+    keyPoint: "GP holds the pen on portfolio decisions; LP holds the capital and the limited-liability claim. Everything else in fund structure is detail around that split of power and risk."
+  },
+  {
+    era: "Fees",
+    icon: "💰",
+    title: "Management Fee & Performance Fee",
+    desc: "The classic “2 and 20” economics: an asset-based management fee plus a share of profits as incentive compensation — still the reference point even as pressure has pushed many funds lower",
+    badge: { label: "Economics", style: "teal" },
+    tags: [["2 and 20","teal"], ["management fee","amber"], ["performance fee","slate"], ["incentive","teal"]],
+    data: [
+      { label: "Management", value: "Often ~1–2% of AUM per year", color: "amber" },
+      { label: "Performance", value: "Often ~15–20% of profits", color: "teal" },
+      { label: "Trend", value: "Fee compression; tiered / founder shares", color: "slate" },
+    ],
+    body: [
+      `The management fee is charged on assets under management (sometimes on committed capital in less liquid strategies) and is meant to cover operating costs: people, data, compliance, office. It accrues regardless of performance and therefore stabilises the manager’s revenue — and can dilute LP returns if AUM is large relative to edge.`,
+      `The performance fee (incentive allocation) gives the GP a percentage of net profits, aligning upside participation with investor gains. It is almost always constrained by a high-water mark and sometimes by a hurdle rate. Crystallisation may be annual, on redemption, or deal-by-deal for certain private strategies.`,
+      `Institutional LPs routinely negotiate fee breaks by size, duration, or share class. “2 and 20” remains the cultural benchmark; realised terms are often tighter.`
+    ],
+    keyPoint: "Management fee pays the lights; performance fee pays for alpha. Together they define the manager’s business model and the LP’s net-of-fee return path."
+  },
+  {
+    era: "HWM",
+    icon: "📊",
+    title: "High-Water Mark",
+    desc: "The rule that performance fees are due only on new profits above the highest previously achieved net asset value for that investor or share class",
+    badge: { label: "Alignment", style: "teal" },
+    tags: [["high-water mark","teal"], ["loss recovery","amber"], ["crystallisation","slate"], ["fairness","teal"]],
+    data: [
+      { label: "Rule", value: "No incentive fee until prior peak NAV is regained", color: "teal" },
+      { label: "Purpose", value: "Prevent double-charging on recovered losses", color: "amber" },
+      { label: "Scope", value: "Usually per investor / share class", color: "slate" },
+    ],
+    body: [
+      `Without a high-water mark, a fund that falls 20% and then recovers could charge a full performance fee on the rebound even though the LP is only back to even. The HWM sets a peak reference: incentive fees accrue only on gains above that peak.`,
+      `Implementation details matter — equalisation for investors who enter at different NAVs, treatment of intermediate crystallisations, and whether gross or net of management fee defines the mark. Poor equalisation can favour early or late entrants unfairly.`,
+      `HWMs protect LPs in volatile strategies; they also mean a deep drawdown can leave the GP earning only management fees for a long recovery period, which affects talent retention and firm stability.`
+    ],
+    keyPoint: "The high-water mark is the LP’s defence against paying incentive fees twice on the same dollar of capital. It is the single most important fairness constraint on performance fees."
+  },
+  {
+    era: "Hurdle",
+    icon: "🏁",
+    title: "Hurdle Rate",
+    desc: "A minimum return that must be earned before performance fees apply — hard or soft, fixed or benchmark-linked",
+    badge: { label: "Terms", style: "amber" },
+    tags: [["hurdle rate","amber"], ["preferred return","teal"], ["soft vs hard","slate"], ["benchmark","teal"]],
+    data: [
+      { label: "Hard hurdle", value: "Fee only on return above the hurdle", color: "teal" },
+      { label: "Soft hurdle", value: "Full fee once hurdle is cleared", color: "amber" },
+      { label: "Base", value: "Fixed % or index (e.g. T-bills, SOFR)", color: "slate" },
+    ],
+    body: [
+      `A hurdle rate requires the fund to clear a preferred return before the GP participates in profits. Under a hard hurdle, the incentive fee applies only to the excess over the hurdle; under a soft hurdle, clearing the hurdle unlocks a fee on the entire profit — more generous to the manager.`,
+      `Hurdles may be fixed (e.g. 5%) or float with risk-free rates or a market index. In low-rate regimes fixed hurdles bite harder; when rates rise, cash benchmarks reprice the meaning of “excess” return.`,
+      `Not all hedge funds use hurdles; many rely on the high-water mark alone. Institutional LPs increasingly ask for both, especially in lower-volatility or credit-style strategies.`
+    ],
+    keyPoint: "A hurdle answers: “Performance fee for beating what?” Without one, any positive return can trigger incentive compensation — including returns that merely match cash."
+  },
+  {
+    era: "Protections",
+    icon: "🛡️",
+    title: "Drawdown Provisions & Key Person Clauses",
+    desc: "Contractual brakes that limit loss-making continuation and that tie the fund’s fate to named individuals whose departure or incapacity triggers rights for LPs",
+    badge: { label: "Governance", style: "red" },
+    tags: [["drawdown limit","red"], ["key person","amber"], ["suspension","slate"], ["lp rights","teal"]],
+    data: [
+      { label: "Drawdown clause", value: "Pause, notify, or wind down after X% loss", color: "red" },
+      { label: "Key person", value: "Named PMs; departure → freeze / consent", color: "amber" },
+      { label: "Effect", value: "Aligns continuity with talent and risk limits", color: "slate" },
+    ],
+    body: [
+      `Drawdown provisions specify what happens if NAV falls by a stated percentage from peak or from start of year: mandatory notification, temporary suspension of risk-taking, LP votes on continuation, or orderly wind-down. They are risk governance written into the LPA rather than left solely to the GP’s discretion.`,
+      `Key person clauses recognise that hedge fund alpha is often concentrated in a few individuals. If a named person dies, leaves, or ceases full-time involvement, LPs may gain redemption rights, consent rights over a replacement, or the ability to suspend the investment period.`,
+      `Together these clauses reduce the chance that LPs remain trapped in a strategy that has either broken its risk budget or lost the human capital they underwrote.`
+    ],
+    keyPoint: "Drawdown and key-person terms are the LP’s emergency brakes. They convert soft trust in the manager into hard contractual options when losses or people change."
+  },
+  {
+    era: "Liquidity",
+    icon: "🚪",
+    title: "Gates & Redemption Restrictions",
+    desc: "Limits on how much capital can leave the fund at once — investor-level and fund-level gates, notice periods, lock-ups, and suspensions",
+    badge: { label: "Liquidity", style: "amber" },
+    tags: [["gates","amber"], ["lock-up","slate"], ["notice period","teal"], ["suspension","red"]],
+    data: [
+      { label: "Lock-up", value: "Minimum hold before first redemption", color: "slate" },
+      { label: "Gate", value: "Cap on % of NAV redeemable per period", color: "amber" },
+      { label: "Notice", value: "30–90+ days common; strategy-dependent", color: "teal" },
+    ],
+    body: [
+      `Open-ended funds promise periodic liquidity, but portfolio assets may not be as liquid as the promise. Gates cap redemptions (e.g. 10–25% of NAV per quarter) so that a run does not force fire sales. Investor-level gates limit one LP’s exit; fund-level gates protect the remaining pool.`,
+      `Lock-ups delay the first redemption date; notice periods give the manager time to raise cash. Side pockets and suspensions handle the extreme case when marks are unreliable or markets are closed.`,
+      `Liquidity terms are a first-order strategy match: a liquid equity L/S book can support monthly liquidity; a distressed or private credit book cannot without lying to someone.`
+    ],
+    keyPoint: "Gates and lock-ups align redemption rights with asset liquidity. They feel restrictive in calm markets and exist to prevent destructive runs in stressed ones."
+  },
+  {
+    era: "Side Pocket",
+    icon: "📦",
+    title: "Side Pockets (Illiquid Assets)",
+    desc: "Segregated accounts that hold hard-to-value or illiquid positions so that redeeming LPs leave without forcing a premature sale — and remaining LPs keep the exposure",
+    badge: { label: "Special", style: "slate" },
+    tags: [["side pocket","slate"], ["illiquid","amber"], ["fairness","teal"], ["valuation","red"]],
+    data: [
+      { label: "Purpose", value: "Isolate illiquids from the liquid NAV", color: "slate" },
+      { label: "Redemption", value: "Liquid NAV paid out; pocket stays until exit", color: "amber" },
+      { label: "Risk", value: "Valuation disputes; prolonged capital lock", color: "red" },
+    ],
+    body: [
+      `When a fund holds positions that cannot be sold at a reliable price (private claims, halted securities, complex structured assets), management may move them into a side pocket. New and redeeming investors transact only against the liquid portfolio; the side pocket is shared by investors who were in the fund when it was created, until realisation.`,
+      `Side pockets protect against forced sales and against transferring mis-marked assets across generations of LPs. They also create long-lived stubs of capital, governance questions over realisation strategy, and potential conflicts if the GP earns fees on stuck NAV.`,
+      `LP scrutiny focuses on when side pockets may be used, how they are valued, and whether incentive fees crystallise on unrealised pocket marks.`
+    ],
+    keyPoint: "Side pockets are fairness machinery for illiquidity: redeemers get cash from the liquid book; everyone who owned the illiquid stays on the ride until it ends."
+  },
+  {
+    era: "Admin",
+    icon: "📋",
+    title: "Fund Administration",
+    desc: "Independent calculation of NAV, investor registry, capital calls/redemptions, and middle-office reporting — the operational backbone LPs rely on for valuation integrity",
+    badge: { label: "Operations", style: "teal" },
+    tags: [["fund admin","teal"], ["nav","amber"], ["transfer agent","slate"], ["middle office","teal"]],
+    data: [
+      { label: "Core jobs", value: "NAV, books, investor servicing, reporting", color: "teal" },
+      { label: "Independence", value: "Third-party check on manager marks", color: "amber" },
+      { label: "LP value", value: "Reduces operational and fraud risk", color: "slate" },
+    ],
+    body: [
+      `The administrator maintains the official books, prices the portfolio (often using independent sources and manager input for hard-to-value names), processes subscriptions and redemptions, and produces statements. For many LPs, a reputable administrator is non-negotiable operational due diligence.`,
+      `Shadow NAV processes, reconciliation against prime brokers, and segregation of duties limit the ability of a rogue manager to fabricate performance. Administrators do not eliminate valuation risk in illiquid assets, but they raise the bar for outright misreporting.`,
+      `Service quality varies: complex multi-strategy and crypto or private-credit books stress administrator capabilities; choosing one is a structural decision, not a commodity purchase.`
+    ],
+    keyPoint: "Fund administration is the independent scorekeeper. LPs are not only buying a strategy — they are buying a NAV they can trust."
+  },
+  {
+    era: "Assurance",
+    icon: "🔍",
+    title: "Auditors & Legal Counsel",
+    desc: "External audit of financial statements and specialised counsel on fund formation, offering documents, and ongoing regulatory compliance",
+    badge: { label: "Assurance", style: "slate" },
+    tags: [["auditor","slate"], ["legal counsel","teal"], ["audit opinion","amber"], ["offering docs","slate"]],
+    data: [
+      { label: "Auditor", value: "Annual financials; controls over valuation", color: "slate" },
+      { label: "Counsel", value: "LPA, PPM, side letters, regulatory filings", color: "teal" },
+      { label: "LP signal", value: "Big-four / known names still matter in DD", color: "amber" },
+    ],
+    body: [
+      `Independent auditors opine on whether the fund’s financial statements are fairly presented. Valuation of Level 3 assets, related-party dealings, and fee calculations draw particular scrutiny. A clean audit is not a performance guarantee; it is assurance on reporting.`,
+      `Legal counsel drafts the limited partnership agreement, private placement memorandum, subscription documents, and side letters, and advises on marketing rules, registrations, and cross-border issues. Ongoing counsel handles amendments, disputes, and regulatory change.`,
+      `Institutional LPs treat auditor and counsel reputation as part of operational due diligence — weak or unknown providers are a yellow flag even when returns look attractive.`
+    ],
+    keyPoint: "Auditors and counsel are the formal external controls around money and contracts. They do not create alpha; they reduce the chance that reported alpha is fiction."
+  },
+  {
+    era: "PB",
+    icon: "🏦",
+    title: "Prime Broker Relationships",
+    desc: "The suite of custody, financing, securities lending, and execution services that lets a hedge fund operate a leveraged, multi-asset portfolio",
+    badge: { label: "Infrastructure", style: "teal" },
+    tags: [["prime broker","teal"], ["margin","amber"], ["stock loan","slate"], ["custody","teal"]],
+    data: [
+      { label: "Services", value: "Custody, margin, borrow, execution, reporting", color: "teal" },
+      { label: "Risk", value: "Financing terms, recall, PB default, rehypothecation", color: "red" },
+      { label: "Practice", value: "Multi-PB common for large funds", color: "amber" },
+    ],
+    body: [
+      `Prime brokers hold fund assets, extend leverage against eligible collateral, locate hard-to-borrow shorts, and provide consolidated reporting. Pricing of financing and stock loan is a major P&L line for long/short and relative-value strategies.`,
+      `Concentration in a single PB creates operational and credit risk (as 2008 reminded the industry). Multi-prime setups diversify financing and custody but increase operational complexity. Margin methodology, cross-margining, and lock-up agreements shape how much leverage is truly available in stress.`,
+      `Onboarding a PB involves credit approval, documentation, and ongoing compliance with concentration and risk limits — a gate that new managers must pass before scaling.`
+    ],
+    keyPoint: "The prime broker is the fund’s balance-sheet partner. Strategy capacity and survival in stress are inseparable from PB financing terms and diversification."
+  },
+  {
+    era: "ISDA",
+    icon: "📜",
+    title: "ISDA & CSA Agreements",
+    desc: "The standard legal framework for OTC derivatives (ISDA Master) and the Credit Support Annex that governs collateral posting between fund and dealer",
+    badge: { label: "Derivatives", style: "amber" },
+    tags: [["isda","amber"], ["csa","teal"], ["otc","slate"], ["collateral","teal"]],
+    data: [
+      { label: "ISDA Master", value: "Core terms for swaps and OTC trades", color: "amber" },
+      { label: "CSA", value: "Who posts margin, thresholds, eligible coll.", color: "teal" },
+      { label: "Stakes", value: "Close-out netting, default, valuation disputes", color: "red" },
+    ],
+    body: [
+      `Almost all bilateral OTC derivatives sit under an ISDA Master Agreement, which defines events of default, netting, and termination. The Credit Support Annex specifies initial and variation margin, haircuts, independent amounts, and eligible collateral — the practical cash and securities flows that secure the book.`,
+      `Negotiating ISDA/CSA terms affects funding cost, operational burden, and gap risk on default. Post-crisis regulation expanded mandatory margin for many counterparties; funds still care about thresholds, rating downgrades, and rehypothecation rights.`,
+      `Without robust ISDA documentation, a fund cannot scale OTC rates, credit, or equity derivative strategies with major dealers.`
+    ],
+    keyPoint: "ISDA and CSA are the legal and collateral plumbing of OTC risk. They determine not only what you can trade, but how much capital that trading consumes."
+  },
+  {
+    era: "Domicile",
+    icon: "🌍",
+    title: "Offshore vs. Onshore Structures",
+    desc: "The dual-fund architecture common in the industry: Delaware (or other onshore) vehicles for US taxable investors and Cayman (or similar) vehicles for non-US and tax-exempt investors",
+    badge: { label: "Structure", style: "slate" },
+    tags: [["cayman","slate"], ["delaware","teal"], ["offshore","amber"], ["master-feeder","teal"]],
+    data: [
+      { label: "Onshore", value: "US LP/LLC — US taxable investors", color: "teal" },
+      { label: "Offshore", value: "Cayman etc. — non-US / tax-exempt", color: "amber" },
+      { label: "Link", value: "Master-feeder or parallel funds", color: "slate" },
+    ],
+    body: [
+      `US taxable investors often prefer a domestic partnership that issues K-1s and passes through character of income. Non-US investors and many US tax-exempts prefer offshore corporations or partnerships that limit ECI/UBTI exposure and simplify reporting. Managers therefore run parallel or master-feeder structures that share one portfolio.`,
+      `Cayman Islands vehicles dominate offshore hedge fund domicile because of flexible company law, tax neutrality, and service-provider infrastructure. Regulatory and substance requirements have increased; “offshore” no longer means “unregulated in practice.”`,
+      `Choice of domicile affects marketing, investor eligibility, tax reporting, and sometimes strategy (e.g. ERISA plan-asset issues). It is a formation decision with long tail consequences.`
+    ],
+    keyPoint: "Onshore and offshore feeders are tax and regulatory adapters plugged into the same strategy. The master portfolio is one; the investor wrappers are many."
+  },
+  {
+    era: "SMA",
+    icon: "👤",
+    title: "Separately Managed Accounts (SMAs)",
+    desc: "Dedicated accounts owned by a single investor and managed to an agreed mandate — offering transparency and control at the cost of operational complexity and minimum size",
+    badge: { label: "Alternative", style: "teal" },
+    tags: [["sma","teal"], ["managed account","amber"], ["transparency","slate"], ["custom mandate","teal"]],
+    data: [
+      { label: "Ownership", value: "Assets in investor’s name / custody", color: "teal" },
+      { label: "Benefits", value: "Full positions, custom guidelines, exit control", color: "amber" },
+      { label: "Costs", value: "Higher ops burden; large minimums", color: "red" },
+    ],
+    body: [
+      `In an SMA the investor does not own shares of a commingled fund; they own the underlying positions in an account the manager trades under a power of attorney or IMA. Guidelines can exclude sectors, cap leverage, or impose ESG constraints. Redemption is effectively the ability to terminate the mandate and keep or liquidate holdings.`,
+      `Large institutions use SMAs for concentration limits, operational due diligence comfort, and fee leverage. Managers accept them selectively because each account multiplies middle-office work and can fragment the expression of a single strategy.`,
+      `SMAs do not eliminate market risk or manager risk; they eliminate commingling risk and much of the gates-and-side-pocket machinery of fund structures.`
+    ],
+    keyPoint: "An SMA is the strategy without the fund wrapper: more transparency and control for the investor, more operational load for the manager, and usually only for large tickets."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

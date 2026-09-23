@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 19.7 Data Pipelines</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 19 · Section 19.7</div>
+      <h1 class="book-title">Data<br><em>Pipelines</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>7</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Orchestrate → ingest → transform → quality · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>19.7 Data Pipelines</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Airflow",
+    icon: "🌬️",
+    title: "Apache Airflow for Workflow Orchestration",
+    desc: "DAG-based scheduling of batch jobs — the industry default for time-driven trading data workflows and dependency management",
+    badge: { label: "Orchestration", style: "slate" },
+    tags: [["airflow","slate"], ["dag","teal"], ["scheduler","amber"], ["batch","teal"]],
+    data: [
+      { label: "Model", value: "DAGs of tasks with dependencies", color: "slate" },
+      { label: "Strength", value: "Ecosystem, operators, visibility", color: "teal" },
+      { label: "Watch", value: "Operational complexity at scale", color: "amber" },
+    ],
+    body: [
+      `Airflow expresses pipelines as directed acyclic graphs: download vendor files, validate, load warehouses, run feature jobs, then notify. Schedulers, retries, and SLA misses are first-class concepts for overnight research and risk batches.`,
+      `Trading firms rely on it for calendar-aware jobs (exchanges holidays, corporate actions). Task idempotency and clear data contracts prevent partial reruns from corrupting marks.`,
+      `Airflow orchestrates — it should not become the compute engine. Heavy work belongs in Spark, warehouses, or specialised workers invoked by tasks.`
+    ],
+    keyPoint: "Airflow is the standard batch orchestrator for trading data estates. DAGs make dependencies visible; discipline keeps the scheduler from becoming a junk drawer."
+  },
+  {
+    era: "Modern",
+    icon: "🚀",
+    title: "Prefect / Dagster (Modern Alternatives)",
+    desc: "Newer orchestration systems emphasising developer experience, typed assets, and hybrid cloud/local execution versus classical Airflow patterns",
+    badge: { label: "Orchestration", style: "teal" },
+    tags: [["prefect","teal"], ["dagster","amber"], ["data assets","slate"], ["dx","teal"]],
+    data: [
+      { label: "Prefect", value: "Pythonic flows; dynamic graphs; hybrid runtime", color: "teal" },
+      { label: "Dagster", value: "Software-defined assets; lineage-centric", color: "amber" },
+      { label: "Choice", value: "Team fit, observability, migration cost", color: "slate" },
+    ],
+    body: [
+      `Prefect and Dagster address pain points teams hit with older Airflow setups: local testability, dynamic workflows, and clearer asset lineage. Dagster in particular models data assets and their dependencies as the primary abstraction.`,
+      `Adoption in trading shops is growing for greenfield feature platforms and research engineering. Migration cost from large Airflow estates is the practical constraint, not feature checklists alone.`,
+      `Evaluate observability, secrets handling, and how each tool records data versions for audit — non-negotiable in regulated environments.`
+    ],
+    keyPoint: "Prefect and Dagster modernise orchestration around developer experience and assets. They compete with Airflow on ergonomics and lineage — pick for the operating model you can staff."
+  },
+  {
+    era: "Kafka",
+    icon: "📨",
+    title: "Kafka for Real-Time Ingestion",
+    desc: "Distributed log for streaming events — market data fan-out, order events, and durable buffers between producers and many consumers",
+    badge: { label: "Streaming", style: "amber" },
+    tags: [["kafka","amber"], ["event log","teal"], ["consumer group","slate"], ["ingestion","teal"]],
+    data: [
+      { label: "Role", value: "Durable, ordered (per partition) event bus", color: "amber" },
+      { label: "Pattern", value: "Produce once; many independent consumers", color: "teal" },
+      { label: "Ops", value: "Partitions, retention, schema registry", color: "slate" },
+    ],
+    body: [
+      `Kafka (and peers) decouple ingestion from processing: gateways publish ticks or normalised events; risk, archive, and signal services consume at their own pace. Partitioning by symbol or venue enables scale and ordering guarantees within a key.`,
+      `Schema evolution, exactly-once ambitions vs. at-least-once reality, and lag monitoring are the operational core. Trading systems care deeply about replay for incident reconstruction.`,
+      `Kafka is not a database of record by itself — pair with appropriate stores for queryable history and with clear retention policies for cost control.`
+    ],
+    keyPoint: "Kafka is the real-time ingestion backbone. It turns market and order events into a replayable log that many downstream systems can share safely."
+  },
+  {
+    era: "dbt",
+    icon: "🔨",
+    title: "dbt (Data Build Tool) for Transformations",
+    desc: "SQL-first transformation framework — versioned models, tests, documentation, and dependency graphs inside the warehouse",
+    badge: { label: "Transform", style: "teal" },
+    tags: [["dbt","teal"], ["sql models","amber"], ["tests","slate"], ["lineage","teal"]],
+    data: [
+      { label: "Model", value: "SELECT statements as versioned models", color: "teal" },
+      { label: "Extras", value: "Tests, docs, packages, CI", color: "amber" },
+      { label: "Fit", value: "Warehouse ELT; analytics marts", color: "slate" },
+    ],
+    body: [
+      `dbt treats warehouse SQL as software: models in git, ref()-based dependencies, schema tests, and generated docs. Trading analytics teams use it for clean marts — PnL, exposures, fills — built on raw landing tables.`,
+      `It shines in ELT designs where the warehouse does the heavy transform. It is not a replacement for stream processors or Airflow; it often runs as a task inside them.`,
+      `Contract tests on critical columns (trade ids, timestamps, notional) catch silent breakage before research consumes bad marts.`
+    ],
+    keyPoint: "dbt industrialises SQL transformations with software engineering practice. Models, tests, and lineage turn the warehouse into a governed product."
+  },
+  {
+    era: "Spark",
+    icon: "⚡",
+    title: "Spark for Large-Scale Batch Processing",
+    desc: "Distributed batch compute over large historical datasets — feature builds, reconciliations, and heavy research extracts",
+    badge: { label: "Batch Scale", style: "slate" },
+    tags: [["spark","slate"], ["batch","teal"], ["dataframe api","amber"], ["cluster","teal"]],
+    data: [
+      { label: "Role", value: "Parallel batch over huge histories", color: "slate" },
+      { label: "APIs", value: "DataFrame/SQL; jobs on clusters", color: "teal" },
+      { label: "Trading use", value: "Multi-year ticks, cross-sectional features", color: "amber" },
+    ],
+    body: [
+      `Apache Spark partitions large workloads across a cluster for joins, aggregations, and featurisation that exceed single-node memory. Quant platforms use it for historical rebuilds and firm-wide risk snapshots.`,
+      `Cost control depends on partitioning, avoiding wide shuffles, and choosing storage formats (Parquet/ORC) wisely. Interactive micro-jobs may be cheaper on DuckDB/Polars.`,
+      `Orchestrate Spark jobs from Airflow/Prefect/Dagster; keep business logic testable and not trapped only in opaque cluster notebooks.`
+    ],
+    keyPoint: "Spark is the default large-scale batch engine for heavy historical trading data. Use it when the dataset outgrows one machine — not as a default for every small transform."
+  },
+  {
+    era: "Flink",
+    icon: "🌊",
+    title: "Flink for Stream Processing",
+    desc: "Stateful stream computation with event-time semantics — continuous features, alerts, and low-latency aggregations on live feeds",
+    badge: { label: "Stream Compute", style: "amber" },
+    tags: [["flink","amber"], ["event time","teal"], ["stateful stream","slate"], ["watermarks","teal"]],
+    data: [
+      { label: "Strength", value: "Event-time, windows, managed state", color: "amber" },
+      { label: "Use", value: "Live features, monitoring, CEP-style logic", color: "teal" },
+      { label: "Hard part", value: "Watermarks, late data, ops of state", color: "red" },
+    ],
+    body: [
+      `Apache Flink processes unbounded streams with explicit event-time windows and consistent state handling — closer to “correct continuous SQL” than naive micro-batches. Trading uses include streaming risk metrics and real-time feature updates.`,
+      `Watermarks and late-event policies determine correctness when feeds are delayed. Checkpointing and recovery are operational necessities, not optional extras.`,
+      `Choose Flink when true streaming semantics matter; prefer simpler consumers when you only need light enrichment of Kafka topics.`
+    ],
+    keyPoint: "Flink is stateful stream processing with serious event-time credentials. It earns its complexity when continuous correctness on live market data is required."
+  },
+  {
+    era: "Quality",
+    icon: "✅",
+    title: "Data Quality Frameworks (Great Expectations)",
+    desc: "Automated assertions on datasets — schema, ranges, uniqueness, and freshness checks that fail pipelines before bad data reaches models",
+    badge: { label: "Quality", style: "red" },
+    tags: [["great expectations","red"], ["data tests","teal"], ["validation","amber"], ["freshness","slate"]],
+    data: [
+      { label: "Idea", value: "Executable expectations on batches/streams", color: "teal" },
+      { label: "Examples", value: "Null rates, PK uniqueness, price bounds", color: "amber" },
+      { label: "Integrate", value: "Run in Airflow/dbt CI before publish", color: "slate" },
+    ],
+    body: [
+      `Great Expectations and similar tools encode data contracts as tests: columns present, values in range, row counts stable, timestamps fresh. Failures block downstream jobs or page on-call before a silent NaN infects production signals.`,
+      `Trading-specific checks include session completeness, corporate-action alignment, and reconciliation vs. administrator or broker files. Document who owns each failing expectation.`,
+      `Quality frameworks only help if alerts are actionable and thresholds are maintained — ignored red dashboards are theatre.`
+    ],
+    keyPoint: "Data quality frameworks make pipeline trust measurable. Great Expectations-style tests turn “we hope the feed is fine” into gated, auditable proof."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

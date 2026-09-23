@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quantitative Methods — 20.6 Synthetic Assets and RWAs</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:wght@400;700&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f4f1eb;
+        --bg2: #ede9e0;
+        --surface: #fff;
+        --surface2: #faf8f4;
+        --border: #d8d2c4;
+        --border2: #c4bdb0;
+        --ink: #1c1814;
+        --ink2: #3a342c;
+        --muted: #7a7268;
+        --faint: #b0a898;
+        --red: #b03020;
+        --red-bg: #fdf2f0;
+        --red-border: #e8c4be;
+        --teal: #1a6b5a;
+        --teal-bg: #f0f8f6;
+        --teal-border: #b4ddd6;
+        --amber: #9a6010;
+        --amber-bg: #fdf6e8;
+        --amber-border: #e8d4a4;
+        --slate: #2a4a6a;
+        --slate-bg: #f0f4f8;
+        --slate-border: #b4c8dc;
+        --accent: #c04828;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Source Serif 4", serif;
+        font-size: 15px;
+        line-height: 1.75;
+      }
+      body:after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.04;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+      .page {
+        position: relative;
+        z-index: 1;
+        max-width: 940px;
+        margin: auto;
+        padding: 52px 40px 100px;
+      }
+      .book-header {
+        margin-bottom: 44px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 24px;
+        align-items: end;
+        border-bottom: 2px solid var(--ink);
+        padding-bottom: 22px;
+      }
+      .chapter-eyebrow,
+      .header-stat,
+      .entry-era,
+      .entry-desc,
+      .entry-badge,
+      .entry-toggle,
+      .data-cell-label,
+      .data-cell-value,
+      .tag,
+      .ctrl-btn,
+      .ctrl-right,
+      .footer-note {
+        font-family: "Space Mono", monospace;
+      }
+      .chapter-eyebrow {
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 10px;
+      }
+      .book-title {
+        font:
+          clamp(30px, 5vw, 52px)/1.05 "DM Serif Display",
+          serif;
+        letter-spacing: -0.02em;
+      }
+      .book-title em {
+        color: var(--accent);
+      }
+      .header-right {
+        text-align: right;
+        padding-bottom: 4px;
+      }
+      .header-stat {
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1.8;
+        letter-spacing: 0.05em;
+      }
+      .header-stat strong {
+        display: block;
+        font:
+          28px/1 "DM Serif Display",
+          serif;
+        color: var(--ink);
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .ctrl-btn {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 7px 16px;
+        border: 1px solid var(--border2);
+        background: var(--surface);
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .ctrl-btn:hover {
+        background: var(--ink);
+        color: var(--bg);
+      }
+      .ctrl-right {
+        margin-left: auto;
+        font-size: 10px;
+        color: var(--faint);
+        letter-spacing: 0.08em;
+      }
+      .timeline {
+        position: relative;
+        padding-left: 36px;
+      }
+      .timeline:before {
+        content: "";
+        position: absolute;
+        left: 11px;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        background: repeating-linear-gradient(
+          to bottom,
+          var(--border2) 0 6px,
+          transparent 6px 12px
+        );
+      }
+      .entry {
+        position: relative;
+        margin-bottom: 6px;
+      }
+      .entry:before {
+        content: "";
+        position: absolute;
+        left: -29px;
+        top: 20px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--bg2);
+        border: 2px solid var(--border2);
+        z-index: 2;
+      }
+      .entry.open:before {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .entry-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+      }
+      .entry.open .entry-card {
+        border-color: var(--border2);
+        box-shadow: 3px 3px 0 var(--bg2);
+      }
+      .entry-header {
+        display: grid;
+        grid-template-columns: 76px 42px 1fr auto 42px;
+        align-items: center;
+        min-height: 58px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .entry-header:hover {
+        background: var(--surface2);
+      }
+      .entry-era {
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+        padding-left: 16px;
+        border-right: 1px solid var(--border);
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .entry-icon {
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        border-right: 1px solid var(--border);
+        font-size: 16px;
+      }
+      .entry-title-block {
+        padding: 12px 16px;
+      }
+      .entry-title {
+        font:
+          16.5px/1.25 "DM Serif Display",
+          serif;
+      }
+      .entry-desc {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 9.5px;
+        letter-spacing: 0.04em;
+      }
+      .entry-badge {
+        margin-right: 14px;
+        padding: 3px 9px;
+        border: 1px solid;
+        white-space: nowrap;
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .badge-red {
+        color: var(--red);
+        border-color: var(--red-border);
+        background: var(--red-bg);
+      }
+      .badge-teal {
+        color: var(--teal);
+        border-color: var(--teal-border);
+        background: var(--teal-bg);
+      }
+      .badge-amber {
+        color: var(--amber);
+        border-color: var(--amber-border);
+        background: var(--amber-bg);
+      }
+      .badge-slate {
+        color: var(--slate);
+        border-color: var(--slate-border);
+        background: var(--slate-bg);
+      }
+      .entry-toggle {
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-left: 1px solid var(--border);
+        color: var(--faint);
+        transition:
+          transform 0.25s,
+          color 0.15s;
+      }
+      .entry.open .entry-toggle {
+        transform: rotate(90deg);
+        color: var(--accent);
+      }
+      .entry-body {
+        display: none;
+        border-top: 1px solid var(--border);
+        background: var(--surface2);
+        padding: 22px 24px 24px;
+      }
+      .entry.open .entry-body {
+        display: block;
+        animation: bodyIn 0.2s ease;
+      }
+      @keyframes bodyIn {
+        from {
+          opacity: 0;
+          transform: translateY(-5px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .entry-body p {
+        margin-bottom: 13px;
+        color: var(--ink2);
+        font-size: 13.5px;
+        line-height: 1.84;
+        font-weight: 300;
+      }
+      .entry-body p:last-of-type {
+        margin-bottom: 0;
+      }
+      .key-insight {
+        display: grid;
+        grid-template-columns: 3px 1fr;
+        gap: 14px;
+        margin-top: 18px;
+      }
+      .key-insight-bar {
+        background: var(--accent);
+        border-radius: 2px;
+      }
+      .key-insight-text {
+        padding: 2px 0;
+        color: var(--ink);
+        font:
+          italic 15px/1.6 "DM Serif Display",
+          serif;
+      }
+      .data-strip {
+        display: flex;
+        flex-wrap: wrap;
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+      }
+      .data-cell {
+        flex: 1;
+        min-width: 140px;
+        padding: 9px 14px;
+        border-right: 1px solid var(--border);
+      }
+      .data-cell:last-child {
+        border-right: 0;
+      }
+      .data-cell-label {
+        margin-bottom: 3px;
+        color: var(--muted);
+        font-size: 9px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .data-cell-value {
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .red {
+        color: var(--red);
+      }
+      .teal {
+        color: var(--teal);
+      }
+      .amber {
+        color: var(--amber);
+      }
+      .slate {
+        color: var(--slate);
+      }
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 16px;
+      }
+      .tag {
+        padding: 3px 8px;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .tag.accent {
+        background: var(--red-bg);
+        border-color: var(--red-border);
+        color: var(--accent);
+      }
+      .tag.teal {
+        background: var(--teal-bg);
+        border-color: var(--teal-border);
+        color: var(--teal);
+      }
+      .tag.amber {
+        background: var(--amber-bg);
+        border-color: var(--amber-border);
+        color: var(--amber);
+      }
+      .tag.slate {
+        background: var(--slate-bg);
+        border-color: var(--slate-border);
+        color: var(--slate);
+      }
+      .foot-rule {
+        border: 0;
+        height: 2px;
+        background: var(--ink);
+        margin: 64px 0 20px;
+      }
+      .footer-note {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      @media (max-width: 640px) {
+        .page {
+          padding: 32px 20px 60px;
+        }
+        .book-header {
+          grid-template-columns: 1fr;
+        }
+        .header-right {
+          text-align: left;
+        }
+        .timeline {
+          padding-left: 24px;
+        }
+        .entry-header {
+          grid-template-columns: 52px 36px 1fr auto;
+        }
+        .entry-badge {
+          display: none;
+        }
+        .entry-era {
+          padding-left: 10px;
+          font-size: 8.5px;
+        }
+        .ctrl-right {
+          width: 100%;
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="book-header">
+        <div>
+          <div class="chapter-eyebrow">Chapter 20 · Section 20.6</div>
+          <h1 class="book-title">Synthetic Assets<br /><em>and RWAs</em></h1>
+        </div>
+        <div class="header-right">
+          <div class="header-stat"><strong>8</strong>core fronts</div>
+        </div>
+      </header>
+      <div class="controls">
+        <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button
+        ><button class="ctrl-btn" onclick="toggleAll(false)">
+          Collapse All
+        </button>
+        <div class="ctrl-right">
+          synthetics · sUSD · equities · treasuries · real estate · credit ·
+          regulation · oracles
+        </div>
+      </div>
+      <div class="timeline" id="entries-root"></div>
+      <div
+        style="height: 1px; background: var(--border); margin: 8px 0 0"
+      ></div>
+      <hr class="foot-rule" style="margin-top: 48px" />
+      <div class="footer-note">
+        <span>Quantitative Methods · Revision Notes</span
+        ><span>20.6 Synthetic Assets and RWAs</span>
+      </div>
+    </div>
+    <script>
+      const entries = [
+        {
+          era: "Exposure",
+          icon: "🪞",
+          title: "Synthetic Exposure to Traditional Assets On-Chain",
+          desc: "Programmable tokens mirror the economics of assets without moving the underlying asset",
+          badge: { label: "Framework", style: "teal" },
+          tags: [
+            ["synthetic exposure", "teal"],
+            ["derivatives", "amber"],
+            ["composability", ""],
+            ["collateral", "slate"],
+          ],
+          data: [
+            {
+              label: "Reference",
+              value: "Stocks · currencies · commodities · rates",
+              color: "teal",
+            },
+            {
+              label: "Settlement",
+              value: "On-chain collateral and rules",
+              color: "amber",
+            },
+            {
+              label: "Core risk",
+              value: "Tracking and liquidation mismatch",
+              color: "red",
+            },
+          ],
+          body: [
+            "Synthetic assets provide on-chain exposure to the price or return of an external reference asset. They can be created through collateralised debt, derivatives, or oracle-driven contracts, allowing users to trade and compose exposure without holding the traditional instrument directly.",
+            "The design separates economic exposure from legal ownership. That can make access and composability easier, but it also introduces collateral, counterparty, oracle, and tracking risks that do not disappear simply because the representation is a token.",
+          ],
+          keyPoint:
+            "Synthetic assets bring traditional market exposure into programmable finance, while moving the main risks into collateral, settlement, and data infrastructure.",
+        },
+        {
+          era: "Synthetix",
+          icon: "🧪",
+          title: "Synthetix: sUSD and Synths",
+          desc: "Collateral-backed synthetic markets for currencies, commodities, and other price references",
+          badge: { label: "Protocol", style: "teal" },
+          tags: [
+            ["sUSD", "teal"],
+            ["Synths", "amber"],
+            ["staking", ""],
+            ["debt pool", "slate"],
+          ],
+          data: [
+            {
+              label: "Unit",
+              value: "sUSD tracks the US dollar",
+              color: "teal",
+            },
+            {
+              label: "Backing",
+              value: "Staked collateral secures debt",
+              color: "amber",
+            },
+            {
+              label: "Mechanism",
+              value: "Mint, burn, and exchange synths",
+              color: "",
+            },
+          ],
+          body: [
+            "Synthetix uses a collateralised debt model to issue synthetic assets, historically including sUSD and a wider set of Synths. Stakers provide collateral and take on system debt, while users can obtain exposure to reference assets through on-chain exchanges.",
+            "The model depends on collateral ratios, liquidations, exchange pricing, and incentives that keep the system solvent. A synthetic dollar is not the same as a bank deposit: its stability is an outcome of protocol rules, collateral value, and market confidence.",
+          ],
+          keyPoint:
+            "Synthetix turns collateral into a shared balance sheet for synthetic exposure, making risk management part of the token design itself.",
+        },
+        {
+          era: "Equities",
+          icon: "📈",
+          title: "Tokenized Equities: Mirror Protocol and Backed",
+          desc: "On-chain representations of public-market exposure and the rights surrounding it",
+          badge: { label: "Markets", style: "amber" },
+          tags: [
+            ["Mirror Protocol", "amber"],
+            ["Backed", "teal"],
+            ["equities", ""],
+            ["redemption", "slate"],
+          ],
+          data: [
+            {
+              label: "Exposure",
+              value: "Price movement of a referenced security",
+              color: "teal",
+            },
+            {
+              label: "Question",
+              value: "Who holds the underlying asset?",
+              color: "amber",
+            },
+            {
+              label: "Risk",
+              value: "Tracking, custody, and legal rights",
+              color: "red",
+            },
+          ],
+          body: [
+            "Tokenized equity products can offer on-chain exposure to the price of shares. Mirror Protocol used synthetic assets to track external prices, while platforms such as Backed have pursued tokenised representations supported by underlying assets and defined issuance and redemption arrangements.",
+            "The word “tokenized” can describe different structures: a derivative, a claim on a custodian, or a security token with legal rights. Investors must distinguish price exposure from voting rights, dividends, settlement rights, and enforceable ownership of the underlying share.",
+          ],
+          keyPoint:
+            "A token that tracks an equity is not automatically the equity itself; the legal wrapper determines what the holder can actually claim.",
+        },
+        {
+          era: "Treasuries",
+          icon: "🏛️",
+          title: "Tokenized Treasuries: Ondo and Franklin Templeton",
+          desc: "Bringing short-duration government debt and fund shares into blockchain settlement",
+          badge: { label: "RWA", style: "teal" },
+          tags: [
+            ["Ondo Finance", "teal"],
+            ["Franklin Templeton", "amber"],
+            ["T-bills", ""],
+            ["fund shares", "slate"],
+          ],
+          data: [
+            {
+              label: "Underlying",
+              value: "Treasury bills and government funds",
+              color: "teal",
+            },
+            {
+              label: "Benefit",
+              value: "Programmable settlement and access",
+              color: "amber",
+            },
+            {
+              label: "Anchor",
+              value: "Custody and transfer restrictions",
+              color: "red",
+            },
+          ],
+          body: [
+            "Tokenized treasury products represent exposure to short-duration government debt, often through a fund, special-purpose vehicle, or custody arrangement. Ondo Finance and Franklin Templeton are examples of issuers bringing treasury-linked products into blockchain-based distribution and settlement.",
+            "The on-chain token can improve transferability, reporting, and composability, but it remains connected to off-chain custody, fund administration, KYC, eligibility, and redemption processes. The blockchain rail does not remove the need for a reliable legal and operational wrapper.",
+          ],
+          keyPoint:
+            "Tokenized Treasuries are a bridge between programmable settlement and regulated asset administration, not a replacement for either one.",
+        },
+        {
+          era: "Property",
+          icon: "🏠",
+          title: "Real Estate Tokenization",
+          desc: "Fractional claims and programmable cash flows for property markets",
+          badge: { label: "Asset class", style: "amber" },
+          tags: [
+            ["property", "amber"],
+            ["fractional ownership", "teal"],
+            ["cash flows", ""],
+            ["SPV", "slate"],
+          ],
+          data: [
+            {
+              label: "Structure",
+              value: "Property held through an entity or trust",
+              color: "teal",
+            },
+            {
+              label: "Token role",
+              value: "Claim on equity, debt, or income",
+              color: "amber",
+            },
+            {
+              label: "Friction",
+              value: "Valuation and secondary liquidity",
+              color: "red",
+            },
+          ],
+          body: [
+            "Real estate tokenization can divide ownership, debt, or rental cash flows into digital units. A special-purpose vehicle may hold the property while tokens represent shares or contractual claims, creating a more granular distribution and potentially simpler transfer process.",
+            "Property remains local, illiquid, and dependent on legal records. Token holders still face valuation uncertainty, maintenance and management costs, transfer restrictions, and the possibility that a liquid token market does not develop for an illiquid building.",
+          ],
+          keyPoint:
+            "Tokenization can fractionalise a property claim, but it cannot make the underlying building instantly liquid or remove local legal complexity.",
+        },
+        {
+          era: "Credit",
+          icon: "💳",
+          title: "Private Credit On-Chain",
+          desc: "Origination, servicing, and repayment of private loans through blockchain rails",
+          badge: { label: "Yield", style: "slate" },
+          tags: [
+            ["private credit", "slate"],
+            ["lending pools", "teal"],
+            ["origination", "amber"],
+            ["default risk", "red"],
+          ],
+          data: [
+            {
+              label: "Borrower",
+              value: "Private companies and real-world loans",
+              color: "teal",
+            },
+            {
+              label: "Return",
+              value: "Interest and credit spread",
+              color: "amber",
+            },
+            {
+              label: "Risk",
+              value: "Default, duration, and recovery",
+              color: "red",
+            },
+          ],
+          body: [
+            "On-chain private credit markets connect capital to loans originated outside public exchanges. The chain can record loan terms, distribute repayments, and provide a common interface for investors, while a manager or originator performs underwriting and servicing.",
+            "The key risks are still credit risks: borrower default, weak underwriting, duration mismatch, concentration, and uncertain recovery. Smart contracts can automate payment logic, but they cannot independently verify a borrower’s business or manufacture a recovery value after default.",
+          ],
+          keyPoint:
+            "Private credit becomes more transparent at the settlement layer, but underwriting and recovery remain human and institution-dependent.",
+        },
+        {
+          era: "Policy",
+          icon: "⚖️",
+          title: "Regulatory Framework Evolution",
+          desc: "Securities law, investor access, custody, and reporting are adapting to tokenised markets",
+          badge: { label: "Critical", style: "red" },
+          tags: [
+            ["securities law", "red"],
+            ["KYC / AML", "teal"],
+            ["custody", "amber"],
+            ["jurisdiction", "slate"],
+          ],
+          data: [
+            {
+              label: "Classification",
+              value: "Security · fund unit · derivative · payment token",
+              color: "teal",
+            },
+            {
+              label: "Controls",
+              value: "Disclosure · eligibility · custody · reporting",
+              color: "amber",
+            },
+            {
+              label: "Open issue",
+              value: "Cross-border enforcement",
+              color: "red",
+            },
+          ],
+          body: [
+            "RWA products sit at the intersection of digital-asset infrastructure and existing financial regulation. Whether a token is treated as a security, fund interest, derivative, or another instrument affects issuance, disclosure, marketing, custody, transfer, and who may hold it.",
+            "The framework is evolving unevenly across jurisdictions. Issuers must design for compliance as part of the product rather than treating a token wrapper as a way around investor-protection rules. Regulatory clarity can enable growth, but it also defines which forms of composability are permitted.",
+          ],
+          keyPoint:
+            "The legal identity of the underlying claim is more important than the technical format of the token carrying it.",
+        },
+        {
+          era: "Oracles",
+          icon: "📍",
+          title: "Oracle Dependency for RWA Pricing",
+          desc: "External data feeds determine how contracts value assets that do not natively exist on-chain",
+          badge: { label: "Risk", style: "red" },
+          tags: [
+            ["oracles", "red"],
+            ["NAV", "amber"],
+            ["attestations", "teal"],
+            ["valuation", "slate"],
+          ],
+          data: [
+            {
+              label: "Input",
+              value: "Price · NAV · rates · ownership data",
+              color: "teal",
+            },
+            {
+              label: "Failure",
+              value: "Stale, wrong, or manipulated feed",
+              color: "red",
+            },
+            {
+              label: "Defence",
+              value: "Multiple sources and circuit breakers",
+              color: "amber",
+            },
+          ],
+          body: [
+            "Blockchains cannot observe a treasury bill, building, or private loan directly. Oracles and attestations carry information about external prices, net asset values, ownership, and payment status into smart contracts.",
+            "An incorrect or delayed feed can trigger bad minting, liquidation, collateral valuation, or redemptions. Robust systems use multiple sources, freshness checks, deviation limits, human attestations where necessary, and explicit fallback behaviour when data quality falls below a threshold.",
+          ],
+          keyPoint:
+            "For RWAs, the oracle is part of the asset’s economic infrastructure: bad data can turn a valid legal claim into an invalid on-chain position.",
+        },
+      ];
+      function render() {
+        document.getElementById("entries-root").innerHTML = entries
+          .map(
+            (e, i) =>
+              `<article class="entry ${i === 0 ? "open" : ""}"><div class="entry-card"><div class="entry-header" onclick="toggleEntry(this.parentElement.parentElement)"><div class="entry-era">${e.era}</div><div class="entry-icon">${e.icon}</div><div class="entry-title-block"><div class="entry-title">${e.title}</div><div class="entry-desc">${e.desc}</div></div><div class="entry-badge badge-${e.badge.style}">${e.badge.label}</div><div class="entry-toggle">›</div></div><div class="entry-body">${e.body.map((p) => `<p>${p}</p>`).join("")}<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div><div class="data-strip">${e.data.map((d) => `<div class="data-cell"><div class="data-cell-label">${d.label}</div><div class="data-cell-value ${d.color}">${d.value}</div></div>`).join("")}</div><div class="tags">${e.tags.map((t) => `<span class="tag ${t[1] || ""}">${t[0]}</span>`).join("")}</div></div></div></article>`,
+          )
+          .join("");
+      }
+      function toggleEntry(entry) {
+        entry.classList.toggle("open");
+      }
+      function toggleAll(open) {
+        document
+          .querySelectorAll(".entry")
+          .forEach((entry) => entry.classList.toggle("open", open));
+      }
+      render();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 18.4 Execution Desks</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 18 · Section 18.4</div>
+      <h1 class="book-title">Execution<br><em>Desks</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Agency → algos → TCA → best execution · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>18.4 Execution Desks</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Agency",
+    icon: "🤝",
+    title: "Agency vs. Principal Execution",
+    desc: "Whether the desk works the order as an agent on behalf of the client or takes the other side as principal — different incentives, transparency, and conflict profiles",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["agency","slate"], ["principal","amber"], ["conflict","red"], ["facilitation","teal"]],
+    data: [
+      { label: "Agency", value: "Desk represents the order; no house position", color: "teal" },
+      { label: "Principal", value: "Firm capital takes the other side", color: "amber" },
+      { label: "Risk", value: "Hidden markup vs. explicit commission", color: "red" },
+    ],
+    body: [
+      `Agency execution means the broker or internal desk routes and works the order for a commission or clear fee, without intentionally warehousing risk. Principal (or risk) execution means the dealer fills the client from its own book and manages the residual — often with an embedded spread rather than a visible commission.`,
+      `Both models are legitimate. Agency is easier to align with “best execution” narratives and TCA; principal can provide immediacy and size when the public book is thin. Conflicts arise when the same institution chooses the mode, sets the price, and measures its own quality.`,
+      `Buy-side desks specify preferences by order: passive agency algos for patient flow, capital commitment for urgent block needs, and explicit consent when crossing into principal.`
+    ],
+    keyPoint: "Agency sells process; principal sells immediacy. Execution quality depends on knowing which hat the counterparty is wearing — and paying for the right one."
+  },
+  {
+    era: "Algos",
+    icon: "⚙️",
+    title: "Algo Selection by Order Type",
+    desc: "Matching algorithmic strategies — VWAP, TWAP, POV, IS, liquidity-seeking, close auctions — to urgency, size, and information sensitivity",
+    badge: { label: "Core Skill", style: "teal" },
+    tags: [["vwap","teal"], ["twap","amber"], ["pov","slate"], ["implementation shortfall","teal"]],
+    data: [
+      { label: "Scheduled", value: "VWAP / TWAP — benchmark the clock", color: "amber" },
+      { label: "Volume-linked", value: "POV — track a % of market volume", color: "teal" },
+      { label: "Cost-focused", value: "IS / adaptive — minimise shortfall vs. decision", color: "slate" },
+    ],
+    body: [
+      `Algorithmic execution is not one button. VWAP and TWAP suit orders that must participate evenly through a window. Percentage-of-volume (POV) tracks liquidity. Implementation-shortfall and adaptive algos optimise against the decision price, accelerating when favourable and slowing when the market runs away.`,
+      `Liquidity-seeking and dark-aware algos prioritise hidden venues; auction algos target open/close prints. Parameters — max participation, limit prices, urgency — encode the PM’s information and risk tolerance.`,
+      `Mis-selection is costly: a loud POV on a news-sensitive name leaks information; an over-patient VWAP on a momentum trade pays opportunity cost. Desk skill is matching tool to intent.`
+    ],
+    keyPoint: "Algo selection is the translation of trading intent into microstructure behaviour. The wrong algo turns a good idea into a predictable, expensive print."
+  },
+  {
+    era: "Impact",
+    icon: "📉",
+    title: "Market Impact Minimization",
+    desc: "Techniques to reduce permanent and temporary price movement caused by the order itself — sizing, scheduling, venue choice, and information control",
+    badge: { label: "Objective", style: "amber" },
+    tags: [["market impact","amber"], ["slippage","red"], ["participation rate","slate"], ["stealth","teal"]],
+    data: [
+      { label: "Temporary", value: "Short-lived pressure from consuming liquidity", color: "amber" },
+      { label: "Permanent", value: "Information / inventory revaluation", color: "red" },
+      { label: "Levers", value: "Pace, limit, venues, splitting, timing", color: "teal" },
+    ],
+    body: [
+      `Market impact is the adverse price move attributable to trading. Temporary impact reflects immediate liquidity consumption; permanent impact reflects the information the flow reveals and the new equilibrium inventory of the market.`,
+      `Desks minimise impact by lowering participation rates, using passive limits, accessing non-displayed liquidity, splitting across brokers and venues, and avoiding predictable schedules that invite front-running. Urgency always trades off against impact: faster usually costs more.`,
+      `Pre-trade models estimate impact from size, ADV, volatility, and spread; post-trade TCA checks whether realised cost matched the forecast. Systematic overruns trigger algo or broker review.`
+    ],
+    keyPoint: "Impact minimisation is the execution desk’s primary alpha defence. Every basis point not paid to the market is a basis point kept for the strategy."
+  },
+  {
+    era: "TCA",
+    icon: "📊",
+    title: "Transaction Cost Analysis (TCA)",
+    desc: "The discipline of measuring execution cost against explicit benchmarks — arrival price, VWAP, close, and peer universes — to improve process over time",
+    badge: { label: "Measurement", style: "teal" },
+    tags: [["tca","teal"], ["arrival price","amber"], ["implementation shortfall","slate"], ["post-trade","teal"]],
+    data: [
+      { label: "Benchmarks", value: "Arrival, VWAP, interval VWAP, close", color: "teal" },
+      { label: "Decompose", value: "Spread, impact, timing, opportunity cost", color: "amber" },
+      { label: "Use", value: "Broker scorecards, algo tuning, PM feedback", color: "slate" },
+    ],
+    body: [
+      `TCA quantifies how much of the decision-to-fill journey was lost to costs. Implementation shortfall versus arrival price is the purest economic measure for many strategies; VWAP benchmarks assess participation quality relative to the day’s volume profile.`,
+      `Good TCA decomposes costs and attributes them to urgency instructions, algo choice, venue, and broker. Aggregated results feed broker reviews and internal playbooks. Without TCA, “best execution” is an anecdote.`,
+      `Limitations remain: benchmarks can be gamed, illiquid names have noisy estimates, and opportunity cost of not trading is hard to observe. Still, relative ranking of brokers and algos is usually robust.`
+    ],
+    keyPoint: "TCA is the feedback loop of the execution desk. What is not measured against a benchmark cannot be systematically improved."
+  },
+  {
+    era: "Brokers",
+    icon: "🏦",
+    title: "Broker Selection & Relationship Management",
+    desc: "Building a roster of brokers by capability — high-touch, electronic, sector expertise, capital commitment — and managing allocation with data, not only history",
+    badge: { label: "Network", style: "slate" },
+    tags: [["broker selection","slate"], ["high touch","amber"], ["electronic","teal"], ["allocation","slate"]],
+    data: [
+      { label: "Criteria", value: "TCA, research, capital, coverage, ops", color: "slate" },
+      { label: "Tools", value: "Scorecards, RFQs, commission budgets", color: "amber" },
+      { label: "Balance", value: "Concentration risk vs. relationship depth", color: "teal" },
+    ],
+    body: [
+      `No single broker is best for every order. Electronic specialists excel at low-touch algo flow; high-touch sales traders matter for blocks and special situations; some houses commit principal capital; others dominate a region or sector.`,
+      `Desks maintain an approved list, route by order characteristics, and review performance quarterly using TCA and operational metrics (fails, locates, outages). Commission wallets and research access still influence allocation, subject to unbundling rules where applicable.`,
+      `Over-concentration creates operational and information risk; over-fragmentation dilutes priority and service. Relationship management is the art of keeping enough competition without becoming a nobody at every shop.`
+    ],
+    keyPoint: "Broker selection is a portfolio problem: diversify capabilities, measure outcomes, and pay for what you actually use — not for habit."
+  },
+  {
+    era: "Dark",
+    icon: "🌑",
+    title: "Dark Pool Access",
+    desc: "Non-displayed venues that match orders without pre-trade transparency — useful for size and reduced signalling, with trade-offs in fill uncertainty and adverse selection",
+    badge: { label: "Venue", style: "amber" },
+    tags: [["dark pool","amber"], ["hidden liquidity","teal"], ["adverse selection","red"], ["midpoint","slate"]],
+    data: [
+      { label: "Benefit", value: "Less signalling; potential midpoint fills", color: "teal" },
+      { label: "Cost", value: "Uncertain fills; informational toxicity", color: "red" },
+      { label: "Practice", value: "Smart order routers with dark preference tiers", color: "amber" },
+    ],
+    body: [
+      `Dark pools and midpoint venues let large orders interact without advertising size on the lit book. That can cut impact and information leakage when counterparties are natural. When counterparties are informed short-term traders, dark fills can be adversely selected.`,
+      `Desks configure SOR logic: which darks to prioritise, minimum quantities, price improvement requirements, and when to spray the lit market. Venue toxicity metrics and conditional orders refine the mix over time.`,
+      `Regulatory constraints (e.g. volume caps in some regimes) and periodic controversy over pool composition mean dark access is a managed privilege, not a free lunch.`
+    ],
+    keyPoint: "Dark pools trade transparency for discretion. They help when your information horizon is long and hurt when the other side’s is shorter than yours."
+  },
+  {
+    era: "Quality",
+    icon: "📋",
+    title: "Execution Quality Reporting",
+    desc: "Internal and external reports that document how orders were handled — venues, timings, prices, and exceptions — supporting oversight, clients, and regulators",
+    badge: { label: "Transparency", style: "teal" },
+    tags: [["execution quality","teal"], ["venue analysis","amber"], ["reporting","slate"], ["oversight","teal"]],
+    data: [
+      { label: "Content", value: "Fill rates, spreads, venues, outlier trades", color: "teal" },
+      { label: "Audience", value: "PMs, risk, compliance, LPs, regulators", color: "amber" },
+      { label: "Cadence", value: "Daily ops packs; formal periodic reviews", color: "slate" },
+    ],
+    body: [
+      `Execution quality reporting closes the loop between policy and practice. Daily packs flag outliers; monthly or quarterly reviews summarise broker and venue performance, algo league tables, and systematic issues (e.g. consistently poor closes in a sector).`,
+      `For multi-PM platforms and institutional clients, reporting demonstrates that the desk is an agent of the portfolio, not a black box. Regulated entities may also face prescribed disclosure formats.`,
+      `Reports only matter if they change behaviour — reweighting brokers, retiring weak algos, or rewriting playbooks when patterns appear.`
+    ],
+    keyPoint: "Execution quality reporting turns trading from folklore into governed process. If it does not drive decisions, it is only archive."
+  },
+  {
+    era: "MiFID",
+    icon: "⚖️",
+    title: "Best Execution Obligations (MiFID II)",
+    desc: "The regulatory duty — exemplified by MiFID II in Europe — to take all sufficient steps to obtain the best possible result for the client, and to demonstrate that process",
+    badge: { label: "Regulatory", style: "red" },
+    tags: [["mifid ii","red"], ["best execution","amber"], ["rts 27/28","slate"], ["sufficient steps","teal"]],
+    data: [
+      { label: "Duty", value: "Best possible result on a consistent basis", color: "red" },
+      { label: "Factors", value: "Price, cost, speed, likelihood, size…", color: "amber" },
+      { label: "Evidence", value: "Policies, monitoring, venue reports", color: "slate" },
+    ],
+    body: [
+      `Under MiFID II, investment firms must implement best-execution policies, monitor outcomes, and show they took “all sufficient steps” — not merely best efforts rhetoric. Price is central for retail; for professionals, a weighted mix of price, cost, speed, likelihood of execution, and settlement may apply.`,
+      `Practical machinery includes venue selection rationales, RTS-style reporting (historically RTS 27/28), periodic policy review, and governance when execution quality deteriorates. Similar principles appear in other jurisdictions under different labels.`,
+      `Best execution is both a legal obligation and a commercial standard. Desks that treat it only as compliance paperwork miss the alignment with TCA-driven improvement.`
+    ],
+    keyPoint: "Best execution under MiFID II is a demonstrable process, not a single best price on one order. Policies, monitoring, and evidence are as mandatory as the trade itself."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

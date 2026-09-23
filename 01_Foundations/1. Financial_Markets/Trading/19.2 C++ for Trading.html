@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 19.2 C++ for Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 19 · Section 19.2</div>
+      <h1 class="book-title">C++ for<br><em>Trading</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>10</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Structures → concurrency → network → measure · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>19.2 C++ for Trading</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Structures",
+    icon: "🧱",
+    title: "High-Performance Data Structures",
+    desc: "Containers and layouts chosen for cache locality, predictable allocation, and hot-path throughput — not only algorithmic Big-O on paper",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["data structures","slate"], ["cache locality","teal"], ["arena","amber"], ["order book","teal"]],
+    data: [
+      { label: "Goals", value: "Locality, stable latency, low allocation", color: "slate" },
+      { label: "Examples", value: "Flat maps, rings, SOAs, custom books", color: "teal" },
+      { label: "Avoid", value: "Pointer-chasing graphs on the hot path", color: "red" },
+    ],
+    body: [
+      `In trading systems, the “best” structure is often the one that stays in L1/L2 cache and avoids heap traffic under burst load. Contiguous arrays, open-addressing maps, pre-sized rings, and structure-of-arrays layouts beat textbook linked structures when every nanosecond compounds.`,
+      `Order books, symbol indexes, and risk flat files are specialised: intrusive lists, price-level arrays, and pooled nodes are common. Measure with realistic message mixes — synthetic microbenchmarks lie about branch and cache behaviour.`,
+      `API design matters: stable references, no surprising reallocation, and clear ownership keep the rest of the stack honest.`
+    ],
+    keyPoint: "High-performance data structures optimise for the memory hierarchy and allocation behaviour. Correct Big-O with bad locality still loses the race."
+  },
+  {
+    era: "Memory",
+    icon: "🧠",
+    title: "Memory Management and RAII",
+    desc: "Deterministic resource lifetime via constructors/destructors — the C++ discipline that prevents leaks and makes cleanup exception-safe",
+    badge: { label: "Core", style: "teal" },
+    tags: [["raii","teal"], ["smart pointers","amber"], ["allocators","slate"], ["ownership","teal"]],
+    data: [
+      { label: "RAII", value: "Acquire in ctor; release in dtor", color: "teal" },
+      { label: "Hot path", value: "Preallocate; avoid alloc in callbacks", color: "red" },
+      { label: "Tools", value: "unique_ptr, pools, custom allocators", color: "amber" },
+    ],
+    body: [
+      `RAII ties resource lifetime to scope: sockets, file descriptors, locks, and memory slabs clean up when objects die — including during stack unwinding. That determinism is foundational for reliable gateways.`,
+      `Low-latency paths still minimise dynamic allocation: object pools, arena allocators, and frame-based reuse keep the critical path allocation-free after warm-up. smart pointers express ownership off the hottest loops more than they replace careful design.`,
+      `Leaks and double-frees are not only correctness bugs; they are operational risk under multi-day process uptime.`
+    ],
+    keyPoint: "RAII is how C++ makes resource safety the default. On the trading hot path, pair it with preallocation so destructors are not paying malloc under load."
+  },
+  {
+    era: "Templates",
+    icon: "📐",
+    title: "Templates and Generics",
+    desc: "Compile-time polymorphism for zero-overhead abstraction — policy-based design, static dispatch, and type-safe message handling",
+    badge: { label: "Language", style: "amber" },
+    tags: [["templates","amber"], ["constexpr","teal"], ["static polymorphism","slate"], ["zero overhead","teal"]],
+    data: [
+      { label: "Benefit", value: "Abstraction without virtual-call cost", color: "teal" },
+      { label: "Patterns", value: "Policies, CRTP, concepts (modern C++)", color: "amber" },
+      { label: "Cost", value: "Compile time, binary size, complexity", color: "red" },
+    ],
+    body: [
+      `Templates let engines specialise algorithms per message type, venue trait, or risk policy while inlining aggressively. Static polymorphism (including CRTP) avoids vtable indirection on paths where virtual calls show up in profiles.`,
+      `Modern C++ adds constexpr, concepts, and better constraints so generic code fails loudly at compile time instead of deeply nested template errors in production builds — still a discipline, not magic.`,
+      `Over-templating creates unreadable compile storms. Use generics where measurement shows abstraction tax; keep simple concrete types at system boundaries.`
+    ],
+    keyPoint: "Templates buy zero-overhead abstraction when used with restraint. They are a performance tool and a complexity tax — spend them where profiles justify it."
+  },
+  {
+    era: "Lock-Free",
+    icon: "🔓",
+    title: "Lock-Free Data Structures",
+    desc: "Concurrent queues and state machines built on atomics — reducing priority inversion and tail latency from kernel-mediated locks",
+    badge: { label: "Concurrency", style: "red" },
+    tags: [["lock-free","red"], ["atomics","amber"], ["spsc queue","teal"], ["memory order","slate"]],
+    data: [
+      { label: "Common", value: "SPSC/MPSC rings between threads", color: "teal" },
+      { label: "Hard part", value: "Memory ordering & ABA correctness", color: "red" },
+      { label: "Rule", value: "Prefer simple proven designs", color: "amber" },
+    ],
+    body: [
+      `Lock-free structures aim for progress even when other threads stall — valuable when a latency-critical reader must not wait on a contended mutex. Single-producer/single-consumer ring buffers are the workhorse between network and strategy threads.`,
+      `Correctness requires careful memory orders, cache-line padding to avoid false sharing, and respect for the limits of “lock-free” (not the same as wait-free, not the same as fast under contention).`,
+      `Most firms adopt battle-tested queues rather than inventing multi-producer designs. A wrong atomic algorithm is worse than a coarse lock.`
+    ],
+    keyPoint: "Lock-free data structures attack lock-induced latency tails. Correct atomics are harder than fast atomics — borrow proven rings before inventing concurrent science."
+  },
+  {
+    era: "SIMD",
+    icon: "🧮",
+    title: "SIMD Intrinsics for Vectorized Computation",
+    desc: "Explicit use of CPU vector units (SSE/AVX/NEON) to process multiple data elements per instruction in signal, risk, and decode kernels",
+    badge: { label: "Compute", style: "amber" },
+    tags: [["simd","amber"], ["avx","teal"], ["vectorization","slate"], ["intrinsics","teal"]],
+    data: [
+      { label: "Target", value: "Tight numeric loops, scans, filters", color: "amber" },
+      { label: "Tools", value: "Intrinsics, autovectorize, ISPC", color: "teal" },
+      { label: "Limits", value: "Data layout & branchy logic resist SIMD", color: "red" },
+    ],
+    body: [
+      `SIMD widens throughput when the same operation applies across aligned arrays — batch Greeks, feature transforms, checksums, or parsing assists. Intrinsics expose the ISA; compilers sometimes autovectorise simple loops if aliases and dependencies are clear.`,
+      `Structure-of-arrays layouts and aligned allocation unlock SIMD; pointer-linked books do not. Always validate numerical edge cases and remainder lanes.`,
+      `Premature SIMD harms readability. Profile first; vectorise the top kernel second.`
+    ],
+    keyPoint: "SIMD is bulk compute on the CPU’s vector lanes. It rewards contiguous data and simple loops — not branchy per-order logic."
+  },
+  {
+    era: "Network",
+    icon: "🔌",
+    title: "Network Programming (Sockets, epoll)",
+    desc: "Non-blocking sockets and scalable I/O multiplexing — the foundation of market-data and order-entry connectivity on Linux",
+    badge: { label: "IO", style: "teal" },
+    tags: [["sockets","teal"], ["epoll","amber"], ["non-blocking","slate"], ["kernel bypass","red"]],
+    data: [
+      { label: "Baseline", value: "Non-blocking TCP/UDP + epoll/kqueue", color: "teal" },
+      { label: "Scale", value: "One thread many fds; edge-triggered care", color: "amber" },
+      { label: "Next level", value: "Kernel bypass (e.g. Onload) when needed", color: "slate" },
+    ],
+    body: [
+      `Trading connectivity is socket programming under load: accept/read/write without blocking the event loop, batch where possible, and handle partial reads, resets, and slow consumers. On Linux, epoll is the standard multiplexer for many descriptors.`,
+      `Edge-triggered modes demand draining sockets fully; level-triggered is simpler but can cost wakeups. User-space networking stacks reduce syscalls when microseconds matter.`,
+      `Protocol framing (length prefixes, FIX, binary exchange protocols) sits above the fd layer and must be robust to fragmentation.`
+    ],
+    keyPoint: "Sockets and epoll are the standard Linux path for multiplexed trading IO. Master non-blocking correctness before chasing kernel-bypass trophies."
+  },
+  {
+    era: "IPC",
+    icon: "📤",
+    title: "Shared Memory IPC",
+    desc: "Processes exchanging data via mapped memory regions — ultra-low-overhead handoff between feed handlers, strategies, and risk processes",
+    badge: { label: "IPC", style: "slate" },
+    tags: [["shared memory","slate"], ["mmap","teal"], ["ipc","amber"], ["ring buffer","teal"]],
+    data: [
+      { label: "Mechanism", value: "mmap / shm_open regions + sync protocol", color: "slate" },
+      { label: "Pattern", value: "SPSC rings across process boundaries", color: "teal" },
+      { label: "Risks", value: "Lifetime, versioning, torn reads", color: "red" },
+    ],
+    body: [
+      `Shared memory avoids serialising through the kernel for every message between co-located processes. A carefully designed ring with sequence numbers enables one writer and one or more readers with minimal overhead.`,
+      `Challenges include process lifetime (who creates/unlinks), schema evolution, cache-line ownership, and detecting crashes mid-write. Memory barriers and well-defined message layouts are mandatory.`,
+      `Shared memory is a sharp tool: excellent for known topologies on one host; a poor substitute for networked service boundaries when isolation matters more than latency.`
+    ],
+    keyPoint: "Shared-memory IPC is the low-overhead inter-process bus on a single machine. Sequence protocols and ownership rules matter as much as the mmap call."
+  },
+  {
+    era: "Profile",
+    icon: "🔬",
+    title: "Profiling (perf, gprof, VTune)",
+    desc: "Measurement tools that locate CPU, cache, and branch bottlenecks — the empirical basis for optimisation instead of folklore",
+    badge: { label: "Tooling", style: "teal" },
+    tags: [["perf","teal"], ["gprof","amber"], ["vtune","slate"], ["profiling","teal"]],
+    data: [
+      { label: "Linux perf", value: "Sampling, PMCs, flame-friendly data", color: "teal" },
+      { label: "gprof", value: "Classic instrumentation; coarser today", color: "amber" },
+      { label: "VTune", value: "Deep microarchitecture analysis", color: "slate" },
+    ],
+    body: [
+      `Optimisation without profiles is guesswork. Linux perf samples hardware events; flame graphs visualise where time goes. Intel VTune (and peers) expose cache misses, alignment issues, and threading effects in richer detail.`,
+      `Profile production-like loads: message rates, symbol counts, and concurrency. Debug builds lie; optimised builds with frame pointers or JIT-friendly symbols make samples actionable.`,
+      `Fix the top inclusive costs first. Micro-optimising a 1% function after ignoring a 40% allocator storm is theatre.`
+    ],
+    keyPoint: "Profiling tools turn performance from opinion into evidence. perf, gprof, and VTune answer where time went — only then do you change the code."
+  },
+  {
+    era: "Latency",
+    icon: "⏱️",
+    title: "Latency Measurement Techniques",
+    desc: "Methods to timestamp, histogram, and compare path delays — from wire to decision — without the measurement destroying the result",
+    badge: { label: "Measurement", style: "amber" },
+    tags: [["latency","amber"], ["rdtsc","teal"], ["histogram","slate"], ["tail latency","red"]],
+    data: [
+      { label: "Clocks", value: "TSC, clock_gettime, NIC hardware stamps", color: "teal" },
+      { label: "Stats", value: "Histograms; p50/p99/p99.9 not only mean", color: "amber" },
+      { label: "Trap", value: "Measurement overhead & clock skew", color: "red" },
+    ],
+    body: [
+      `Latency work lives in tails: p99 and p99.9 under load define competitive reality more than the mean. Techniques include calibrated TSC reads, hardware timestamping on NICs, and coordinated logging across threads with care for reordering.`,
+      `Histograms (HDR-style) capture rare spikes. Compare like-with-like: same machine isolation, frequency scaling settings, and warm caches.`,
+      `A probe that allocates, logs synchronously, or takes locks can create the latency it claims to measure. Design passive or sampled instrumentation for production.`
+    ],
+    keyPoint: "Latency measurement is a first-class engineering problem. Timestamp carefully, report tails, and never trust a mean that hides the spike that missed the market."
+  },
+  {
+    era: "FIX",
+    icon: "📨",
+    title: "QuickFIX/J-Style Stacks in C++ (QuickFIX)",
+    desc: "FIX protocol engines in C++ — session management, message encode/decode, and store/recover behaviour for order routing and drops",
+    badge: { label: "Protocol", style: "slate" },
+    tags: [["quickfix","slate"], ["fix protocol","teal"], ["session","amber"], ["order entry","teal"]],
+    data: [
+      { label: "Role", value: "FIX sessions to brokers/exchanges/venues", color: "slate" },
+      { label: "Pieces", value: "Codec, session layer, persistence", color: "teal" },
+      { label: "Prod needs", value: "Tune, validate, sometimes custom engine", color: "amber" },
+    ],
+    body: [
+      `FIX remains the lingua franca of much institutional order flow. QuickFIX (and related C++ engines) implement sessions, sequence numbers, heartbeats, and data dictionaries so firms can speak standard tags without rewriting the protocol from scratch.`,
+      `Production hardening includes dictionary correctness per counterparty, latency tuning, storage for recovery, and clear separation between session state and strategy logic. Some ultra-low-latency desks replace generic engines with specialised binary codecs while keeping FIX for periphery.`,
+      `Interoperability testing against each broker’s “dialect” is mandatory — the standard is broad; the edge cases are specific.`
+    ],
+    keyPoint: "C++ FIX engines like QuickFIX provide the session and codec foundation for institutional connectivity. Standards get you to the table; counterparty quirks decide production readiness."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

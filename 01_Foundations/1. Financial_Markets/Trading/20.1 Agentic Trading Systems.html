@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Microstructure — 20.1 Agentic Trading Systems</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f4f1eb;
+    --bg2:       #ede9e0;
+    --surface:   #ffffff;
+    --surface2:  #faf8f4;
+    --border:    #d8d2c4;
+    --border2:   #c4bdb0;
+    --ink:       #1c1814;
+    --ink2:      #3a342c;
+    --muted:     #7a7268;
+    --faint:     #b0a898;
+    --red:       #b03020;
+    --red-bg:    #fdf2f0;
+    --red-border:#e8c4be;
+    --teal:      #1a6b5a;
+    --teal-bg:   #f0f8f6;
+    --teal-border:#b4ddd6;
+    --amber:     #9a6010;
+    --amber-bg:  #fdf6e8;
+    --amber-border:#e8d4a4;
+    --slate:     #2a4a6a;
+    --slate-bg:  #f0f4f8;
+    --slate-border:#b4c8dc;
+    --accent:    #c04828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 52px 40px 100px;
+  }
+
+  .book-header {
+    margin-bottom: 44px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 22px;
+  }
+
+  .chapter-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .book-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(30px, 5vw, 52px);
+    color: var(--ink);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .book-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .header-right {
+    text-align: right;
+    padding-bottom: 4px;
+  }
+
+  .header-stat {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .header-stat strong {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    font-family: 'DM Serif Display', serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--border2) 0px,
+      var(--border2) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+  }
+
+  .entry {
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -29px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 2px solid var(--border2);
+    transition: border-color 0.2s, background 0.2s;
+    z-index: 2;
+  }
+
+  .entry.open::before {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .entry.open .entry-card {
+    border-color: var(--border2);
+    box-shadow: 3px 3px 0 var(--bg2);
+  }
+
+  .entry-header {
+    display: grid;
+    grid-template-columns: 78px auto 1fr auto auto;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    min-height: 54px;
+  }
+
+  .entry-header:hover { background: var(--surface2); }
+
+  .entry-era {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 0 0 16px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .entry-icon {
+    font-size: 16px;
+    padding: 0 14px;
+    opacity: 0.8;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+
+  .entry-title-block {
+    padding: 12px 16px;
+  }
+
+  .entry-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16.5px;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+
+  .entry-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+  }
+
+  .entry-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    margin-right: 14px;
+    white-space: nowrap;
+    align-self: center;
+    border: 1px solid;
+  }
+
+  .badge-red    { color: var(--red);   border-color: var(--red-border);   background: var(--red-bg); }
+  .badge-teal   { color: var(--teal);  border-color: var(--teal-border);  background: var(--teal-bg); }
+  .badge-amber  { color: var(--amber); border-color: var(--amber-border); background: var(--amber-bg); }
+  .badge-slate  { color: var(--slate); border-color: var(--slate-border); background: var(--slate-bg); }
+  .badge-ink    { color: var(--ink);   border-color: var(--border2);      background: var(--bg2); }
+
+  .entry-toggle {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--faint);
+    transition: transform 0.25s, color 0.15s;
+    padding: 0 18px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+  }
+
+  .entry.open .entry-toggle {
+    transform: rotate(90deg);
+    color: var(--accent);
+  }
+
+  .entry-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 22px 24px 24px 24px;
+    animation: bodyIn 0.2s ease;
+  }
+
+  .entry.open .entry-body { display: block; }
+
+  @keyframes bodyIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .entry-body p {
+    font-size: 13.5px;
+    line-height: 1.84;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 300;
+  }
+
+  .entry-body p:last-of-type { margin-bottom: 0; }
+
+  .entry-body p em { font-style: italic; color: var(--ink); font-weight: 400; }
+  .entry-body p strong { font-weight: 600; color: var(--ink); }
+
+  .key-insight {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 14px;
+  }
+
+  .key-insight-bar {
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .key-insight-text {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2px 0;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .compare-box {
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-box.left  { background: var(--red-bg);  border-color: var(--red-border); }
+  .compare-box.right { background: var(--teal-bg); border-color: var(--teal-border); }
+
+  .compare-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .compare-box.left .compare-label  { color: var(--red); }
+  .compare-box.right .compare-label { color: var(--teal); }
+
+  .compare-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.6 !important;
+  }
+
+  .data-strip {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .data-cell {
+    padding: 9px 14px;
+    border-right: 1px solid var(--border);
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .data-cell:last-child { border-right: none; }
+
+  .data-cell-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .data-cell-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .data-cell-value.red   { color: var(--red); }
+  .data-cell-value.teal  { color: var(--teal); }
+  .data-cell-value.amber { color: var(--amber); }
+  .data-cell-value.slate { color: var(--slate); }
+
+  .tags {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tag.accent { background: var(--red-bg); border-color: var(--red-border); color: var(--accent); }
+  .tag.teal   { background: var(--teal-bg); border-color: var(--teal-border); color: var(--teal); }
+  .tag.amber  { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .tag.slate  { background: var(--slate-bg); border-color: var(--slate-border); color: var(--slate); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-right {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--faint);
+    letter-spacing: 0.08em;
+  }
+
+  .foot-rule {
+    border: none;
+    height: 2px;
+    background: var(--ink);
+    margin: 64px 0 20px;
+  }
+
+  .footer-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .note-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--slate-bg);
+    border: 1px solid var(--slate-border);
+    border-left: 3px solid var(--slate);
+  }
+
+  .note-box .note-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 6px;
+  }
+
+  .note-box p {
+    font-size: 12.5px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  @media (max-width: 640px) {
+    .page { padding: 32px 20px 60px; }
+    .timeline { padding-left: 24px; }
+    .book-header { grid-template-columns: 1fr; }
+    .header-right { text-align: left; }
+    .entry-header { grid-template-columns: 52px 36px 1fr auto; }
+    .entry-badge { display: none; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .entry-era { font-size: 8.5px; padding-left: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="book-header">
+    <div>
+      <div class="chapter-eyebrow">Chapter 20 · Section 20.1</div>
+      <h1 class="book-title">Agentic Trading<br><em>Systems</em></h1>
+    </div>
+    <div class="header-right">
+      <div class="header-stat">
+        <strong>8</strong>
+        core concepts
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button>
+    <button class="ctrl-btn" onclick="toggleAll(false)">Collapse All</button>
+    <div class="ctrl-right">Architecture → tools → multi-agent → safety · click any entry to expand</div>
+  </div>
+
+  <div class="timeline" id="entries-root"></div>
+
+  <div style="height:1px; background: var(--border); margin: 8px 0 0 0;"></div>
+
+  <hr class="foot-rule" style="margin-top:48px;">
+  <div class="footer-note">
+    <span>Market Microstructure · Revision Notes</span>
+    <span>20.1 Agentic Trading Systems</span>
+  </div>
+</div>
+
+<script>
+const entries = [
+  {
+    era: "Architecture",
+    icon: "🤖",
+    title: "Autonomous Agent Architectures for Trading",
+    desc: "System designs where software agents perceive market and firm state, decide, and act through tools — under explicit risk and compliance boundaries",
+    badge: { label: "Foundation", style: "slate" },
+    tags: [["agent architecture","slate"], ["autonomy","amber"], ["perception-action","teal"], ["trading loop","teal"]],
+    data: [
+      { label: "Loop", value: "Observe → reason → act → learn/log", color: "slate" },
+      { label: "Scope", value: "Research, sizing, routing, monitoring", color: "teal" },
+      { label: "Constraint", value: "Limits, audit, human escalation", color: "red" },
+    ],
+    body: [
+      `An agentic trading system is more than a model score: it is a closed loop that reads data, invokes tools (screens, risk checks, order APIs), and updates state. Autonomy is graded — from “propose only” to “execute within hard limits.”`,
+      `Architecture separates policy (what is allowed), cognition (LLM or classical logic), and actuation (OMS/EMS adapters). Without that split, prompt text becomes an un-auditable trading desk.`,
+      `Latency tiers differ: slow agents for research synthesis; fast deterministic paths for order placement once a decision is validated.`
+    ],
+    keyPoint: "Agentic trading architecture is a controlled perceive–decide–act loop. Autonomy without hard policy boundaries is just an unsupervised order blaster."
+  },
+  {
+    era: "Tools",
+    icon: "🛠️",
+    title: "Tool-Using LLM Agents (News → Signal → Execution)",
+    desc: "LLM agents that call external tools — news APIs, screeners, risk engines, brokers — to turn unstructured events into constrained trading actions",
+    badge: { label: "LLM Agents", style: "teal" },
+    tags: [["tool use","teal"], ["llm agent","amber"], ["news to signal","slate"], ["function calling","teal"]],
+    data: [
+      { label: "Pattern", value: "Model selects tools; tools return facts", color: "teal" },
+      { label: "Pipeline", value: "Ingest event → extract → score → size → route", color: "amber" },
+      { label: "Risk", value: "Hallucinated facts if tools are skipped", color: "red" },
+    ],
+    body: [
+      `Tool-using agents bind language models to market reality: fetch headlines, pull fundamentals, query positions, request a risk verdict, then — only if allowed — submit an order intent. Function-calling schemas make tool choice structured rather than free prose.`,
+      `The news→signal→execution chain must ground every factual claim in tool output. Otherwise the model invents numbers and the desk inherits fiction as risk.`,
+      `Human-in-the-loop checkpoints are natural at signal acceptance and before live routing, especially early in deployment.`
+    ],
+    keyPoint: "Tool-using LLM agents earn trust by grounding actions in tool results. Unverified narrative is research colour — not an execution ticket."
+  },
+  {
+    era: "Multi-Agent",
+    icon: "👥",
+    title: "Multi-Agent Coordination (Research + Execution)",
+    desc: "Specialised agents that collaborate — one digests information, another sizes and routes — coordinated by protocols, shared state, and supervisors",
+    badge: { label: "Coordination", style: "amber" },
+    tags: [["multi-agent","amber"], ["research agent","teal"], ["execution agent","slate"], ["supervisor","teal"]],
+    data: [
+      { label: "Split", value: "Research vs. risk vs. execution roles", color: "amber" },
+      { label: "Bus", value: "Messages, shared memory, event log", color: "teal" },
+      { label: "Failure", value: "Conflicting orders; race conditions", color: "red" },
+    ],
+    body: [
+      `Multi-agent designs mirror a desk: a research agent summarises and scores; a risk agent enforces limits; an execution agent optimises routing. A supervisor or workflow engine sequences handoffs and resolves conflicts.`,
+      `Coordination needs explicit contracts — message schemas, idempotent order IDs, and single-writer rules for live orders. Parallel agents without a ledger double-spend attention and capital.`,
+      `Start with sequential pipelines; add concurrency only when instrumentation proves handoffs are safe.`
+    ],
+    keyPoint: "Multi-agent trading works when roles and ledgers are explicit. Research can be creative; execution must be single-minded and constrained."
+  },
+  {
+    era: "ReAct",
+    icon: "💭",
+    title: "ReAct (Reason + Act) Framework",
+    desc: "Interleaved reasoning traces and tool actions — the agent thinks, acts, observes, and repeats until a stopping condition",
+    badge: { label: "Pattern", style: "teal" },
+    tags: [["react","teal"], ["reason act","amber"], ["tool loop","slate"], ["trace","teal"]],
+    data: [
+      { label: "Cycle", value: "Thought → action → observation → …", color: "teal" },
+      { label: "Benefit", value: "Adapts plan to tool feedback", color: "amber" },
+      { label: "Cost", value: "Tokens, latency, runaway loops", color: "red" },
+    ],
+    body: [
+      `ReAct-style agents alternate natural-language reasoning with concrete tool calls. In trading, a thought might prioritise a headline; an action fetches the release text; an observation updates the thesis before any order tool is exposed.`,
+      `Persisted traces support audit and debugging — what the agent believed when it acted. Cap iterations and tool budgets so a confused loop cannot spam APIs or the market.`,
+      `Reasoning text is not a control plane; hard validators must still approve side-effecting tools.`
+    ],
+    keyPoint: "ReAct interleaves thinking with tool feedback. Useful for adaptive research — dangerous if action tools lack hard stops and budgets."
+  },
+  {
+    era: "Plan",
+    icon: "🗺️",
+    title: "Plan-and-Execute Agents",
+    desc: "Agents that draft a multi-step plan first, then execute steps (often with a separate executor) — structured workflows over pure reactive loops",
+    badge: { label: "Pattern", style: "amber" },
+    tags: [["plan and execute","amber"], ["planner","teal"], ["executor","slate"], ["workflow","teal"]],
+    data: [
+      { label: "Phase 1", value: "Propose ordered steps / checklist", color: "amber" },
+      { label: "Phase 2", value: "Execute, verify, replan on failure", color: "teal" },
+      { label: "Fit", value: "Research memos, multi-source diligence", color: "slate" },
+    ],
+    body: [
+      `Plan-and-execute separates strategy from tactics: the planner lists data to gather and checks to pass; the executor runs tools and returns status. Replanning handles missing filings or failed API calls without abandoning the goal.`,
+      `For trading, plans map cleanly onto compliance checklists — “confirm liquidity, check MNPI flags, size within limit, then propose order.” Execution agents should not invent new side effects outside the plan without escalation.`,
+      `Static plans can be brittle in fast markets; hybrid designs replan on significant observation changes.`
+    ],
+    keyPoint: "Plan-and-execute adds structure to agent behaviour. Planning creates an auditable checklist; execution should not freestyle beyond it."
+  },
+  {
+    era: "Memory",
+    icon: "🧠",
+    title: "Memory Systems (Episodic & Semantic)",
+    desc: "Persistent stores that let agents recall past trades, research notes, and domain facts — beyond the current context window",
+    badge: { label: "State", style: "slate" },
+    tags: [["episodic memory","slate"], ["semantic memory","teal"], ["vector store","amber"], ["context","teal"]],
+    data: [
+      { label: "Episodic", value: "What happened: trades, events, outcomes", color: "slate" },
+      { label: "Semantic", value: "What is true: policies, definitions, playbooks", color: "teal" },
+      { label: "Mechanism", value: "DBs, vector retrieval, summaries", color: "amber" },
+    ],
+    body: [
+      `Episodic memory records trajectories — positions taken, PnL, errors — so agents can avoid repeating failures. Semantic memory holds stable knowledge: limit policies, instrument metadata, approved procedures.`,
+      `Retrieval-augmented generation pulls relevant slices into the prompt. Stale or wrong memories poison decisions; versioning and TTLs matter as much as embedding quality.`,
+      `Write paths need care: not every intermediate thought deserves long-term storage, and sensitive data must respect retention and access rules.`
+    ],
+    keyPoint: "Memory makes agents cumulative rather than amnesiac. Episodic traces teach from outcomes; semantic stores enforce institutional knowledge — both must be curated."
+  },
+  {
+    era: "Eval",
+    icon: "📏",
+    title: "Agent Evaluation Frameworks",
+    desc: "Systematic tests of agent behaviour — task success, cost, latency, policy violations, and regression suites before capital is at risk",
+    badge: { label: "Evaluation", style: "teal" },
+    tags: [["evaluation","teal"], ["benchmarks","amber"], ["regressions","slate"], ["sim environment","teal"]],
+    data: [
+      { label: "Metrics", value: "Success rate, violations, $ impact, tokens", color: "teal" },
+      { label: "Methods", value: "Sim brokers, golden transcripts, A/B", color: "amber" },
+      { label: "Cadence", value: "Pre-deploy gates + ongoing monitors", color: "slate" },
+    ],
+    body: [
+      `Agents fail differently from classifiers: they may loop, skip tools, or comply with the letter of a prompt while violating desk policy. Evaluation harnesses score trajectories in simulation — paper brokers, frozen news days, adversarial prompts.`,
+      `Regression sets capture known incidents (“must not trade restricted name”). Online evaluation watches live proposals for drift in reject rates and human overrides.`,
+      `No single leaderboard replaces domain tests. Financial correctness and compliance dominate generic chatbot metrics.`
+    ],
+    keyPoint: "Agent evaluation is trajectory testing under policy constraints. If you cannot fail an agent in sim for a known bad behaviour, you will fail in production instead."
+  },
+  {
+    era: "Safety",
+    icon: "🛡️",
+    title: "Safety and Guardrails for Autonomous Agents",
+    desc: "Hard controls that bound what agents may do — allowlists, limit checks, human approval, kill switches, and immutable audit logs",
+    badge: { label: "Critical", style: "red" },
+    tags: [["guardrails","red"], ["allowlist","amber"], ["kill switch","slate"], ["audit log","teal"]],
+    data: [
+      { label: "Hard limits", value: "Notional, instruments, venues, hours", color: "red" },
+      { label: "Gates", value: "Dual control; human approve on tier", color: "amber" },
+      { label: "Break glass", value: "Kill switch; revoke tool credentials", color: "slate" },
+    ],
+    body: [
+      `Guardrails implement defence in depth: prompt policy, tool allowlists, server-side risk engines that cannot be overridden by model text, and operational kill switches. The model proposes; deterministic code disposes.`,
+      `Least-privilege credentials, rate limits, and separation between research and live execution credentials reduce blast radius. Every side-effecting call should leave an immutable audit record.`,
+      `Safety is not a one-time prompt paragraph. It is tested controls with owners, monitored like any other production risk system.`
+    ],
+    keyPoint: "Safety for trading agents is enforced in code and process, not in polite instructions. Guardrails, limits, and kill switches are the real autonomy boundary."
+  }
+];
+
+let counter = 0;
+
+function renderAll() {
+  const root = document.getElementById('entries-root');
+  entries.forEach((e, i) => {
+    const idx = counter++;
+    const tagHtml = e.tags.map(([l, s]) => `<span class="tag ${s}">${l}</span>`).join('');
+
+    const dataHtml = e.data ? `
+      <div class="data-strip">
+        ${e.data.map(d => `
+          <div class="data-cell">
+            <div class="data-cell-label">${d.label}</div>
+            <div class="data-cell-value ${d.color}">${d.value || '—'}</div>
+          </div>
+        `).join('')}
+      </div>` : '';
+
+    const compareHtml = e.compare ? `
+      <div class="compare-grid">
+        <div class="compare-box left">
+          <div class="compare-label">${e.compare.left.label}</div>
+          <p>${e.compare.left.text}</p>
+        </div>
+        <div class="compare-box right">
+          <div class="compare-label">${e.compare.right.label}</div>
+          <p>${e.compare.right.text}</p>
+        </div>
+      </div>` : '';
+
+    const noteHtml = e.note ? `
+      <div class="note-box">
+        <div class="note-label">${e.note.label}</div>
+        <p>${e.note.text}</p>
+      </div>` : '';
+
+    const bodyHtml =
+      e.body.map(p => `<p>${p}</p>`).join('') +
+      compareHtml +
+      dataHtml +
+      noteHtml +
+      `<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div>` +
+      `<div class="tags">${tagHtml}</div>`;
+
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.id = `e-${idx}`;
+    div.innerHTML = `
+      <div class="entry-card">
+        <div class="entry-header" onclick="toggle(${idx})">
+          <div class="entry-era">${e.era}</div>
+          <div class="entry-icon">${e.icon}</div>
+          <div class="entry-title-block">
+            <div class="entry-title">${e.title}</div>
+            <div class="entry-desc">${e.desc}</div>
+          </div>
+          <span class="entry-badge badge-${e.badge.style}">${e.badge.label}</span>
+          <span class="entry-toggle">▶</span>
+        </div>
+        <div class="entry-body">${bodyHtml}</div>
+      </div>
+    `;
+    root.appendChild(div);
+  });
+}
+
+function toggle(i) {
+  document.getElementById(`e-${i}`).classList.toggle('open');
+}
+
+function toggleAll(open) {
+  for (let i = 0; i < counter; i++) {
+    const el = document.getElementById(`e-${i}`);
+    if (el) open ? el.classList.add('open') : el.classList.remove('open');
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
