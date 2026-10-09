@@ -1,0 +1,1999 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bond Convexity & Fixed Income Analytics</title>
+    <style>
+      :root {
+        --bg: #f4f6f9;
+        --bg-card: #ffffff;
+        --bg-input: #ffffff;
+        --text: #111827;
+        --text-secondary: #6b7280;
+        --border: #d1d5db;
+        --accent: #1d4ed8;
+        --accent-hover: #1e40af;
+        --positive: #059669;
+        --negative: #dc2626;
+        --premium: #059669;
+        --discount: #dc2626;
+        --par: #6b7280;
+        --grid: #e5e7eb;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        --mono: ui-monospace, "SF Mono", "Roboto Mono", Consolas, monospace;
+        --sans:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+      }
+      [data-theme="dark"] {
+        --bg: #0b1220;
+        --bg-card: #111827;
+        --bg-input: #1f2937;
+        --text: #f3f4f6;
+        --text-secondary: #9ca3af;
+        --border: #374151;
+        --accent: #3b82f6;
+        --accent-hover: #60a5fa;
+        --positive: #10b981;
+        --negative: #f87171;
+        --premium: #10b981;
+        --discount: #f87171;
+        --par: #9ca3af;
+        --grid: #1f2937;
+        --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: var(--sans);
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.45;
+        font-size: 13.5px;
+        min-height: 100vh;
+      }
+      header {
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border);
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: var(--shadow);
+      }
+      header h1 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .theme-toggle {
+        background: var(--bg-input);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 6px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12.5px;
+        font-weight: 500;
+      }
+      .theme-toggle:hover {
+        background: var(--border);
+      }
+      .container {
+        max-width: 1640px;
+        margin: 0 auto;
+        padding: 14px 16px 36px;
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 1050px) {
+        .container {
+          grid-template-columns: 1fr;
+        }
+      }
+      .panel {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px;
+        box-shadow: var(--shadow);
+      }
+      .panel h2 {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.045em;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+        font-weight: 600;
+      }
+      label {
+        display: block;
+        font-size: 11.5px;
+        color: var(--text-secondary);
+        margin-bottom: 2px;
+        font-weight: 500;
+      }
+      input[type="number"],
+      input[type="text"],
+      select {
+        width: 100%;
+        padding: 6px 9px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: var(--bg-input);
+        color: var(--text);
+        font-size: 13px;
+        font-family: var(--mono);
+        margin-bottom: 9px;
+      }
+      input:focus,
+      select:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 0;
+      }
+      .btn {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        padding: 7px 12px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 12.5px;
+        font-weight: 500;
+      }
+      .btn:hover {
+        background: var(--accent-hover);
+      }
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      .btn-secondary:hover {
+        background: var(--border);
+      }
+      .btn-sm {
+        padding: 4px 9px;
+        font-size: 11.5px;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+        gap: 9px;
+        margin-bottom: 14px;
+      }
+      .kpi {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        box-shadow: var(--shadow);
+      }
+      .kpi .label {
+        font-size: 10.5px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-bottom: 3px;
+      }
+      .kpi .value {
+        font-size: 1.12rem;
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+      .tooltip {
+        position: relative;
+        display: inline-block;
+        cursor: help;
+        border-bottom: 1px dotted var(--text-secondary);
+      }
+      .tooltip .tip {
+        visibility: hidden;
+        width: 230px;
+        background: #1e293b;
+        color: #f1f5f9;
+        text-align: left;
+        border-radius: 6px;
+        padding: 7px 9px;
+        position: absolute;
+        z-index: 50;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11.5px;
+        line-height: 1.35;
+        opacity: 0;
+        transition: opacity 0.12s;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+      .tooltip:hover .tip {
+        visibility: visible;
+        opacity: 1;
+      }
+      .chart-wrap {
+        position: relative;
+        width: 100%;
+        height: 400px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      #priceYieldChart,
+      #priceMaturityChart {
+        width: 100%;
+        height: 100%;
+        display: block;
+        cursor: crosshair;
+      }
+      .chart-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: flex-end;
+        margin-bottom: 8px;
+      }
+      .chart-controls label {
+        margin-bottom: 1px;
+      }
+      .chart-controls input,
+      .chart-controls select {
+        width: auto;
+        min-width: 70px;
+        margin-bottom: 0;
+      }
+      .formula-box {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        line-height: 1.55;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        margin: 6px 0;
+      }
+      .hl-ytm {
+        background: rgba(59, 130, 246, 0.22);
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+      .hl-cpn {
+        background: rgba(16, 185, 129, 0.22);
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+      .hl-par {
+        background: rgba(245, 158, 11, 0.25);
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11.5px;
+        font-family: var(--mono);
+      }
+      th,
+      td {
+        padding: 5px 7px;
+        border: 1px solid var(--border);
+        text-align: right;
+      }
+      th {
+        background: var(--bg);
+        font-weight: 600;
+        font-size: 10.5px;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        position: sticky;
+        top: 0;
+      }
+      td:first-child,
+      th:first-child {
+        text-align: center;
+      }
+      .table-scroll {
+        max-height: 380px;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+      }
+      .indicator-bar {
+        height: 7px;
+        background: linear-gradient(
+          to right,
+          var(--discount),
+          var(--par) 50%,
+          var(--premium)
+        );
+        border-radius: 4px;
+        position: relative;
+        margin: 10px 0 5px;
+      }
+      .indicator-marker {
+        position: absolute;
+        top: -5px;
+        width: 3px;
+        height: 17px;
+        background: var(--text);
+        border-radius: 2px;
+        transform: translateX(-50%);
+      }
+      .val-status {
+        text-align: center;
+        font-weight: 600;
+        font-size: 12.5px;
+        margin-bottom: 3px;
+      }
+      .insight {
+        background: var(--bg);
+        border-left: 3px solid var(--accent);
+        padding: 8px 12px;
+        margin: 6px 0;
+        font-size: 12.5px;
+        line-height: 1.45;
+      }
+      .collapsible-header {
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        user-select: none;
+      }
+      .collapsible-header:hover {
+        color: var(--accent);
+      }
+      .collapsible-body {
+        display: none;
+      }
+      .collapsible-body.open {
+        display: block;
+      }
+      .validation-msg {
+        color: var(--negative);
+        font-size: 11.5px;
+        margin-top: -6px;
+        margin-bottom: 6px;
+        display: none;
+      }
+      .main-content {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .flex-between {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .bond-tabs {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+      .bond-tab {
+        padding: 3px 10px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11.5px;
+        background: var(--bg);
+      }
+      .bond-tab.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .footer {
+        text-align: center;
+        padding: 16px;
+        color: var(--text-secondary);
+        font-size: 11.5px;
+        border-top: 1px solid var(--border);
+        margin-top: 16px;
+      }
+      .legend {
+        display: flex;
+        gap: 14px;
+        font-size: 11.5px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .legend-swatch {
+        width: 14px;
+        height: 3px;
+        border-radius: 1px;
+      }
+      .shock-btns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin: 6px 0;
+      }
+      .shock-btn {
+        padding: 4px 9px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11.5px;
+        font-family: var(--mono);
+      }
+      .shock-btn.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .whatif-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .whatif-card {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px;
+      }
+      .whatif-card .wl {
+        font-size: 10.5px;
+        color: var(--text-secondary);
+      }
+      .whatif-card .wv {
+        font-size: 1rem;
+        font-family: var(--mono);
+        font-weight: 600;
+      }
+      .note {
+        font-size: 11.5px;
+        color: var(--text-secondary);
+        margin-top: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Bond Convexity &amp; Fixed Income Analytics</h1>
+      <button class="theme-toggle" id="themeToggle">Dark Mode</button>
+    </header>
+
+    <div class="container">
+      <aside>
+        <div class="panel">
+          <h2>Bond Parameters</h2>
+          <div class="bond-tabs" id="bondTabs"></div>
+
+          <label
+            ><span class="tooltip"
+              >Par / Face Value ($)<span class="tip"
+                >Principal repaid at maturity. Also called face value or
+                redemption amount.</span
+              ></span
+            ></label
+          >
+          <input type="number" id="parValue" value="1000" min="0.01" step="1" />
+          <div class="validation-msg" id="parErr"></div>
+
+          <label
+            ><span class="tooltip"
+              >Coupon / Interest Rate (%)<span class="tip"
+                >Annual contractual coupon rate applied to par value.</span
+              ></span
+            ></label
+          >
+          <input type="number" id="couponRate" value="5" min="0" step="0.01" />
+          <div class="validation-msg" id="couponErr"></div>
+
+          <label
+            ><span class="tooltip"
+              >Yield to Maturity – YTM (%)<span class="tip"
+                >Annualized internal rate of return implied by the current
+                price, assuming all cash flows are received.</span
+              ></span
+            ></label
+          >
+          <input type="number" id="ytm" value="4" min="-5" step="0.01" />
+          <div class="validation-msg" id="ytmErr"></div>
+
+          <label>Maturity (Years)</label>
+          <input
+            type="number"
+            id="maturity"
+            value="10"
+            min="0.25"
+            max="100"
+            step="0.25"
+          />
+          <div class="validation-msg" id="matErr"></div>
+
+          <label>Payment Frequency</label>
+          <select id="frequency">
+            <option value="1">Annual</option>
+            <option value="2" selected>Semi-Annual</option>
+            <option value="4">Quarterly</option>
+            <option value="12">Monthly</option>
+          </select>
+
+          <div class="collapsible-header" id="advToggle">
+            <span>Advanced Parameters</span><span>▸</span>
+          </div>
+          <div class="collapsible-body" id="advBody">
+            <p class="note">
+              <strong>Basic mode assumptions:</strong><br />
+              • Equal-period cash flows (period-based)<br />
+              • Settlement = start of first period<br />
+              • No accrued interest (Clean = Dirty)<br />
+              • Compounding matches payment frequency<br />
+              • Day-count effectively 30/360 periodic equivalent<br />
+              • Full principal repaid at final coupon date
+            </p>
+            <label>Settlement / Maturity Dates</label>
+            <input type="text" value="Today → Maturity + Years" disabled />
+            <label>Day-Count Convention</label>
+            <select disabled>
+              <option>Period-based (equal periods)</option>
+            </select>
+            <label>Compounding</label>
+            <select disabled>
+              <option>Periodic (standard bond)</option>
+            </select>
+          </div>
+
+          <button
+            class="btn"
+            id="resetBtn"
+            style="width: 100%; margin-top: 10px"
+          >
+            Reset to Defaults
+          </button>
+          <button
+            class="btn btn-secondary"
+            id="addBondBtn"
+            style="width: 100%; margin-top: 5px"
+          >
+            + Compare Bond (max 3)
+          </button>
+        </div>
+
+        <div class="panel" style="margin-top: 14px">
+          <h2>Bond Valuation</h2>
+          <div class="val-status" id="valStatus">—</div>
+          <div class="indicator-bar">
+            <div
+              class="indicator-marker"
+              id="valMarker"
+              style="left: 50%"
+            ></div>
+          </div>
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              font-size: 10.5px;
+              color: var(--text-secondary);
+            "
+          >
+            <span>Discount</span><span>Par</span><span>Premium</span>
+          </div>
+          <div
+            class="insight"
+            id="couponYtmInsight"
+            style="margin-top: 10px"
+          ></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <div class="kpi-grid" id="kpiGrid"></div>
+
+        <!-- Price vs Yield Chart -->
+        <div class="panel">
+          <div class="flex-between">
+            <h2 style="margin: 0">Bond Price vs Yield Curve</h2>
+            <div class="legend" id="chartLegend"></div>
+          </div>
+          <div class="chart-controls">
+            <div>
+              <label>Min Yield (%)</label
+              ><input
+                type="number"
+                id="yieldMin"
+                value="0"
+                step="0.25"
+                style="width: 68px"
+              />
+            </div>
+            <div>
+              <label>Max Yield (%)</label
+              ><input
+                type="number"
+                id="yieldMax"
+                value="12"
+                step="0.25"
+                style="width: 68px"
+              />
+            </div>
+            <div>
+              <label>Resolution</label>
+              <select id="curveRes">
+                <option value="25">25 pts</option>
+                <option value="50">50 pts</option>
+                <option value="100" selected>100 pts</option>
+                <option value="200">200 pts</option>
+              </select>
+            </div>
+            <div>
+              <label>&nbsp;</label
+              ><button class="btn btn-sm btn-secondary" id="resetZoom">
+                Reset View
+              </button>
+            </div>
+            <div style="padding-bottom: 2px">
+              <label
+                ><input type="checkbox" id="showTangent" checked /> Duration
+                Tangent</label
+              >
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="priceYieldChart"></canvas></div>
+          <p class="note">
+            Hover for YTM / Price / Δ vs current. Scroll to zoom · drag to pan.
+            Curve uses full pricing formula (convexity visible).
+          </p>
+        </div>
+
+        <!-- NEW: Price vs Maturity Chart -->
+        <div class="panel">
+          <div class="flex-between">
+            <h2 style="margin: 0">Bond Price vs Time to Maturity</h2>
+            <div class="legend" id="matLegend"></div>
+          </div>
+          <div class="chart-controls">
+            <div>
+              <label>Min Maturity (yrs)</label
+              ><input
+                type="number"
+                id="matMin"
+                value="0.25"
+                step="0.25"
+                min="0.25"
+                style="width: 72px"
+              />
+            </div>
+            <div>
+              <label>Max Maturity (yrs)</label
+              ><input
+                type="number"
+                id="matMax"
+                value="30"
+                step="1"
+                min="1"
+                style="width: 72px"
+              />
+            </div>
+            <div>
+              <label>Resolution</label>
+              <select id="matRes">
+                <option value="40">40 pts</option>
+                <option value="80" selected>80 pts</option>
+                <option value="120">120 pts</option>
+                <option value="200">200 pts</option>
+              </select>
+            </div>
+            <div>
+              <label>&nbsp;</label
+              ><button class="btn btn-sm btn-secondary" id="resetMatZoom">
+                Reset View
+              </button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="priceMaturityChart"></canvas>
+          </div>
+          <p class="note">
+            Price path as maturity changes while coupon, YTM and frequency stay
+            fixed. Hover for exact values. Scroll to zoom.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>Live Bond Pricing Formula</h2>
+          <p style="font-size: 12px; margin-bottom: 4px">Generic:</p>
+          <div class="formula-box">
+            P = Σ<sub>t=1</sub><sup>n</sup> [ C / (1 + y/m)<sup>t</sup> ] + F /
+            (1 + y/m)<sup>n</sup>
+            C = (F × c) / m
+          </div>
+          <p style="font-size: 12px; margin: 8px 0 4px">Substituted (live):</p>
+          <div class="formula-box" id="liveFormula"></div>
+          <p style="margin-top: 8px; font-size: 14px">
+            <strong>Calculated Bond Price:</strong>
+            <span
+              id="calcPrice"
+              style="
+                font-family: var(--mono);
+                font-size: 1.25rem;
+                color: var(--accent);
+              "
+            ></span>
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>What the Model Is Telling You</h2>
+          <div id="insightPanel"></div>
+        </div>
+
+        <div class="panel">
+          <div class="flex-between">
+            <h2 style="margin: 0">Yield Sensitivity Analysis</h2>
+            <button class="btn btn-sm btn-secondary" id="exportSens">
+              Export CSV
+            </button>
+          </div>
+          <p class="note">
+            Estimated = Duration-only and Duration + Convexity approximations.
+            Actual = full pricing formula.
+          </p>
+          <div class="table-scroll" style="max-height: 300px">
+            <table id="sensTable">
+              <thead>
+                <tr>
+                  <th>Yield Change</th>
+                  <th>New YTM</th>
+                  <th>Dur-only Est.</th>
+                  <th>Dur+Conv Est.</th>
+                  <th>Actual Price</th>
+                  <th>Actual ΔP</th>
+                  <th>Actual ΔP %</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>What-If Analysis – Yield Shock</h2>
+          <div class="shock-btns" id="shockBtns">
+            <button class="shock-btn" data-bps="-200">−200 bps</button>
+            <button class="shock-btn" data-bps="-100">−100 bps</button>
+            <button class="shock-btn" data-bps="-50">−50 bps</button>
+            <button class="shock-btn" data-bps="-25">−25 bps</button>
+            <button class="shock-btn active" data-bps="0">0 bps</button>
+            <button class="shock-btn" data-bps="25">+25 bps</button>
+            <button class="shock-btn" data-bps="50">+50 bps</button>
+            <button class="shock-btn" data-bps="100">+100 bps</button>
+            <button class="shock-btn" data-bps="200">+200 bps</button>
+          </div>
+          <div class="whatif-grid" id="whatIfGrid"></div>
+        </div>
+
+        <div class="panel">
+          <div class="flex-between">
+            <h2 style="margin: 0">Bond Cash Flow &amp; Valuation Schedule</h2>
+            <button class="btn btn-sm btn-secondary" id="exportCF">
+              Export CSV
+            </button>
+          </div>
+          <p class="note" id="cfSummary"></p>
+          <div class="table-scroll">
+            <table id="cfTable">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Approx Date</th>
+                  <th>Time (yrs)</th>
+                  <th>Beg. Principal</th>
+                  <th>Cpn Rate</th>
+                  <th>Coupon</th>
+                  <th>Principal</th>
+                  <th>Total CF</th>
+                  <th>DF</th>
+                  <th>PV</th>
+                  <th>% Price</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+              <tfoot></tfoot>
+            </table>
+          </div>
+          <div
+            style="
+              display: flex;
+              gap: 20px;
+              margin-top: 8px;
+              flex-wrap: wrap;
+              font-family: var(--mono);
+              font-size: 12.5px;
+            "
+          >
+            <div>Total PV Coupons: <strong id="pvCoupons">—</strong></div>
+            <div>PV Principal: <strong id="pvPrincipal">—</strong></div>
+            <div>Bond Price: <strong id="pvTotal">—</strong></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="collapsible-header" id="mathToggle">
+            <h2 style="margin: 0">Bond Mathematics</h2>
+            <span>▸</span>
+          </div>
+          <div class="collapsible-body" id="mathBody">
+            <div class="formula-box" style="font-size: 12px">
+              <strong>Bond Price</strong>
+              P = Σ CF<sub>t</sub> / (1+y/m)<sup>t</sup>
+
+              <strong>Periodic Coupon</strong>
+              C = (F × c) / m
+
+              <strong>Current Yield</strong>
+              Annual Coupon / Price
+
+              <strong>Macaulay Duration (years)</strong>
+              D<sub>M</sub> = [Σ t × PV(CF<sub>t</sub>)] / (P × m)
+
+              <strong>Modified Duration</strong>
+              D<sub>Mod</sub> = D<sub>M</sub> / (1 + y/m)
+
+              <strong>Convexity</strong>
+              Conv = (1/P) × Σ [ CF<sub>t</sub> × t(t+1) / (m²
+              (1+y/m)<sup>t+2</sup>) ]
+
+              <strong>Approx. Price Change</strong>
+              ΔP/P ≈ −D<sub>Mod</sub> Δy + ½ Conv (Δy)²
+            </div>
+            <p class="note">
+              All metrics are derived from the same cash-flow engine. Frequency
+              changes n = years × m and the periodic coupon.
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <footer class="footer">
+      Standalone Bond Pricing · Duration · Convexity Terminal · Client-side only
+      · Educational / professional reference
+    </footer>
+
+    <script>
+      (function () {
+        "use strict";
+
+        const COLORS = ["#3b82f6", "#10b981", "#f59e0b"];
+
+        const state = {
+          bonds: [
+            {
+              id: 0,
+              name: "Bond A",
+              par: 1000,
+              coupon: 0.05,
+              ytm: 0.04,
+              maturity: 10,
+              freq: 2,
+              color: COLORS[0],
+            },
+          ],
+          activeBond: 0,
+          yieldMin: 0,
+          yieldMax: 0.12,
+          resolution: 100,
+          showTangent: true,
+          shockBps: 0,
+          chartZoom: { xMin: null, xMax: null, yMin: null, yMax: null },
+          // maturity chart state
+          matMin: 0.25,
+          matMax: 30,
+          matRes: 80,
+          matZoom: { xMin: null, xMax: null, yMin: null, yMax: null },
+          isDragging: false,
+          lastMouse: null,
+        };
+
+        // ---------- formatting ----------
+        function fmt(n, d = 2) {
+          if (!isFinite(n)) return "—";
+          return n.toLocaleString(undefined, {
+            minimumFractionDigits: d,
+            maximumFractionDigits: d,
+          });
+        }
+        function fmtPct(n, d = 2) {
+          if (!isFinite(n)) return "—";
+          return (
+            (n * 100).toLocaleString(undefined, {
+              minimumFractionDigits: d,
+              maximumFractionDigits: d,
+            }) + "%"
+          );
+        }
+        function fmtBps(n) {
+          if (!isFinite(n)) return "—";
+          const s = n >= 0 ? "+" : "";
+          return s + Math.round(n) + " bps";
+        }
+        function money(n) {
+          if (!isFinite(n)) return "—";
+          return "$" + fmt(n, 2);
+        }
+
+        // ---------- core bond engine ----------
+        function getCashFlows(bond) {
+          const m = bond.freq;
+          const n = Math.max(1, Math.round(bond.maturity * m));
+          const c = bond.coupon;
+          const F = bond.par;
+          const C = (F * c) / m;
+          const flows = [];
+          for (let t = 1; t <= n; t++) {
+            const principal = t === n ? F : 0;
+            flows.push({
+              t,
+              timeYrs: t / m,
+              coupon: C,
+              principal,
+              total: C + principal,
+            });
+          }
+          return flows;
+        }
+
+        function priceBond(bond, ytmOverride, maturityOverride) {
+          const y = ytmOverride !== undefined ? ytmOverride : bond.ytm;
+          const mat =
+            maturityOverride !== undefined ? maturityOverride : bond.maturity;
+          const temp = Object.assign({}, bond, { maturity: mat });
+          const m = temp.freq;
+          const flows = getCashFlows(temp);
+          let price = 0;
+          const periodRate = y / m;
+          flows.forEach((f) => {
+            const df = 1 / Math.pow(1 + periodRate, f.t);
+            price += f.total * df;
+          });
+          return price;
+        }
+
+        function analytics(bond, ytmOverride) {
+          const y = ytmOverride !== undefined ? ytmOverride : bond.ytm;
+          const m = bond.freq;
+          const flows = getCashFlows(bond);
+          const periodRate = y / m;
+          let price = 0;
+          let sumT_PV = 0;
+          let sumT2_PV = 0;
+          let pvCoupons = 0;
+          let pvPrincipal = 0;
+
+          flows.forEach((f) => {
+            const df = 1 / Math.pow(1 + periodRate, f.t);
+            const pv = f.total * df;
+            price += pv;
+            sumT_PV += f.t * pv;
+            sumT2_PV += f.t * (f.t + 1) * pv;
+            if (f.principal > 0) {
+              pvPrincipal += f.principal * df;
+              pvCoupons += f.coupon * df;
+            } else {
+              pvCoupons += pv;
+            }
+          });
+
+          const mac = price > 0 ? sumT_PV / (price * m) : 0;
+          const mod = price > 0 ? mac / (1 + periodRate) : 0;
+          const conv =
+            price > 0
+              ? sumT2_PV / (price * m * m * Math.pow(1 + periodRate, 2))
+              : 0;
+
+          const annualCoupon = bond.par * bond.coupon;
+          const currentYield = price > 0 ? annualCoupon / price : 0;
+
+          return {
+            price,
+            macDuration: mac,
+            modDuration: mod,
+            convexity: conv,
+            currentYield,
+            pvCoupons,
+            pvPrincipal,
+            flows,
+            ytm: y,
+          };
+        }
+
+        // ---------- validation ----------
+        function validateInputs() {
+          let ok = true;
+          const par = parseFloat(document.getElementById("parValue").value);
+          const cpn = parseFloat(document.getElementById("couponRate").value);
+          const ytm = parseFloat(document.getElementById("ytm").value);
+          const mat = parseFloat(document.getElementById("maturity").value);
+
+          const showErr = (id, msg) => {
+            const el = document.getElementById(id);
+            if (msg) {
+              el.textContent = msg;
+              el.style.display = "block";
+              ok = false;
+            } else {
+              el.style.display = "none";
+            }
+          };
+
+          showErr("parErr", !isFinite(par) || par <= 0 ? "Must be > 0" : "");
+          showErr("couponErr", !isFinite(cpn) || cpn < 0 ? "Must be ≥ 0" : "");
+          showErr("ytmErr", !isFinite(ytm) ? "Invalid number" : "");
+          showErr(
+            "matErr",
+            !isFinite(mat) || mat < 0.25 || mat > 100 ? "0.25 – 100 years" : "",
+          );
+          return ok;
+        }
+
+        // ---------- state sync ----------
+        function readInputsToActive() {
+          if (!validateInputs()) return false;
+          const b = state.bonds[state.activeBond];
+          b.par = parseFloat(document.getElementById("parValue").value);
+          b.coupon =
+            parseFloat(document.getElementById("couponRate").value) / 100;
+          b.ytm = parseFloat(document.getElementById("ytm").value) / 100;
+          b.maturity = parseFloat(document.getElementById("maturity").value);
+          b.freq = parseInt(document.getElementById("frequency").value, 10);
+          return true;
+        }
+
+        function writeActiveToInputs() {
+          const b = state.bonds[state.activeBond];
+          document.getElementById("parValue").value = b.par;
+          document.getElementById("couponRate").value = (
+            b.coupon * 100
+          ).toFixed(2);
+          document.getElementById("ytm").value = (b.ytm * 100).toFixed(2);
+          document.getElementById("maturity").value = b.maturity;
+          document.getElementById("frequency").value = String(b.freq);
+        }
+
+        // ---------- UI builders ----------
+        function renderTabs() {
+          const container = document.getElementById("bondTabs");
+          container.innerHTML = "";
+          state.bonds.forEach((b, i) => {
+            const tab = document.createElement("div");
+            tab.className =
+              "bond-tab" + (i === state.activeBond ? " active" : "");
+            tab.textContent = b.name;
+            tab.style.borderColor = b.color;
+            if (i === state.activeBond) tab.style.background = b.color;
+            tab.onclick = () => {
+              if (readInputsToActive()) {
+                state.activeBond = i;
+                writeActiveToInputs();
+                updateAll();
+              }
+            };
+            container.appendChild(tab);
+          });
+        }
+
+        function renderKPIs() {
+          const grid = document.getElementById("kpiGrid");
+          grid.innerHTML = "";
+          state.bonds.forEach((b) => {
+            const a = analytics(b);
+            const items = [
+              {
+                label: b.name + " Price",
+                value: money(a.price),
+                color: b.color,
+              },
+              { label: "Mod Duration", value: fmt(a.modDuration, 3) + " yrs" },
+              { label: "Macaulay Dur", value: fmt(a.macDuration, 3) + " yrs" },
+              { label: "Convexity", value: fmt(a.convexity, 2) },
+              { label: "Current Yield", value: fmtPct(a.currentYield) },
+              { label: "YTM", value: fmtPct(b.ytm) },
+            ];
+            items.forEach((it) => {
+              const div = document.createElement("div");
+              div.className = "kpi";
+              div.innerHTML = `<div class="label">${it.label}</div><div class="value" style="${it.color ? "color:" + it.color : ""}">${it.value}</div>`;
+              grid.appendChild(div);
+            });
+          });
+        }
+
+        function updateValuationPanel() {
+          const b = state.bonds[state.activeBond];
+          const a = analytics(b);
+          const status = document.getElementById("valStatus");
+          const marker = document.getElementById("valMarker");
+          const insight = document.getElementById("couponYtmInsight");
+
+          let pct = 50;
+          let label = "Par";
+          let color = "var(--par)";
+          if (a.price > b.par * 1.002) {
+            label = "Premium";
+            color = "var(--premium)";
+            pct = 50 + Math.min(50, (a.price / b.par - 1) * 250);
+          } else if (a.price < b.par * 0.998) {
+            label = "Discount";
+            color = "var(--discount)";
+            pct = 50 - Math.min(50, (1 - a.price / b.par) * 250);
+          }
+          status.textContent = label + "  ·  " + money(a.price);
+          status.style.color = color;
+          marker.style.left = pct + "%";
+
+          const cpn = b.coupon * 100;
+          const y = b.ytm * 100;
+          let text = "";
+          if (Math.abs(cpn - y) < 0.05) {
+            text = `Coupon ≈ YTM → bond trades near par.`;
+          } else if (cpn > y) {
+            text = `Coupon (${fmt(cpn)}%) > YTM (${fmt(y)}%) → investors pay a premium for the higher contractual cash flows.`;
+          } else {
+            text = `Coupon (${fmt(cpn)}%) < YTM (${fmt(y)}%) → bond must trade at a discount so that the lower coupons still deliver the market yield.`;
+          }
+          insight.textContent = text;
+        }
+
+        function updateLiveFormula() {
+          const b = state.bonds[state.activeBond];
+          const m = b.freq;
+          const n = Math.round(b.maturity * m);
+          const C = (b.par * b.coupon) / m;
+          const y = b.ytm;
+          const box = document.getElementById("liveFormula");
+          box.innerHTML = `P = Σ<sub>t=1</sub><sup>${n}</sup> [ <span class="hl-cpn">${fmt(C, 4)}</span> / (1 + <span class="hl-ytm">${fmtPct(y)}</span>/${m})<sup>t</sup> ]
+  + <span class="hl-par">${fmt(b.par, 2)}</span> / (1 + <span class="hl-ytm">${fmtPct(y)}</span>/${m})<sup>${n}</sup>`;
+
+          const price = priceBond(b);
+          document.getElementById("calcPrice").textContent = money(price);
+        }
+
+        function updateInsights() {
+          const panel = document.getElementById("insightPanel");
+          const b = state.bonds[state.activeBond];
+          const a = analytics(b);
+          const dy = 0.01;
+          const pUp = priceBond(b, b.ytm - dy);
+          const pDown = priceBond(b, b.ytm + dy);
+          const approxDur = -a.modDuration * dy * a.price;
+          const approxConv = 0.5 * a.convexity * dy * dy * a.price;
+
+          panel.innerHTML = `
+      <div class="insight">
+        <strong>Duration</strong> tells you the first-order (linear) sensitivity.
+        A parallel +100 bp rise in yields is expected to change price by roughly
+        <strong>${money(approxDur)}</strong> (−ModDur × Δy × P).
+      </div>
+      <div class="insight">
+        <strong>Convexity</strong> is the second-order curvature term.
+        The +½·Conv·(Δy)² adjustment for a 100 bp move is approximately
+        <strong>${money(approxConv)}</strong> (always positive for a vanilla bond).
+      </div>
+      <div class="insight">
+        Actual full-reprice for −100 bp / +100 bp:
+        <strong>${money(pUp)}</strong> / <strong>${money(pDown)}</strong>.
+        The duration-only estimate understates the upside and overstates the downside —
+        that asymmetry is exactly what positive convexity buys you.
+      </div>
+      <div class="insight">
+        Higher coupon or shorter maturity → lower duration & lower convexity.
+        Lower coupon / longer maturity → higher interest-rate risk and more curvature.
+      </div>`;
+        }
+
+        function updateSensitivityTable() {
+          const b = state.bonds[state.activeBond];
+          const a = analytics(b);
+          const tbody = document.querySelector("#sensTable tbody");
+          tbody.innerHTML = "";
+          const shocks = [-200, -100, -50, -25, 0, 25, 50, 100, 200];
+          shocks.forEach((bps) => {
+            const dy = bps / 10000;
+            const newY = b.ytm + dy;
+            const actual = priceBond(b, newY);
+            const dP = actual - a.price;
+            const dPpct = a.price ? dP / a.price : 0;
+            const durOnly = a.price * (-a.modDuration * dy);
+            const durConv =
+              a.price * (-a.modDuration * dy + 0.5 * a.convexity * dy * dy);
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+        <td>${fmtBps(bps)}</td>
+        <td>${fmtPct(newY)}</td>
+        <td>${money(a.price + durOnly)}</td>
+        <td>${money(a.price + durConv)}</td>
+        <td>${money(actual)}</td>
+        <td style="color:${dP >= 0 ? "var(--positive)" : "var(--negative)"}">${money(dP)}</td>
+        <td style="color:${dPpct >= 0 ? "var(--positive)" : "var(--negative)"}">${fmtPct(dPpct, 3)}</td>`;
+            tbody.appendChild(tr);
+          });
+        }
+
+        function updateWhatIf() {
+          const b = state.bonds[state.activeBond];
+          const base = analytics(b);
+          const dy = state.shockBps / 10000;
+          const shocked = analytics(b, b.ytm + dy);
+          const grid = document.getElementById("whatIfGrid");
+          const dP = shocked.price - base.price;
+          const dPpct = base.price ? dP / base.price : 0;
+          grid.innerHTML = `
+      <div class="whatif-card"><div class="wl">New YTM</div><div class="wv">${fmtPct(shocked.ytm)}</div></div>
+      <div class="whatif-card"><div class="wl">New Price</div><div class="wv">${money(shocked.price)}</div></div>
+      <div class="whatif-card"><div class="wl">Δ Price</div><div class="wv" style="color:${dP >= 0 ? "var(--positive)" : "var(--negative)"}">${money(dP)}</div></div>
+      <div class="whatif-card"><div class="wl">Δ Price %</div><div class="wv" style="color:${dPpct >= 0 ? "var(--positive)" : "var(--negative)"}">${fmtPct(dPpct, 3)}</div></div>
+      <div class="whatif-card"><div class="wl">Mod Duration</div><div class="wv">${fmt(shocked.modDuration, 3)}</div></div>
+      <div class="whatif-card"><div class="wl">Convexity</div><div class="wv">${fmt(shocked.convexity, 2)}</div></div>`;
+        }
+
+        function updateCashFlowTable() {
+          const b = state.bonds[state.activeBond];
+          const a = analytics(b);
+          const tbody = document.querySelector("#cfTable tbody");
+          tbody.innerHTML = "";
+
+          const start = new Date();
+          a.flows.forEach((f) => {
+            const df = 1 / Math.pow(1 + b.ytm / b.freq, f.t);
+            const pv = f.total * df;
+            const d = new Date(start);
+            d.setMonth(d.getMonth() + Math.round((f.t / b.freq) * 12));
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+        <td>${f.t}</td>
+        <td>${d.toISOString().slice(0, 10)}</td>
+        <td>${fmt(f.timeYrs, 3)}</td>
+        <td>${money(b.par)}</td>
+        <td>${fmtPct(b.coupon)}</td>
+        <td>${money(f.coupon)}</td>
+        <td>${money(f.principal)}</td>
+        <td>${money(f.total)}</td>
+        <td>${fmt(df, 6)}</td>
+        <td>${money(pv)}</td>
+        <td>${fmtPct(a.price ? pv / a.price : 0, 2)}</td>`;
+            tbody.appendChild(tr);
+          });
+
+          document.getElementById("pvCoupons").textContent = money(a.pvCoupons);
+          document.getElementById("pvPrincipal").textContent = money(
+            a.pvPrincipal,
+          );
+          document.getElementById("pvTotal").textContent = money(a.price);
+          document.getElementById("cfSummary").textContent =
+            `${a.flows.length} periods · ${b.freq}× per year · settlement assumed at start of first period`;
+        }
+
+        // ---------- charts ----------
+        let chartHover = null;
+        let matHover = null;
+
+        function drawChart() {
+          const canvas = document.getElementById("priceYieldChart");
+          const ctx = canvas.getContext("2d");
+          const dpr = window.devicePixelRatio || 1;
+          const rect = canvas.parentElement.getBoundingClientRect();
+          canvas.width = rect.width * dpr;
+          canvas.height = rect.height * dpr;
+          canvas.style.width = rect.width + "px";
+          canvas.style.height = rect.height + "px";
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          const W = rect.width;
+          const H = rect.height;
+          const pad = { l: 58, r: 20, t: 20, b: 40 };
+
+          const xMin =
+            state.chartZoom.xMin !== null
+              ? state.chartZoom.xMin
+              : state.yieldMin;
+          const xMax =
+            state.chartZoom.xMax !== null
+              ? state.chartZoom.xMax
+              : state.yieldMax;
+
+          let yMin = Infinity,
+            yMax = -Infinity;
+          const curves = state.bonds.map((b) => {
+            const pts = [];
+            for (let i = 0; i <= state.resolution; i++) {
+              const y = xMin + (xMax - xMin) * (i / state.resolution);
+              const p = priceBond(b, y);
+              pts.push({ y, p });
+              if (p < yMin) yMin = p;
+              if (p > yMax) yMax = p;
+            }
+            return { bond: b, pts };
+          });
+          if (state.chartZoom.yMin !== null) {
+            yMin = state.chartZoom.yMin;
+            yMax = state.chartZoom.yMax;
+          } else {
+            const span = yMax - yMin || 1;
+            yMin -= span * 0.08;
+            yMax += span * 0.08;
+          }
+
+          function xScale(y) {
+            return pad.l + ((y - xMin) / (xMax - xMin)) * (W - pad.l - pad.r);
+          }
+          function yScale(p) {
+            return (
+              pad.t + (1 - (p - yMin) / (yMax - yMin)) * (H - pad.t - pad.b)
+            );
+          }
+
+          ctx.fillStyle =
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--bg-card")
+              .trim() || "#fff";
+          ctx.fillRect(0, 0, W, H);
+
+          ctx.strokeStyle =
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--grid")
+              .trim() || "#e5e7eb";
+          ctx.lineWidth = 1;
+          ctx.font =
+            "11px " +
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--mono")
+              .trim();
+          ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue("--text-secondary")
+            .trim();
+
+          for (let i = 0; i <= 6; i++) {
+            const y = xMin + (xMax - xMin) * (i / 6);
+            const x = xScale(y);
+            ctx.beginPath();
+            ctx.moveTo(x, pad.t);
+            ctx.lineTo(x, H - pad.b);
+            ctx.stroke();
+            ctx.fillText(fmt(y * 100, 1) + "%", x - 12, H - pad.b + 16);
+          }
+          for (let i = 0; i <= 5; i++) {
+            const p = yMin + (yMax - yMin) * (i / 5);
+            const yy = yScale(p);
+            ctx.beginPath();
+            ctx.moveTo(pad.l, yy);
+            ctx.lineTo(W - pad.r, yy);
+            ctx.stroke();
+            ctx.fillText(fmt(p, 0), 4, yy + 3);
+          }
+
+          curves.forEach((c) => {
+            ctx.beginPath();
+            ctx.strokeStyle = c.bond.color;
+            ctx.lineWidth = 2.2;
+            c.pts.forEach((pt, i) => {
+              const x = xScale(pt.y);
+              const y = yScale(pt.p);
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            const curP = priceBond(c.bond);
+            ctx.beginPath();
+            ctx.arc(xScale(c.bond.ytm), yScale(curP), 5, 0, Math.PI * 2);
+            ctx.fillStyle = c.bond.color;
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            if (state.showTangent && c.bond === state.bonds[state.activeBond]) {
+              const a = analytics(c.bond);
+              const slope = -a.modDuration * curP;
+              const y1 = c.bond.ytm - 0.03;
+              const y2 = c.bond.ytm + 0.03;
+              const pL = curP + slope * (y1 - c.bond.ytm);
+              const pR = curP + slope * (y2 - c.bond.ytm);
+              ctx.beginPath();
+              ctx.setLineDash([5, 4]);
+              ctx.strokeStyle = c.bond.color;
+              ctx.globalAlpha = 0.7;
+              ctx.lineWidth = 1.5;
+              ctx.moveTo(xScale(y1), yScale(pL));
+              ctx.lineTo(xScale(y2), yScale(pR));
+              ctx.stroke();
+              ctx.setLineDash([]);
+              ctx.globalAlpha = 1;
+            }
+          });
+
+          if (chartHover) {
+            const { mx, my, ytm, price, bond } = chartHover;
+            ctx.strokeStyle = getComputedStyle(document.documentElement)
+              .getPropertyValue("--text-secondary")
+              .trim();
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(mx, pad.t);
+            ctx.lineTo(mx, H - pad.b);
+            ctx.moveTo(pad.l, my);
+            ctx.lineTo(W - pad.r, my);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            const lines = [
+              `YTM ${fmtPct(ytm)}`,
+              `Price ${money(price)}`,
+              `Δ ${money(price - priceBond(bond))} vs current`,
+            ];
+            const tw = 130,
+              th = 52;
+            let tx = mx + 12,
+              ty = my - th - 8;
+            if (tx + tw > W - 5) tx = mx - tw - 12;
+            if (ty < 5) ty = my + 12;
+            ctx.fillStyle = "rgba(15,23,42,0.92)";
+            ctx.fillRect(tx, ty, tw, th);
+            ctx.fillStyle = "#f1f5f9";
+            ctx.font =
+              "11.5px " +
+              getComputedStyle(document.documentElement)
+                .getPropertyValue("--mono")
+                .trim();
+            lines.forEach((ln, i) =>
+              ctx.fillText(ln, tx + 8, ty + 16 + i * 14),
+            );
+          }
+
+          ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue("--text-secondary")
+            .trim();
+          ctx.font = "11px sans-serif";
+          ctx.fillText("Yield to Maturity", W / 2 - 40, H - 6);
+        }
+
+        // ---------- NEW: Price vs Maturity chart ----------
+        function drawMaturityChart() {
+          const canvas = document.getElementById("priceMaturityChart");
+          const ctx = canvas.getContext("2d");
+          const dpr = window.devicePixelRatio || 1;
+          const rect = canvas.parentElement.getBoundingClientRect();
+          canvas.width = rect.width * dpr;
+          canvas.height = rect.height * dpr;
+          canvas.style.width = rect.width + "px";
+          canvas.style.height = rect.height + "px";
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          const W = rect.width;
+          const H = rect.height;
+          const pad = { l: 58, r: 20, t: 20, b: 40 };
+
+          const xMin =
+            state.matZoom.xMin !== null ? state.matZoom.xMin : state.matMin;
+          const xMax =
+            state.matZoom.xMax !== null ? state.matZoom.xMax : state.matMax;
+
+          let yMin = Infinity,
+            yMax = -Infinity;
+          const curves = state.bonds.map((b) => {
+            const pts = [];
+            for (let i = 0; i <= state.matRes; i++) {
+              const mat = xMin + (xMax - xMin) * (i / state.matRes);
+              const p = priceBond(b, undefined, mat);
+              pts.push({ mat, p });
+              if (p < yMin) yMin = p;
+              if (p > yMax) yMax = p;
+            }
+            return { bond: b, pts };
+          });
+
+          if (state.matZoom.yMin !== null) {
+            yMin = state.matZoom.yMin;
+            yMax = state.matZoom.yMax;
+          } else {
+            const span = yMax - yMin || 1;
+            yMin -= span * 0.08;
+            yMax += span * 0.08;
+          }
+
+          function xScale(m) {
+            return pad.l + ((m - xMin) / (xMax - xMin)) * (W - pad.l - pad.r);
+          }
+          function yScale(p) {
+            return (
+              pad.t + (1 - (p - yMin) / (yMax - yMin)) * (H - pad.t - pad.b)
+            );
+          }
+
+          ctx.fillStyle =
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--bg-card")
+              .trim() || "#fff";
+          ctx.fillRect(0, 0, W, H);
+
+          ctx.strokeStyle =
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--grid")
+              .trim() || "#e5e7eb";
+          ctx.lineWidth = 1;
+          ctx.font =
+            "11px " +
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--mono")
+              .trim();
+          ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue("--text-secondary")
+            .trim();
+
+          for (let i = 0; i <= 6; i++) {
+            const m = xMin + (xMax - xMin) * (i / 6);
+            const x = xScale(m);
+            ctx.beginPath();
+            ctx.moveTo(x, pad.t);
+            ctx.lineTo(x, H - pad.b);
+            ctx.stroke();
+            ctx.fillText(fmt(m, 1), x - 10, H - pad.b + 16);
+          }
+          for (let i = 0; i <= 5; i++) {
+            const p = yMin + (yMax - yMin) * (i / 5);
+            const yy = yScale(p);
+            ctx.beginPath();
+            ctx.moveTo(pad.l, yy);
+            ctx.lineTo(W - pad.r, yy);
+            ctx.stroke();
+            ctx.fillText(fmt(p, 0), 4, yy + 3);
+          }
+
+          curves.forEach((c) => {
+            ctx.beginPath();
+            ctx.strokeStyle = c.bond.color;
+            ctx.lineWidth = 2.2;
+            c.pts.forEach((pt, i) => {
+              const x = xScale(pt.mat);
+              const y = yScale(pt.p);
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // current maturity marker
+            const curP = priceBond(c.bond);
+            ctx.beginPath();
+            ctx.arc(xScale(c.bond.maturity), yScale(curP), 5, 0, Math.PI * 2);
+            ctx.fillStyle = c.bond.color;
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          });
+
+          if (matHover) {
+            const { mx, my, mat, price, bond } = matHover;
+            ctx.strokeStyle = getComputedStyle(document.documentElement)
+              .getPropertyValue("--text-secondary")
+              .trim();
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(mx, pad.t);
+            ctx.lineTo(mx, H - pad.b);
+            ctx.moveTo(pad.l, my);
+            ctx.lineTo(W - pad.r, my);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            const lines = [
+              `Maturity ${fmt(mat, 2)} yrs`,
+              `Price ${money(price)}`,
+              `Δ ${money(price - priceBond(bond))} vs current`,
+            ];
+            const tw = 140,
+              th = 52;
+            let tx = mx + 12,
+              ty = my - th - 8;
+            if (tx + tw > W - 5) tx = mx - tw - 12;
+            if (ty < 5) ty = my + 12;
+            ctx.fillStyle = "rgba(15,23,42,0.92)";
+            ctx.fillRect(tx, ty, tw, th);
+            ctx.fillStyle = "#f1f5f9";
+            ctx.font =
+              "11.5px " +
+              getComputedStyle(document.documentElement)
+                .getPropertyValue("--mono")
+                .trim();
+            lines.forEach((ln, i) =>
+              ctx.fillText(ln, tx + 8, ty + 16 + i * 14),
+            );
+          }
+
+          ctx.fillStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue("--text-secondary")
+            .trim();
+          ctx.font = "11px sans-serif";
+          ctx.fillText("Time to Maturity (years)", W / 2 - 55, H - 6);
+        }
+
+        function updateLegend() {
+          const leg = document.getElementById("chartLegend");
+          leg.innerHTML = "";
+          state.bonds.forEach((b) => {
+            const item = document.createElement("div");
+            item.className = "legend-item";
+            item.innerHTML = `<span class="legend-swatch" style="background:${b.color}"></span>${b.name}`;
+            leg.appendChild(item);
+          });
+
+          const matLeg = document.getElementById("matLegend");
+          matLeg.innerHTML = "";
+          state.bonds.forEach((b) => {
+            const item = document.createElement("div");
+            item.className = "legend-item";
+            item.innerHTML = `<span class="legend-swatch" style="background:${b.color}"></span>${b.name}`;
+            matLeg.appendChild(item);
+          });
+        }
+
+        // ---------- master update ----------
+        function updateAll() {
+          if (!readInputsToActive()) return;
+          renderTabs();
+          renderKPIs();
+          updateValuationPanel();
+          updateLiveFormula();
+          updateInsights();
+          updateSensitivityTable();
+          updateWhatIf();
+          updateCashFlowTable();
+          updateLegend();
+          drawChart();
+          drawMaturityChart();
+        }
+
+        // ---------- event wiring ----------
+        function bindEvents() {
+          ["parValue", "couponRate", "ytm", "maturity", "frequency"].forEach(
+            (id) => {
+              document.getElementById(id).addEventListener("input", () => {
+                if (readInputsToActive()) updateAll();
+              });
+              document.getElementById(id).addEventListener("change", () => {
+                if (readInputsToActive()) updateAll();
+              });
+            },
+          );
+
+          document
+            .getElementById("yieldMin")
+            .addEventListener("change", (e) => {
+              state.yieldMin = parseFloat(e.target.value) / 100;
+              state.chartZoom.xMin = null;
+              drawChart();
+            });
+          document
+            .getElementById("yieldMax")
+            .addEventListener("change", (e) => {
+              state.yieldMax = parseFloat(e.target.value) / 100;
+              state.chartZoom.xMax = null;
+              drawChart();
+            });
+          document
+            .getElementById("curveRes")
+            .addEventListener("change", (e) => {
+              state.resolution = parseInt(e.target.value, 10);
+              drawChart();
+            });
+          document
+            .getElementById("showTangent")
+            .addEventListener("change", (e) => {
+              state.showTangent = e.target.checked;
+              drawChart();
+            });
+          document.getElementById("resetZoom").addEventListener("click", () => {
+            state.chartZoom = {
+              xMin: null,
+              xMax: null,
+              yMin: null,
+              yMax: null,
+            };
+            drawChart();
+          });
+
+          // maturity chart controls
+          document.getElementById("matMin").addEventListener("change", (e) => {
+            state.matMin = Math.max(0.25, parseFloat(e.target.value) || 0.25);
+            state.matZoom.xMin = null;
+            drawMaturityChart();
+          });
+          document.getElementById("matMax").addEventListener("change", (e) => {
+            state.matMax = Math.max(1, parseFloat(e.target.value) || 30);
+            state.matZoom.xMax = null;
+            drawMaturityChart();
+          });
+          document.getElementById("matRes").addEventListener("change", (e) => {
+            state.matRes = parseInt(e.target.value, 10);
+            drawMaturityChart();
+          });
+          document
+            .getElementById("resetMatZoom")
+            .addEventListener("click", () => {
+              state.matZoom = {
+                xMin: null,
+                xMax: null,
+                yMin: null,
+                yMax: null,
+              };
+              drawMaturityChart();
+            });
+
+          // theme
+          document
+            .getElementById("themeToggle")
+            .addEventListener("click", () => {
+              const html = document.documentElement;
+              const dark = html.getAttribute("data-theme") === "dark";
+              html.setAttribute("data-theme", dark ? "" : "dark");
+              document.getElementById("themeToggle").textContent = dark
+                ? "Dark Mode"
+                : "Light Mode";
+              drawChart();
+              drawMaturityChart();
+            });
+
+          // collapsibles
+          document.getElementById("advToggle").addEventListener("click", () => {
+            const body = document.getElementById("advBody");
+            body.classList.toggle("open");
+            document
+              .getElementById("advToggle")
+              .querySelector("span:last-child").textContent =
+              body.classList.contains("open") ? "▾" : "▸";
+          });
+          document
+            .getElementById("mathToggle")
+            .addEventListener("click", () => {
+              const body = document.getElementById("mathBody");
+              body.classList.toggle("open");
+              document
+                .getElementById("mathToggle")
+                .querySelector("span:last-child").textContent =
+                body.classList.contains("open") ? "▾" : "▸";
+            });
+
+          // reset
+          document.getElementById("resetBtn").addEventListener("click", () => {
+            const b = state.bonds[state.activeBond];
+            b.par = 1000;
+            b.coupon = 0.05;
+            b.ytm = 0.04;
+            b.maturity = 10;
+            b.freq = 2;
+            writeActiveToInputs();
+            updateAll();
+          });
+
+          // add bond
+          document
+            .getElementById("addBondBtn")
+            .addEventListener("click", () => {
+              if (state.bonds.length >= 3) return;
+              const id = state.bonds.length;
+              const names = ["Bond A", "Bond B", "Bond C"];
+              state.bonds.push({
+                id,
+                name: names[id],
+                par: 1000,
+                coupon: 0.04 + id * 0.01,
+                ytm: 0.045,
+                maturity: 8 + id * 2,
+                freq: 2,
+                color: COLORS[id],
+              });
+              state.activeBond = id;
+              writeActiveToInputs();
+              updateAll();
+            });
+
+          // shock buttons
+          document.querySelectorAll(".shock-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              document
+                .querySelectorAll(".shock-btn")
+                .forEach((b) => b.classList.remove("active"));
+              btn.classList.add("active");
+              state.shockBps = parseInt(btn.dataset.bps, 10);
+              updateWhatIf();
+            });
+          });
+
+          // exports
+          document
+            .getElementById("exportSens")
+            .addEventListener("click", () => {
+              const rows = [
+                [
+                  "Yield Change (bps)",
+                  "New YTM",
+                  "Dur-only",
+                  "Dur+Conv",
+                  "Actual",
+                  "ΔP",
+                  "ΔP %",
+                ],
+              ];
+              document.querySelectorAll("#sensTable tbody tr").forEach((tr) => {
+                rows.push(Array.from(tr.children).map((td) => td.textContent));
+              });
+              downloadCSV(rows, "sensitivity.csv");
+            });
+          document.getElementById("exportCF").addEventListener("click", () => {
+            const rows = [
+              [
+                "Period",
+                "Date",
+                "Time",
+                "Beg Principal",
+                "Cpn Rate",
+                "Coupon",
+                "Principal",
+                "Total CF",
+                "DF",
+                "PV",
+                "% Price",
+              ],
+            ];
+            document.querySelectorAll("#cfTable tbody tr").forEach((tr) => {
+              rows.push(Array.from(tr.children).map((td) => td.textContent));
+            });
+            downloadCSV(rows, "cashflows.csv");
+          });
+
+          // yield chart interaction
+          const canvas = document.getElementById("priceYieldChart");
+          canvas.addEventListener("mousemove", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const pad = { l: 58, r: 20, t: 20, b: 40 };
+            const xMin =
+              state.chartZoom.xMin !== null
+                ? state.chartZoom.xMin
+                : state.yieldMin;
+            const xMax =
+              state.chartZoom.xMax !== null
+                ? state.chartZoom.xMax
+                : state.yieldMax;
+            if (mx < pad.l || mx > rect.width - pad.r) {
+              chartHover = null;
+              drawChart();
+              return;
+            }
+            const ytm =
+              xMin +
+              ((mx - pad.l) / (rect.width - pad.l - pad.r)) * (xMax - xMin);
+            const bond = state.bonds[state.activeBond];
+            const price = priceBond(bond, ytm);
+            chartHover = { mx, my, ytm, price, bond };
+            drawChart();
+          });
+          canvas.addEventListener("mouseleave", () => {
+            chartHover = null;
+            drawChart();
+          });
+          canvas.addEventListener(
+            "wheel",
+            (e) => {
+              e.preventDefault();
+              const factor = e.deltaY > 0 ? 1.12 : 0.88;
+              const xMin =
+                state.chartZoom.xMin !== null
+                  ? state.chartZoom.xMin
+                  : state.yieldMin;
+              const xMax =
+                state.chartZoom.xMax !== null
+                  ? state.chartZoom.xMax
+                  : state.yieldMax;
+              const mid = (xMin + xMax) / 2;
+              const half = ((xMax - xMin) / 2) * factor;
+              state.chartZoom.xMin = Math.max(0, mid - half);
+              state.chartZoom.xMax = mid + half;
+              drawChart();
+            },
+            { passive: false },
+          );
+
+          // maturity chart interaction
+          const matCanvas = document.getElementById("priceMaturityChart");
+          matCanvas.addEventListener("mousemove", (e) => {
+            const rect = matCanvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const pad = { l: 58, r: 20, t: 20, b: 40 };
+            const xMin =
+              state.matZoom.xMin !== null ? state.matZoom.xMin : state.matMin;
+            const xMax =
+              state.matZoom.xMax !== null ? state.matZoom.xMax : state.matMax;
+            if (mx < pad.l || mx > rect.width - pad.r) {
+              matHover = null;
+              drawMaturityChart();
+              return;
+            }
+            const mat =
+              xMin +
+              ((mx - pad.l) / (rect.width - pad.l - pad.r)) * (xMax - xMin);
+            const bond = state.bonds[state.activeBond];
+            const price = priceBond(bond, undefined, mat);
+            matHover = { mx, my, mat, price, bond };
+            drawMaturityChart();
+          });
+          matCanvas.addEventListener("mouseleave", () => {
+            matHover = null;
+            drawMaturityChart();
+          });
+          matCanvas.addEventListener(
+            "wheel",
+            (e) => {
+              e.preventDefault();
+              const factor = e.deltaY > 0 ? 1.12 : 0.88;
+              const xMin =
+                state.matZoom.xMin !== null ? state.matZoom.xMin : state.matMin;
+              const xMax =
+                state.matZoom.xMax !== null ? state.matZoom.xMax : state.matMax;
+              const mid = (xMin + xMax) / 2;
+              const half = ((xMax - xMin) / 2) * factor;
+              state.matZoom.xMin = Math.max(0.25, mid - half);
+              state.matZoom.xMax = mid + half;
+              drawMaturityChart();
+            },
+            { passive: false },
+          );
+
+          window.addEventListener("resize", () => {
+            drawChart();
+            drawMaturityChart();
+          });
+        }
+
+        function downloadCSV(rows, filename) {
+          const csv = rows
+            .map((r) =>
+              r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","),
+            )
+            .join("\n");
+          const blob = new Blob([csv], { type: "text/csv" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(a.href);
+        }
+
+        // ---------- boot ----------
+        bindEvents();
+        writeActiveToInputs();
+        updateAll();
+      })();
+    </script>
+  </body>
+</html>

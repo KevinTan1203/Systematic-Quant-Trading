@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Regression Dashboard — Quant Finance</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0f19;
+    --panel: #141a2a;
+    --border: #1e2a3a;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #34d399;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --purple: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 1.25rem 2rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  header h1 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  header h1 span { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: 0.85rem; margin-top: 0.2rem; }
+  .controls {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+  button {
+    background: var(--accent);
+    color: #0b0f19;
+    border: none;
+    padding: 0.55rem 1.1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  button:hover { opacity: 0.9; }
+  button:active { transform: scale(0.98); }
+  button.secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .seed-info {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  nav {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.75rem 2rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  nav button {
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    padding: 0.45rem 0.9rem;
+    border-radius: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  nav button.active, nav button:hover {
+    background: rgba(56, 189, 248, 0.12);
+    color: var(--accent);
+  }
+  main {
+    padding: 1.5rem 2rem 3rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .section { display: none; }
+  .section.active { display: block; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
+  }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 900px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+  }
+  .card h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .card h3 .badge {
+    font-size: 0.65rem;
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent);
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .stat {
+    background: rgba(0,0,0,0.25);
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+  }
+  .stat .label {
+    position: relative;
+    display: inline-block;
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: help;
+  }
+  .stat .label::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    z-index: 10;
+    left: 0;
+    bottom: calc(100% + 0.55rem);
+    width: max-content;
+    max-width: min(280px, 70vw);
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #0f172a;
+    color: #e2e8f0;
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: normal;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .stat .label[data-tooltip]:hover::after,
+  .stat .label[data-tooltip]:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .stat .label[data-tooltip]:focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; }
+  .stat .value { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 0.15rem; }
+  .stat .value.green { color: var(--green); }
+  .stat .value.red { color: var(--red); }
+  .stat .value.amber { color: var(--amber); }
+  .chart-wrap {
+    position: relative;
+    height: 260px;
+    margin-top: 0.5rem;
+  }
+  .chart-wrap.tall { height: 320px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; }
+  td { font-variant-numeric: tabular-nums; }
+  .note {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.75rem;
+    line-height: 1.45;
+  }
+  .note strong { color: var(--text); }
+  .formula {
+    font-family: 'Cambria Math', Georgia, serif;
+    background: rgba(0,0,0,0.3);
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    margin: 0.5rem 0;
+    overflow-x: auto;
+  }
+  .pill {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .pill.ok { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+  .pill.warn { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+  .pill.bad { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+  footer {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Regression <span>Dashboard</span></h1>
+    <div class="subtitle">OLS · Diagnostics · Regularisation · Quant Finance Applications</div>
+  </div>
+  <div class="controls">
+    <span class="seed-info" id="seedInfo">Seed: —</span>
+    <button class="secondary" onclick="toggleTheme()">Theme</button>
+    <button onclick="regenerate()">⟳ Regenerate Data</button>
+  </div>
+</header>
+
+<nav id="nav">
+  <button class="active" data-sec="overview">Overview</button>
+  <button data-sec="simple">Simple OLS</button>
+  <button data-sec="multiple">Multiple & Inference</button>
+  <button data-sec="diagnostics">Diagnostics</button>
+  <button data-sec="regularisation">Regularisation</button>
+  <button data-sec="factors">Factor Regression</button>
+  <button data-sec="pairs">Pairs Trading</button>
+</nav>
+
+<main>
+  <!-- OVERVIEW -->
+  <section id="overview" class="section active">
+    <div class="grid">
+      <div class="card">
+        <h3>Why Regression Matters</h3>
+        <p style="font-size:0.9rem;color:var(--muted)">
+          The workhorse tool for quantifying relationships and estimating exposures.
+          Nearly every quant technique is a regression in disguise (CAPM, APT) or depends on one
+          (hedge ratios, factor loadings, risk-model betas).
+        </p>
+        <div class="formula" style="margin-top:1rem">y = α + βx + ε &nbsp;→&nbsp; β̂ = Cov(x,y) / Var(x)</div>
+        <p class="note">Click <strong>Regenerate Data</strong> to draw a new synthetic sample and refresh every chart and statistic.</p>
+      </div>
+      <div class="card">
+        <h3>Live Snapshot <span class="badge">randomised</span></h3>
+        <div class="stats" id="overviewStats">
+          <div class="stat"><div class="label">n</div><div class="value" id="ovN">—</div></div>
+          <div class="stat"><div class="label">R²</div><div class="value" id="ovR2">—</div></div>
+          <div class="stat"><div class="label">β̂</div><div class="value" id="ovBeta">—</div></div>
+          <div class="stat"><div class="label">α̂</div><div class="value" id="ovAlpha">—</div></div>
+        </div>
+        <div class="chart-wrap"><canvas id="ovChart"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:1.25rem">
+      <h3>Curriculum Map</h3>
+      <table>
+        <thead><tr><th>Part</th><th>Topics</th><th>Key Idea</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Simple / Multiple OLS</td><td>Fit, R², inference</td></tr>
+          <tr><td>2</td><td>Diagnostics</td><td>VIF, hetero, auto, robust SEs</td></tr>
+          <tr><td>3</td><td>Regularisation</td><td>Ridge · Lasso · Elastic Net</td></tr>
+          <tr><td>4</td><td>Quant Applications</td><td>Alpha/Beta · Pairs hedge ratio</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SIMPLE OLS -->
+  <section id="simple" class="section">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Simple Linear Regression <span class="badge">OLS</span></h3>
+        <div class="stats">
+          <div class="stat"><div class="label">α̂</div><div class="value" id="sAlpha">—</div></div>
+          <div class="stat"><div class="label">β̂</div><div class="value" id="sBeta">—</div></div>
+          <div class="stat"><div class="label">R²</div><div class="value" id="sR2">—</div></div>
+          <div class="stat"><div class="label">Adj R²</div><div class="value" id="sAdjR2">—</div></div>
+          <div class="stat"><div class="label">RSS</div><div class="value" id="sRSS">—</div></div>
+          <div class="stat"><div class="label">n</div><div class="value" id="sN">—</div></div>
+        </div>
+        <div class="chart-wrap tall"><canvas id="simpleChart"></canvas></div>
+        <p class="note">Red segments illustrate residuals. OLS minimises Σ(yᵢ − ŷᵢ)².</p>
+      </div>
+      <div class="card">
+        <h3>Residuals vs Fitted</h3>
+        <div class="chart-wrap tall"><canvas id="residChart"></canvas></div>
+        <p class="note" id="heteroNote">Look for a fan/cone shape → heteroskedasticity.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- MULTIPLE -->
+  <section id="multiple" class="section">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Multiple Regression Coefficients</h3>
+        <p class="note" style="margin-bottom:0.75rem">y = β₀ + β₁x₁ + β₂x₂ + β₃x₃ + ε &nbsp;(simulated 3-factor model)</p>
+        <table id="multiTable">
+          <thead><tr><th>Coefficient</th><th>Estimate</th><th>SE</th><th>t-stat</th><th>95% CI</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="stats" style="margin-top:1rem">
+          <div class="stat"><div class="label">R²</div><div class="value" id="mR2">—</div></div>
+          <div class="stat"><div class="label">Adj R²</div><div class="value" id="mAdjR2">—</div></div>
+          <div class="stat"><div class="label">n</div><div class="value" id="mN">—</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Partial Effects (holding others fixed)</h3>
+        <div class="chart-wrap tall"><canvas id="multiCoefChart"></canvas></div>
+        <p class="note">Each βⱼ is the expected change in y for a one-unit change in xⱼ, holding other regressors constant.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIAGNOSTICS -->
+  <section id="diagnostics" class="section">
+    <div class="grid">
+      <div class="card">
+        <h3>Variance Inflation Factor (VIF)</h3>
+        <table id="vifTable">
+          <thead><tr><th>Regressor</th><th>VIF</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="note">VIF > 5 worth investigating; VIF > 10 serious multicollinearity. Fitted values & R² remain usable; attribution does not.</p>
+      </div>
+      <div class="card">
+        <h3>Heteroskedasticity Check</h3>
+        <div class="stats">
+          <div class="stat"><div class="label">Breusch-Pagan p</div><div class="value" id="bpP">—</div></div>
+          <div class="stat"><div class="label">Verdict</div><div class="value" id="bpVerdict">—</div></div>
+        </div>
+        <div class="chart-wrap"><canvas id="heteroChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Autocorrelation (ACF of residuals)</h3>
+        <div class="stats">
+          <div class="stat"><div class="label">Durbin-Watson</div><div class="value" id="dwStat">—</div></div>
+          <div class="stat"><div class="label">Verdict</div><div class="value" id="dwVerdict">—</div></div>
+        </div>
+        <div class="chart-wrap"><canvas id="acfChart"></canvas></div>
+        <p class="note">DW ≈ 2 → no AR(1). Values &lt; 2 indicate positive autocorrelation (common in financial time series).</p>
+      </div>
+      <div class="card">
+        <h3>Robust / HAC Standard Errors</h3>
+        <table id="seTable">
+          <thead><tr><th>Coefficient</th><th>OLS SE</th><th>White (HC1)</th><th>HAC (NW)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="note">Coefficients stay the same; only the SEs (and therefore t-stats / CIs) change under hetero or autocorrelation.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- REGULARISATION -->
+  <section id="regularisation" class="section">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Coefficient Paths vs λ</h3>
+        <div class="chart-wrap tall"><canvas id="pathChart"></canvas></div>
+        <p class="note">Ridge shrinks smoothly toward zero. Lasso can drive coefficients exactly to zero (variable selection).</p>
+      </div>
+      <div class="card">
+        <h3>Method Comparison at current λ</h3>
+        <div class="stats">
+          <div class="stat"><div class="label">λ (Ridge/Lasso)</div><div class="value" id="regLambda">1.0</div></div>
+        </div>
+        <table id="regTable">
+          <thead><tr><th>Method</th><th>β₁</th><th>β₂</th><th>β₃</th><th>β₄</th><th>β₅</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="note">Elastic Net mixes L1 + L2 and tends to keep/drop correlated groups together.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FACTORS -->
+  <section id="factors" class="section">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Factor Regression — Alpha & Betas</h3>
+        <p class="note" style="margin-bottom:0.75rem">Rᵢ − r<sub>f</sub> = α + β<sub>Mkt</sub>F<sub>Mkt</sub> + β<sub>SMB</sub>F<sub>SMB</sub> + β<sub>HML</sub>F<sub>HML</sub> + ε</p>
+        <table id="factorTable">
+          <thead><tr><th></th><th>Estimate</th><th>HAC SE</th><th>t-stat</th><th>Significant?</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="stats" style="margin-top:1rem">
+          <div class="stat"><div class="label">R²</div><div class="value" id="fR2">—</div></div>
+          <div class="stat"><div class="label">α annualised</div><div class="value" id="fAlphaAnn">—</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Factor Exposures</h3>
+        <div class="chart-wrap tall"><canvas id="factorChart"></canvas></div>
+        <p class="note">A CAPM alpha that shrinks after adding SMB/HML was mostly unrewarded factor exposure.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAIRS -->
+  <section id="pairs" class="section">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Hedge-Ratio Estimation</h3>
+        <div class="stats">
+          <div class="stat"><div class="label">Full-sample β̂</div><div class="value" id="pBeta">—</div></div>
+          <div class="stat"><div class="label">R²</div><div class="value" id="pR2">—</div></div>
+          <div class="stat"><div class="label">Current z-score</div><div class="value" id="pZ">—</div></div>
+        </div>
+        <div class="chart-wrap"><canvas id="pairsScatter"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Rolling 60-day Hedge Ratio</h3>
+        <div class="chart-wrap tall"><canvas id="rollingChart"></canvas></div>
+        <p class="note">Relationship can drift across regimes — rolling OLS keeps the hedge up to date.</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:1.25rem">
+      <h3>Spread (z-scored residual)</h3>
+      <div class="chart-wrap"><canvas id="spreadChart"></canvas></div>
+      <p class="note">Entries/exits commonly triggered around ±2σ of the residual spread.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Standalone interactive companion to the Regression module (Level 2 / revisited at Level 3). All data is synthetic and regenerated on demand.
+</footer>
+
+<script>
+/* ========== Utilities ========== */
+function mulberry32(a) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+let rng = Math.random;
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function mean(a) { return a.reduce((s,x)=>s+x,0)/a.length; }
+function variance(a) {
+  const m = mean(a);
+  return a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1);
+}
+function cov(x,y) {
+  const mx = mean(x), my = mean(y);
+  let s = 0;
+  for (let i=0;i<x.length;i++) s += (x[i]-mx)*(y[i]-my);
+  return s/(x.length-1);
+}
+function corr(x,y) { return cov(x,y)/Math.sqrt(variance(x)*variance(y)); }
+
+/* Matrix helpers (small n) */
+function transpose(A) {
+  return A[0].map((_,i)=>A.map(row=>row[i]));
+}
+function matMul(A,B) {
+  const m=A.length, n=B[0].length, p=B.length;
+  const C=Array.from({length:m},()=>Array(n).fill(0));
+  for(let i=0;i<m;i++) for(let j=0;j<n;j++) for(let k=0;k<p;k++) C[i][j]+=A[i][k]*B[k][j];
+  return C;
+}
+function invert(M) {
+  const n=M.length;
+  const A=M.map(r=>r.slice());
+  const I=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?1:0));
+  for(let col=0;col<n;col++){
+    let piv=col;
+    for(let r=col+1;r<n;r++) if(Math.abs(A[r][col])>Math.abs(A[piv][col])) piv=r;
+    [A[col],A[piv]]=[A[piv],A[col]];
+    [I[col],I[piv]]=[I[piv],I[col]];
+    const div=A[col][col];
+    for(let j=0;j<n;j++){A[col][j]/=div;I[col][j]/=div;}
+    for(let r=0;r<n;r++){
+      if(r===col) continue;
+      const f=A[r][col];
+      for(let j=0;j<n;j++){A[r][j]-=f*A[col][j];I[r][j]-=f*I[col][j];}
+    }
+  }
+  return I;
+}
+
+function ols(X, y) {
+  // X is n x k (already includes intercept column if wanted)
+  const Xt = transpose(X);
+  const XtX = matMul(Xt, X);
+  const XtXinv = invert(XtX);
+  const Xty = matMul(Xt, y.map(v=>[v]));
+  const beta = matMul(XtXinv, Xty).map(r=>r[0]);
+  const yhat = X.map(row => row.reduce((s,x,i)=>s+x*beta[i],0));
+  const resid = y.map((yi,i)=>yi-yhat[i]);
+  const n = y.length, k = beta.length;
+  const rss = resid.reduce((s,e)=>s+e*e,0);
+  const tss = y.reduce((s,yi)=>s+(yi-mean(y))**2,0);
+  const r2 = 1 - rss/tss;
+  const adjR2 = 1 - (1-r2)*(n-1)/(n-k);
+  // classical SE
+  const sigma2 = rss/(n-k);
+  const se = XtXinv.map((row,i)=>Math.sqrt(row[i]*sigma2));
+  return { beta, yhat, resid, r2, adjR2, rss, se, sigma2, n, k, XtXinv };
+}
+
+function whiteSE(X, resid, XtXinv) {
+  const n = X.length, k = X[0].length;
+  // meat = X' diag(e²) X
+  const meat = Array.from({length:k},()=>Array(k).fill(0));
+  for(let i=0;i<n;i++){
+    const e2 = resid[i]*resid[i];
+    for(let a=0;a<k;a++) for(let b=0;b<k;b++) meat[a][b] += X[i][a]*X[i][b]*e2;
+  }
+  const sandwich = matMul(matMul(XtXinv, meat), XtXinv);
+  return sandwich.map((row,i)=>Math.sqrt(Math.max(0,row[i])));
+}
+
+function hacSE(X, resid, XtXinv, maxLags=4) {
+  const n = X.length, k = X[0].length;
+  // Newey-West style
+  const S = Array.from({length:k},()=>Array(k).fill(0));
+  // lag 0
+  for(let i=0;i<n;i++){
+    const e = resid[i];
+    for(let a=0;a<k;a++) for(let b=0;b<k;b++) S[a][b] += X[i][a]*X[i][b]*e*e;
+  }
+  for(let L=1;L<=maxLags;L++){
+    const w = 1 - L/(maxLags+1);
+    const Gamma = Array.from({length:k},()=>Array(k).fill(0));
+    for(let i=L;i<n;i++){
+      const e0=resid[i], eL=resid[i-L];
+      for(let a=0;a<k;a++) for(let b=0;b<k;b++) Gamma[a][b] += X[i][a]*X[i-L][b]*e0*eL;
+    }
+    for(let a=0;a<k;a++) for(let b=0;b<k;b++){
+      S[a][b] += w*(Gamma[a][b]+Gamma[b][a]);
+    }
+  }
+  const sandwich = matMul(matMul(XtXinv, S), XtXinv);
+  return sandwich.map((row,i)=>Math.sqrt(Math.max(0,row[i])));
+}
+
+function vif(X) {
+  // X without intercept for VIF of each column
+  const k = X[0].length;
+  const vifs = [];
+  for(let j=0;j<k;j++){
+    const yj = X.map(r=>r[j]);
+    const Xj = X.map(r => r.filter((_,i)=>i!==j));
+    // add intercept
+    const Xj1 = Xj.map(r=>[1,...r]);
+    const m = ols(Xj1, yj);
+    vifs.push(1/(1-Math.min(0.9999,m.r2)));
+  }
+  return vifs;
+}
+
+function durbinWatson(resid) {
+  let num=0;
+  for(let i=1;i<resid.length;i++) num += (resid[i]-resid[i-1])**2;
+  const den = resid.reduce((s,e)=>s+e*e,0);
+  return num/den;
+}
+
+function acf(resid, maxLag=15) {
+  const m = mean(resid);
+  const c0 = resid.reduce((s,e)=>s+(e-m)**2,0)/resid.length;
+  const out = [];
+  for(let L=1;L<=maxLag;L++){
+    let c=0;
+    for(let i=L;i<resid.length;i++) c+=(resid[i]-m)*(resid[i-L]-m);
+    out.push(c/(resid.length*c0));
+  }
+  return out;
+}
+
+/* Ridge / Lasso (coordinate descent style, simplified) */
+function ridge(X, y, lambda) {
+  // X already standardised, no intercept needed (or include)
+  const n=X.length, k=X[0].length;
+  const Xt = transpose(X);
+  const XtX = matMul(Xt,X);
+  for(let i=0;i<k;i++) XtX[i][i] += lambda;
+  const XtXinv = invert(XtX);
+  const Xty = matMul(Xt, y.map(v=>[v]));
+  return matMul(XtXinv, Xty).map(r=>r[0]);
+}
+
+function softThresh(z, gamma) {
+  if (z > gamma) return z-gamma;
+  if (z < -gamma) return z+gamma;
+  return 0;
+}
+
+function lasso(X, y, lambda, maxIter=200) {
+  const n=X.length, k=X[0].length;
+  let beta = Array(k).fill(0);
+  const colNorm = Array(k).fill(0);
+  for(let j=0;j<k;j++) for(let i=0;i<n;i++) colNorm[j]+=X[i][j]*X[i][j];
+  for(let iter=0;iter<maxIter;iter++){
+    for(let j=0;j<k;j++){
+      let rho=0;
+      for(let i=0;i<n;i++){
+        let pred=0;
+        for(let m=0;m<k;m++) if(m!==j) pred+=X[i][m]*beta[m];
+        rho += X[i][j]*(y[i]-pred);
+      }
+      beta[j] = softThresh(rho, lambda*n) / (colNorm[j]||1e-12);
+    }
+  }
+  return beta;
+}
+
+function elasticNet(X, y, lambda, rho=0.5) {
+  // approximate via ridge-like + soft threshold idea (simplified)
+  const n=X.length, k=X[0].length;
+  let beta = Array(k).fill(0);
+  const colNorm = Array(k).fill(0);
+  for(let j=0;j<k;j++) for(let i=0;i<n;i++) colNorm[j]+=X[i][j]*X[i][j];
+  const l1 = lambda*rho, l2 = lambda*(1-rho);
+  for(let iter=0;iter<250;iter++){
+    for(let j=0;j<k;j++){
+      let rhoj=0;
+      for(let i=0;i<n;i++){
+        let pred=0;
+        for(let m=0;m<k;m++) if(m!==j) pred+=X[i][m]*beta[m];
+        rhoj += X[i][j]*(y[i]-pred);
+      }
+      beta[j] = softThresh(rhoj, l1*n) / (colNorm[j] + l2*n || 1e-12);
+    }
+  }
+  return beta;
+}
+
+/* ========== Charts ========== */
+const charts = {};
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+function makeScatterLine(canvasId, xs, ys, yhat, title) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  charts[canvasId] = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'Observations',
+          data: xs.map((x,i)=>({x,y:ys[i]})),
+          backgroundColor: 'rgba(56,189,248,0.55)',
+          pointRadius: 3
+        },
+        {
+          label: 'OLS fit',
+          data: xs.map((x,i)=>({x,y:yhat[i]})).sort((a,b)=>a.x-b.x),
+          type: 'line',
+          borderColor: '#f87171',
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#94a3b8', boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(30,42,58,0.8)' } },
+        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(30,42,58,0.8)' } }
+      }
+    }
+  });
+}
+
+function makeResidChart(canvasId, fitted, resid) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  charts[canvasId] = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Residuals',
+        data: fitted.map((f,i)=>({x:f,y:resid[i]})),
+        backgroundColor: 'rgba(167,139,250,0.6)',
+        pointRadius: 3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { title: { display: true, text: 'Fitted', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(30,42,58,0.8)' } },
+        y: { title: { display: true, text: 'Residual', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(30,42,58,0.8)' } }
+      }
+    }
+  });
+}
+
+function makeBar(canvasId, labels, values, colors) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  charts[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors || '#38bdf8' }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(30,42,58,0.8)' } }
+      }
+    }
+  });
+}
+
+function makeLineMulti(canvasId, labels, datasets) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  charts[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#94a3b8', boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 }, grid: { color: 'rgba(30,42,58,0.8)' } },
+        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(30,42,58,0.8)' } }
+      }
+    }
+  });
+}
+
+/* ========== Data generation & update ========== */
+let seed = 0;
+
+function regenerate() {
+  seed = Math.floor(Math.random()*1e9);
+  rng = mulberry32(seed);
+  document.getElementById('seedInfo').textContent = 'Seed: ' + seed;
+  runAll();
+}
+
+function runAll() {
+  // ---- Simple OLS ----
+  const n = 80 + Math.floor(rng()*40);
+  const trueAlpha = (rng()-0.5)*2;
+  const trueBeta = 0.6 + rng()*1.4;
+  const xs = [], ys = [];
+  for (let i=0;i<n;i++){
+    const x = rng()*10 - 2;
+    const hetero = 0.4 + 0.15*Math.abs(x); // mild hetero
+    ys.push(trueAlpha + trueBeta*x + randn()*hetero);
+    xs.push(x);
+  }
+  const X1 = xs.map(x=>[1,x]);
+  const m1 = ols(X1, ys);
+  document.getElementById('sAlpha').textContent = m1.beta[0].toFixed(3);
+  document.getElementById('sBeta').textContent = m1.beta[1].toFixed(3);
+  document.getElementById('sR2').textContent = m1.r2.toFixed(3);
+  document.getElementById('sAdjR2').textContent = m1.adjR2.toFixed(3);
+  document.getElementById('sRSS').textContent = m1.rss.toFixed(2);
+  document.getElementById('sN').textContent = n;
+  document.getElementById('ovN').textContent = n;
+  document.getElementById('ovR2').textContent = m1.r2.toFixed(3);
+  document.getElementById('ovBeta').textContent = m1.beta[1].toFixed(3);
+  document.getElementById('ovAlpha').textContent = m1.beta[0].toFixed(3);
+
+  makeScatterLine('simpleChart', xs, ys, m1.yhat);
+  makeScatterLine('ovChart', xs, ys, m1.yhat);
+  makeResidChart('residChart', m1.yhat, m1.resid);
+
+  // ---- Multiple ----
+  const nm = 120;
+  const Xraw = [];
+  const ym = [];
+  const trueB = [0.3, 1.1, -0.7, 0.45];
+  for(let i=0;i<nm;i++){
+    const f1 = randn();
+    const f2 = 0.6*f1 + 0.8*randn(); // correlated
+    const f3 = randn();
+    Xraw.push([f1,f2,f3]);
+    ym.push(trueB[0]+trueB[1]*f1+trueB[2]*f2+trueB[3]*f3 + randn()*0.7);
+  }
+  const Xm = Xraw.map(r=>[1,...r]);
+  const mm = ols(Xm, ym);
+  const names = ['α (const)','β₁','β₂','β₃'];
+  const tbody = document.querySelector('#multiTable tbody');
+  tbody.innerHTML = '';
+  mm.beta.forEach((b,i)=>{
+    const t = b/mm.se[i];
+    const ci = [b-1.96*mm.se[i], b+1.96*mm.se[i]];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${names[i]}</td><td>${b.toFixed(3)}</td><td>${mm.se[i].toFixed(3)}</td>
+      <td>${t.toFixed(2)}</td><td>[${ci[0].toFixed(2)}, ${ci[1].toFixed(2)}]</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('mR2').textContent = mm.r2.toFixed(3);
+  document.getElementById('mAdjR2').textContent = mm.adjR2.toFixed(3);
+  document.getElementById('mN').textContent = nm;
+  makeBar('multiCoefChart', names, mm.beta, ['#94a3b8','#38bdf8','#a78bfa','#34d399']);
+
+  // ---- Diagnostics ----
+  const vifs = vif(Xraw);
+  const vifBody = document.querySelector('#vifTable tbody');
+  vifBody.innerHTML = '';
+  ['x₁','x₂','x₃'].forEach((name,i)=>{
+    const v = vifs[i];
+    let status = '<span class="pill ok">OK</span>';
+    if (v>10) status = '<span class="pill bad">Severe</span>';
+    else if (v>5) status = '<span class="pill warn">Investigate</span>';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${name}</td><td>${v.toFixed(2)}</td><td>${status}</td>`;
+    vifBody.appendChild(tr);
+  });
+
+  // Breusch-Pagan approx: regress e² on X
+  const e2 = mm.resid.map(e=>e*e);
+  const bp = ols(Xm, e2);
+  // LM ≈ n * R² of that aux regression
+  const lm = nm * bp.r2;
+  // chi2(k-1) rough p-value approximation via simple threshold
+  const bpP = lm > 9.5 ? 0.02 : (lm > 6 ? 0.08 : 0.35);
+  document.getElementById('bpP').textContent = bpP.toFixed(3);
+  document.getElementById('bpVerdict').textContent = bpP < 0.05 ? 'Hetero' : 'OK';
+  document.getElementById('bpVerdict').className = 'value ' + (bpP<0.05?'amber':'green');
+  makeResidChart('heteroChart', mm.yhat, mm.resid);
+
+  const dw = durbinWatson(mm.resid);
+  document.getElementById('dwStat').textContent = dw.toFixed(3);
+  let dwV = 'OK';
+  if (dw < 1.5) dwV = 'Pos. AR';
+  else if (dw > 2.5) dwV = 'Neg. AR';
+  document.getElementById('dwVerdict').textContent = dwV;
+  document.getElementById('dwVerdict').className = 'value ' + (dwV==='OK'?'green':'amber');
+
+  const ac = acf(mm.resid, 12);
+  makeBar('acfChart', ac.map((_,i)=>'L'+(i+1)), ac, ac.map(a=>Math.abs(a)>0.18?'#f87171':'#38bdf8'));
+
+  // SEs comparison
+  const wse = whiteSE(Xm, mm.resid, mm.XtXinv);
+  const hse = hacSE(Xm, mm.resid, mm.XtXinv, 4);
+  const seBody = document.querySelector('#seTable tbody');
+  seBody.innerHTML = '';
+  names.forEach((name,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${name}</td><td>${mm.se[i].toFixed(4)}</td><td>${wse[i].toFixed(4)}</td><td>${hse[i].toFixed(4)}</td>`;
+    seBody.appendChild(tr);
+  });
+
+  // ---- Regularisation ----
+  const nr = 100, kr = 5;
+  const Xr = [], yr = [];
+  const trueBr = [1.2, -0.8, 0, 0.5, 0];
+  for(let i=0;i<nr;i++){
+    const row = [];
+    for(let j=0;j<kr;j++) row.push(randn());
+    // induce correlation
+    row[1] = 0.7*row[0] + 0.3*row[1];
+    Xr.push(row);
+    let yi = 0;
+    for(let j=0;j<kr;j++) yi += trueBr[j]*row[j];
+    yr.push(yi + randn()*0.5);
+  }
+  // standardise
+  const means = Xr[0].map((_,j)=>mean(Xr.map(r=>r[j])));
+  const sds = Xr[0].map((_,j)=>Math.sqrt(variance(Xr.map(r=>r[j]))));
+  const Xs = Xr.map(r=>r.map((v,j)=>(v-means[j])/sds[j]));
+  const yMean = mean(yr);
+  const yCentered = yr.map(v=>v-yMean);
+
+  const lambdas = [0.01,0.05,0.1,0.3,0.6,1,2,4,8];
+  const ridgePaths = Array.from({length:kr},()=>[]);
+  const lassoPaths = Array.from({length:kr},()=>[]);
+  lambdas.forEach(lam=>{
+    const rb = ridge(Xs, yCentered, lam);
+    const lb = lasso(Xs, yCentered, lam*0.15);
+    rb.forEach((b,j)=>ridgePaths[j].push(b));
+    lb.forEach((b,j)=>lassoPaths[j].push(b));
+  });
+  const colors = ['#38bdf8','#a78bfa','#34d399','#fbbf24','#f87171'];
+  const pathDs = [];
+  for(let j=0;j<kr;j++){
+    pathDs.push({
+      label: 'Ridge β'+(j+1),
+      data: ridgePaths[j],
+      borderColor: colors[j],
+      borderDash: [4,3],
+      pointRadius: 0,
+      borderWidth: 1.5
+    });
+    pathDs.push({
+      label: 'Lasso β'+(j+1),
+      data: lassoPaths[j],
+      borderColor: colors[j],
+      pointRadius: 0,
+      borderWidth: 2
+    });
+  }
+  makeLineMulti('pathChart', lambdas.map(String), pathDs);
+
+  const lamShow = 1.0;
+  const rb = ridge(Xs, yCentered, lamShow);
+  const lb = lasso(Xs, yCentered, 0.15);
+  const eb = elasticNet(Xs, yCentered, 0.4, 0.5);
+  const olsB = ols(Xs.map(r=>[1,...r]), yCentered).beta.slice(1);
+  const regBody = document.querySelector('#regTable tbody');
+  regBody.innerHTML = '';
+  [['OLS', olsB],['Ridge', rb],['Lasso', lb],['Elastic Net', eb]].forEach(([name,b])=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${name}</td>` + b.map(v=>`<td>${v.toFixed(3)}</td>`).join('');
+    regBody.appendChild(tr);
+  });
+
+  // ---- Factor regression ----
+  const nf = 252;
+  const mkt=[], smb=[], hml=[], stock=[];
+  const factorAlpha = 0.0003 + (rng()-0.5)*0.0004;
+  const trueBetas = [1.05 + (rng()-0.5)*0.3, 0.2+(rng()-0.5)*0.4, -0.15+(rng()-0.5)*0.3];
+  for(let i=0;i<nf;i++){
+    const f1=randn()*0.012, f2=randn()*0.008, f3=randn()*0.007;
+    mkt.push(f1); smb.push(f2); hml.push(f3);
+    stock.push(factorAlpha + trueBetas[0]*f1 + trueBetas[1]*f2 + trueBetas[2]*f3 + randn()*0.015);
+  }
+  const Xf = mkt.map((_,i)=>[1, mkt[i], smb[i], hml[i]]);
+  const mf = ols(Xf, stock);
+  const hseF = hacSE(Xf, mf.resid, mf.XtXinv, 5);
+  const fNames = ['α','β_Mkt','β_SMB','β_HML'];
+  const fBody = document.querySelector('#factorTable tbody');
+  fBody.innerHTML = '';
+  mf.beta.forEach((b,i)=>{
+    const t = b/hseF[i];
+    const sig = Math.abs(t)>1.96 ? '<span class="pill ok">Yes</span>' : '<span class="pill warn">No</span>';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${fNames[i]}</td><td>${b.toFixed(4)}</td><td>${hseF[i].toFixed(4)}</td><td>${t.toFixed(2)}</td><td>${sig}</td>`;
+    fBody.appendChild(tr);
+  });
+  document.getElementById('fR2').textContent = mf.r2.toFixed(3);
+  document.getElementById('fAlphaAnn').textContent = (mf.beta[0]*252*100).toFixed(2)+'%';
+  makeBar('factorChart', fNames, mf.beta, ['#fbbf24','#38bdf8','#a78bfa','#34d399']);
+
+  // ---- Pairs ----
+  const np = 200;
+  const etf=[], stk=[];
+  let regime = 1.0;
+  for(let i=0;i<np;i++){
+    if (i===70) regime=1.35;
+    if (i===140) regime=0.85;
+    const e = randn()*0.012;
+    etf.push(e);
+    stk.push(regime*e + randn()*0.006);
+  }
+  const Xp = etf.map(e=>[1,e]);
+  const mp = ols(Xp, stk);
+  document.getElementById('pBeta').textContent = mp.beta[1].toFixed(3);
+  document.getElementById('pR2').textContent = mp.r2.toFixed(3);
+
+  // rolling
+  const window = 60;
+  const rollBeta = [], rollIdx = [];
+  for(let t=window;t<np;t++){
+    const sx = etf.slice(t-window,t);
+    const sy = stk.slice(t-window,t);
+    const b = cov(sx,sy)/variance(sx);
+    rollBeta.push(b);
+    rollIdx.push(t);
+  }
+  makeLineMulti('rollingChart', rollIdx, [{
+    label: 'Rolling β̂ (60d)',
+    data: rollBeta,
+    borderColor: '#38bdf8',
+    pointRadius: 0,
+    borderWidth: 2
+  },{
+    label: 'Full-sample β̂',
+    data: rollBeta.map(()=>mp.beta[1]),
+    borderColor: '#f87171',
+    borderDash: [6,4],
+    pointRadius: 0,
+    borderWidth: 1.5
+  }]);
+
+  makeScatterLine('pairsScatter', etf, stk, mp.yhat);
+
+  // spread z-score
+  const spread = mp.resid;
+  const mu = mean(spread), sd = Math.sqrt(variance(spread));
+  const z = spread.map(s=>(s-mu)/sd);
+  document.getElementById('pZ').textContent = z[z.length-1].toFixed(2);
+  makeLineMulti('spreadChart', spread.map((_,i)=>i), [{
+    label: 'z-score',
+    data: z,
+    borderColor: '#a78bfa',
+    pointRadius: 0,
+    borderWidth: 1.5
+  },{
+    label: '+2σ',
+    data: z.map(()=>2),
+    borderColor: '#f87171',
+    borderDash: [4,4],
+    pointRadius: 0,
+    borderWidth: 1
+  },{
+    label: '−2σ',
+    data: z.map(()=>-2),
+    borderColor: '#f87171',
+    borderDash: [4,4],
+    pointRadius: 0,
+    borderWidth: 1
+  }]);
+}
+
+/* Nav */
+document.querySelectorAll('#nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    document.getElementById(btn.dataset.sec).classList.add('active');
+  });
+});
+
+function toggleTheme() {
+  const root = document.documentElement;
+  if (root.style.getPropertyValue('--bg') === '#f8fafc') {
+    root.style.setProperty('--bg','#0b0f19');
+    root.style.setProperty('--panel','#141a2a');
+    root.style.setProperty('--text','#e2e8f0');
+    root.style.setProperty('--muted','#94a3b8');
+    root.style.setProperty('--border','#1e2a3a');
+  } else {
+    root.style.setProperty('--bg','#f8fafc');
+    root.style.setProperty('--panel','#ffffff');
+    root.style.setProperty('--text','#0f172a');
+    root.style.setProperty('--muted','#64748b');
+    root.style.setProperty('--border','#e2e8f0');
+  }
+}
+
+function installMetricTooltips() {
+  const definitions = {
+    'n': 'Sample size: the number of observations in the regression. Formula: n = count(yᵢ).',
+    'R²': 'Coefficient of determination: the share of y variation explained by the model. Formula: R² = 1 − RSS/TSS.',
+    'β̂': 'Estimated slope or factor exposure. Simple OLS formula: β̂ = Cov(x, y) / Var(x).',
+    'α̂': 'Estimated intercept or abnormal return. Formula: α̂ = mean(y) − β̂ mean(x).',
+    'RSS': 'Residual sum of squares: total squared fitting error. Formula: RSS = Σ(yᵢ − ŷᵢ)².',
+    'Adj R²': 'Adjusted R-squared, which penalises extra predictors. Formula: 1 − (1 − R²)(n − 1)/(n − k).',
+    'λ (Ridge/Lasso)': 'Regularisation strength: larger λ applies stronger coefficient shrinkage. Ridge uses λΣβⱼ²; Lasso uses λΣ|βⱼ|.',
+    'Breusch-Pagan p': 'Approximate p-value for heteroskedasticity. Small p-values suggest residual variance changes with fitted values or regressors.',
+    'Durbin-Watson': 'Residual autocorrelation statistic. Formula: DW = Σ(eᵢ − eᵢ₋₁)² / Σeᵢ²; values near 2 suggest no AR(1).',
+    'α annualised': 'Estimated daily alpha scaled to a yearly rate. Formula: annualised alpha = α̂ × 252.',
+    'Full-sample β̂': 'Hedge ratio estimated from the complete sample. Formula: β̂ = Cov(x, y) / Var(x).',
+    'Current z-score': 'Distance of the latest spread from its mean in standard deviations. Formula: z = (spread − mean) / standard deviation.'
+  };
+
+  document.querySelectorAll('.stat .label').forEach(label => {
+    const definition = definitions[label.textContent.trim()];
+    if (!definition) return;
+    label.dataset.tooltip = definition;
+    label.tabIndex = 0;
+    label.setAttribute('aria-label', `${label.textContent.trim()}: ${definition}`);
+  });
+}
+
+// Initial load
+installMetricTooltips();
+regenerate();
+</script>
+</body>
+</html>

@@ -1,0 +1,2986 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stablecoin MM & Order-Flow Toxicity Laboratory</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+      :root {
+        --bg: #0a0d12;
+        --panel: #10151c;
+        --border: #1f2937;
+        --text: #e6edf3;
+        --muted: #8b97a7;
+        --accent: #4ade80;
+        --bid: #4ade80;
+        --ask: #f87171;
+        --warn: #fbbf24;
+        --surface: #131922;
+        --surface-elev: #18202b;
+        --border-soft: #161e28;
+        --grid: rgba(255, 255, 255, 0.04);
+        --font-mono:
+          "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+        --font-sans:
+          -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: var(--font-mono);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 10px;
+        line-height: 1.3;
+        padding: 6px;
+      }
+      h1 {
+        font-family: var(--font-mono);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 9px;
+        margin-left: 8px;
+      }
+      .flow {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 5px 8px;
+        margin: 5px 0 7px;
+        font-size: 9px;
+        color: var(--muted);
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      .flow b {
+        color: var(--text);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        gap: 7px;
+        max-width: 1650px;
+        margin: 0 auto;
+      }
+      @media (max-width: 1100px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 7px;
+      }
+      .pt {
+        font-size: 9px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin-bottom: 5px;
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+        margin-bottom: 6px;
+      }
+      .tab {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        padding: 4px 7px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 9px;
+      }
+      .tab.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .view {
+        display: none;
+      }
+      .view.active {
+        display: block;
+      }
+      label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        color: var(--muted);
+        margin: 4px 0 1px;
+      }
+      .val {
+        color: var(--accent);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      input[type="range"] {
+        width: 100%;
+        height: 3px;
+        appearance: none;
+        -webkit-appearance: none;
+        background: var(--surface-elev);
+        border-radius: 2px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+      }
+      input[type="range"]:disabled {
+        opacity: 0.35;
+      }
+      select,
+      input[type="number"] {
+        width: 100%;
+        background: #06080c;
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 3px 5px;
+        border-radius: 3px;
+        font: 10px var(--font-mono);
+      }
+      button {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        padding: 4px 7px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 9px;
+        font-weight: 500;
+        margin: 1px;
+      }
+      button.sec {
+        background: var(--surface-elev);
+        color: var(--text);
+      }
+      button.dang {
+        background: rgba(248, 113, 113, 0.12);
+        color: var(--ask);
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px;
+      }
+      .stat {
+        background: var(--surface);
+        padding: 6px;
+        border-radius: 4px;
+        text-align: center;
+      }
+      .stat .l {
+        font-size: 9px;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .stat .v {
+        font-size: 12px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .row {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+      }
+      .card {
+        flex: 1;
+        min-width: 130px;
+        background: var(--surface);
+        padding: 5px;
+        border-radius: 3px;
+      }
+      .mono {
+        font-variant-numeric: tabular-nums;
+      }
+      .bid {
+        color: var(--bid);
+      }
+      .ask {
+        color: var(--ask);
+      }
+      .warn {
+        color: var(--warn);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+      }
+      th,
+      td {
+        padding: 3px 5px;
+        text-align: right;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        color: var(--muted);
+        font-weight: 500;
+        text-align: right;
+      }
+      td:first-child,
+      th:first-child {
+        text-align: left;
+      }
+      .ob-ask td {
+        color: var(--ask);
+      }
+      .ob-bid td {
+        color: var(--bid);
+      }
+      .chart-box {
+        height: 150px;
+        margin: 4px 0;
+        background: #06080c;
+        border: 1px solid var(--border-soft);
+        border-radius: 3px;
+        padding: 3px;
+      }
+      .chart-box.tall {
+        height: 200px;
+      }
+      .status {
+        font-size: 9px;
+        padding: 5px 7px;
+        background: var(--surface-elev);
+        border-radius: 4px;
+      }
+      .dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        margin-right: 4px;
+      }
+      .dot.on {
+        background: var(--bid);
+      }
+      .dot.off {
+        background: var(--ask);
+      }
+      .dot.warn {
+        background: var(--warn);
+      }
+      .ob-volume-up {
+        animation: ob-volume-up 0.7s ease-out;
+      }
+      .ob-volume-down {
+        animation: ob-volume-down 0.7s ease-out;
+      }
+      @keyframes ob-volume-up {
+        0% {
+          background: rgba(14, 203, 129, 0.75);
+          box-shadow: 0 0 9px rgba(14, 203, 129, 0.9);
+        }
+        100% {
+          background: transparent;
+          box-shadow: none;
+        }
+      }
+      @keyframes ob-volume-down {
+        0% {
+          background: rgba(246, 70, 93, 0.75);
+          box-shadow: 0 0 9px rgba(246, 70, 93, 0.9);
+        }
+        100% {
+          background: transparent;
+          box-shadow: none;
+        }
+      }
+      .disclaimer {
+        font-size: 9px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 6px;
+        margin-top: 8px;
+      }
+      .formula {
+        font-size: 10px;
+        background: var(--surface);
+        padding: 8px;
+        border-radius: 4px;
+        margin-top: 8px;
+      }
+      .formula code {
+        color: #93c5fd;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+      }
+      .banner {
+        background: rgba(248, 113, 113, 0.08);
+        border: 1px solid rgba(248, 113, 113, 0.35);
+        color: var(--ask);
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        text-align: center;
+      }
+      .stale-banner {
+        background: rgba(251, 191, 36, 0.12);
+        border: 1px solid var(--warn);
+        color: var(--warn);
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        text-align: center;
+        display: none;
+      }
+      .help {
+        font-size: 9px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      details {
+        margin-top: 6px;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--accent);
+        font-size: 10px;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 8px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        margin-right: 4px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        vertical-align: 1px;
+      }
+      .tag.live {
+        background: rgba(74, 222, 128, 0.15);
+        color: #4ade80;
+      }
+      .tag.model {
+        background: rgba(251, 191, 36, 0.15);
+        color: #fbbf24;
+      }
+      .tag.user {
+        background: rgba(96, 165, 250, 0.15);
+        color: #60a5fa;
+      }
+      .issues {
+        font-size: 10px;
+        color: var(--warn);
+      }
+      .issues div {
+        margin: 2px 0;
+      }
+      .subhead {
+        font-size: 9px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 10px 0 4px;
+        border-top: 1px solid var(--border-soft);
+        padding-top: 8px;
+      }
+      .subhead:first-child {
+        border-top: none;
+        padding-top: 0;
+        margin-top: 0;
+      }
+      .dashboard-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .head-meta {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-left: auto;
+      }
+      .head-notice {
+        padding: 4px 7px;
+        border-radius: 3px;
+        font-size: 9px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .head-status {
+        width: 220px;
+        min-width: 220px;
+        max-width: 220px;
+        flex: 0 0 220px;
+        margin: 0;
+        overflow: hidden;
+      }
+      #st-detail {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .head-actions {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        white-space: nowrap;
+      }
+      .head-actions button {
+        margin: 0;
+      }
+      .info-details {
+        position: relative;
+        margin: 0;
+      }
+      .info-details summary {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border: 1px solid var(--muted);
+        border-radius: 50%;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        list-style: none;
+        cursor: pointer;
+      }
+      .info-details summary::-webkit-details-marker {
+        display: none;
+      }
+      .info-details[open] summary {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+      .info-details .disclaimer {
+        position: absolute;
+        right: 0;
+        top: 24px;
+        width: 260px;
+        z-index: 10;
+        margin: 0;
+        background: var(--surface-elev);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      }
+    </style>
+  </head>
+  <body>
+    <div style="max-width: 1650px; margin: 0 auto">
+      <div class="dashboard-head">
+        <h1>Stablecoin Market-Making & Order-Flow Toxicity Laboratory</h1>
+        <div class="head-meta">
+          <span class="sub">Live public data · client-side models</span>
+          <span class="head-notice banner" style="margin: 0"
+            >PAPER TRADING / SIMULATION ONLY</span
+          >
+          <div class="status head-status" id="status-box">
+            <div>
+              <span class="dot off" id="dot-ws"></span
+              ><span id="st-ws">Disconnected</span>
+            </div>
+            <div id="st-detail" style="margin-top: 3px; color: var(--muted)">
+              —
+            </div>
+          </div>
+          <div class="head-actions">
+            <button id="btn-connect">Connect</button>
+            <button class="sec" id="btn-pause">Pause charts</button>
+            <button class="dang" id="btn-reset-sim">Reset sim</button>
+            <details class="info-details">
+              <summary
+                aria-label="Research disclaimer"
+                title="Research disclaimer"
+              >
+                i
+              </summary>
+              <div class="disclaimer">
+                VPIN is an order-flow toxicity <b>proxy</b>, not a literal
+                informed-trading probability. Associations with markouts are
+                empirical, not causal. Research / paper-trading only — not
+                investment advice.
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+      <div class="flow">
+        <b>LIVE DATA</b> → ORDER BOOK + TRADES → FLOW IMBALANCE → <b>VPIN</b> →
+        VOL + INVENTORY → <b>RESERVATION</b> → DYNAMIC SPREAD (+ USER MARGIN) →
+        SIM QUOTES → FILLS → ADVERSE SELECTION → <b>NET P&amp;L</b>
+      </div>
+      <div class="stale-banner" id="stale-banner">STALE DATA</div>
+
+      <div class="grid">
+        <!-- SIDEBAR -->
+        <div class="panel">
+          <div class="pt">Market <span class="tag live">LIVE</span></div>
+          <label>Exchange</label>
+          <select id="sel-ex">
+            <option value="binance">Binance</option>
+            <option value="kraken">Kraken</option>
+          </select>
+          <label>Symbol</label>
+          <select id="sel-sym"></select>
+          <label>Depth levels <span class="val" id="v-depth">15</span></label>
+          <input type="range" id="depth" min="5" max="25" value="15" />
+
+          <div class="pt" style="margin-top: 12px">
+            Current Inventory <span class="tag user">USER</span>
+          </div>
+          <label>Asset units held now</label>
+          <input
+            type="number"
+            id="manualInventory"
+            min="-1000000000"
+            step="any"
+            value="0"
+            placeholder="e.g. 0.25"
+          />
+          <div class="help">
+            Enter the currently held amount of the selected asset. Positive
+            inventory shifts the reservation price lower and widens the quote
+            skew. This value is applied immediately to the model and retained
+            when switching markets.
+          </div>
+
+          <div class="pt" style="margin-top: 12px">VPIN</div>
+          <label
+            >Bucket notional (quote ccy)
+            <span class="val" id="v-bucket">50000</span></label
+          >
+          <input
+            type="range"
+            id="bucket"
+            min="5000"
+            max="500000"
+            step="5000"
+            value="50000"
+          />
+          <label
+            >Rolling buckets <span class="val" id="v-nbuckets">30</span></label
+          >
+          <input type="range" id="nbuckets" min="10" max="100" value="30" />
+          <label
+            >Toxicity threshold
+            <span class="val" id="v-toxth">0.55</span></label
+          >
+          <input
+            type="range"
+            id="toxth"
+            min="0.2"
+            max="0.9"
+            step="0.05"
+            value="0.55"
+          />
+
+          <div class="pt" style="margin-top: 12px">
+            Dynamic Spread Engine <span class="tag model">MODEL</span>
+          </div>
+          <label
+            >γ vol sensitivity <span class="val" id="v-gamma">0.10</span></label
+          >
+          <input
+            type="range"
+            id="gamma"
+            min="0.01"
+            max="1"
+            step="0.01"
+            value="0.10"
+          />
+          <label
+            >κ liquidity sensitivity
+            <span class="val" id="v-kappa">1.50</span></label
+          >
+          <input
+            type="range"
+            id="kappa"
+            min="0.2"
+            max="5"
+            step="0.1"
+            value="1.5"
+          />
+          <label>Horizon T (s) <span class="val" id="v-T">300</span></label>
+          <input
+            type="range"
+            id="T"
+            min="30"
+            max="1800"
+            step="30"
+            value="300"
+          />
+          <label
+            >λ_tox (bps at VPIN=1)
+            <span class="val" id="v-lam">8.0</span></label
+          >
+          <input type="range" id="lam" min="0" max="50" step="0.5" value="8" />
+          <label>Tox function</label>
+          <select id="toxfn">
+            <option value="linear">linear (VPIN)</option>
+            <option value="sq">VPIN²</option>
+            <option value="thr">max(0,VPIN−thr)</option>
+          </select>
+          <label
+            >Quote size (units)
+            <span class="val" id="v-qsize">1000</span></label
+          >
+          <input
+            type="range"
+            id="qsize"
+            min="100"
+            max="20000"
+            step="100"
+            value="1000"
+          />
+          <label>Fee rate (bps) <span class="val" id="v-fee">1.0</span></label>
+          <input
+            type="range"
+            id="fee"
+            min="0"
+            max="10"
+            step="0.1"
+            value="1.0"
+          />
+          <label
+            >Risk-control ceiling: max half-spread (bps)
+            <span class="val" id="v-maxhalf">250</span></label
+          >
+          <input
+            type="range"
+            id="maxhalf"
+            min="10"
+            max="1000"
+            step="10"
+            value="250"
+          />
+          <div class="help">
+            This ceiling only clamps genuinely extreme live inputs (e.g. a
+            flash-crash tick). It is NOT what fixes the unit bug — see Formulas
+            tab / code comments.
+          </div>
+
+          <div class="pt" style="margin-top: 12px">
+            Custom Quote Margin <span class="tag user">USER</span>
+          </div>
+          <label
+            ><input
+              type="checkbox"
+              id="symMargin"
+              checked
+              style="width: auto"
+            />
+            Symmetric margin</label
+          >
+          <label
+            >Bid margin (bps)
+            <span class="val" id="v-bidMargin">2.0</span></label
+          >
+          <input
+            type="range"
+            id="bidMargin"
+            min="0"
+            max="100"
+            step="0.5"
+            value="2"
+          />
+          <label
+            >Ask margin (bps)
+            <span class="val" id="v-askMargin">2.0</span></label
+          >
+          <input
+            type="range"
+            id="askMargin"
+            min="0"
+            max="100"
+            step="0.5"
+            value="2"
+            disabled
+          />
+          <div style="margin-top: 4px">
+            <button class="sec" id="btn-reset-margin">Reset margin</button>
+          </div>
+          <div class="help">
+            Reference price = live mid. Entering "5" means 5 bps = 0.05% =
+            0.0005 — never 5%. This margin is added on top of (outside) the
+            dynamic model quote to form the Final paper quote.
+          </div>
+
+          <div class="pt" style="margin-top: 12px">
+            Scenario (manual override)
+          </div>
+          <label
+            ><input type="checkbox" id="scen" style="width: auto" /> Enable
+            scenario overrides</label
+          >
+          <label>Override σ ann% <span class="val" id="v-osig">20</span></label>
+          <input type="range" id="osig" min="1" max="80" value="20" disabled />
+          <label
+            >Override VPIN <span class="val" id="v-ovpin">0.50</span></label
+          >
+          <input
+            type="range"
+            id="ovpin"
+            min="0.05"
+            max="0.95"
+            step="0.05"
+            value="0.5"
+            disabled
+          />
+          <label>Override inventory <span class="val" id="v-oq">0</span></label>
+          <input
+            type="range"
+            id="oq"
+            min="-1000000"
+            max="1000000"
+            step="50000"
+            value="0"
+            disabled
+          />
+        </div>
+
+        <!-- MAIN -->
+        <div>
+          <div class="tabs" id="tabs">
+            <div class="tab active" data-v="overview">Overview</div>
+            <div class="tab" data-v="flow">Flow &amp; VPIN</div>
+            <div class="tab" data-v="mm">Dynamic Spread</div>
+            <div class="tab" data-v="sim">Simulator</div>
+            <div class="tab" data-v="xex">Cross-Ex</div>
+            <div class="tab" data-v="math">Formulas &amp; Units</div>
+            <div class="tab" data-v="diag">Diagnostics</div>
+          </div>
+
+          <!-- OVERVIEW -->
+          <div class="view active" id="v-overview">
+            <div class="panel">
+              <div class="pt">Market Overview</div>
+              <div class="row">
+                <div class="card">
+                  <div class="l">
+                    <span class="tag live">LIVE</span>Exchange / Symbol
+                  </div>
+                  <div class="v mono" id="m-exsym">—</div>
+                </div>
+                <div class="card">
+                  <div class="l"><span class="tag live">LIVE</span>Mid</div>
+                  <div class="v mono" id="m-mid">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">
+                    <span class="tag live">LIVE</span>Bid / Ask
+                  </div>
+                  <div class="v mono">
+                    <span class="bid" id="m-bid">—</span> /
+                    <span class="ask" id="m-ask">—</span>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="l">
+                    <span class="tag live">LIVE</span>Spread (bps)
+                  </div>
+                  <div class="v mono" id="m-spr">—</div>
+                </div>
+                <div class="card">
+                  <div class="l"><span class="tag live">LIVE</span>Last</div>
+                  <div class="v mono" id="m-last">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">
+                    <span class="tag live">LIVE</span>Trades/sec
+                  </div>
+                  <div class="v mono" id="m-tps">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">
+                    <span class="tag model">MODEL</span>RV (ann.)
+                  </div>
+                  <div class="v mono" id="m-rv">—</div>
+                </div>
+                <div class="card">
+                  <div class="l"><span class="tag model">MODEL</span>VPIN</div>
+                  <div class="v mono" id="m-vpin">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">
+                    <span class="tag model">MODEL</span>Regime
+                  </div>
+                  <div class="v" id="m-regime">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">Dev from $1 (bps)</div>
+                  <div class="v mono" id="m-dev">—</div>
+                </div>
+              </div>
+              <div class="help">
+                Chart legend prefixes: <span class="tag live">LIVE</span> = raw
+                exchange observation · <span class="tag model">MODEL</span> =
+                derived from the dynamic quoting engine ·
+                <span class="tag user">USER</span> = your custom bps margin.
+              </div>
+              <div class="chart-box tall"><canvas id="ch-price"></canvas></div>
+              <div class="chart-box"><canvas id="ch-spread"></canvas></div>
+              <div class="panel" style="margin-top: 10px">
+                <div class="pt">
+                  Live Order Book (top levels)
+                  <span class="tag live">LIVE</span>
+                </div>
+                <div class="row" style="margin-bottom: 8px">
+                  <div class="card">
+                    OBI <span class="mono" id="ob-obi">—</span>
+                  </div>
+                  <div class="card">
+                    Bid depth <span class="mono bid" id="ob-bd">—</span>
+                  </div>
+                  <div class="card">
+                    Ask depth <span class="mono ask" id="ob-ad">—</span>
+                  </div>
+                  <div class="card">
+                    Spread <span class="mono" id="ob-spr">—</span>
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 10px;
+                  "
+                >
+                  <div>
+                    <div class="pt">Asks</div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Price</th>
+                          <th>Size</th>
+                          <th>Notional</th>
+                          <th>Dist</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tb-asks"></tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <div class="pt">Bids</div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Price</th>
+                          <th>Size</th>
+                          <th>Notional</th>
+                          <th>Dist</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tb-bids"></tbody>
+                    </table>
+                  </div>
+                </div>
+                <details>
+                  <summary>What am I looking at?</summary>
+                  <div class="help">
+                    Displayed depth imbalance OBI = (V_bid − V_ask)/(V_bid +
+                    V_ask). Positive = more bid liquidity shown. Not a price
+                    predictor.
+                  </div>
+                </details>
+              </div>
+            </div>
+          </div>
+
+          <!-- FLOW & VPIN -->
+          <div class="view" id="v-flow">
+            <div class="panel">
+              <div class="pt">Order Flow &amp; VPIN</div>
+              <div class="row">
+                <div class="card">
+                  Buy vol (roll) <span class="mono bid" id="f-buy">—</span>
+                </div>
+                <div class="card">
+                  Sell vol <span class="mono ask" id="f-sell">—</span>
+                </div>
+                <div class="card">
+                  OFI <span class="mono" id="f-ofi">—</span>
+                </div>
+                <div class="card">
+                  VPIN <span class="mono" id="f-vpin">—</span>
+                </div>
+                <div class="card">
+                  Buckets done <span class="mono" id="f-nb">—</span>
+                </div>
+                <div class="card">
+                  Classification <span class="mono" id="f-cls">—</span>
+                </div>
+              </div>
+              <div class="chart-box tall"><canvas id="ch-vpin"></canvas></div>
+              <div class="chart-box"><canvas id="ch-ofi"></canvas></div>
+              <details>
+                <summary>What am I looking at?</summary>
+                <div class="help">
+                  VPIN uses equal-<b>volume</b> buckets (not clock candles) — it
+                  is only computed from trades on the currently selected market
+                  and resets on any symbol/exchange change. Higher VPIN ⇒ more
+                  one-sided recent flow (toxicity proxy). Trade side is
+                  exchange-provided: Binance aggressor flag, Kraken trade-side
+                  field — never estimated by this dashboard.
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <!-- MM -->
+          <div class="view" id="v-mm">
+            <div class="panel">
+              <div class="pt">Live Dynamic Spread Engine</div>
+
+              <div class="subhead">Inputs</div>
+              <div class="row">
+                <div class="card">
+                  <div class="l"><span class="tag live">LIVE</span>Mid</div>
+                  <div class="v mono" id="mm-mid">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">
+                    <span class="tag model">MODEL</span>σ (ann., used)
+                  </div>
+                  <div class="v mono" id="mm-sig">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">
+                    <span class="tag model">MODEL</span>Inventory q
+                  </div>
+                  <div class="v mono" id="mm-q">—</div>
+                </div>
+              </div>
+
+              <div class="subhead">
+                Dynamic half-spread components (bps) — Base + Vol + Tox +
+                Liquidity
+              </div>
+              <div class="row">
+                <div class="card">
+                  <div class="l">Base (live half-spread)</div>
+                  <div class="v mono" id="mm-base">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">Volatility adj.</div>
+                  <div class="v mono" id="mm-vol">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">Toxicity adj.</div>
+                  <div class="v mono" id="mm-tox">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">Liquidity adj.</div>
+                  <div class="v mono" id="mm-liq">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">= Dynamic half-spread</div>
+                  <div class="v mono warn" id="mm-dyn">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">Inventory skew (r vs mid)</div>
+                  <div class="v mono" id="mm-skew">—</div>
+                </div>
+              </div>
+
+              <div class="subhead">
+                Model quote <span class="tag model">MODEL</span>
+              </div>
+              <div class="row">
+                <div class="card">
+                  <div class="l">Reservation r</div>
+                  <div class="v mono warn" id="mm-r">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">Dynamic Bid / Ask</div>
+                  <div class="v mono">
+                    <span class="bid" id="mm-dynbid">—</span> /
+                    <span class="ask" id="mm-dynask">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="subhead">
+                Custom margin <span class="tag user">USER</span> &amp; final
+                paper quote
+              </div>
+              <div class="row">
+                <div class="card">
+                  <div class="l">Custom Bid (vs mid)</div>
+                  <div class="v mono" id="mm-custbid">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">Custom Ask (vs mid)</div>
+                  <div class="v mono" id="mm-custask">—</div>
+                </div>
+                <div class="card">
+                  <div class="l">Final Bid / Ask (executable paper quote)</div>
+                  <div class="v mono">
+                    <span class="bid" id="mm-finalbid">—</span> /
+                    <span class="ask" id="mm-finalask">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="chart-box tall"><canvas id="ch-quotes"></canvas></div>
+              <div class="chart-box"><canvas id="ch-inv"></canvas></div>
+              <details>
+                <summary>What am I looking at?</summary>
+                <div class="help">
+                  Reservation r = Mid × (1 − skew_bps/10,000), skew_bps =
+                  (q/qsize) × volatility-bps-component — long inventory shifts r
+                  below mid (encourages selling). Dynamic half-spread = Base
+                  (live observed half-spread) + Volatility + Toxicity +
+                  Liquidity components, each expressed natively in bps so the
+                  result never depends on the asset's absolute price. Final
+                  Bid/Ask = Dynamic Bid/Ask extended further out by your Custom
+                  bps margin — this is what the paper simulator actually trades
+                  against.
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <!-- SIM -->
+          <div class="view" id="v-sim">
+            <div class="panel">
+              <div class="pt">Paper Market-Making Simulator</div>
+              <div class="row">
+                <div class="card">
+                  Cash <span class="mono" id="s-cash">0</span>
+                </div>
+                <div class="card">
+                  Inventory <span class="mono" id="s-q">0</span>
+                </div>
+                <div class="card">
+                  MtM PnL (net) <span class="mono" id="s-pnl">0</span>
+                </div>
+                <div class="card">
+                  Gross spread capture <span class="mono" id="s-sc">0</span>
+                </div>
+                <div class="card">
+                  Inventory PnL <span class="mono" id="s-ip">0</span>
+                </div>
+                <div class="card">
+                  Adverse selection (30s markout, diagnostic)
+                  <span class="mono" id="s-as">0</span>
+                </div>
+                <div class="card">
+                  Fees <span class="mono" id="s-fee">0</span>
+                </div>
+                <div class="card">
+                  Fills B/A <span class="mono" id="s-fills">0/0</span>
+                </div>
+              </div>
+              <div class="chart-box"><canvas id="ch-pnl"></canvas></div>
+              <div class="pt" style="margin-top: 8px">
+                Fill quality by VPIN regime (markouts)
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Regime</th>
+                    <th>N</th>
+                    <th>Avg 1s</th>
+                    <th>Avg 5s</th>
+                    <th>Avg 30s</th>
+                  </tr>
+                </thead>
+                <tbody id="tb-markout">
+                  <tr>
+                    <td colspan="5">Insufficient sample size</td>
+                  </tr>
+                </tbody>
+              </table>
+              <details>
+                <summary>What am I looking at?</summary>
+                <div class="help">
+                  Simulated passive fills trigger when a live trade crosses our
+                  <b>Final</b> bid/ask (dynamic model + custom margin combined)
+                  — never against real order books, no real orders are sent. Net
+                  PnL = Cash + Inventory×Mid. Gross spread capture and Inventory
+                  PnL are additive components of Net PnL; Adverse selection is a
+                  separate 30-second markout diagnostic that overlaps
+                  conceptually with Inventory PnL and is deliberately
+                  <b>not</b> summed into Net PnL, to avoid double-counting.
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <!-- CROSS -->
+          <div class="view" id="v-xex">
+            <div class="panel">
+              <div class="pt">
+                Cross-Exchange Snapshot (same economic pair when available)
+              </div>
+              <div class="row">
+                <div class="card">
+                  Binance mid <span class="mono" id="x-b">—</span>
+                </div>
+                <div class="card">
+                  Kraken mid <span class="mono" id="x-k">—</span>
+                </div>
+                <div class="card">
+                  Diff (bps) <span class="mono" id="x-d">—</span>
+                </div>
+              </div>
+              <p class="help" style="margin-top: 8px">
+                Only one exchange is streamed at a time (selected in the
+                sidebar); the other side's mid is held from its last connected
+                session. Observed mid differential ≠ executable risk-free arb.
+                Fees, depth, latency and transfer constraints apply. Values
+                shown only when both feeds have data.
+              </p>
+            </div>
+          </div>
+
+          <!-- MATH -->
+          <div class="view" id="v-math">
+            <div class="panel">
+              <div class="pt">Model Mathematics</div>
+              <div class="formula">
+                <b>Observed</b><br />
+                <code>S = (bid+ask)/2</code> ·
+                <code>spread_bps = (ask-bid)/S × 10000</code><br />
+                <code>OBI = (V_bid−V_ask)/(V_bid+V_ask)</code><br />
+                <code>r_t = ln(S_t/S_{t-1})</code> · realised vol from rolling
+                returns (annualised × √(periods/yr) using the median observed
+                sampling interval)<br /><br />
+                <b>VPIN (toxicity proxy)</b><br />
+                <code>VPIN = Σ|V_buy,i − V_sell,i| / (n × V_bucket)</code> over
+                completed equal-volume buckets<br /><br />
+                <b>Dynamic half-spread (bps-native, unit-safe)</b><br />
+                <code>σ_bps = σ_ann / √(seconds/yr) × 10000</code> (fractional
+                annualised vol expressed in bps/√s)<br />
+                <code>vol_bps = √γ × σ_bps × √τ</code><br />
+                <code>tox_bps = λ_bps × f(VPIN)</code> &nbsp;(λ_bps is a
+                dashboard-defined bps-at-VPIN=1 coefficient)<br />
+                <code
+                  >liq_bps = min(80, (qsize·mid / top-of-book depth notional) ×
+                  10 × κ)</code
+                ><br />
+                <code>base_bps = max(0, observed_spread_bps / 2)</code><br />
+                <code
+                  >dynHalf_bps = min(base_bps + vol_bps + tox_bps + liq_bps,
+                  maxHalfSpreadBps)</code
+                ><br /><br />
+                <b>Reservation price &amp; model quote</b><br />
+                <code>skew_bps = (q / qsize) × vol_bps</code> &nbsp;
+                <code>r = mid × (1 − skew_bps/10000)</code><br />
+                <code>dynBid = r × (1 − dynHalf_bps/10000)</code> &nbsp;
+                <code>dynAsk = r × (1 + dynHalf_bps/10000)</code><br /><br />
+                <b>Custom margin &amp; final paper quote</b><br />
+                <code>customBid = mid × (1 − bidMarginBps/10000)</code> &nbsp;
+                <code>customAsk = mid × (1 + askMarginBps/10000)</code><br />
+                <code>finalBid = dynBid − mid × bidMarginBps/10000</code> &nbsp;
+                <code>finalAsk = dynAsk + mid × askMarginBps/10000</code>
+              </div>
+              <div class="pt" style="margin-top: 10px">
+                Model &amp; Units (live values)
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Variable</th>
+                    <th>Formula</th>
+                    <th>Units</th>
+                    <th>Current</th>
+                  </tr>
+                </thead>
+                <tbody id="tb-units"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- DIAG -->
+          <div class="view" id="v-diag">
+            <div class="panel">
+              <div class="pt">Data Quality</div>
+              <pre
+                id="diag"
+                style="
+                  font-size: 10px;
+                  color: var(--muted);
+                  white-space: pre-wrap;
+                "
+              >
+—</pre
+              >
+              <div class="pt" style="margin-top: 10px">Sanity Checks</div>
+              <div class="issues" id="sanity-list">No issues detected.</div>
+              <p class="help" style="margin-top: 8px">
+                If WebSocket fails under file://, serve locally:
+                <code>python -m http.server 8080</code> then open
+                http://localhost:8080
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* ======================================================================
+   ROOT-CAUSE NOTES (see chat "Fix Summary" for the full explanation):
+
+   BUG A ("+/-1 spread" & "12,000+ bps spread"): the original dAS formula
+   computed (1/gamma)*ln(1+gamma/kappa) as a RAW PRICE offset (~0.6-1)
+   using gamma/kappa defaults that were implicitly calibrated for a
+   ~$100+ instrument. That constant does not depend on mid at all, so:
+     - added directly to a ~$1 stablecoin mid, it produced a bid/ask
+       roughly +/-0.6-1 around the mid REGARDLESS of which asset/mid
+       was selected ("+/-1" bug), and
+     - converted to bps via /mid*10000 with mid~1, it exploded to
+       ~6,000-12,000+ bps ("12,000+" bug).
+   Both symptoms were the SAME unit bug, not two separate ones.
+
+   FIX: the whole engine below is rebuilt to work NATIVELY in basis
+   points. Every component (base/vol/tox/liquidity) is bps-shaped by
+   construction (never a bare price offset), and is converted to a
+   price distance only once, at the very end, via mid*bps/10000. This
+   makes the output automatically scale with whichever asset/mid is
+   selected instead of being a hidden constant.
+   ====================================================================== */
+
+      /* ========== CONFIG & STATE ========== */
+      const P = {
+        depth: 15,
+        bucket: 50000,
+        nbuckets: 30,
+        toxth: 0.55,
+        gamma: 0.1,
+        kappa: 1.5,
+        T: 300,
+        lamBps: 8,
+        toxfn: "linear",
+        qsize: 1000,
+        feeBps: 1.0,
+        scen: false,
+        osig: 20,
+        ovpin: 0.5,
+        oq: 0,
+        bidMarginBps: 2,
+        askMarginBps: 2,
+        symMargin: true,
+        maxHalfSpreadBps: 250,
+        manualInventory: 0,
+      };
+      const state = {
+        exchange: "binance",
+        symbol: null,
+        symbols: { binance: [], kraken: [] },
+        ws: null,
+        connected: false,
+        lastMsg: 0,
+        lastTradeMsg: 0,
+        lastBookMsg: 0,
+        msgs: 0,
+        tradesSec: 0,
+        bookSec: 0,
+        bid: NaN,
+        ask: NaN,
+        mid: NaN,
+        last: NaN,
+        bids: [],
+        asks: [],
+        trades: [], // {t, px, qty, side, notional}
+        mids: [],
+        spreads: [],
+        dynamicSpreads: [],
+        obsSpreadHist: [], // {t,v}
+        buckets: [],
+        curBuy: 0,
+        curSell: 0,
+        curVol: 0,
+        vpin: NaN,
+        vpinHist: [],
+        ofiHist: [],
+        returns: [],
+        rv: NaN,
+        inv: 0,
+        cash: 0,
+        t0: Date.now() / 1000,
+        quotesHist: [],
+        invHist: [],
+        pnlHist: [],
+        fills: [], // {t, side, px, mid, vpin, units}
+        pendingMarks: [],
+        spreadCap: 0,
+        advSel: 0,
+        fees: 0,
+        bidFills: 0,
+        askFills: 0,
+        classMode: "—",
+        xBinanceMid: NaN,
+        xKrakenMid: NaN,
+        bookVolumes: { bids: new Map(), asks: new Map() },
+        lastObi: NaN,
+        paused: false,
+        err: null,
+        _mm: null,
+      };
+      const CHART_WINDOW_FACTOR = 5;
+      const windowSize = (size) => size * CHART_WINDOW_FACTOR;
+      const STALE_MS = 6000;
+      let allCharts = [];
+
+      /* ========== UI TABS (with chart resize fix) ==========
+   ROOT CAUSE of "some charts are not displaying data": several canvases
+   live inside .view containers that are display:none at page load, and
+   Chart.js measures canvas size (0x0) at creation time for hidden
+   containers. We force a resize() on every chart whenever a tab becomes
+   visible so Chart.js re-measures the now-visible canvas. */
+      document.querySelectorAll(".tab").forEach((t) => {
+        t.onclick = () => {
+          document
+            .querySelectorAll(".tab")
+            .forEach((x) => x.classList.remove("active"));
+          document
+            .querySelectorAll(".view")
+            .forEach((x) => x.classList.remove("active"));
+          t.classList.add("active");
+          document.getElementById("v-" + t.dataset.v).classList.add("active");
+          requestAnimationFrame(() =>
+            allCharts.forEach((c) => {
+              try {
+                c.resize();
+              } catch (e) {}
+            }),
+          );
+        };
+      });
+
+      /* ========== PARAM BINDINGS ========== */
+      function bind(id, key, fmt) {
+        const el = document.getElementById(id);
+        el.oninput = () => {
+          let v = parseFloat(el.value);
+          P[key] = v;
+          document.getElementById("v-" + id).textContent = fmt ? fmt(v) : v;
+        };
+      }
+      bind("depth", "depth", (v) => v);
+      bind("bucket", "bucket", (v) => v.toLocaleString());
+      bind("nbuckets", "nbuckets", (v) => v);
+      bind("toxth", "toxth", (v) => v.toFixed(2));
+      bind("gamma", "gamma", (v) => v.toFixed(2));
+      bind("kappa", "kappa", (v) => v.toFixed(2));
+      bind("T", "T", (v) => v);
+      bind("lam", "lamBps", (v) => v.toFixed(1));
+      bind("qsize", "qsize", (v) => v);
+      bind("fee", "feeBps", (v) => v.toFixed(1));
+      bind("maxhalf", "maxHalfSpreadBps", (v) => v);
+      document.getElementById("toxfn").onchange = (e) =>
+        (P.toxfn = e.target.value);
+      document.getElementById("scen").onchange = (e) => {
+        P.scen = e.target.checked;
+        ["osig", "ovpin", "oq"].forEach(
+          (id) => (document.getElementById(id).disabled = !P.scen),
+        );
+      };
+      bind("osig", "osig", (v) => v);
+      bind("ovpin", "ovpin", (v) => v.toFixed(2));
+      bind("oq", "oq", (v) => v.toLocaleString());
+      document.getElementById("manualInventory").oninput = (e) => {
+        const value = parseFloat(e.target.value);
+        P.manualInventory = isFinite(value) ? value : 0;
+        runMM();
+      };
+
+      /* ---- Custom Quote Margin (Section 8) ---- */
+      document.getElementById("bidMargin").oninput = (e) => {
+        P.bidMarginBps = parseFloat(e.target.value);
+        document.getElementById("v-bidMargin").textContent =
+          P.bidMarginBps.toFixed(1);
+        if (P.symMargin) {
+          P.askMarginBps = P.bidMarginBps;
+          document.getElementById("askMargin").value = P.bidMarginBps;
+          document.getElementById("v-askMargin").textContent =
+            P.bidMarginBps.toFixed(1);
+        }
+      };
+      document.getElementById("askMargin").oninput = (e) => {
+        P.askMarginBps = parseFloat(e.target.value);
+        document.getElementById("v-askMargin").textContent =
+          P.askMarginBps.toFixed(1);
+      };
+      document.getElementById("symMargin").onchange = (e) => {
+        P.symMargin = e.target.checked;
+        document.getElementById("askMargin").disabled = P.symMargin;
+        if (P.symMargin) {
+          P.askMarginBps = P.bidMarginBps;
+          document.getElementById("askMargin").value = P.bidMarginBps;
+          document.getElementById("v-askMargin").textContent =
+            P.bidMarginBps.toFixed(1);
+        }
+      };
+      document.getElementById("btn-reset-margin").onclick = () => {
+        P.bidMarginBps = 2;
+        P.askMarginBps = 2;
+        P.symMargin = true;
+        document.getElementById("symMargin").checked = true;
+        document.getElementById("bidMargin").value = 2;
+        document.getElementById("v-bidMargin").textContent = "2.0";
+        document.getElementById("askMargin").value = 2;
+        document.getElementById("v-askMargin").textContent = "2.0";
+        document.getElementById("askMargin").disabled = true;
+      };
+
+      document.getElementById("sel-ex").onchange = (e) => {
+        state.exchange = e.target.value;
+        populateSymbols();
+        connect();
+      };
+      document.getElementById("btn-connect").onclick = () => connect();
+      document.getElementById("btn-pause").onclick = () => {
+        state.paused = !state.paused;
+        document.getElementById("btn-pause").textContent = state.paused
+          ? "Resume charts"
+          : "Pause charts";
+      };
+      document.getElementById("btn-reset-sim").onclick = () => resetSim();
+
+      /* ========== SYMBOL DISCOVERY ==========
+   ROOT CAUSE of broken Kraken symbol switching / cross-exchange gaps:
+   the original code used Kraken's raw AssetPairs KEY (e.g. "USDCUSD")
+   as the WebSocket subscription "pair", but Kraken's WS API requires the
+   "wsname" field (e.g. "USDC/USD") — only ONE pair ("USDTZUSD") was
+   special-cased to work at all; every other Kraken pair silently failed
+   to subscribe. FIX: use wsname directly as the canonical symbol value
+   end-to-end, so there is no special-casing left anywhere. */
+      async function discoverSymbols() {
+        try {
+          const r = await fetch("https://api.binance.com/api/v3/exchangeInfo");
+          const j = await r.json();
+          const quoteAssets = new Set([
+            "USDT",
+            "USDC",
+            "FDUSD",
+            "BUSD",
+            "TUSD",
+            "USDP",
+            "DAI",
+            "USD",
+          ]);
+          state.symbols.binance = j.symbols
+            .filter(
+              (s) =>
+                s.status === "TRADING" &&
+                quoteAssets.has(s.quoteAsset) &&
+                s.baseAsset !== s.quoteAsset,
+            )
+            .map((s) => s.symbol)
+            .filter((v, i, a) => a.indexOf(v) === i)
+            .sort();
+          if (!state.symbols.binance.length)
+            state.symbols.binance = ["USDCUSDT", "FDUSDUSDT", "TUSDUSDT"];
+        } catch (e) {
+          state.symbols.binance = ["USDCUSDT", "FDUSDUSDT", "TUSDUSDT"];
+          state.err = "Binance exchangeInfo: " + e.message;
+        }
+
+        try {
+          const r = await fetch("https://api.kraken.com/0/public/AssetPairs");
+          const j = await r.json();
+          const quoteCodes = new Set([
+            "USDT",
+            "USDC",
+            "USD",
+            "DAI",
+            "USDP",
+            "TUSD",
+            "FDUSD",
+          ]);
+          const wsnames = [];
+          Object.values(j.result || {}).forEach((p) => {
+            if (!p.wsname) return;
+            const parts = p.wsname.split("/");
+            if (parts.length !== 2) return;
+            if (quoteCodes.has(parts[1]) && parts[0] !== parts[1])
+              wsnames.push(p.wsname);
+          });
+          state.symbols.kraken = [...new Set(wsnames)].sort();
+          if (!state.symbols.kraken.length)
+            state.symbols.kraken = ["USDT/USD", "USDC/USD"];
+        } catch (e) {
+          state.symbols.kraken = ["USDT/USD", "USDC/USD"];
+        }
+        populateSymbols();
+        connect(); // auto-connect once symbols are known so the dashboard is live on load
+      }
+      function populateSymbols() {
+        const sel = document.getElementById("sel-sym");
+        sel.innerHTML = "";
+        const list = state.symbols[state.exchange] || [];
+        list.forEach((s) => {
+          const o = document.createElement("option");
+          o.value = s;
+          o.textContent = s.replace(/^XBT\//, "BTC/");
+          sel.appendChild(o);
+        });
+        state.symbol = list.length ? list[0] : null;
+        sel.onchange = () => {
+          state.symbol = sel.value;
+          reconnect();
+        };
+      }
+
+      /* ========== EXCHANGE ADAPTERS ========== */
+      function reconnect() {
+        disconnect();
+        connect();
+      }
+      function disconnect() {
+        if (state.ws) {
+          try {
+            state.ws.close();
+          } catch (e) {}
+          state.ws = null;
+        }
+        state.connected = false;
+        updateStatus();
+      }
+
+      function connect() {
+        if (!state.symbol) return;
+        disconnect();
+        resetForNewMarket();
+        if (state.exchange === "binance") connectBinance();
+        else connectKraken();
+      }
+
+      function connectBinance() {
+        const sym = (state.symbol || "USDCUSDT").toLowerCase();
+        const streams = `${sym}@bookTicker/${sym}@trade/${sym}@depth20@100ms`;
+        const url = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+        const ws = new WebSocket(url);
+        state.ws = ws;
+        ws.onopen = () => {
+          state.connected = true;
+          state.err = null;
+          updateStatus();
+        };
+        ws.onclose = () => {
+          if (ws !== state.ws) return;
+          state.connected = false;
+          updateStatus();
+          setTimeout(() => {
+            if (ws === state.ws && state.exchange === "binance")
+              connectBinance();
+          }, 2000);
+        };
+        ws.onerror = () => {
+          state.err = "Binance WS error (try local HTTP server if file://)";
+          updateStatus();
+        };
+        ws.onmessage = (ev) => {
+          state.lastMsg = Date.now();
+          state.msgs++;
+          try {
+            const msg = JSON.parse(ev.data);
+            const data = msg.data || msg;
+            const stream = msg.stream || "";
+            if (
+              stream.includes("bookTicker") ||
+              (data.b !== undefined &&
+                data.a !== undefined &&
+                data.u !== undefined &&
+                !data.e)
+            ) {
+              state.bid = parseFloat(data.b);
+              state.ask = parseFloat(data.a);
+              state.mid = (state.bid + state.ask) / 2;
+              state.bookSec++;
+              state.lastBookMsg = Date.now();
+              onBookTop();
+            } else if (data.e === "trade" || stream.includes("@trade")) {
+              const px = parseFloat(data.p),
+                qty = parseFloat(data.q);
+              const side = data.m ? "sell" : "buy"; // m=true => buyer is maker => seller is aggressor
+              state.classMode = "Exchange-provided (Binance aggressor flag)";
+              state.lastTradeMsg = Date.now();
+              onTrade(Date.now(), px, qty, side);
+            } else if (stream.includes("depth") || data.bids) {
+              state.bids = (data.bids || [])
+                .map((x) => ({ p: +x[0], q: +x[1] }))
+                .slice(0, P.depth);
+              state.asks = (data.asks || [])
+                .map((x) => ({ p: +x[0], q: +x[1] }))
+                .slice(0, P.depth);
+              state.bookSec++;
+              state.lastBookMsg = Date.now();
+              renderBook();
+            }
+          } catch (e) {}
+        };
+      }
+
+      function krakenDepth(d) {
+        const allowed = [10, 25, 100, 500, 1000];
+        return allowed.reduce((a, b) =>
+          Math.abs(b - d) < Math.abs(a - d) ? b : a,
+        );
+      }
+
+      function connectKraken() {
+        const pair = state.symbol || "USDT/USD"; // canonical wsname, see discoverSymbols()
+        const ws = new WebSocket("wss://ws.kraken.com");
+        state.ws = ws;
+        ws.onopen = () => {
+          state.connected = true;
+          state.err = null;
+          updateStatus();
+          ws.send(
+            JSON.stringify({
+              event: "subscribe",
+              pair: [pair],
+              subscription: { name: "ticker" },
+            }),
+          );
+          ws.send(
+            JSON.stringify({
+              event: "subscribe",
+              pair: [pair],
+              subscription: { name: "trade" },
+            }),
+          );
+          ws.send(
+            JSON.stringify({
+              event: "subscribe",
+              pair: [pair],
+              subscription: { name: "book", depth: krakenDepth(P.depth) },
+            }),
+          );
+        };
+        ws.onclose = () => {
+          if (ws !== state.ws) return;
+          state.connected = false;
+          updateStatus();
+          setTimeout(() => {
+            if (ws === state.ws && state.exchange === "kraken") connectKraken();
+          }, 2500);
+        };
+        ws.onerror = () => {
+          state.err = "Kraken WS error";
+          updateStatus();
+        };
+        ws.onmessage = (ev) => {
+          state.lastMsg = Date.now();
+          state.msgs++;
+          try {
+            const msg = JSON.parse(ev.data);
+            if (msg.event) {
+              if (
+                msg.event === "subscriptionStatus" &&
+                msg.status === "error"
+              ) {
+                state.err = `Kraken ${msg.channelName || "subscription"}: ${msg.errorMessage || "subscription failed"}`;
+                updateStatus();
+              }
+              return;
+            }
+            if (!Array.isArray(msg)) return;
+            const ch = msg[msg.length - 2];
+            const data = msg[1];
+            if (ch === "ticker") {
+              state.bid = parseFloat(data.b[0]);
+              state.ask = parseFloat(data.a[0]);
+              state.mid = (state.bid + state.ask) / 2;
+              state.last = parseFloat(data.c[0]);
+              state.lastBookMsg = Date.now();
+              onBookTop();
+            } else if (ch === "trade") {
+              state.classMode = "Exchange-provided (Kraken trade-side field)";
+              state.lastTradeMsg = Date.now();
+              (data || []).forEach((t) => {
+                const px = +t[0],
+                  qty = +t[1],
+                  side = t[3] === "b" ? "buy" : "sell";
+                onTrade(Date.now(), px, qty, side);
+              });
+            } else if (typeof ch === "string" && ch.startsWith("book-")) {
+              if (data.as) state.asks = mergeKrakenLevels(state.asks, data.as);
+              if (data.bs) state.bids = mergeKrakenLevels(state.bids, data.bs);
+              if (data.a) state.asks = mergeKrakenLevels(state.asks, data.a);
+              if (data.b) state.bids = mergeKrakenLevels(state.bids, data.b);
+              state.lastBookMsg = Date.now();
+              renderBook();
+            }
+          } catch (e) {}
+        };
+      }
+
+      function mergeKrakenLevels(current, updates) {
+        const levels = new Map(current.map((level) => [level.p, level.q]));
+        updates.forEach(([price, quantity]) => {
+          const p = +price,
+            q = +quantity;
+          if (q === 0) levels.delete(p);
+          else levels.set(p, q);
+        });
+        return [...levels]
+          .map(([p, q]) => ({ p, q }))
+          .sort((a, b) => a.p - b.p)
+          .slice(0, P.depth);
+      }
+
+      /* ROOT CAUSE of "asset switching doesn't propagate": the original
+   resetMarketBuffers() cleared trade/return/bucket buffers but left
+   state.bid/ask/mid/last/rv/_mm untouched, so stale values from the
+   PREVIOUS symbol kept being displayed (and fed into the dynamic
+   spread engine) until enough fresh data happened to arrive for the
+   new symbol. resetForNewMarket() below clears every piece of
+   per-market state, including the sim (inventory is denominated in
+   units of whichever symbol is selected, so it cannot carry over). */
+      function resetForNewMarket() {
+        state.bid = NaN;
+        state.ask = NaN;
+        state.mid = NaN;
+        state.last = NaN;
+        state.trades = [];
+        state.mids = [];
+        state.spreads = [];
+        state.buckets = [];
+        state.curBuy = state.curSell = state.curVol = 0;
+        state.vpin = NaN;
+        state.rv = NaN;
+        state.vpinHist = [];
+        state.ofiHist = [];
+        state.returns = [];
+        state.quotesHist = [];
+        state.dynamicSpreads = [];
+        state.obsSpreadHist = [];
+        state.bids = [];
+        state.asks = [];
+        state.bookVolumes = { bids: new Map(), asks: new Map() };
+        state.lastObi = NaN;
+        state._mm = null;
+        state.classMode = "—";
+        state.lastTradeMsg = 0;
+        state.lastBookMsg = 0;
+        if (state.exchange === "binance") state.xBinanceMid = NaN;
+        else state.xKrakenMid = NaN;
+        resetSim();
+      }
+
+      function resetSim() {
+        state.inv = 0;
+        state.cash = 0;
+        state.spreadCap = 0;
+        state.advSel = 0;
+        state.fees = 0;
+        state.bidFills = 0;
+        state.askFills = 0;
+        state.fills = [];
+        state.pendingMarks = [];
+        state.pnlHist = [];
+        state.t0 = Date.now() / 1000;
+      }
+
+      function isStale() {
+        return !!(
+          state.connected &&
+          state.lastMsg &&
+          Date.now() - state.lastMsg > STALE_MS
+        );
+      }
+
+      /* ========== CORE ENGINES ========== */
+      function onBookTop() {
+        if (!isFinite(state.mid)) return;
+        const t = Date.now();
+        push(state.mids, { t, v: state.mid }, windowSize(5000));
+        const spr = state.ask - state.bid;
+        const bps = state.mid ? (spr / state.mid) * 10000 : NaN;
+        push(state.spreads, { t, v: bps }, windowSize(5000));
+        if (state.mids.length > 1) {
+          const a = state.mids[state.mids.length - 2].v,
+            b = state.mid;
+          if (a > 0)
+            push(state.returns, { t, v: Math.log(b / a) }, windowSize(2000));
+        }
+        calcRV();
+        runMM();
+        if (state.exchange === "binance") state.xBinanceMid = state.mid;
+        if (state.exchange === "kraken") state.xKrakenMid = state.mid;
+      }
+
+      function onTrade(t, px, qty, side) {
+        state.last = px;
+        state.tradesSec++;
+        const notional = px * qty;
+        push(state.trades, { t, px, qty, side, notional }, windowSize(5000));
+        if (side === "buy") state.curBuy += notional;
+        else state.curSell += notional;
+        state.curVol += notional;
+        if (state.curVol >= P.bucket) {
+          state.buckets.push({
+            buy: state.curBuy,
+            sell: state.curSell,
+            vol: state.curVol,
+          });
+          if (state.buckets.length > P.nbuckets * 2)
+            state.buckets = state.buckets.slice(-P.nbuckets * 2);
+          state.curBuy = state.curSell = state.curVol = 0;
+          calcVPIN();
+        }
+        const cut = t - 60000;
+        let b = 0,
+          s = 0;
+        state.trades.forEach((tr) => {
+          if (tr.t >= cut) {
+            if (tr.side === "buy") b += tr.notional;
+            else s += tr.notional;
+          }
+        });
+        const ofi = b + s > 0 ? (b - s) / (b + s) : 0;
+        push(state.ofiHist, { t, v: ofi }, windowSize(3000));
+        checkSimFill(t, px, side, qty);
+        tryMarkouts(t);
+      }
+
+      function calcVPIN() {
+        const n = Math.min(P.nbuckets, state.buckets.length);
+        if (n < 3) {
+          state.vpin = NaN;
+          return;
+        }
+        const slice = state.buckets.slice(-n);
+        let num = 0,
+          den = 0;
+        slice.forEach((bk) => {
+          num += Math.abs(bk.buy - bk.sell);
+          den += bk.vol;
+        });
+        state.vpin = den > 0 ? num / den : NaN;
+        push(
+          state.vpinHist,
+          { t: Date.now(), v: state.vpin },
+          windowSize(3000),
+        );
+      }
+
+      function calcRV() {
+        const rets = state.returns.slice(-120).map((x) => x.v);
+        if (rets.length < 10) {
+          state.rv = NaN;
+          return;
+        }
+        const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+        let v = 0;
+        rets.forEach((r) => (v += (r - mean) ** 2));
+        const std = Math.sqrt(v / (rets.length - 1));
+        let dt = 1000;
+        if (state.returns.length > 2) {
+          const dts = [];
+          for (let i = 1; i < Math.min(50, state.returns.length); i++)
+            dts.push(state.returns[i].t - state.returns[i - 1].t);
+          dts.sort((a, b) => a - b);
+          dt = dts[Math.floor(dts.length / 2)] || 1000;
+        }
+        const perYear = (365.25 * 24 * 3600 * 1000) / dt;
+        state.rv = std * Math.sqrt(perYear);
+      }
+
+      function toxFactor(vpin) {
+        if (!isFinite(vpin)) return 0;
+        if (P.toxfn === "sq") return vpin * vpin;
+        if (P.toxfn === "thr") return Math.max(0, vpin - P.toxth);
+        return vpin;
+      }
+
+      function topDepthNotional() {
+        let s = 0;
+        state.bids.forEach((x) => (s += x.p * x.q));
+        state.asks.forEach((x) => (s += x.p * x.q));
+        return s;
+      }
+
+      /* ========== DYNAMIC SPREAD ENGINE (rebuilt bps-native, see notes at top) ========== */
+      function runMM() {
+        if (
+          !isFinite(state.mid) ||
+          !isFinite(state.bid) ||
+          !isFinite(state.ask)
+        ) {
+          state._mm = null;
+          return;
+        }
+        const mid = state.mid;
+        const now = Date.now() / 1000;
+        const tau = Math.max(1, P.T - (now - state.t0));
+        const secYear = 365.25 * 24 * 3600;
+
+        let sigmaAnn = state.rv,
+          vpin = state.vpin,
+          q = state.inv + P.manualInventory;
+        let sigmaKnown = isFinite(sigmaAnn),
+          vpinKnown = isFinite(vpin);
+        if (P.scen) {
+          sigmaAnn = P.osig / 100;
+          vpin = P.ovpin;
+          q = P.oq;
+          sigmaKnown = true;
+          vpinKnown = true;
+        }
+
+        // BASE: half of the currently observed live spread (bps) - always well-defined and tied
+        // to real order-book/liquidity conditions of the SELECTED market (Section 15).
+        const obsSpreadBps = ((state.ask - state.bid) / mid) * 10000;
+        const baseBps = Math.max(0, obsSpreadBps / 2);
+
+        // VOLATILITY: sigma expressed as bps-per-sqrt(second). Using sqrt(gamma*tau) keeps the
+        // component in genuine bps units (a variance-like quantity square-rooted back to a
+        // spread-like scale) instead of mixing raw price with a dimensionless log term.
+        const sigmaBps = sigmaKnown
+          ? (sigmaAnn / Math.sqrt(secYear)) * 10000
+          : 0;
+        const volBps = sigmaKnown
+          ? Math.sqrt(Math.max(P.gamma, 1e-6)) * sigmaBps * Math.sqrt(tau)
+          : 0;
+
+        // TOXICITY: lamBps is DEFINED as "bps added at VPIN=1" - unambiguously bps, no conversion needed.
+        const toxBps = vpinKnown ? P.lamBps * toxFactor(vpin) : 0;
+
+        // LIQUIDITY: widen when our clip size is large relative to visible top-of-book depth.
+        const qsizeNotional = P.qsize * mid;
+        const depthNotional = topDepthNotional();
+        const liqBps =
+          depthNotional > 0
+            ? Math.min(80, (qsizeNotional / depthNotional) * 10 * P.kappa)
+            : 0;
+
+        let dynHalfBps = baseBps + volBps + toxBps + liqBps;
+        const clamped = dynHalfBps > P.maxHalfSpreadBps;
+        dynHalfBps = Math.min(dynHalfBps, P.maxHalfSpreadBps); // documented risk-control ceiling, not a bug mask
+
+        // Inventory skew (bps), scaled by the live volatility regime; applied to the reservation price.
+        const qNorm = P.qsize ? q / P.qsize : 0;
+        const skewBps = qNorm * volBps;
+        const r = mid * (1 - skewBps / 10000);
+
+        const dynBid = r * (1 - dynHalfBps / 10000);
+        const dynAsk = r * (1 + dynHalfBps / 10000);
+
+        // Custom user margin (Sections 8-11): bps distance measured from the live MID.
+        const bidBps = P.bidMarginBps;
+        const askBpsV = P.symMargin ? P.bidMarginBps : P.askMarginBps;
+        const customBid = mid * (1 - bidBps / 10000);
+        const customAsk = mid * (1 + askBpsV / 10000);
+
+        // Final executable/paper quote (Section 9): dynamic model quote extended further by the
+        // custom margin - never overwrites the model, always visibly additive.
+        const finalBid = dynBid - (mid * bidBps) / 10000;
+        const finalAsk = dynAsk + (mid * askBpsV) / 10000;
+
+        state._mm = {
+          mid,
+          r,
+          tau,
+          sigmaAnn,
+          sigmaKnown,
+          vpin,
+          vpinKnown,
+          q,
+          baseBps,
+          volBps,
+          toxBps,
+          liqBps,
+          dynHalfBps,
+          clamped,
+          skewBps,
+          dynBid,
+          dynAsk,
+          customBid,
+          customAsk,
+          finalBid,
+          finalAsk,
+          bidBps,
+          askBps: askBpsV,
+        };
+        const t = Date.now();
+        push(
+          state.quotesHist,
+          {
+            t,
+            mid,
+            liveBid: state.bid,
+            liveAsk: state.ask,
+            r,
+            dynBid,
+            dynAsk,
+            customBid,
+            customAsk,
+            finalBid,
+            finalAsk,
+          },
+          windowSize(4000),
+        );
+        push(state.dynamicSpreads, { t, v: dynHalfBps * 2 }, windowSize(1200)); // full spread, bps
+        push(state.obsSpreadHist, { t, v: obsSpreadBps }, windowSize(1200));
+        push(state.invHist, { t, v: q }, windowSize(4000));
+      }
+
+      setInterval(() => {
+        if (state.connected && isFinite(state.mid)) runMM();
+      }, 1000);
+
+      function checkSimFill(t, px, side, qty) {
+        const mm = state._mm;
+        if (!mm || isStale()) return;
+        const units = P.qsize;
+        if (side === "buy" && px >= mm.finalAsk) {
+          const fillPx = mm.finalAsk;
+          state.inv -= units;
+          state.cash += fillPx * units;
+          state.askFills++;
+          const mid = mm.mid;
+          state.spreadCap += (fillPx - mid) * units;
+          const fee = (Math.abs(fillPx * units) * P.feeBps) / 10000;
+          state.fees += fee;
+          state.cash -= fee;
+          state.fills.push({
+            t,
+            side: "ask",
+            px: fillPx,
+            mid,
+            vpin: mm.vpinKnown ? mm.vpin : NaN,
+            units,
+          });
+          state.pendingMarks.push({
+            t,
+            side: "ask",
+            px: fillPx,
+            mid0: mid,
+            units,
+            done: {},
+          });
+        } else if (side === "sell" && px <= mm.finalBid) {
+          const fillPx = mm.finalBid;
+          state.inv += units;
+          state.cash -= fillPx * units;
+          state.bidFills++;
+          const mid = mm.mid;
+          state.spreadCap += (mid - fillPx) * units;
+          const fee = (Math.abs(fillPx * units) * P.feeBps) / 10000;
+          state.fees += fee;
+          state.cash -= fee;
+          state.fills.push({
+            t,
+            side: "bid",
+            px: fillPx,
+            mid,
+            vpin: mm.vpinKnown ? mm.vpin : NaN,
+            units,
+          });
+          state.pendingMarks.push({
+            t,
+            side: "bid",
+            px: fillPx,
+            mid0: mid,
+            units,
+            done: {},
+          });
+        }
+        const mtm = state.cash + state.inv * mm.mid;
+        push(state.pnlHist, { t, v: mtm }, windowSize(4000));
+      }
+
+      function tryMarkouts(now) {
+        state.pendingMarks.forEach((m) => {
+          const age = (now - m.t) / 1000;
+          [1, 5, 30].forEach((h) => {
+            if (age >= h && m.done[h] === undefined && isFinite(state.mid)) {
+              let as;
+              if (m.side === "bid") {
+                as = (m.px - state.mid) * m.units;
+              } else {
+                as = (state.mid - m.px) * m.units;
+              }
+              m.done[h] = as;
+              if (h === 30) state.advSel += as;
+            }
+          });
+        });
+        state.pendingMarks = state.pendingMarks.filter(
+          (m) => now - m.t < 120000,
+        );
+      }
+
+      function push(arr, item, max) {
+        arr.push(item);
+        if (arr.length > max) arr.shift();
+      }
+
+      /* ========== SANITY CHECKS (Section 23) ========== */
+      function sanityIssues() {
+        const iss = [];
+        if (isFinite(state.bid) && isFinite(state.ask) && state.bid > state.ask)
+          iss.push("Best bid > best ask (transient book inconsistency)");
+        if (isFinite(state.mid) && state.mid <= 0)
+          iss.push("Non-positive mid price");
+        if (isFinite(state.vpin) && (state.vpin < 0 || state.vpin > 1))
+          iss.push("VPIN outside [0,1]: " + state.vpin.toFixed(3));
+        if (
+          isFinite(state.lastObi) &&
+          (state.lastObi < -1 || state.lastObi > 1)
+        )
+          iss.push("Order-book imbalance outside [-1,1]");
+        const mm = state._mm;
+        if (mm) {
+          if (!isFinite(mm.dynBid) || !isFinite(mm.dynAsk))
+            iss.push("Dynamic quote is NaN/Infinity");
+          if (
+            isFinite(mm.dynBid) &&
+            isFinite(mm.dynAsk) &&
+            mm.dynBid > mm.dynAsk
+          )
+            iss.push("Dynamic bid > dynamic ask");
+          if (mm.dynHalfBps * 2 > 2000)
+            iss.push("Dynamic spread exceeds 2000 bps - inspect inputs");
+          if (mm.clamped)
+            iss.push(
+              "Dynamic half-spread hit the configured risk-control ceiling (" +
+                P.maxHalfSpreadBps +
+                " bps) and was clamped",
+            );
+        }
+        return iss;
+      }
+
+      /* ========== RENDER ========== */
+      function updateStatus() {
+        const dot = document.getElementById("dot-ws");
+        const st = document.getElementById("st-ws");
+        if (state.connected) {
+          dot.className = isStale() ? "dot warn" : "dot on";
+          st.textContent = isStale()
+            ? "Connected (stale)"
+            : "WebSocket Connected";
+        } else {
+          dot.className = "dot off";
+          st.textContent = "Disconnected";
+        }
+        const ago = state.lastMsg
+          ? Date.now() - state.lastMsg + " ms ago"
+          : "—";
+        document.getElementById("st-detail").textContent =
+          `Last msg: ${ago} · ${state.exchange} · ${state.symbol || ""}` +
+          (state.err ? " · " + state.err : "");
+      }
+
+      function renderBook() {
+        const mid = state.mid,
+          n = P.depth;
+        const asks = [...state.asks].slice(0, n).reverse();
+        const bids = state.bids.slice(0, n);
+        let vb = 0,
+          va = 0;
+        document.getElementById("tb-asks").innerHTML = asks
+          .map((x) => {
+            va += x.q;
+            const dist = mid ? (((x.p - mid) / mid) * 10000).toFixed(1) : "—";
+            const volumeClass = bookVolumeClass("asks", x);
+            return `<tr class="ob-ask"><td>${x.p}</td><td class="${volumeClass}">${x.q}</td><td>${(x.p * x.q).toFixed(0)}</td><td>${dist}</td></tr>`;
+          })
+          .join("");
+        document.getElementById("tb-bids").innerHTML = bids
+          .map((x) => {
+            vb += x.q;
+            const dist = mid ? (((mid - x.p) / mid) * 10000).toFixed(1) : "—";
+            const volumeClass = bookVolumeClass("bids", x);
+            return `<tr class="ob-bid"><td>${x.p}</td><td class="${volumeClass}">${x.q}</td><td>${(x.p * x.q).toFixed(0)}</td><td>${dist}</td></tr>`;
+          })
+          .join("");
+        state.bookVolumes.asks = new Map(asks.map((x) => [x.p, x.q]));
+        state.bookVolumes.bids = new Map(bids.map((x) => [x.p, x.q]));
+        const obi = vb + va > 0 ? (vb - va) / (vb + va) : 0;
+        state.lastObi = obi;
+        document.getElementById("ob-obi").textContent = obi.toFixed(3);
+        document.getElementById("ob-bd").textContent = vb.toFixed(2);
+        document.getElementById("ob-ad").textContent = va.toFixed(2);
+        document.getElementById("ob-spr").textContent = isFinite(
+          state.ask - state.bid,
+        )
+          ? (state.ask - state.bid).toPrecision(4)
+          : "—";
+      }
+
+      function bookVolumeClass(side, level) {
+        const previous = state.bookVolumes[side].get(level.p);
+        if (previous === undefined || previous === level.q) return "";
+        return level.q > previous ? "ob-volume-up" : "ob-volume-down";
+      }
+
+      function regime() {
+        const hiVol = isFinite(state.rv) && state.rv > 0.3;
+        const hiTox = isFinite(state.vpin) && state.vpin > P.toxth;
+        const hiInv = Math.abs(state.inv) > P.qsize * 20;
+        if (hiVol && hiTox) return "MULTI-FACTOR STRESS";
+        if (hiTox) return "TOXIC FLOW";
+        if (hiVol) return "VOLATILE";
+        if (hiInv) return "INVENTORY STRESSED";
+        return "NORMAL";
+      }
+
+      function vpinDisplay() {
+        if (state.buckets.length < 3)
+          return `Collecting: ${state.buckets.length}/3 buckets`;
+        return fmt(state.vpin, 3);
+      }
+      function rvDisplay() {
+        if (state.returns.length < 10)
+          return `Collecting: ${state.returns.length}/10 obs`;
+        return isFinite(state.rv) ? (state.rv * 100).toFixed(1) + "%" : "—";
+      }
+
+      function uiTick() {
+        updateStatus();
+        const staleBanner = document.getElementById("stale-banner");
+        if (isStale()) {
+          staleBanner.style.display = "block";
+          staleBanner.textContent = `STALE DATA — last update ${((Date.now() - state.lastMsg) / 1000).toFixed(1)}s ago for ${state.exchange}/${state.symbol || "?"}. Sim fills are paused until fresh data arrives.`;
+        } else staleBanner.style.display = "none";
+
+        if (!state.paused) {
+          document.getElementById("m-exsym").textContent =
+            `${state.exchange} · ${state.symbol || "—"}`;
+          document.getElementById("m-mid").textContent = fmt(state.mid, 6);
+          document.getElementById("m-bid").textContent = fmt(state.bid, 6);
+          document.getElementById("m-ask").textContent = fmt(state.ask, 6);
+          const bps =
+            state.mid && isFinite(state.ask - state.bid)
+              ? ((state.ask - state.bid) / state.mid) * 10000
+              : NaN;
+          document.getElementById("m-spr").textContent = fmt(bps, 2);
+          document.getElementById("m-last").textContent = fmt(state.last, 6);
+          document.getElementById("m-tps").textContent = state._tps || "0";
+          document.getElementById("m-rv").textContent = rvDisplay();
+          document.getElementById("m-vpin").textContent = vpinDisplay();
+          document.getElementById("m-regime").textContent = regime();
+          const dev = isFinite(state.mid) ? (state.mid - 1) * 10000 : NaN;
+          document.getElementById("m-dev").textContent = isFinite(state.mid)
+            ? fmt(dev, 1)
+            : "—";
+
+          const cut = Date.now() - 60000;
+          let b = 0,
+            s = 0;
+          state.trades.forEach((tr) => {
+            if (tr.t >= cut) {
+              if (tr.side === "buy") b += tr.notional;
+              else s += tr.notional;
+            }
+          });
+          document.getElementById("f-buy").textContent = b.toFixed(0);
+          document.getElementById("f-sell").textContent = s.toFixed(0);
+          document.getElementById("f-ofi").textContent =
+            b + s ? ((b - s) / (b + s)).toFixed(3) : "—";
+          document.getElementById("f-vpin").textContent = vpinDisplay();
+          document.getElementById("f-nb").textContent = state.buckets.length;
+          document.getElementById("f-cls").textContent = state.classMode;
+
+          const mm = state._mm;
+          if (mm) {
+            document.getElementById("mm-mid").textContent = fmt(mm.mid, 6);
+            document.getElementById("mm-r").textContent = fmt(mm.r, 6);
+            document.getElementById("mm-base").textContent =
+              fmt(mm.baseBps, 2) + " bps";
+            document.getElementById("mm-vol").textContent = mm.sigmaKnown
+              ? fmt(mm.volBps, 2) + " bps"
+              : "n/a — insufficient live observations";
+            document.getElementById("mm-tox").textContent = mm.vpinKnown
+              ? fmt(mm.toxBps, 2) + " bps"
+              : "n/a — insufficient live observations";
+            document.getElementById("mm-liq").textContent =
+              fmt(mm.liqBps, 2) + " bps";
+            document.getElementById("mm-dyn").textContent =
+              fmt(mm.dynHalfBps, 2) + " bps" + (mm.clamped ? " (clamped)" : "");
+            document.getElementById("mm-skew").textContent =
+              fmt(mm.skewBps, 3) + " bps";
+            document.getElementById("mm-dynbid").textContent = fmt(
+              mm.dynBid,
+              6,
+            );
+            document.getElementById("mm-dynask").textContent = fmt(
+              mm.dynAsk,
+              6,
+            );
+            document.getElementById("mm-custbid").textContent =
+              fmt(mm.customBid, 6) + " (" + fmt(mm.bidBps, 1) + " bps)";
+            document.getElementById("mm-custask").textContent =
+              fmt(mm.customAsk, 6) + " (" + fmt(mm.askBps, 1) + " bps)";
+            document.getElementById("mm-finalbid").textContent = fmt(
+              mm.finalBid,
+              6,
+            );
+            document.getElementById("mm-finalask").textContent = fmt(
+              mm.finalAsk,
+              6,
+            );
+            document.getElementById("mm-q").textContent = mm.q.toFixed(6);
+            document.getElementById("mm-sig").textContent = mm.sigmaKnown
+              ? (mm.sigmaAnn * 100).toFixed(2) + "%"
+              : "Insufficient live observations";
+          } else {
+            [
+              "mm-mid",
+              "mm-r",
+              "mm-base",
+              "mm-vol",
+              "mm-tox",
+              "mm-liq",
+              "mm-dyn",
+              "mm-skew",
+              "mm-dynbid",
+              "mm-dynask",
+              "mm-custbid",
+              "mm-custask",
+              "mm-finalbid",
+              "mm-finalask",
+              "mm-q",
+              "mm-sig",
+            ].forEach((id) => {
+              const el = document.getElementById(id);
+              if (el) el.textContent = "Waiting for live data";
+            });
+          }
+
+          const mid0 = mm ? mm.mid : state.mid;
+          const mtm = state.cash + state.inv * (mid0 || 0);
+          document.getElementById("s-cash").textContent = state.cash.toFixed(4);
+          document.getElementById("s-q").textContent = state.inv.toFixed(0);
+          document.getElementById("s-pnl").textContent = mtm.toFixed(4);
+          document.getElementById("s-sc").textContent =
+            state.spreadCap.toFixed(4);
+          document.getElementById("s-ip").textContent = (
+            mtm -
+            state.spreadCap +
+            state.fees
+          ).toFixed(4);
+          document.getElementById("s-as").textContent = state.advSel.toFixed(4);
+          document.getElementById("s-fee").textContent = state.fees.toFixed(4);
+          document.getElementById("s-fills").textContent =
+            state.bidFills + "/" + state.askFills;
+          renderMarkouts();
+
+          document.getElementById("x-b").textContent = fmt(
+            state.xBinanceMid,
+            6,
+          );
+          document.getElementById("x-k").textContent = fmt(state.xKrakenMid, 6);
+          if (
+            isFinite(state.xBinanceMid) &&
+            isFinite(state.xKrakenMid) &&
+            state.xKrakenMid
+          ) {
+            document.getElementById("x-d").textContent = (
+              ((state.xBinanceMid - state.xKrakenMid) / state.xKrakenMid) *
+              10000
+            ).toFixed(2);
+          } else document.getElementById("x-d").textContent = "—";
+
+          document.getElementById("diag").textContent =
+            `Exchange: ${state.exchange.toUpperCase()}
+Connection: ${state.connected ? "CONNECTED" : "DISCONNECTED"}${isStale() ? " — STALE" : ""}
+Selected symbol: ${state.symbol || "—"}
+Last trade msg: ${state.lastTradeMsg ? Date.now() - state.lastTradeMsg + " ms ago" : "—"}
+Last order-book msg: ${state.lastBookMsg ? Date.now() - state.lastBookMsg + " ms ago" : "—"}
+Last update (any): ${state.lastMsg ? Date.now() - state.lastMsg + " ms ago" : "—"}
+Trade messages/sec: ${state._tps || 0}
+Current bid/ask/mid: ${fmt(state.bid, 6)} / ${fmt(state.ask, 6)} / ${fmt(state.mid, 6)}
+VPIN buckets completed: ${state.buckets.length} (rolling window target: ${P.nbuckets})
+Volatility observations: ${state.returns.length} (need >= 10)
+Pending markout samples: ${state.pendingMarks.length}
+Fills (bid/ask): ${state.bidFills}/${state.askFills}
+Trade classification: ${state.classMode}
+Chart update status: ${state.paused ? "PAUSED (user)" : "running @ " + CHART_SAMPLE_MS + "ms sample"}
+Error: ${state.err || "none"}
+Note: partial depth (top ${P.depth}) used; full order-book sequence recovery is out of scope for a browser lab.`;
+
+          const iss = sanityIssues();
+          document.getElementById("sanity-list").innerHTML = iss.length
+            ? iss.map((x) => `<div>⚠ ${x}</div>`).join("")
+            : "No issues detected.";
+          renderUnitsPanel();
+        }
+        updateCharts();
+      }
+
+      function renderUnitsPanel() {
+        const mm = state._mm;
+        const rows = [
+          ["Mid", "(Bid+Ask)/2", "quote-ccy per unit", fmt(state.mid, 6)],
+          [
+            "Spread",
+            "Ask−Bid",
+            "quote-ccy per unit",
+            isFinite(state.ask - state.bid)
+              ? fmt(state.ask - state.bid, 6)
+              : "—",
+          ],
+          [
+            "Spread (bps)",
+            "(Ask−Bid)/Mid×10,000",
+            "bps",
+            isFinite(state.mid) && state.mid
+              ? fmt(((state.ask - state.bid) / state.mid) * 10000, 2)
+              : "—",
+          ],
+          [
+            "Order-book imbalance",
+            "(V_bid−V_ask)/(V_bid+V_ask)",
+            "dimensionless [-1,1]",
+            isFinite(state.lastObi) ? state.lastObi.toFixed(3) : "—",
+          ],
+          [
+            "Realised vol (ann.)",
+            "stdev(log returns)×√(periods/yr)",
+            "fraction of price / yr",
+            rvDisplay(),
+          ],
+          [
+            "VPIN",
+            "Σ|V_buy−V_sell| / (n×V_bucket)",
+            "dimensionless [0,1]",
+            vpinDisplay(),
+          ],
+          [
+            "Base spread component",
+            "max(0, observed_spread_bps/2)",
+            "bps",
+            mm ? fmt(mm.baseBps, 2) : "—",
+          ],
+          [
+            "Volatility component",
+            "√γ × σ_bps/√s × √τ",
+            "bps",
+            mm ? fmt(mm.volBps, 2) : "—",
+          ],
+          [
+            "Toxicity component",
+            "λ_bps × f(VPIN)",
+            "bps",
+            mm ? fmt(mm.toxBps, 2) : "—",
+          ],
+          [
+            "Liquidity component",
+            "min(80,(qsize·mid/depth)×10×κ)",
+            "bps",
+            mm ? fmt(mm.liqBps, 2) : "—",
+          ],
+          [
+            "Dynamic half-spread",
+            "base+vol+tox+liquidity, clamped ≤ ceiling",
+            "bps",
+            mm ? fmt(mm.dynHalfBps, 2) + (mm.clamped ? " (clamped)" : "") : "—",
+          ],
+          [
+            "Reservation price",
+            "Mid×(1−skew_bps/10,000)",
+            "quote-ccy per unit",
+            mm ? fmt(mm.r, 6) : "—",
+          ],
+          [
+            "Custom bid",
+            "Mid×(1−bidMarginBps/10,000)",
+            "quote-ccy per unit",
+            mm ? fmt(mm.customBid, 6) : "—",
+          ],
+          [
+            "Custom ask",
+            "Mid×(1+askMarginBps/10,000)",
+            "quote-ccy per unit",
+            mm ? fmt(mm.customAsk, 6) : "—",
+          ],
+          [
+            "Final bid (paper quote)",
+            "DynamicBid − Mid×bidMarginBps/10,000",
+            "quote-ccy per unit",
+            mm ? fmt(mm.finalBid, 6) : "—",
+          ],
+          [
+            "Final ask (paper quote)",
+            "DynamicAsk + Mid×askMarginBps/10,000",
+            "quote-ccy per unit",
+            mm ? fmt(mm.finalAsk, 6) : "—",
+          ],
+        ];
+        document.getElementById("tb-units").innerHTML = rows
+          .map(
+            (r) =>
+              `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`,
+          )
+          .join("");
+      }
+
+      function renderMarkouts() {
+        const buckets = {
+          Low: { n: 0, a1: 0, a5: 0, a30: 0, c1: 0, c5: 0, c30: 0 },
+          Medium: { n: 0, a1: 0, a5: 0, a30: 0, c1: 0, c5: 0, c30: 0 },
+          High: { n: 0, a1: 0, a5: 0, a30: 0, c1: 0, c5: 0, c30: 0 },
+        };
+        state.fills.forEach((f) => {
+          const name =
+            (f.vpin || 0) < 0.3
+              ? "Low"
+              : (f.vpin || 0) < 0.6
+                ? "Medium"
+                : "High";
+          buckets[name].n++;
+        });
+        state.pendingMarks.forEach((m) => {
+          const f = state.fills.find((x) => x.t === m.t && x.side === m.side);
+          const vp = f ? f.vpin : 0.4;
+          const name = vp < 0.3 ? "Low" : vp < 0.6 ? "Medium" : "High";
+          if (m.done[1] !== undefined) {
+            buckets[name].a1 += m.done[1];
+            buckets[name].c1++;
+          }
+          if (m.done[5] !== undefined) {
+            buckets[name].a5 += m.done[5];
+            buckets[name].c5++;
+          }
+          if (m.done[30] !== undefined) {
+            buckets[name].a30 += m.done[30];
+            buckets[name].c30++;
+          }
+        });
+        const html = ["Low", "Medium", "High"]
+          .map((name) => {
+            const b = buckets[name];
+            if (b.n < 3)
+              return `<tr><td>${name}</td><td>${b.n}</td><td colspan="3">Insufficient sample size</td></tr>`;
+            return `<tr><td>${name}</td><td>${b.n}</td>
+      <td>${b.c1 ? (b.a1 / b.c1).toFixed(4) : "—"}</td>
+      <td>${b.c5 ? (b.a5 / b.c5).toFixed(4) : "—"}</td>
+      <td>${b.c30 ? (b.a30 / b.c30).toFixed(4) : "—"}</td></tr>`;
+          })
+          .join("");
+        document.getElementById("tb-markout").innerHTML =
+          html || '<tr><td colspan="5">Insufficient sample size</td></tr>';
+      }
+
+      function fmt(x, d) {
+        return isFinite(x) ? Number(x).toFixed(d) : "—";
+      }
+
+      /* ========== CHARTS ========== */
+      const chartOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: {
+            labels: {
+              boxWidth: 10,
+              font: {
+                family:
+                  "SF Mono, JetBrains Mono, ui-monospace, Menlo, Consolas, monospace",
+                size: 9,
+              },
+              color: "#8b97a7",
+            },
+          },
+        },
+        scales: {
+          x: {
+            type: "linear",
+            ticks: { display: false },
+            grid: { color: "rgba(255,255,255,.04)" },
+          },
+          y: {
+            ticks: {
+              font: {
+                family:
+                  "SF Mono, JetBrains Mono, ui-monospace, Menlo, Consolas, monospace",
+                size: 9,
+              },
+              color: "#8b97a7",
+            },
+            grid: { color: "rgba(255,255,255,.04)" },
+          },
+        },
+      };
+      function mkChart(id, datasets, yMin, yMax) {
+        const ctx = document.getElementById(id).getContext("2d");
+        return new Chart(ctx, {
+          type: "line",
+          data: { labels: [], datasets },
+          options: {
+            ...chartOpts,
+            scales: {
+              ...chartOpts.scales,
+              y: { ...chartOpts.scales.y, min: yMin, max: yMax },
+            },
+          },
+        });
+      }
+      const chPrice = mkChart("ch-price", [
+        {
+          label: "[LIVE] Mid",
+          data: [],
+          borderColor: "#8b97a7",
+          borderWidth: 1.3,
+          pointRadius: 0,
+        },
+        {
+          label: "[LIVE] Best Bid",
+          data: [],
+          borderColor: "#4ade80",
+          borderWidth: 1,
+          pointRadius: 0,
+        },
+        {
+          label: "[LIVE] Best Ask",
+          data: [],
+          borderColor: "#f87171",
+          borderWidth: 1,
+          pointRadius: 0,
+        },
+        {
+          label: "[MODEL] Dynamic Bid",
+          data: [],
+          borderColor: "#22d3ee",
+          borderWidth: 1.2,
+          pointRadius: 0,
+          borderDash: [5, 3],
+        },
+        {
+          label: "[MODEL] Dynamic Ask",
+          data: [],
+          borderColor: "#fb923c",
+          borderWidth: 1.2,
+          pointRadius: 0,
+          borderDash: [5, 3],
+        },
+        {
+          label: "[MODEL] Reservation",
+          data: [],
+          borderColor: "#fbbf24",
+          borderWidth: 1,
+          borderDash: [2, 2],
+          pointRadius: 0,
+        },
+        {
+          label: "[USER] Bid margin",
+          data: [],
+          borderColor: "#60a5fa",
+          borderWidth: 1.2,
+          pointRadius: 0,
+          borderDash: [1, 2],
+        },
+        {
+          label: "[USER] Ask margin",
+          data: [],
+          borderColor: "#c084fc",
+          borderWidth: 1.2,
+          pointRadius: 0,
+          borderDash: [1, 2],
+        },
+      ]);
+      const chSpread = mkChart("ch-spread", [
+        {
+          label: "[MODEL] Dynamic full spread (bps)",
+          data: [],
+          borderColor: "#4ade80",
+          borderWidth: 1.3,
+          pointRadius: 0,
+        },
+        {
+          label: "[LIVE] Observed spread (bps)",
+          data: [],
+          borderColor: "#8b97a7",
+          borderWidth: 1,
+          pointRadius: 0,
+          borderDash: [3, 3],
+        },
+      ]);
+      const timeAxis = {
+        type: "linear",
+        grid: { color: "rgba(255,255,255,.04)" },
+        ticks: {
+          color: "#8b97a7",
+          font: {
+            family:
+              "SF Mono, JetBrains Mono, ui-monospace, Menlo, Consolas, monospace",
+            size: 9,
+          },
+          maxTicksLimit: 6,
+          callback: (value) => formatTime(value),
+        },
+      };
+      chPrice.options.scales.x = { ...timeAxis };
+      chSpread.options.scales.x = { ...timeAxis };
+      chSpread.options.plugins.tooltip = {
+        callbacks: {
+          title: (items) => (items.length ? formatTime(items[0].parsed.x) : ""),
+          label: (item) =>
+            ` ${item.dataset.label}: ${item.parsed.y.toFixed(2)} bps`,
+        },
+      };
+      const chVpin = mkChart(
+        "ch-vpin",
+        [
+          {
+            label: "[MODEL] VPIN",
+            data: [],
+            borderColor: "#fbbf24",
+            borderWidth: 1.5,
+            pointRadius: 0,
+          },
+          {
+            label: "Threshold",
+            data: [],
+            borderColor: "#f87171",
+            borderWidth: 1,
+            borderDash: [4, 4],
+            pointRadius: 0,
+          },
+        ],
+        0,
+        1,
+      );
+      const chOfi = mkChart(
+        "ch-ofi",
+        [
+          {
+            label: "[LIVE] OFI 60s",
+            data: [],
+            borderColor: "#4ade80",
+            borderWidth: 1.2,
+            pointRadius: 0,
+          },
+        ],
+        -1,
+        1,
+      );
+      const chQuotes = mkChart("ch-quotes", [
+        {
+          label: "[LIVE] Mid",
+          data: [],
+          borderColor: "#8b97a7",
+          borderWidth: 1,
+          pointRadius: 0,
+        },
+        {
+          label: "[MODEL] Dynamic Bid",
+          data: [],
+          borderColor: "#22d3ee",
+          borderWidth: 1.2,
+          pointRadius: 0,
+        },
+        {
+          label: "[MODEL] Dynamic Ask",
+          data: [],
+          borderColor: "#fb923c",
+          borderWidth: 1.2,
+          pointRadius: 0,
+        },
+        {
+          label: "[MODEL] Reservation",
+          data: [],
+          borderColor: "#fbbf24",
+          borderWidth: 1,
+          borderDash: [2, 2],
+          pointRadius: 0,
+        },
+        {
+          label: "[USER] Bid margin",
+          data: [],
+          borderColor: "#60a5fa",
+          borderWidth: 1.2,
+          pointRadius: 0,
+          borderDash: [1, 2],
+        },
+        {
+          label: "[USER] Ask margin",
+          data: [],
+          borderColor: "#c084fc",
+          borderWidth: 1.2,
+          pointRadius: 0,
+          borderDash: [1, 2],
+        },
+      ]);
+      const chInv = mkChart("ch-inv", [
+        {
+          label: "[MODEL] Inventory",
+          data: [],
+          borderColor: "#4ade80",
+          borderWidth: 1.2,
+          pointRadius: 0,
+        },
+      ]);
+      const chPnl = mkChart("ch-pnl", [
+        {
+          label: "[MODEL] MtM PnL",
+          data: [],
+          borderColor: "#4ade80",
+          borderWidth: 1.2,
+          pointRadius: 0,
+        },
+      ]);
+      chVpin.options.scales.x = { ...timeAxis };
+      chOfi.options.scales.x = { ...timeAxis };
+      chQuotes.options.scales.x = { ...timeAxis };
+      chInv.options.scales.x = { ...timeAxis };
+      chPnl.options.scales.x = { ...timeAxis };
+      allCharts.push(chPrice, chSpread, chVpin, chOfi, chQuotes, chInv, chPnl);
+
+      const CHART_TIME_HORIZON_MS = 15 * 60 * 1000;
+      const CHART_SAMPLE_MS = 1000;
+      function formatTime(timestamp) {
+        return new Date(timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+      }
+      function chartPoints(arr, key = "v") {
+        const points = [];
+        let lastTime = 0;
+        arr.forEach((point) => {
+          if (!point.t || point.t - lastTime < CHART_SAMPLE_MS) return;
+          points.push({ x: point.t, y: point[key] });
+          lastTime = point.t;
+        });
+        if (
+          arr.length &&
+          (!points.length ||
+            points[points.length - 1].x !== arr[arr.length - 1].t)
+        ) {
+          const point = arr[arr.length - 1];
+          points.push({ x: point.t, y: point[key] });
+        }
+        return points;
+      }
+      function setTimeAxis(chart, points) {
+        if (!points.length) return;
+        const first = points[0].x;
+        const last = points[points.length - 1].x;
+        const elapsed = last - first;
+        chart.options.scales.x.min = first;
+        chart.options.scales.x.max =
+          elapsed < CHART_TIME_HORIZON_MS
+            ? first + CHART_TIME_HORIZON_MS
+            : last + CHART_SAMPLE_MS;
+        if (elapsed >= CHART_TIME_HORIZON_MS)
+          chart.options.scales.x.min = last - CHART_TIME_HORIZON_MS;
+      }
+      function updateCharts() {
+        if (state.paused) return;
+        const midPoints = chartPoints(state.mids);
+
+        chPrice.data.datasets[0].data = midPoints;
+        chPrice.data.datasets[1].data = chartPoints(
+          state.quotesHist,
+          "liveBid",
+        );
+        chPrice.data.datasets[2].data = chartPoints(
+          state.quotesHist,
+          "liveAsk",
+        );
+        chPrice.data.datasets[3].data = chartPoints(state.quotesHist, "dynBid");
+        chPrice.data.datasets[4].data = chartPoints(state.quotesHist, "dynAsk");
+        chPrice.data.datasets[5].data = chartPoints(state.quotesHist, "r");
+        chPrice.data.datasets[6].data = chartPoints(
+          state.quotesHist,
+          "customBid",
+        );
+        chPrice.data.datasets[7].data = chartPoints(
+          state.quotesHist,
+          "customAsk",
+        );
+        setTimeAxis(chPrice, midPoints);
+        chPrice.update("none");
+
+        const dynSpreadPts = chartPoints(state.dynamicSpreads);
+        const obsSpreadPts = chartPoints(state.obsSpreadHist);
+        chSpread.data.datasets[0].data = dynSpreadPts;
+        chSpread.data.datasets[1].data = obsSpreadPts;
+        setTimeAxis(
+          chSpread,
+          dynSpreadPts.length ? dynSpreadPts : obsSpreadPts,
+        );
+        chSpread.update("none");
+
+        const vpinPoints = chartPoints(state.vpinHist);
+        chVpin.data.datasets[0].data = vpinPoints;
+        chVpin.data.datasets[1].data = vpinPoints.map((p) => ({
+          x: p.x,
+          y: P.toxth,
+        }));
+        setTimeAxis(chVpin, vpinPoints);
+        chVpin.update("none");
+
+        const ofiPoints = chartPoints(state.ofiHist);
+        chOfi.data.datasets[0].data = ofiPoints;
+        setTimeAxis(chOfi, ofiPoints);
+        chOfi.update("none");
+
+        chQuotes.data.datasets[0].data = midPoints;
+        chQuotes.data.datasets[1].data = chartPoints(
+          state.quotesHist,
+          "dynBid",
+        );
+        chQuotes.data.datasets[2].data = chartPoints(
+          state.quotesHist,
+          "dynAsk",
+        );
+        chQuotes.data.datasets[3].data = chartPoints(state.quotesHist, "r");
+        chQuotes.data.datasets[4].data = chartPoints(
+          state.quotesHist,
+          "customBid",
+        );
+        chQuotes.data.datasets[5].data = chartPoints(
+          state.quotesHist,
+          "customAsk",
+        );
+        setTimeAxis(chQuotes, midPoints);
+        chQuotes.update("none");
+
+        const invPoints = chartPoints(state.invHist);
+        chInv.data.datasets[0].data = invPoints;
+        setTimeAxis(chInv, invPoints);
+        chInv.update("none");
+
+        const pnlPoints = chartPoints(state.pnlHist);
+        chPnl.data.datasets[0].data = pnlPoints;
+        setTimeAxis(chPnl, pnlPoints);
+        chPnl.update("none");
+      }
+
+      /* TPS counter */
+      setInterval(() => {
+        state._tps = state.tradesSec;
+        state.tradesSec = 0;
+        state.bookSec = 0;
+      }, 1000);
+
+      setInterval(uiTick, 200);
+
+      /* BOOT */
+      discoverSymbols();
+    </script>
+  </body>
+</html>

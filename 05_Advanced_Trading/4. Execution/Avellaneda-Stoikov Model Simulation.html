@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avellaneda-Stoikov Market Making Dashboard</title>
+<style>
+  :root {
+    --bg: #0b0e11;
+    --panel: #12161c;
+    --panel-border: #1e2329;
+    --text: #eaecef;
+    --muted: #848e9c;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --bid: #0ecb81;
+    --ask: #f6465d;
+    --res: #f0b90b;
+    --mid: #848e9c;
+    --surface: #1a1f26;
+    --input-bg: #0b0e11;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .header {
+    max-width: 1440px;
+    margin: 0 auto 12px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 12px;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 960px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--panel-border);
+  }
+
+  .panel-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* Controls */
+  .control-group { margin-bottom: 8px; }
+
+  .control-group label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .control-group .val {
+    color: var(--accent);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+  }
+
+  input[type=range] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--surface);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+
+  input[type=range]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0 10px;
+  }
+
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 11px;
+    transition: background 0.15s;
+  }
+
+  button:hover { background: var(--accent-hover); }
+  button.secondary { background: var(--surface); color: var(--text); }
+  button.secondary:hover { background: #252b33; }
+  button.danger { background: #3d1f24; color: var(--ask); }
+  button.danger:hover { background: #4a252c; }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .stat {
+    background: var(--surface);
+    padding: 7px 8px;
+    border-radius: 5px;
+    text-align: center;
+  }
+
+  .stat .label {
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 2px;
+  }
+
+  .stat .value {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Chart area */
+  .chart-wrap {
+    position: relative;
+  }
+
+  canvas {
+    width: 100%;
+    height: 360px;
+    background: var(--surface);
+    border-radius: 6px;
+    display: block;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .legend span::before {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 2px;
+    border-radius: 1px;
+  }
+
+  .leg-mid::before { background: var(--mid); height: 2px; }
+  .leg-res::before { background: var(--res); height: 2px; border-style: dashed; }
+  .leg-bid::before { background: var(--bid); }
+  .leg-ask::before { background: var(--ask); }
+
+  .note {
+    margin-top: 10px;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .formula {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 12px;
+    background: var(--surface);
+    padding: 8px 10px;
+    border-radius: 5px;
+    line-height: 1.55;
+  }
+
+  .formula strong {
+    color: var(--text);
+    font-size: 10px;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .formula code {
+    color: #93c5fd;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 10px;
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>Avellaneda–Stoikov Market Making</h1>
+    <span class="subtitle">Stochastic optimal control (2008) · reservation price + inventory-aware quotes</span>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT -->
+    <div class="panel">
+      <div class="panel-title">Parameters</div>
+
+      <div class="control-group">
+        <label>γ risk aversion <span class="val" id="v-gamma">0.10</span></label>
+        <input type="range" id="gamma" min="0.01" max="1" step="0.01" value="0.1">
+      </div>
+      <div class="control-group">
+        <label>σ volatility <span class="val" id="v-sigma">2.0</span></label>
+        <input type="range" id="sigma" min="0.5" max="5" step="0.1" value="2.0">
+      </div>
+      <div class="control-group">
+        <label>κ intensity decay <span class="val" id="v-kappa">1.5</span></label>
+        <input type="range" id="kappa" min="0.3" max="5" step="0.1" value="1.5">
+      </div>
+      <div class="control-group">
+        <label>A arrival scale <span class="val" id="v-A">140</span></label>
+        <input type="range" id="A" min="20" max="400" step="10" value="140">
+      </div>
+      <div class="control-group">
+        <label>T horizon <span class="val" id="v-T">1.0</span></label>
+        <input type="range" id="T" min="0.2" max="2" step="0.1" value="1.0">
+      </div>
+      <div class="control-group">
+        <label>Steps <span class="val" id="v-steps">200</span></label>
+        <input type="range" id="steps" min="50" max="500" step="10" value="200">
+      </div>
+      <div class="control-group">
+        <label>Speed ms/step <span class="val" id="v-speed">40</span></label>
+        <input type="range" id="speed" min="10" max="200" step="5" value="40">
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-play">Play</button>
+        <button id="btn-pause" class="secondary">Pause</button>
+        <button id="btn-step" class="secondary">Step</button>
+        <button id="btn-reset" class="danger">Reset</button>
+        <button id="btn-replay" class="secondary">Replay</button>
+      </div>
+
+      <div class="panel-title" style="margin-top:4px;">State</div>
+      <div class="stats">
+        <div class="stat"><div class="label">Time t</div><div class="value" id="s-t">0.000</div></div>
+        <div class="stat"><div class="label">Inventory q</div><div class="value" id="s-q">0</div></div>
+        <div class="stat"><div class="label">Cash</div><div class="value" id="s-cash">0.0</div></div>
+        <div class="stat"><div class="label">PnL (MtM)</div><div class="value" id="s-pnl">0.0</div></div>
+        <div class="stat"><div class="label">Mid S</div><div class="value" id="s-mid">100.00</div></div>
+        <div class="stat"><div class="label">Reservation r</div><div class="value" id="s-r">100.00</div></div>
+        <div class="stat"><div class="label">Bid / Ask</div><div class="value" id="s-quotes">—</div></div>
+        <div class="stat"><div class="label">Fills B / A</div><div class="value" id="s-fills">0 / 0</div></div>
+      </div>
+
+      <div class="formula">
+        <strong>Closed-form</strong>
+        <code>r = S − q γ σ² (T−t)</code><br>
+        <code>δ* = γ σ² (T−t) + (2/γ) ln(1 + γ/κ)</code><br>
+        <code>bid = r − δ*/2 &nbsp; ask = r + δ*/2</code><br>
+        λ(δ) = A e<sup>−κδ</sup>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="panel chart-wrap">
+      <canvas id="chart" width="960" height="360"></canvas>
+      <div class="legend">
+        <span class="leg-mid">Mid</span>
+        <span class="leg-res">Reservation</span>
+        <span class="leg-bid">Bid</span>
+        <span class="leg-ask">Ask</span>
+      </div>
+      <p class="note">
+        Green markers = bid fills (buy). Red markers = ask fills (sell).
+        Positive inventory shifts the reservation price (and both quotes) downward.
+        Near T the inventory-risk term vanishes and the strategy flattens more aggressively.
+      </p>
+    </div>
+  </div>
+
+<script>
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+
+let params = {
+  gamma: 0.1, sigma: 2.0, kappa: 1.5, A: 140,
+  T: 1.0, nSteps: 200, speed: 40, S0: 100
+};
+let sim = null;
+let playing = false;
+let timer = null;
+let lastPath = null;
+
+['gamma','sigma','kappa','A','T','steps','speed'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    const map = {gamma:'gamma',sigma:'sigma',kappa:'kappa',A:'A',T:'T',steps:'nSteps',speed:'speed'};
+    params[map[id]] = parseFloat(el.value);
+    const display = id === 'gamma' ? parseFloat(el.value).toFixed(2) : el.value;
+    document.getElementById('v-'+id).textContent = display;
+  });
+});
+
+document.getElementById('btn-play').onclick = () => { if (!playing) startPlay(); };
+document.getElementById('btn-pause').onclick = () => pause();
+document.getElementById('btn-step').onclick = () => { pause(); step(); };
+document.getElementById('btn-reset').onclick = () => { pause(); initSim(true); draw(); updateStats(); };
+document.getElementById('btn-replay').onclick = () => { pause(); initSim(false); draw(); updateStats(); startPlay(); };
+
+function initSim(newPath = true) {
+  const dt = params.T / params.nSteps;
+  let path;
+  if (newPath || !lastPath) {
+    path = [params.S0];
+    for (let i = 1; i <= params.nSteps; i++) {
+      path.push(path[i-1] + params.sigma * Math.sqrt(dt) * randn());
+    }
+    lastPath = path.slice();
+  } else {
+    path = lastPath.slice();
+  }
+  sim = {
+    t: 0, i: 0, dt,
+    S: path[0], path,
+    q: 0, cash: 0,
+    bidFills: 0, askFills: 0,
+    history: { S: [path[0]], r: [path[0]], bid: [], ask: [], fills: [] },
+    finished: false
+  };
+  const {r, bid, ask} = quotes(sim.S, sim.q, sim.t);
+  sim.history.bid = [bid];
+  sim.history.ask = [ask];
+  sim.history.r = [r];
+}
+
+function quotes(S, q, t) {
+  const tau = Math.max(0, params.T - t);
+  const r = S - q * params.gamma * params.sigma**2 * tau;
+  const delta = params.gamma * params.sigma**2 * tau
+              + (2 / params.gamma) * Math.log(1 + params.gamma / params.kappa);
+  const half = delta / 2;
+  return { r, bid: r - half, ask: r + half, delta };
+}
+
+function step() {
+  if (!sim || sim.finished) return;
+  const { kappa, A } = params;
+  const dt = sim.dt;
+  sim.i++;
+  sim.t = sim.i * dt;
+  if (sim.i >= params.nSteps) {
+    sim.finished = true;
+    sim.cash += sim.q * sim.S;
+    sim.q = 0;
+    updateStats();
+    draw();
+    pause();
+    return;
+  }
+  sim.S = sim.path[sim.i];
+  const { r, bid, ask } = quotes(sim.S, sim.q, sim.t);
+
+  const db = Math.max(0, sim.S - bid);
+  const da = Math.max(0, ask - sim.S);
+  const lambdaB = A * Math.exp(-kappa * db);
+  const lambdaA = A * Math.exp(-kappa * da);
+  const pB = 1 - Math.exp(-lambdaB * dt);
+  const pA = 1 - Math.exp(-lambdaA * dt);
+
+  if (Math.random() < pB) {
+    sim.q += 1;
+    sim.cash -= bid;
+    sim.bidFills++;
+    sim.history.fills.push({i: sim.i, type: 'bid', price: bid});
+  }
+  if (Math.random() < pA) {
+    sim.q -= 1;
+    sim.cash += ask;
+    sim.askFills++;
+    sim.history.fills.push({i: sim.i, type: 'ask', price: ask});
+  }
+
+  sim.history.S.push(sim.S);
+  sim.history.r.push(r);
+  sim.history.bid.push(bid);
+  sim.history.ask.push(ask);
+
+  updateStats();
+  draw();
+}
+
+function startPlay() {
+  if (!sim || sim.finished) initSim(true);
+  playing = true;
+  timer = setInterval(() => {
+    step();
+    if (sim.finished) pause();
+  }, params.speed);
+}
+
+function pause() {
+  playing = false;
+  if (timer) clearInterval(timer);
+  timer = null;
+}
+
+function updateStats() {
+  if (!sim) return;
+  const { r, bid, ask } = quotes(sim.S, sim.q, sim.t);
+  const pnl = sim.cash + sim.q * sim.S;
+  document.getElementById('s-t').textContent = sim.t.toFixed(3);
+  document.getElementById('s-q').textContent = sim.q;
+  document.getElementById('s-cash').textContent = sim.cash.toFixed(1);
+  document.getElementById('s-pnl').textContent = pnl.toFixed(1);
+  document.getElementById('s-mid').textContent = sim.S.toFixed(2);
+  document.getElementById('s-r').textContent = r.toFixed(2);
+  document.getElementById('s-quotes').textContent = bid.toFixed(2) + ' / ' + ask.toFixed(2);
+  document.getElementById('s-fills').textContent = sim.bidFills + ' / ' + sim.askFills;
+}
+
+function draw() {
+  if (!sim) return;
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const hist = sim.history;
+  const n = hist.S.length;
+  if (n < 2) return;
+
+  let ymin = Infinity, ymax = -Infinity;
+  for (let i = 0; i < n; i++) {
+    ymin = Math.min(ymin, hist.S[i], hist.r[i], hist.bid[i], hist.ask[i]);
+    ymax = Math.max(ymax, hist.S[i], hist.r[i], hist.bid[i], hist.ask[i]);
+  }
+  const pad = (ymax - ymin) * 0.08 || 1;
+  ymin -= pad; ymax += pad;
+
+  const x = i => (i / params.nSteps) * (W - 48) + 28;
+  const y = v => H - 24 - ((v - ymin) / (ymax - ymin)) * (H - 40);
+
+  // subtle grid
+  ctx.strokeStyle = '#1e2329';
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const yy = 16 + g * (H - 40) / 4;
+    ctx.beginPath();
+    ctx.moveTo(28, yy);
+    ctx.lineTo(W - 20, yy);
+    ctx.stroke();
+  }
+
+  // mid
+  ctx.strokeStyle = '#848e9c';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const xx = x(i), yy = y(hist.S[i]);
+    i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+  }
+  ctx.stroke();
+
+  // reservation
+  ctx.strokeStyle = '#f0b90b';
+  ctx.lineWidth = 1.25;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const xx = x(i), yy = y(hist.r[i]);
+    i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // bid
+  ctx.strokeStyle = '#0ecb81';
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const xx = x(i), yy = y(hist.bid[i]);
+    i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+  }
+  ctx.stroke();
+
+  // ask
+  ctx.strokeStyle = '#f6465d';
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const xx = x(i), yy = y(hist.ask[i]);
+    i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+  }
+  ctx.stroke();
+
+  // fill markers
+  hist.fills.forEach(f => {
+    ctx.beginPath();
+    ctx.arc(x(f.i), y(f.price), 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = f.type === 'bid' ? '#0ecb81' : '#f6465d';
+    ctx.fill();
+  });
+
+  // current time line
+  if (sim.i > 0) {
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(x(sim.i), 16);
+    ctx.lineTo(x(sim.i), H - 24);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // axis labels
+  ctx.fillStyle = '#848e9c';
+  ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillText(ymax.toFixed(1), 2, 22);
+  ctx.fillText(ymin.toFixed(1), 2, H - 20);
+  ctx.fillText('t = 0', 28, H - 6);
+  ctx.fillText('t = T', W - 42, H - 6);
+}
+
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+initSim(true);
+updateStats();
+draw();
+</script>
+</body>
+</html>

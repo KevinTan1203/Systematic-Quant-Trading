@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merton Jump-Diffusion Model – Interactive Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #12161f;
+    --card: #161b26;
+    --border: #1e2533;
+    --text: #e6edf7;
+    --muted: #8b95a8;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f59e0b;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: #0d111a;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 16px;
+  }
+  .logo-text { font-weight: 700; font-size: 18px; }
+  .logo-sub { font-size: 11px; color: var(--muted); letter-spacing: 0.4px; }
+  .badge {
+    background: #1e3a5f;
+    color: #93c5fd;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  .sidebar {
+    width: 320px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin: 18px 0 10px;
+  }
+  .section-title:first-child { margin-top: 0; }
+  .param-row { margin-bottom: 14px; }
+  .param-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .param-label span:last-child {
+    font-weight: 600;
+    color: #93c5fd;
+    font-variant-numeric: tabular-nums;
+  }
+  input[type="range"] {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #1e293b;
+    border-radius: 3px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    background: #3b82f6;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .15s;
+  }
+  .btn-primary { background: #2563eb; color: white; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-secondary {
+    background: #1a2230;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: #222a3a; }
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 1200px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+  .chart-wrap {
+    position: relative;
+    height: 260px;
+  }
+  .chart-wrap.tall { height: 320px; }
+  .full-width { grid-column: 1 / -1; }
+  .formula-box {
+    background: #0d111a;
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+  }
+  .explain {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-val {
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .legend span::before {
+    content: "";
+    display: inline-block;
+    width: 12px; height: 3px;
+    margin-right: 6px;
+    vertical-align: middle;
+    border-radius: 2px;
+  }
+  .leg-merton::before { background: #3b82f6; }
+  .leg-gbm::before { background: #64748b; }
+  .leg-jump::before { background: #ef4444; height: 8px; width: 8px; border-radius: 50%; }
+  .leg-shock::before { background: #f59e0b; height: 8px; width: 8px; border-radius: 2px; }
+  .callout {
+    background: linear-gradient(135deg, #1e1b2e, #0f172a);
+    border: 1px solid #3b2d5c;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: #c4b5fd;
+    line-height: 1.5;
+  }
+  .callout strong { color: #e9d5ff; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #2a3548; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">M</div>
+    <div>
+      <div class="logo-text">Merton Jump-Diffusion</div>
+      <div class="logo-sub">Stochastic Asset Price Model Explorer</div>
+    </div>
+  </div>
+  <span class="badge">Interactive Simulation + Real-life Jump Illustration</span>
+</div>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="section-title">Model Parameters</div>
+
+    <div class="param-row">
+      <div class="param-label"><span>Drift μ</span><span id="muVal">0.08</span></div>
+      <input type="range" id="mu" min="-0.20" max="0.30" step="0.01" value="0.08">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>Volatility σ</span><span id="sigmaVal">0.20</span></div>
+      <input type="range" id="sigma" min="0.05" max="0.60" step="0.01" value="0.20">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>Jump intensity λ</span><span id="lambdaVal">0.80</span></div>
+      <input type="range" id="lambda" min="0" max="3" step="0.05" value="0.80">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>Jump mean μ<sub>J</sub></span><span id="muJVal">-0.12</span></div>
+      <input type="range" id="muJ" min="-0.40" max="0.20" step="0.01" value="-0.12">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>Jump vol σ<sub>J</sub></span><span id="sigmaJVal">0.18</span></div>
+      <input type="range" id="sigmaJ" min="0.01" max="0.50" step="0.01" value="0.18">
+    </div>
+
+    <div class="section-title">Simulation Settings</div>
+    <div class="param-row">
+      <div class="param-label"><span>Time horizon T (years)</span><span id="TVal">2.00</span></div>
+      <input type="range" id="T" min="0.25" max="5" step="0.25" value="2">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>Number of paths</span><span id="nPathsVal">25</span></div>
+      <input type="range" id="nPaths" min="5" max="80" step="5" value="25">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>Steps per path</span><span id="nStepsVal">300</span></div>
+      <input type="range" id="nSteps" min="50" max="500" step="10" value="300">
+    </div>
+    <div class="param-row">
+      <div class="param-label"><span>Initial price S₀</span><span id="S0Val">100</span></div>
+      <input type="range" id="S0" min="50" max="200" step="5" value="100">
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="runSimulation()">▶ Simulate</button>
+      <button class="btn btn-secondary" onclick="resetDefaults()">Reset</button>
+    </div>
+
+    <div class="section-title" style="margin-top:24px">Quick Insight</div>
+    <p class="explain">
+      When <b>λ = 0</b> the model collapses to classic geometric Brownian motion.
+      Raising λ + making μ<sub>J</sub> negative produces the sudden crashes seen in real markets (Flash Crash, COVID crash, earnings gaps…).
+    </p>
+  </aside>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <!-- Formula -->
+    <div class="card full-width" style="margin-bottom:16px">
+      <div class="card-title">The Merton Jump-Diffusion SDE</div>
+      <div class="formula-box" id="formula"></div>
+      <p class="explain">
+        Continuous Brownian motion + rare discontinuous jumps (Poisson arrivals). The −λκ term compensates the drift so that the expected return stays μ.
+      </p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats" id="statsRow">
+      <div class="stat"><div class="stat-val" id="statMean">–</div><div class="stat-label">Mean E[S<sub>T</sub>]</div></div>
+      <div class="stat"><div class="stat-val" id="statStd">–</div><div class="stat-label">Std Dev</div></div>
+      <div class="stat"><div class="stat-val" id="statSkew">–</div><div class="stat-label">Skewness</div></div>
+      <div class="stat"><div class="stat-val" id="statKurt">–</div><div class="stat-label">Excess Kurtosis</div></div>
+    </div>
+
+    <!-- NEW: Real-life style single path with clear jump shocks -->
+    <div class="card full-width" style="margin-bottom:16px">
+      <div class="card-title">
+        <span class="dot" style="background:#f59e0b"></span>
+        Real-life Style Illustration – Single Stock Path with Visible Jumps / Shocks
+      </div>
+      <div class="legend">
+        <span class="leg-merton">Continuous diffusion segments</span>
+        <span class="leg-jump">Jump / Shock events</span>
+        <span class="leg-shock">Annotated crash-like gaps</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="realLifeChart"></canvas></div>
+      <div class="callout">
+        <strong>How jumps appear in real markets:</strong>
+        Earnings misses, geopolitical shocks, flash crashes, or liquidity evaporations create near-instantaneous price gaps.
+        In the chart above the red circles mark the exact moments a Poisson jump occurred.
+        The orange dashed vertical lines highlight the largest shocks — these are the “fat-tail” events that pure Brownian motion cannot generate.
+      </div>
+    </div>
+
+    <!-- Paths comparison -->
+    <div class="grid">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:#3b82f6"></span> Multiple Merton Paths (with jumps)</div>
+        <div class="legend">
+          <span class="leg-merton">Merton paths</span>
+          <span class="leg-jump">Jumps on first path</span>
+        </div>
+        <div class="chart-wrap"><canvas id="pathsChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:#64748b"></span> Pure GBM Comparison (λ = 0)</div>
+        <div class="legend">
+          <span class="leg-gbm">Continuous paths only</span>
+        </div>
+        <div class="chart-wrap"><canvas id="gbmChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Histogram + Zoomed jump anatomy -->
+    <div class="grid">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:#a855f7"></span> Terminal Price Distribution S<sub>T</sub></div>
+        <div class="legend">
+          <span class="leg-merton">Merton</span>
+          <span class="leg-gbm">GBM</span>
+        </div>
+        <div class="chart-wrap"><canvas id="histChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:#ef4444"></span> Zoomed Anatomy of One Jump</div>
+        <div class="legend">
+          <span class="leg-merton">Price path</span>
+          <span class="leg-jump">Jump instant</span>
+        </div>
+        <div class="chart-wrap"><canvas id="zoomChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- KaTeX ----------
+katex.render(
+  String.raw`\frac{dS_t}{S_{t-}} = (\mu - \lambda\kappa)\,dt + \sigma\,dW_t + (J-1)\,dN_t`,
+  document.getElementById("formula"),
+  { displayMode: true, throwOnError: false }
+);
+
+// ---------- Parameters ----------
+const params = {
+  mu: 0.08, sigma: 0.20, lambda: 0.80,
+  muJ: -0.12, sigmaJ: 0.18,
+  T: 2.0, nPaths: 25, nSteps: 300, S0: 100
+};
+
+const ids = ["mu","sigma","lambda","muJ","sigmaJ","T","nPaths","nSteps","S0"];
+ids.forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener("input", () => {
+    params[id] = parseFloat(el.value);
+    document.getElementById(id + "Val").textContent =
+      (id === "nPaths" || id === "nSteps" || id === "S0")
+        ? params[id]
+        : params[id].toFixed(2);
+  });
+});
+
+function resetDefaults() {
+  const d = { mu:0.08, sigma:0.20, lambda:0.80, muJ:-0.12, sigmaJ:0.18, T:2, nPaths:25, nSteps:300, S0:100 };
+  Object.assign(params, d);
+  ids.forEach(id => {
+    document.getElementById(id).value = d[id];
+    document.getElementById(id + "Val").textContent =
+      (id === "nPaths" || id === "nSteps" || id === "S0") ? d[id] : d[id].toFixed(2);
+  });
+  runSimulation();
+}
+
+// ---------- RNG ----------
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function poisson(lam) {
+  if (lam < 1e-8) return 0;
+  const L = Math.exp(-lam);
+  let k = 0, p = 1;
+  do { k++; p *= Math.random(); } while (p > L);
+  return k - 1;
+}
+
+// ---------- Core simulation ----------
+function simulateMerton(withJumps = true, forceSeedPath = false) {
+  const { mu, sigma, lambda, muJ, sigmaJ, T, nPaths, nSteps, S0 } = params;
+  const dt = T / nSteps;
+  const kappa = Math.exp(muJ + 0.5 * sigmaJ * sigmaJ) - 1;
+  const drift = withJumps ? (mu - lambda * kappa) : mu;
+
+  const paths = [];
+  const terminals = [];
+  let detailedJumps = [];      // all jumps on the “hero” path
+  let heroPath = null;
+  let heroTimes = null;
+
+  for (let p = 0; p < nPaths; p++) {
+    const path = [S0];
+    let S = S0;
+    const jumps = [];
+    for (let i = 1; i <= nSteps; i++) {
+      const dW = Math.sqrt(dt) * randn();
+      let jumpFactor = 1;
+      if (withJumps) {
+        const nJ = poisson(lambda * dt);
+        for (let j = 0; j < nJ; j++) {
+          const logJ = muJ + sigmaJ * randn();
+          const J = Math.exp(logJ);
+          jumpFactor *= J;
+          jumps.push({
+            t: i * dt,
+            S_before: S,
+            S_after: S * J,
+            size: (J - 1) * 100   // percent
+          });
+        }
+      }
+      S = S * Math.exp((drift - 0.5 * sigma * sigma) * dt + sigma * dW) * jumpFactor;
+      path.push(S);
+    }
+    paths.push(path);
+    terminals.push(S);
+    if (p === 0) {
+      detailedJumps = jumps;
+      heroPath = path;
+      heroTimes = Array.from({length: nSteps + 1}, (_, i) => i * dt);
+    }
+  }
+  return {
+    paths,
+    terminals,
+    detailedJumps,
+    heroPath,
+    times: Array.from({length: nSteps + 1}, (_, i) => i * dt)
+  };
+}
+
+// ---------- Stats ----------
+function calcStats(arr) {
+  const n = arr.length;
+  const mean = arr.reduce((a, b) => a + b, 0) / n;
+  const variance = arr.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
+  const std = Math.sqrt(variance);
+  const skew = std > 0 ? arr.reduce((a, b) => a + ((b - mean) / std) ** 3, 0) / n : 0;
+  const kurt = std > 0 ? arr.reduce((a, b) => a + ((b - mean) / std) ** 4, 0) / n - 3 : 0;
+  return { mean, std, skew, kurt };
+}
+
+// ---------- Charts ----------
+let pathsChart, gbmChart, histChart, realLifeChart, zoomChart;
+
+function destroyCharts() {
+  [pathsChart, gbmChart, histChart, realLifeChart, zoomChart].forEach(c => c && c.destroy());
+}
+
+function makePathDatasets(paths, times, color, alpha = 0.4) {
+  return paths.map((path, idx) => ({
+    data: path.map((y, i) => ({ x: times[i], y })),
+    borderColor: color,
+    borderWidth: idx === 0 ? 2.2 : 1,
+    pointRadius: 0,
+    fill: false,
+    tension: 0.05
+  }));
+}
+
+function chartOptions(xTitle, yTitle, extra = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => `Price: ${ctx.parsed.y.toFixed(2)}`
+        }
+      },
+      ...extra.plugins
+    },
+    scales: {
+      x: {
+        type: "linear",
+        title: { display: true, text: xTitle, color: "#8b95a8" },
+        ticks: { color: "#8b95a8" },
+        grid: { color: "#1e2533" }
+      },
+      y: {
+        title: { display: true, text: yTitle, color: "#8b95a8" },
+        ticks: { color: "#8b95a8" },
+        grid: { color: "#1e2533" }
+      }
+    },
+    ...extra
+  };
+}
+
+function runSimulation() {
+  destroyCharts();
+
+  const merton = simulateMerton(true);
+  const gbm = simulateMerton(false);
+
+  // Stats
+  const st = calcStats(merton.terminals);
+  document.getElementById("statMean").textContent = st.mean.toFixed(1);
+  document.getElementById("statStd").textContent = st.std.toFixed(1);
+  document.getElementById("statSkew").textContent = st.skew.toFixed(2);
+  document.getElementById("statKurt").textContent = st.kurt.toFixed(2);
+
+  // ===== 1. Real-life style single path (hero path) =====
+  const heroData = merton.heroPath.map((y, i) => ({ x: merton.times[i], y }));
+  const jumpPoints = merton.detailedJumps.map(j => ({
+    x: j.t,
+    y: j.S_after
+  }));
+
+  // Find the 2–3 largest jumps for annotation lines
+  const bigJumps = [...merton.detailedJumps]
+    .sort((a, b) => Math.abs(b.size) - Math.abs(a.size))
+    .slice(0, 3);
+
+  realLifeChart = new Chart(document.getElementById("realLifeChart"), {
+    type: "line",
+    data: {
+      datasets: [
+        {
+          label: "Price path",
+          data: heroData,
+          borderColor: "#3b82f6",
+          borderWidth: 2.5,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.05
+        },
+        {
+          label: "Jump events",
+          data: jumpPoints,
+          borderColor: "#ef4444",
+          backgroundColor: "#ef4444",
+          pointRadius: 6,
+          pointStyle: "circle",
+          showLine: false,
+          order: 0
+        }
+      ]
+    },
+    options: {
+      ...chartOptions("Time (years)", "Stock Price"),
+      plugins: {
+        legend: { display: false },
+        annotation: undefined // we draw vertical lines via plugin below
+      }
+    },
+    plugins: [{
+      id: "jumpLines",
+      afterDraw(chart) {
+        const ctx = chart.ctx;
+        const xAxis = chart.scales.x;
+        const yAxis = chart.scales.y;
+        bigJumps.forEach(j => {
+          const x = xAxis.getPixelForValue(j.t);
+          ctx.save();
+          ctx.beginPath();
+          ctx.setLineDash([6, 4]);
+          ctx.strokeStyle = "rgba(245, 158, 11, 0.7)";
+          ctx.lineWidth = 1.5;
+          ctx.moveTo(x, yAxis.top);
+          ctx.lineTo(x, yAxis.bottom);
+          ctx.stroke();
+          // label
+          ctx.fillStyle = "#f59e0b";
+          ctx.font = "11px sans-serif";
+          ctx.textAlign = "center";
+          const pct = j.size.toFixed(1);
+          ctx.fillText(`${pct > 0 ? "+" : ""}${pct}%`, x, yAxis.top + 14);
+          ctx.restore();
+        });
+      }
+    }]
+  });
+
+  // ===== 2. Multiple Merton paths =====
+  const mertonDS = makePathDatasets(merton.paths, merton.times, "rgba(59,130,246,0.45)");
+  mertonDS.push({
+    data: jumpPoints,
+    borderColor: "#ef4444",
+    backgroundColor: "#ef4444",
+    pointRadius: 4,
+    showLine: false,
+    order: 0
+  });
+  pathsChart = new Chart(document.getElementById("pathsChart"), {
+    type: "line",
+    data: { datasets: mertonDS },
+    options: chartOptions("Time (years)", "Price")
+  });
+
+  // ===== 3. GBM paths =====
+  gbmChart = new Chart(document.getElementById("gbmChart"), {
+    type: "line",
+    data: { datasets: makePathDatasets(gbm.paths, gbm.times, "rgba(100,116,139,0.5)") },
+    options: chartOptions("Time (years)", "Price")
+  });
+
+  // ===== 4. Histogram =====
+  const bins = 40;
+  const all = merton.terminals.concat(gbm.terminals);
+  const minV = Math.min(...all) * 0.95;
+  const maxV = Math.max(...all) * 1.05;
+  const step = (maxV - minV) / bins;
+  const mHist = new Array(bins).fill(0);
+  const gHist = new Array(bins).fill(0);
+  merton.terminals.forEach(v => {
+    const idx = Math.min(bins - 1, Math.floor((v - minV) / step));
+    mHist[idx]++;
+  });
+  gbm.terminals.forEach(v => {
+    const idx = Math.min(bins - 1, Math.floor((v - minV) / step));
+    gHist[idx]++;
+  });
+  const labels = Array.from({ length: bins }, (_, i) => (minV + (i + 0.5) * step).toFixed(0));
+
+  histChart = new Chart(document.getElementById("histChart"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: "Merton", data: mHist, backgroundColor: "rgba(59,130,246,0.65)", borderWidth: 0 },
+        { label: "GBM", data: gHist, backgroundColor: "rgba(100,116,139,0.4)", borderWidth: 0 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: "#8b95a8" } } },
+      scales: {
+        x: { ticks: { color: "#8b95a8", maxTicksLimit: 8 }, grid: { color: "#1e2533" } },
+        y: { ticks: { color: "#8b95a8" }, grid: { color: "#1e2533" }, title: { display: true, text: "Count", color: "#8b95a8" } }
+      }
+    }
+  });
+
+  // ===== 5. Zoomed anatomy of the largest jump =====
+  if (merton.detailedJumps.length > 0) {
+    const biggest = merton.detailedJumps.reduce((a, b) =>
+      Math.abs(b.size) > Math.abs(a.size) ? b : a
+    );
+    const window = 0.08; // years around the jump
+    const t0 = Math.max(0, biggest.t - window);
+    const t1 = Math.min(params.T, biggest.t + window);
+    const zoomData = [];
+    for (let i = 0; i < merton.times.length; i++) {
+      if (merton.times[i] >= t0 && merton.times[i] <= t1) {
+        zoomData.push({ x: merton.times[i], y: merton.heroPath[i] });
+      }
+    }
+    zoomChart = new Chart(document.getElementById("zoomChart"), {
+      type: "line",
+      data: {
+        datasets: [
+          {
+            data: zoomData,
+            borderColor: "#3b82f6",
+            borderWidth: 2.5,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.1
+          },
+          {
+            data: [{ x: biggest.t, y: biggest.S_after }],
+            borderColor: "#ef4444",
+            backgroundColor: "#ef4444",
+            pointRadius: 8,
+            pointStyle: "circle",
+            showLine: false
+          }
+        ]
+      },
+      options: {
+        ...chartOptions("Time (years)", "Price"),
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: `Largest shock: ${biggest.size > 0 ? "+" : ""}${biggest.size.toFixed(1)}% at t = ${biggest.t.toFixed(3)}y`,
+            color: "#f87171",
+            font: { size: 12 }
+          }
+        }
+      }
+    });
+  } else {
+    // no jumps – show placeholder message via empty chart
+    zoomChart = new Chart(document.getElementById("zoomChart"), {
+      type: "line",
+      data: { datasets: [] },
+      options: {
+        ...chartOptions("Time (years)", "Price"),
+        plugins: {
+          title: {
+            display: true,
+            text: "No jumps occurred in this path – try increasing λ",
+            color: "#8b95a8"
+          }
+        }
+      }
+    });
+  }
+}
+
+// Initial run
+runSimulation();
+</script>
+</body>
+</html>
