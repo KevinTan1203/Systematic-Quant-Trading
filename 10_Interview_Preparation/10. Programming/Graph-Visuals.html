@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph Concepts Visualizer</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --text: #e2e8f0;
+    --accent: #38bdf8;
+    --node: #64748b;
+    --visited: #4ade80;
+    --current: #facc15;
+    --path: #f87171;
+    --edge: #94a3b8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 6px;
+    background: linear-gradient(90deg, #38bdf8, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle { color: #94a3b8; margin-bottom: 20px; font-size: 0.95rem; }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 16px;
+    max-width: 1100px;
+  }
+
+  button, select {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid #334155;
+    padding: 9px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    transition: all 0.15s;
+  }
+
+  button:hover:not(:disabled) { background: #334155; border-color: var(--accent); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.active { background: #0369a1; border-color: #38bdf8; }
+
+  .main {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 1100px;
+  }
+
+  .canvas-wrap {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+
+  canvas {
+    background: #0f172a;
+    border-radius: 8px;
+    cursor: crosshair;
+    display: block;
+  }
+
+  .side-panel {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px;
+    min-width: 260px;
+    max-width: 300px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+
+  .side-panel h3 { margin-bottom: 10px; font-size: 1rem; color: var(--accent); }
+
+  .adj-list {
+    font-family: monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    max-height: 280px;
+    overflow-y: auto;
+    color: #cbd5e1;
+  }
+
+  .legend {
+    display: flex;
+    gap: 14px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 0.85rem;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+
+  .info { margin-top: 12px; color: #94a3b8; font-size: 0.9rem; text-align: center; }
+
+  /* Code section */
+  .code-section { width: 100%; max-width: 1100px; margin-top: 28px; }
+
+  .code-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .code-header h2 { font-size: 1.15rem; margin-right: auto; }
+
+  .lang-btn { padding: 7px 13px; font-size: 0.85rem; }
+  .lang-btn.active { background: #0369a1; border-color: #38bdf8; }
+
+  .code-container {
+    background: #0d1117;
+    border-radius: 12px;
+    border: 1px solid #30363d;
+    overflow: hidden;
+  }
+
+  .code-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    font-size: 0.85rem;
+    color: #8b949e;
+  }
+
+  pre {
+    margin: 0;
+    padding: 18px;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    color: #e6edf3;
+  }
+
+  .kw { color: #ff7b72; }
+  .fn { color: #d2a8ff; }
+  .cm { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .type { color: #ffa657; }
+  .str { color: #a5d6ff; }
+</style>
+</head>
+<body>
+
+<h1>Graph Concepts Visualizer</h1>
+<p class="subtitle">Nodes • Edges • BFS • DFS • Adjacency List</p>
+
+<div class="controls">
+  <button onclick="setMode('add')" id="btn-add" class="active">Add Node</button>
+  <button onclick="setMode('connect')" id="btn-connect">Connect</button>
+  <button onclick="setMode('delete')" id="btn-delete">Delete</button>
+  <button onclick="clearGraph()">Clear</button>
+  <button onclick="loadExample()">Example Graph</button>
+
+  <select id="directed">
+    <option value="undirected">Undirected</option>
+    <option value="directed">Directed</option>
+  </select>
+
+  <button onclick="runBFS()" id="btn-bfs" style="background:#0369a1;border-color:#38bdf8">Run BFS</button>
+  <button onclick="runDFS()" id="btn-dfs" style="background:#7c3aed;border-color:#a78bfa">Run DFS</button>
+  <button onclick="stopAnim()" id="btn-stop" disabled>Stop</button>
+</div>
+
+<div class="main">
+  <div class="canvas-wrap">
+    <canvas id="canvas" width="700" height="480"></canvas>
+  </div>
+
+  <div class="side-panel">
+    <h3>Adjacency List</h3>
+    <div class="adj-list" id="adjList">No nodes yet</div>
+    <div style="margin-top:16px;font-size:0.85rem;color:#94a3b8;">
+      <strong>How to use:</strong><br>
+      1. Click canvas → add node<br>
+      2. Select “Connect” → click two nodes<br>
+      3. Choose start node then Run BFS/DFS
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="dot" style="background:var(--node)"></div> Node</div>
+  <div class="legend-item"><div class="dot" style="background:var(--current)"></div> Current</div>
+  <div class="legend-item"><div class="dot" style="background:var(--visited)"></div> Visited</div>
+  <div class="legend-item"><div class="dot" style="background:var(--path)"></div> Path / Edge</div>
+</div>
+
+<p class="info" id="status">Click on the canvas to add nodes</p>
+
+<!-- CODE SECTION -->
+<div class="code-section">
+  <div class="code-header">
+    <h2>Graph Code</h2>
+    <select id="code-topic" onchange="updateCode()">
+      <option value="representation">Graph Representation</option>
+      <option value="bfs">BFS Traversal</option>
+      <option value="dfs">DFS Traversal</option>
+    </select>
+    <button class="lang-btn active" data-lang="python" onclick="setLang('python')">Python</button>
+    <button class="lang-btn" data-lang="java" onclick="setLang('java')">Java</button>
+    <button class="lang-btn" data-lang="cpp" onclick="setLang('cpp')">C++</button>
+    <button class="lang-btn" data-lang="javascript" onclick="setLang('javascript')">JavaScript</button>
+  </div>
+
+  <div class="code-container">
+    <div class="code-toolbar">
+      <span id="code-title">Graph Representation — Python</span>
+      <button onclick="copyCode()" style="padding:4px 10px;font-size:0.8rem">Copy</button>
+    </div>
+    <pre><code id="code-block"></code></pre>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const adjListEl = document.getElementById('adjList');
+const statusEl = document.getElementById('status');
+
+let nodes = [];          // {id, x, y, label}
+let edges = [];          // {from, to}
+let mode = 'add';
+let selectedNode = null;
+let startNode = null;
+let visited = new Set();
+let current = null;
+let animating = false;
+let stopFlag = false;
+let nodeIdCounter = 0;
+
+function setMode(m) {
+  mode = m;
+  selectedNode = null;
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  if (m === 'add') document.getElementById('btn-add').classList.add('active');
+  if (m === 'connect') document.getElementById('btn-connect').classList.add('active');
+  if (m === 'delete') document.getElementById('btn-delete').classList.add('active');
+  statusEl.textContent = m === 'add' ? 'Click canvas to add a node' :
+                         m === 'connect' ? 'Click two nodes to connect them' :
+                         'Click a node or edge to delete';
+}
+
+function isDirected() {
+  return document.getElementById('directed').value === 'directed';
+}
+
+canvas.addEventListener('click', (e) => {
+  if (animating) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const clicked = findNode(x, y);
+
+  if (mode === 'add') {
+    if (!clicked) {
+      nodes.push({ id: nodeIdCounter++, x, y, label: String.fromCharCode(65 + nodes.length % 26) });
+      draw();
+      updateAdjList();
+    }
+  } else if (mode === 'connect') {
+    if (clicked) {
+      if (!selectedNode) {
+        selectedNode = clicked;
+        statusEl.textContent = `Selected ${clicked.label}. Click another node.`;
+        draw();
+      } else if (selectedNode.id !== clicked.id) {
+        const exists = edges.some(e =>
+          (e.from === selectedNode.id && e.to === clicked.id) ||
+          (!isDirected() && e.from === clicked.id && e.to === selectedNode.id)
+        );
+        if (!exists) {
+          edges.push({ from: selectedNode.id, to: clicked.id });
+        }
+        selectedNode = null;
+        statusEl.textContent = 'Edge added';
+        draw();
+        updateAdjList();
+      }
+    }
+  } else if (mode === 'delete') {
+    if (clicked) {
+      nodes = nodes.filter(n => n.id !== clicked.id);
+      edges = edges.filter(e => e.from !== clicked.id && e.to !== clicked.id);
+      draw();
+      updateAdjList();
+    }
+  }
+});
+
+function findNode(x, y) {
+  return nodes.find(n => Math.hypot(n.x - x, n.y - y) < 22);
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // edges
+  edges.forEach(e => {
+    const a = nodes.find(n => n.id === e.from);
+    const b = nodes.find(n => n.id === e.to);
+    if (!a || !b) return;
+
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = varPath(e) ? '#f87171' : '#64748b';
+    ctx.lineWidth = varPath(e) ? 3 : 2;
+    ctx.stroke();
+
+    if (isDirected()) {
+      drawArrow(a.x, a.y, b.x, b.y);
+    }
+  });
+
+  // nodes
+  nodes.forEach(n => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 20, 0, Math.PI * 2);
+
+    if (current && current.id === n.id) ctx.fillStyle = '#facc15';
+    else if (visited.has(n.id)) ctx.fillStyle = '#4ade80';
+    else if (selectedNode && selectedNode.id === n.id) ctx.fillStyle = '#38bdf8';
+    else ctx.fillStyle = '#64748b';
+
+    ctx.fill();
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.label, n.x, n.y);
+  });
+}
+
+function varPath(e) {
+  return false; // can be extended for path highlighting
+}
+
+function drawArrow(x1, y1, x2, y2) {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const len = 22;
+  const ax = x2 - Math.cos(angle) * 20;
+  const ay = y2 - Math.sin(angle) * 20;
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(ax - len * Math.cos(angle - 0.4), ay - len * Math.sin(angle - 0.4));
+  ctx.lineTo(ax - len * Math.cos(angle + 0.4), ay - len * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fillStyle = '#64748b';
+  ctx.fill();
+}
+
+function updateAdjList() {
+  if (nodes.length === 0) {
+    adjListEl.textContent = 'No nodes yet';
+    return;
+  }
+  const map = {};
+  nodes.forEach(n => map[n.label] = []);
+  edges.forEach(e => {
+    const a = nodes.find(n => n.id === e.from);
+    const b = nodes.find(n => n.id === e.to);
+    if (a && b) {
+      map[a.label].push(b.label);
+      if (!isDirected()) map[b.label].push(a.label);
+    }
+  });
+  adjListEl.innerHTML = Object.entries(map)
+    .map(([k, v]) => `<div><strong>${k}</strong> → [${v.join(', ')}]</div>`)
+    .join('');
+}
+
+function clearGraph() {
+  if (animating) return;
+  nodes = []; edges = []; nodeIdCounter = 0;
+  visited.clear(); current = null; selectedNode = null;
+  draw(); updateAdjList();
+  statusEl.textContent = 'Graph cleared';
+}
+
+function loadExample() {
+  if (animating) return;
+  clearGraph();
+  // Classic example
+  const positions = [
+    [150, 120], [350, 80], [550, 120],
+    [150, 280], [350, 320], [550, 280],
+    [350, 200]
+  ];
+  positions.forEach(([x, y], i) => {
+    nodes.push({ id: nodeIdCounter++, x, y, label: String.fromCharCode(65 + i) });
+  });
+  const conns = [[0,1],[1,2],[0,3],[1,6],[2,5],[3,4],[4,5],[6,4],[6,3]];
+  conns.forEach(([a,b]) => edges.push({ from: nodes[a].id, to: nodes[b].id }));
+  draw(); updateAdjList();
+  statusEl.textContent = 'Example graph loaded. Select a start node then run BFS/DFS.';
+}
+
+/* ========== TRAVERSALS ========== */
+function getNeighbors(nodeId) {
+  const result = [];
+  edges.forEach(e => {
+    if (e.from === nodeId) result.push(e.to);
+    else if (!isDirected() && e.to === nodeId) result.push(e.from);
+  });
+  return result;
+}
+
+async function runBFS() {
+  if (animating || nodes.length === 0) return;
+  if (!selectedNode) {
+    statusEl.textContent = 'First click a node to set as start, then press Run BFS';
+    mode = 'connect'; // reuse selection
+    return;
+  }
+  startNode = selectedNode;
+  await animateTraversal('bfs');
+}
+
+async function runDFS() {
+  if (animating || nodes.length === 0) return;
+  if (!selectedNode) {
+    statusEl.textContent = 'First click a node to set as start, then press Run DFS';
+    return;
+  }
+  startNode = selectedNode;
+  await animateTraversal('dfs');
+}
+
+async function animateTraversal(type) {
+  animating = true;
+  stopFlag = false;
+  visited.clear();
+  current = null;
+  document.getElementById('btn-bfs').disabled = true;
+  document.getElementById('btn-dfs').disabled = true;
+  document.getElementById('btn-stop').disabled = false;
+
+  const order = [];
+  if (type === 'bfs') {
+    const queue = [startNode.id];
+    visited.add(startNode.id);
+    while (queue.length && !stopFlag) {
+      const id = queue.shift();
+      const node = nodes.find(n => n.id === id);
+      current = node;
+      order.push(node.label);
+      draw();
+      statusEl.textContent = `BFS visiting: ${node.label} | Order: ${order.join(' → ')}`;
+      await sleep(600);
+      for (const nei of getNeighbors(id)) {
+        if (!visited.has(nei)) {
+          visited.add(nei);
+          queue.push(nei);
+        }
+      }
+    }
+  } else {
+    // DFS iterative
+    const stack = [startNode.id];
+    while (stack.length && !stopFlag) {
+      const id = stack.pop();
+      if (visited.has(id)) continue;
+      visited.add(id);
+      const node = nodes.find(n => n.id === id);
+      current = node;
+      order.push(node.label);
+      draw();
+      statusEl.textContent = `DFS visiting: ${node.label} | Order: ${order.join(' → ')}`;
+      await sleep(600);
+      const neighbors = getNeighbors(id).reverse();
+      for (const nei of neighbors) {
+        if (!visited.has(nei)) stack.push(nei);
+      }
+    }
+  }
+
+  current = null;
+  draw();
+  statusEl.textContent = `${type.toUpperCase()} complete: ${order.join(' → ')}`;
+  animating = false;
+  document.getElementById('btn-bfs').disabled = false;
+  document.getElementById('btn-dfs').disabled = false;
+  document.getElementById('btn-stop').disabled = true;
+}
+
+function stopAnim() { stopFlag = true; }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ========== CODE SNIPPETS ========== */
+const codeSnippets = {
+  representation: {
+    python: `<span class="cm"># Graph Representation (Adjacency List) - Python</span>
+<span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">class</span> <span class="fn">Graph</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, directed=<span class="kw">False</span>):
+        self.graph = defaultdict(list)
+        self.directed = directed
+
+    <span class="kw">def</span> <span class="fn">add_edge</span>(self, u, v):
+        self.graph[u].append(v)
+        <span class="kw">if not</span> self.directed:
+            self.graph[v].append(u)
+
+    <span class="kw">def</span> <span class="fn">print_graph</span>(self):
+        <span class="kw">for</span> node <span class="kw">in</span> self.graph:
+            <span class="fn">print</span>(f<span class="str">"{node} → {self.graph[node]}"</span>)
+
+<span class="cm"># Usage</span>
+g = <span class="fn">Graph</span>()
+g.add_edge(<span class="str">'A'</span>, <span class="str">'B'</span>)
+g.add_edge(<span class="str">'A'</span>, <span class="str">'C'</span>)
+g.add_edge(<span class="str">'B'</span>, <span class="str">'D'</span>)
+g.print_graph()`,
+
+    java: `<span class="cm">// Graph Representation - Java</span>
+<span class="kw">import</span> java.util.*;
+
+<span class="kw">class</span> <span class="fn">Graph</span> {
+    <span class="kw">private</span> Map&lt;String, List&lt;String&gt;&gt; adj = <span class="kw">new</span> HashMap&lt;&gt;();
+    <span class="kw">private boolean</span> directed;
+
+    <span class="kw">public</span> <span class="fn">Graph</span>(<span class="type">boolean</span> directed) {
+        this.directed = directed;
+    }
+
+    <span class="kw">public void</span> <span class="fn">addEdge</span>(String u, String v) {
+        adj.putIfAbsent(u, <span class="kw">new</span> ArrayList&lt;&gt;());
+        adj.get(u).add(v);
+        <span class="kw">if</span> (!directed) {
+            adj.putIfAbsent(v, <span class="kw">new</span> ArrayList&lt;&gt;());
+            adj.get(v).add(u);
+        }
+    }
+
+    <span class="kw">public void</span> <span class="fn">printGraph</span>() {
+        <span class="kw">for</span> (String node : adj.keySet()) {
+            System.out.println(node + <span class="str">" → "</span> + adj.get(node));
+        }
+    }
+}`,
+
+    cpp: `<span class="cm">// Graph Representation - C++</span>
+<span class="kw">#include</span> &lt;bits/stdc++.h&gt;
+<span class="kw">using namespace</span> std;
+
+<span class="kw">class</span> <span class="fn">Graph</span> {
+    map&lt;string, vector&lt;string&gt;&gt; adj;
+    <span class="type">bool</span> directed;
+<span class="kw">public</span>:
+    <span class="fn">Graph</span>(<span class="type">bool</span> dir = <span class="kw">false</span>) : directed(dir) {}
+
+    <span class="kw">void</span> <span class="fn">addEdge</span>(string u, string v) {
+        adj[u].push_back(v);
+        <span class="kw">if</span> (!directed) adj[v].push_back(u);
+    }
+
+    <span class="kw">void</span> <span class="fn">printGraph</span>() {
+        <span class="kw">for</span> (<span class="kw">auto</span>& [node, neighbors] : adj) {
+            cout &lt;&lt; node &lt;&lt; <span class="str">" → "</span>;
+            <span class="kw">for</span> (string n : neighbors) cout &lt;&lt; n &lt;&lt; <span class="str">" "</span>;
+            cout &lt;&lt; endl;
+        }
+    }
+};`,
+
+    javascript: `<span class="cm">// Graph Representation - JavaScript</span>
+<span class="kw">class</span> <span class="fn">Graph</span> {
+  <span class="fn">constructor</span>(directed = <span class="kw">false</span>) {
+    this.adj = <span class="kw">new</span> Map();
+    this.directed = directed;
+  }
+
+  <span class="fn">addEdge</span>(u, v) {
+    <span class="kw">if</span> (!this.adj.has(u)) this.adj.set(u, []);
+    this.adj.get(u).push(v);
+    <span class="kw">if</span> (!this.directed) {
+      <span class="kw">if</span> (!this.adj.has(v)) this.adj.set(v, []);
+      this.adj.get(v).push(u);
+    }
+  }
+
+  <span class="fn">printGraph</span>() {
+    <span class="kw">for</span> (<span class="kw">const</span> [node, neighbors] <span class="kw">of</span> this.adj) {
+      console.log(<span class="str">\`\${node} → [\${neighbors.join(', ')}]\`</span>);
+    }
+  }
+}`
+  },
+
+  bfs: {
+    python: `<span class="cm"># BFS Traversal - Python</span>
+<span class="kw">from</span> collections <span class="kw">import</span> deque
+
+<span class="kw">def</span> <span class="fn">bfs</span>(graph, start):
+    visited = <span class="fn">set</span>()
+    queue = deque([start])
+    visited.add(start)
+    order = []
+
+    <span class="kw">while</span> queue:
+        node = queue.popleft()
+        order.append(node)
+        <span class="kw">for</span> neighbor <span class="kw">in</span> graph[node]:
+            <span class="kw">if</span> neighbor <span class="kw">not in</span> visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+    <span class="kw">return</span> order
+
+<span class="cm"># Example</span>
+graph = {
+    <span class="str">'A'</span>: [<span class="str">'B'</span>, <span class="str">'C'</span>],
+    <span class="str">'B'</span>: [<span class="str">'A'</span>, <span class="str">'D'</span>, <span class="str">'E'</span>],
+    <span class="str">'C'</span>: [<span class="str">'A'</span>, <span class="str">'F'</span>],
+    <span class="str">'D'</span>: [<span class="str">'B'</span>],
+    <span class="str">'E'</span>: [<span class="str">'B'</span>, <span class="str">'F'</span>],
+    <span class="str">'F'</span>: [<span class="str">'C'</span>, <span class="str">'E'</span>]
+}
+<span class="fn">print</span>(bfs(graph, <span class="str">'A'</span>))  <span class="cm"># ['A', 'B', 'C', 'D', 'E', 'F']</span>`,
+
+    java: `<span class="cm">// BFS Traversal - Java</span>
+<span class="kw">import</span> java.util.*;
+
+<span class="kw">public static</span> List&lt;String&gt; <span class="fn">bfs</span>(Map&lt;String, List&lt;String&gt;&gt; graph, String start) {
+    Set&lt;String&gt; visited = <span class="kw">new</span> HashSet&lt;&gt;();
+    Queue&lt;String&gt; queue = <span class="kw">new</span> LinkedList&lt;&gt;();
+    List&lt;String&gt; order = <span class="kw">new</span> ArrayList&lt;&gt;();
+
+    queue.add(start);
+    visited.add(start);
+
+    <span class="kw">while</span> (!queue.isEmpty()) {
+        String node = queue.poll();
+        order.add(node);
+        <span class="kw">for</span> (String neighbor : graph.getOrDefault(node, List.of())) {
+            <span class="kw">if</span> (!visited.contains(neighbor)) {
+                visited.add(neighbor);
+                queue.add(neighbor);
+            }
+        }
+    }
+    <span class="kw">return</span> order;
+}`,
+
+    cpp: `<span class="cm">// BFS Traversal - C++</span>
+<span class="kw">#include</span> &lt;bits/stdc++.h&gt;
+<span class="kw">using namespace</span> std;
+
+vector&lt;string&gt; <span class="fn">bfs</span>(map&lt;string, vector&lt;string&gt;&gt;& graph, string start) {
+    set&lt;string&gt; visited;
+    queue&lt;string&gt; q;
+    vector&lt;string&gt; order;
+
+    q.push(start);
+    visited.insert(start);
+
+    <span class="kw">while</span> (!q.empty()) {
+        string node = q.front(); q.pop();
+        order.push_back(node);
+        <span class="kw">for</span> (string& nei : graph[node]) {
+            <span class="kw">if</span> (!visited.count(nei)) {
+                visited.insert(nei);
+                q.push(nei);
+            }
+        }
+    }
+    <span class="kw">return</span> order;
+}`,
+
+    javascript: `<span class="cm">// BFS Traversal - JavaScript</span>
+<span class="kw">function</span> <span class="fn">bfs</span>(graph, start) {
+  <span class="kw">const</span> visited = <span class="kw">new</span> Set();
+  <span class="kw">const</span> queue = [start];
+  <span class="kw">const</span> order = [];
+
+  visited.add(start);
+
+  <span class="kw">while</span> (queue.length > <span class="num">0</span>) {
+    <span class="kw">const</span> node = queue.shift();
+    order.push(node);
+    <span class="kw">for</span> (<span class="kw">const</span> neighbor <span class="kw">of</span> (graph[node] || [])) {
+      <span class="kw">if</span> (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+  <span class="kw">return</span> order;
+}`
+  },
+
+  dfs: {
+    python: `<span class="cm"># DFS Traversal - Python</span>
+<span class="kw">def</span> <span class="fn">dfs</span>(graph, start, visited=<span class="kw">None</span>):
+    <span class="kw">if</span> visited <span class="kw">is None</span>:
+        visited = <span class="fn">set</span>()
+    visited.add(start)
+    order = [start]
+
+    <span class="kw">for</span> neighbor <span class="kw">in</span> graph[start]:
+        <span class="kw">if</span> neighbor <span class="kw">not in</span> visited:
+            order += <span class="fn">dfs</span>(graph, neighbor, visited)
+    <span class="kw">return</span> order
+
+<span class="cm"># Iterative DFS</span>
+<span class="kw">def</span> <span class="fn">dfs_iterative</span>(graph, start):
+    visited = <span class="fn">set</span>()
+    stack = [start]
+    order = []
+
+    <span class="kw">while</span> stack:
+        node = stack.pop()
+        <span class="kw">if</span> node <span class="kw">not in</span> visited:
+            visited.add(node)
+            order.append(node)
+            stack.extend(reversed(graph[node]))
+    <span class="kw">return</span> order`,
+
+    java: `<span class="cm">// DFS Traversal - Java</span>
+<span class="kw">public static</span> List&lt;String&gt; <span class="fn">dfs</span>(Map&lt;String, List&lt;String&gt;&gt; graph, String start) {
+    Set&lt;String&gt; visited = <span class="kw">new</span> HashSet&lt;&gt;();
+    List&lt;String&gt; order = <span class="kw">new</span> ArrayList&lt;&gt;();
+    <span class="fn">dfsHelper</span>(graph, start, visited, order);
+    <span class="kw">return</span> order;
+}
+
+<span class="kw">private static void</span> <span class="fn">dfsHelper</span>(Map&lt;String, List&lt;String&gt;&gt; graph, String node,
+                                   Set&lt;String&gt; visited, List&lt;String&gt; order) {
+    visited.add(node);
+    order.add(node);
+    <span class="kw">for</span> (String neighbor : graph.getOrDefault(node, List.of())) {
+        <span class="kw">if</span> (!visited.contains(neighbor)) {
+            <span class="fn">dfsHelper</span>(graph, neighbor, visited, order);
+        }
+    }
+}`,
+
+    cpp: `<span class="cm">// DFS Traversal - C++</span>
+<span class="kw">void</span> <span class="fn">dfsHelper</span>(map&lt;string, vector&lt;string&gt;&gt;& graph, string node,
+              set&lt;string&gt;& visited, vector&lt;string&gt;& order) {
+    visited.insert(node);
+    order.push_back(node);
+    <span class="kw">for</span> (string& nei : graph[node]) {
+        <span class="kw">if</span> (!visited.count(nei))
+            <span class="fn">dfsHelper</span>(graph, nei, visited, order);
+    }
+}
+
+vector&lt;string&gt; <span class="fn">dfs</span>(map&lt;string, vector&lt;string&gt;&gt;& graph, string start) {
+    set&lt;string&gt; visited;
+    vector&lt;string&gt; order;
+    <span class="fn">dfsHelper</span>(graph, start, visited, order);
+    <span class="kw">return</span> order;
+}`,
+
+    javascript: `<span class="cm">// DFS Traversal - JavaScript</span>
+<span class="kw">function</span> <span class="fn">dfs</span>(graph, start, visited = <span class="kw">new</span> Set()) {
+  visited.add(start);
+  <span class="kw">const</span> order = [start];
+
+  <span class="kw">for</span> (<span class="kw">const</span> neighbor <span class="kw">of</span> (graph[start] || [])) {
+    <span class="kw">if</span> (!visited.has(neighbor)) {
+      order.push(...<span class="fn">dfs</span>(graph, neighbor, visited));
+    }
+  }
+  <span class="kw">return</span> order;
+}
+
+<span class="cm">// Iterative version</span>
+<span class="kw">function</span> <span class="fn">dfsIterative</span>(graph, start) {
+  <span class="kw">const</span> visited = <span class="kw">new</span> Set();
+  <span class="kw">const</span> stack = [start];
+  <span class="kw">const</span> order = [];
+
+  <span class="kw">while</span> (stack.length) {
+    <span class="kw">const</span> node = stack.pop();
+    <span class="kw">if</span> (!visited.has(node)) {
+      visited.add(node);
+      order.push(node);
+      <span class="kw">const</span> neighbors = (graph[node] || []).slice().reverse();
+      stack.push(...neighbors);
+    }
+  }
+  <span class="kw">return</span> order;
+}`
+  }
+};
+
+let currentLang = 'python';
+
+function setLang(lang) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+  updateCode();
+}
+
+function updateCode() {
+  const topic = document.getElementById('code-topic').value;
+  const titles = {
+    representation: 'Graph Representation',
+    bfs: 'BFS Traversal',
+    dfs: 'DFS Traversal'
+  };
+  const langNames = { python: 'Python', java: 'Java', cpp: 'C++', javascript: 'JavaScript' };
+  document.getElementById('code-title').textContent = `${titles[topic]} — ${langNames[currentLang]}`;
+  document.getElementById('code-block').innerHTML = codeSnippets[topic][currentLang];
+}
+
+function copyCode() {
+  const text = document.getElementById('code-block').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+/* Init */
+draw();
+updateCode();
+</script>
+</body>
+</html>
