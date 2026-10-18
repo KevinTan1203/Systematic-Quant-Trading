@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+ <head>
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+ <title>Quantitative Methods — 21.6 Statistical Arbitrage</title>
+ <link
+ href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:wght@400;700&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,600&display=swap"
+ rel="stylesheet"
+ />
+ <style>
+ :root {
+ --bg: #f4f1eb;
+ --bg2: #ede9e0;
+ --surface: #fff;
+ --surface2: #faf8f4;
+ --border: #d8d2c4;
+ --border2: #c4bdb0;
+ --ink: #1c1814;
+ --ink2: #3a342c;
+ --muted: #7a7268;
+ --faint: #b0a898;
+ --red: #b03020;
+ --red-bg: #fdf2f0;
+ --red-border: #e8c4be;
+ --teal: #1a6b5a;
+ --teal-bg: #f0f8f6;
+ --teal-border: #b4ddd6;
+ --amber: #9a6010;
+ --amber-bg: #fdf6e8;
+ --amber-border: #e8d4a4;
+ --slate: #2a4a6a;
+ --slate-bg: #f0f4f8;
+ --slate-border: #b4c8dc;
+ --accent: #c04828;
+ }
+ * {
+ box-sizing: border-box;
+ margin: 0;
+ padding: 0;
+ }
+ body {
+ background: var(--bg);
+ color: var(--ink);
+ font-family: "Source Serif 4", serif;
+ font-size: 15px;
+ line-height: 1.75;
+ }
+ body:after {
+ content: "";
+ position: fixed;
+ inset: 0;
+ pointer-events: none;
+ z-index: 0;
+ opacity: 0.04;
+ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+ }
+ .page {
+ position: relative;
+ z-index: 1;
+ max-width: 940px;
+ margin: auto;
+ padding: 52px 40px 100px;
+ }
+ .book-header {
+ margin-bottom: 44px;
+ display: grid;
+ grid-template-columns: 1fr auto;
+ gap: 24px;
+ align-items: end;
+ border-bottom: 2px solid var(--ink);
+ padding-bottom: 22px;
+ }
+ .chapter-eyebrow,
+ .header-stat,
+ .entry-era,
+ .entry-desc,
+ .entry-badge,
+ .entry-toggle,
+ .data-cell-label,
+ .data-cell-value,
+ .tag,
+ .ctrl-btn,
+ .ctrl-right,
+ .footer-note {
+ font-family: "Space Mono", monospace;
+ }
+ .chapter-eyebrow {
+ font-size: 10px;
+ letter-spacing: 0.22em;
+ text-transform: uppercase;
+ color: var(--accent);
+ margin-bottom: 10px;
+ }
+ .book-title {
+ font:
+ clamp(30px, 5vw, 52px)/1.05 "DM Serif Display",
+ serif;
+ letter-spacing: -0.02em;
+ }
+ .book-title em {
+ color: var(--accent);
+ }
+ .header-right {
+ text-align: right;
+ padding-bottom: 4px;
+ }
+ .header-stat {
+ font-size: 10px;
+ color: var(--muted);
+ line-height: 1.8;
+ letter-spacing: 0.05em;
+ }
+ .header-stat strong {
+ display: block;
+ font:
+ 28px/1 "DM Serif Display",
+ serif;
+ color: var(--ink);
+ }
+ .controls {
+ display: flex;
+ gap: 8px;
+ margin-bottom: 32px;
+ flex-wrap: wrap;
+ align-items: center;
+ }
+ .ctrl-btn {
+ font-size: 10px;
+ letter-spacing: 0.12em;
+ text-transform: uppercase;
+ padding: 7px 16px;
+ border: 1px solid var(--border2);
+ background: var(--surface);
+ color: var(--muted);
+ cursor: pointer;
+ }
+ .ctrl-btn:hover {
+ background: var(--ink);
+ color: var(--bg);
+ }
+ .ctrl-right {
+ margin-left: auto;
+ font-size: 10px;
+ color: var(--faint);
+ letter-spacing: 0.08em;
+ }
+ .timeline {
+ position: relative;
+ padding-left: 36px;
+ }
+ .timeline:before {
+ content: "";
+ position: absolute;
+ left: 11px;
+ top: 8px;
+ bottom: 8px;
+ width: 2px;
+ background: repeating-linear-gradient(
+ to bottom,
+ var(--border2) 0 6px,
+ transparent 6px 12px
+ );
+ }
+ .entry {
+ position: relative;
+ margin-bottom: 6px;
+ }
+ .entry:before {
+ content: "";
+ position: absolute;
+ left: -29px;
+ top: 20px;
+ width: 10px;
+ height: 10px;
+ border-radius: 50%;
+ background: var(--bg2);
+ border: 2px solid var(--border2);
+ z-index: 2;
+ }
+ .entry.open:before {
+ background: var(--accent);
+ border-color: var(--accent);
+ }
+ .entry-card {
+ background: var(--surface);
+ border: 1px solid var(--border);
+ }
+ .entry.open .entry-card {
+ border-color: var(--border2);
+ box-shadow: 3px 3px 0 var(--bg2);
+ }
+ .entry-header {
+ display: grid;
+ grid-template-columns: 76px 42px 1fr auto 42px;
+ align-items: center;
+ min-height: 58px;
+ cursor: pointer;
+ user-select: none;
+ }
+ .entry-header:hover {
+ background: var(--surface2);
+ }
+ .entry-era {
+ align-self: stretch;
+ display: flex;
+ align-items: center;
+ padding-left: 16px;
+ border-right: 1px solid var(--border);
+ font-size: 9px;
+ font-weight: 700;
+ color: var(--accent);
+ letter-spacing: 0.06em;
+ text-transform: uppercase;
+ }
+ .entry-icon {
+ align-self: stretch;
+ display: flex;
+ align-items: center;
+ padding: 0 12px;
+ border-right: 1px solid var(--border);
+ font-size: 16px;
+ }
+ .entry-title-block {
+ padding: 12px 16px;
+ }
+ .entry-title {
+ font:
+ 16.5px/1.25 "DM Serif Display",
+ serif;
+ }
+ .entry-desc {
+ margin-top: 3px;
+ color: var(--muted);
+ font-size: 9.5px;
+ letter-spacing: 0.04em;
+ }
+ .entry-badge {
+ margin-right: 14px;
+ padding: 3px 9px;
+ border: 1px solid;
+ white-space: nowrap;
+ font-size: 9px;
+ letter-spacing: 0.1em;
+ text-transform: uppercase;
+ }
+ .badge-red {
+ color: var(--red);
+ border-color: var(--red-border);
+ background: var(--red-bg);
+ }
+ .badge-teal {
+ color: var(--teal);
+ border-color: var(--teal-border);
+ background: var(--teal-bg);
+ }
+ .badge-amber {
+ color: var(--amber);
+ border-color: var(--amber-border);
+ background: var(--amber-bg);
+ }
+ .badge-slate {
+ color: var(--slate);
+ border-color: var(--slate-border);
+ background: var(--slate-bg);
+ }
+ .entry-toggle {
+ align-self: stretch;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ border-left: 1px solid var(--border);
+ color: var(--faint);
+ transition:
+ transform 0.25s,
+ color 0.15s;
+ }
+ .entry.open .entry-toggle {
+ transform: rotate(90deg);
+ color: var(--accent);
+ }
+ .entry-body {
+ display: none;
+ border-top: 1px solid var(--border);
+ background: var(--surface2);
+ padding: 22px 24px 24px;
+ }
+ .entry.open .entry-body {
+ display: block;
+ animation: bodyIn 0.2s ease;
+ }
+ @keyframes bodyIn {
+ from {
+ opacity: 0;
+ transform: translateY(-5px);
+ }
+ to {
+ opacity: 1;
+ transform: translateY(0);
+ }
+ }
+ .entry-body p {
+ margin-bottom: 13px;
+ color: var(--ink2);
+ font-size: 13.5px;
+ line-height: 1.84;
+ font-weight: 300;
+ }
+ .entry-body p:last-of-type {
+ margin-bottom: 0;
+ }
+ .key-insight {
+ display: grid;
+ grid-template-columns: 3px 1fr;
+ gap: 14px;
+ margin-top: 18px;
+ }
+ .key-insight-bar {
+ background: var(--accent);
+ border-radius: 2px;
+ }
+ .key-insight-text {
+ padding: 2px 0;
+ color: var(--ink);
+ font:
+ italic 15px/1.6 "DM Serif Display",
+ serif;
+ }
+ .data-strip {
+ display: flex;
+ flex-wrap: wrap;
+ margin-top: 16px;
+ border: 1px solid var(--border);
+ overflow: hidden;
+ }
+ .data-cell {
+ flex: 1;
+ min-width: 140px;
+ padding: 9px 14px;
+ border-right: 1px solid var(--border);
+ }
+ .data-cell:last-child {
+ border-right: 0;
+ }
+ .data-cell-label {
+ margin-bottom: 3px;
+ color: var(--muted);
+ font-size: 9px;
+ letter-spacing: 0.14em;
+ text-transform: uppercase;
+ }
+ .data-cell-value {
+ font-size: 12px;
+ font-weight: 700;
+ }
+ .red {
+ color: var(--red);
+ }
+ .teal {
+ color: var(--teal);
+ }
+ .amber {
+ color: var(--amber);
+ }
+ .slate {
+ color: var(--slate);
+ }
+ .tags {
+ display: flex;
+ flex-wrap: wrap;
+ gap: 5px;
+ margin-top: 16px;
+ }
+ .tag {
+ padding: 3px 8px;
+ background: var(--bg2);
+ border: 1px solid var(--border);
+ color: var(--muted);
+ font-size: 9px;
+ letter-spacing: 0.1em;
+ text-transform: uppercase;
+ }
+ .tag.accent {
+ background: var(--red-bg);
+ border-color: var(--red-border);
+ color: var(--accent);
+ }
+ .tag.teal {
+ background: var(--teal-bg);
+ border-color: var(--teal-border);
+ color: var(--teal);
+ }
+ .tag.amber {
+ background: var(--amber-bg);
+ border-color: var(--amber-border);
+ color: var(--amber);
+ }
+ .tag.slate {
+ background: var(--slate-bg);
+ border-color: var(--slate-border);
+ color: var(--slate);
+ }
+ .foot-rule {
+ border: 0;
+ height: 2px;
+ background: var(--ink);
+ margin: 64px 0 20px;
+ }
+ .footer-note {
+ display: flex;
+ justify-content: space-between;
+ color: var(--muted);
+ font-size: 10px;
+ letter-spacing: 0.14em;
+ text-transform: uppercase;
+ }
+ @media (max-width: 640px) {
+ .page {
+ padding: 32px 20px 60px;
+ }
+ .book-header {
+ grid-template-columns: 1fr;
+ }
+ .header-right {
+ text-align: left;
+ }
+ .timeline {
+ padding-left: 24px;
+ }
+ .entry-header {
+ grid-template-columns: 52px 36px 1fr auto;
+ }
+ .entry-badge {
+ display: none;
+ }
+ .entry-era {
+ padding-left: 10px;
+ font-size: 8.5px;
+ }
+ .ctrl-right {
+ width: 100%;
+ margin-left: 0;
+ }
+ }
+ </style>
+ </head>
+ <body>
+ <div class="page">
+ <header class="book-header">
+ <div>
+ <div class="chapter-eyebrow">Chapter 21 · Section 21.6</div>
+ <h1 class="book-title">Statistical<br /><em>Arbitrage</em></h1>
+ </div>
+ <div class="header-right">
+ <div class="header-stat"><strong>7</strong>core fronts</div>
+ </div>
+ </header>
+ <div class="controls">
+ <button class="ctrl-btn" onclick="toggleAll(true)">Expand All</button
+ ><button class="ctrl-btn" onclick="toggleAll(false)">
+ Collapse All
+ </button>
+ <div class="ctrl-right">
+ residual mean reversion · factor neutrality · pair z-score · basket spread · cointegration risk · low latency
+ </div>
+ </div>
+ <div class="timeline" id="entries-root"></div>
+ <div
+ style="height: 1px; background: var(--border); margin: 8px 0 0"
+ ></div>
+ <hr class="foot-rule" style="margin-top: 48px" />
+ <div class="footer-note">
+ <span>Quantitative Methods · Revision Notes</span
+ ><span>21.6 Statistical Arbitrage</span>
+ </div>
+ </div>
+ <script>
+ const entries = [
+ {
+ era: "Core Idea",
+ icon: "📐",
+ title: "Exploiting Mean-Reverting Residuals",
+ desc: "Construct factor-neutral portfolios and trade the residual series that are expected to revert to zero",
+ badge: { label: "Framework", style: "teal" },
+ tags: [
+ ["stat arb", "teal"],
+ ["residuals", "amber"],
+ ["factor neutral", ""],
+ ["mean reversion", "slate"],
+ ],
+ data: [
+ {
+ label: "Approach",
+ value: "Trade residuals of factor-neutral books",
+ color: "teal",
+ },
+ {
+ label: "Neutrality",
+ value: "Remove systematic factor exposures",
+ color: "amber",
+ },
+ {
+ label: "Edge",
+ value: "Idiosyncratic residual mean reversion",
+ color: "slate",
+ },
+ ],
+ body: [
+ "Statistical arbitrage seeks to profit from the temporary deviations of prices or spreads from the values implied by a statistical model, while remaining approximately neutral to broad market and common-factor moves. The central object of trade is the residual—the component of return left after a factor model has explained the systematic portion of price variation.",
+ "By constructing portfolios that are long and short in such a way that net exposure to the chosen factors is near zero, the strategy isolates idiosyncratic, mean-reverting fluctuations. When a residual becomes unusually large (positive or negative), the portfolio is positioned for its expected return toward zero. When the residual normalises, the position is exited.",
+ "The approach sits between pure pairs trading and multi-factor equity market-neutral investing. It relies on the twin assumptions that a well-specified factor model captures most of the correlated movement among assets and that the remaining idiosyncratic residuals exhibit economically exploitable mean reversion over horizons of days to weeks.",
+ ],
+ keyPoint:
+ "Statistical arbitrage is the systematic harvesting of mean reversion in the residual space that remains after common factors have been removed.",
+ },
+ {
+ era: "Signals",
+ icon: "📡",
+ title: "Signal Inputs and Residual Construction",
+ desc: "Residual returns after a factor model, pair z-scores, and basket-spread z-scores",
+ badge: { label: "Mechanism", style: "amber" },
+ tags: [
+ ["residual return", "teal"],
+ ["pair z-score", "amber"],
+ ["basket spread", ""],
+ ["factor model", "slate"],
+ ],
+ data: [
+ {
+ label: "Primary signal",
+ value: "Standardised residual after factor model",
+ color: "teal",
+ },
+ {
+ label: "Pairs",
+ value: "Z-score of cointegrated or residual spread",
+ color: "amber",
+ },
+ {
+ label: "Baskets",
+ value: "Z-score of multi-asset residual portfolio",
+ color: "slate",
+ },
+ ],
+ body: [
+ "The foundational signal is the residual return obtained by regressing an asset’s return on a set of factors (market, size, value, industry, or statistical principal components) and retaining the intercept-plus-error term. This residual is then standardised—often as a z-score relative to its recent volatility—to produce a trading signal. Extreme positive residuals are shorted; extreme negative residuals are bought.",
+ "Classic pairs trading is the two-asset special case. A cointegration relationship or a simple residual spread is estimated; the z-score of that spread generates entry and exit thresholds. When the z-score exceeds a chosen level the pair is traded for reversion; when it returns toward zero the trade is closed.",
+ "Basket or multi-asset versions generalise the same logic. A portfolio of several securities is formed so that it is factor-neutral by construction; the residual value of the basket is monitored and traded when its z-score becomes extreme. The richer residual series can improve diversification and reduce the impact of any single cointegration failure.",
+ ],
+ keyPoint:
+ "All statistical-arbitrage signals ultimately measure how far a residual or spread has travelled from its statistical equilibrium and bet on its return.",
+ },
+ {
+ era: "Assumptions",
+ icon: "🧠",
+ title: "Market Assumptions and Model Foundations",
+ desc: "Factor exposures explain most correlated movement; idiosyncratic residuals mean-revert",
+ badge: { label: "Theory", style: "slate" },
+ tags: [
+ ["factor model", "teal"],
+ ["idiosyncratic", "amber"],
+ ["mean reversion", ""],
+ ["neutrality", "slate"],
+ ],
+ data: [
+ {
+ label: "Factor role",
+ value: "Explain majority of co-movement",
+ color: "teal",
+ },
+ {
+ label: "Residual behaviour",
+ value: "Idiosyncratic residuals mean-revert",
+ color: "amber",
+ },
+ {
+ label: "Implication",
+ value: "Neutral books isolate tradable noise",
+ color: "slate",
+ },
+ ],
+ body: [
+ "Statistical arbitrage rests on two linked assumptions. First, a suitably chosen factor model accounts for the bulk of the contemporaneous correlation among the assets in the universe. Once those factor exposures are hedged, the remaining residuals are largely idiosyncratic. Second, those idiosyncratic residuals exhibit mean reversion over intermediate horizons—driven by temporary liquidity imbalances, slow diffusion of stock-specific information, or inventory effects among market makers.",
+ "If the factor model is well specified, the residual portfolio has low net exposure to market direction, sector moves, and other systematic risks. Performance then depends primarily on the strength and stability of residual mean reversion rather than on the correctness of a directional market view.",
+ "The assumptions fail when the factor model is incomplete (omitted factors appear), when residuals become permanently displaced by corporate events or structural change, or when mean reversion weakens because the residual series itself begins to trend. Continuous monitoring of residual diagnostics and factor exposures is therefore essential.",
+ ],
+ keyPoint:
+ "The edge exists only in the residual space; any leakage of systematic factor exposure converts statistical arbitrage into an unintended directional or style bet.",
+ },
+ {
+ era: "Horizon",
+ icon: "⏱️",
+ title: "Typical Holding Period and Turnover",
+ desc: "Days to weeks—longer than pure high-frequency market making, shorter than classic medium-term momentum",
+ badge: { label: "Design", style: "teal" },
+ tags: [
+ ["days to weeks", "teal"],
+ ["intermediate", "amber"],
+ ["turnover", ""],
+ ["reversion half-life", "slate"],
+ ],
+ data: [
+ {
+ label: "Holding period",
+ value: "Typically days to a few weeks",
+ color: "teal",
+ },
+ {
+ label: "Driver",
+ value: "Half-life of residual mean reversion",
+ color: "amber",
+ },
+ {
+ label: "Turnover",
+ value: "Material but lower than pure HFT",
+ color: "slate",
+ },
+ ],
+ body: [
+ "Statistical-arbitrage holding periods are characteristically intermediate. Residuals that arise from liquidity shocks or slow information diffusion tend to revert over a few days to a few weeks. Positions are therefore opened when residual z-scores become extreme and closed when they normalise or when a time-based or stop-loss rule is triggered.",
+ "The optimal horizon is governed by the estimated half-life of the residual process. Faster residual processes support shorter holding periods and higher turnover; slower processes allow multi-week holds. In practice most equity statistical-arbitrage books operate with average holding periods measured in days to low tens of days.",
+ "Because turnover remains material, transaction costs and market impact are first-order considerations. Capacity is constrained both by the liquidity of the underlying names and by the speed at which competing residual traders detect and arbitrage the same dislocations.",
+ ],
+ keyPoint:
+ "The holding period is matched to the statistical half-life of the residual; too short and costs dominate, too long and the mean-reversion edge decays.",
+ },
+ {
+ era: "Risk",
+ icon: "⚖️",
+ title: "Risk Profile and Performance Characteristics",
+ desc: "Attractive Sharpe ratios in normal regimes, but material blow-up risk when residual relationships break",
+ badge: { label: "Profile", style: "amber" },
+ tags: [
+ ["Sharpe 1.5–3.0", "teal"],
+ ["blow-up risk", "red"],
+ ["cointegration", "amber"],
+ ["residual variance", "slate"],
+ ],
+ data: [
+ {
+ label: "Typical Sharpe",
+ value: "1.5 – 3.0 in favourable regimes",
+ color: "teal",
+ },
+ {
+ label: "Primary risk",
+ value: "Cointegration or residual-model failure",
+ color: "red",
+ },
+ {
+ label: "Character",
+ value: "Moderate returns · left-tail events",
+ color: "amber",
+ },
+ ],
+ body: [
+ "Well-executed statistical-arbitrage strategies have historically delivered Sharpe ratios in the 1.5–3.0 range after costs, reflecting the relatively high information content of residual mean-reversion signals and the benefit of factor neutrality. Returns are generated by a large number of small, positively expected trades rather than by a few large directional bets.",
+ "The dominant risk is model or relationship failure. A residual series that has mean-reverted reliably for months can suddenly stop doing so after a corporate event, a change in business fundamentals, an accounting restatement, or a structural shift in the market. Positions that assume continued reversion then become outright directional exposures and can generate large losses.",
+ "Because many residual trades can be correlated through common liquidity or sector effects, portfolio-level drawdowns can exceed what single-name residual volatility would suggest. Continuous residual diagnostics, hard position limits, and rapid reduction of exposure when residual variance or half-life estimates deteriorate are essential risk-management practices.",
+ ],
+ keyPoint:
+ "Statistical arbitrage offers attractive risk-adjusted returns precisely while residual mean reversion remains intact; the largest losses occur when that statistical relationship breaks.",
+ },
+ {
+ era: "Infrastructure",
+ icon: "🖥️",
+ title: "Infrastructure and Operational Requirements",
+ desc: "Real-time factor-model computation, low-latency execution, and a robust portfolio-management system",
+ badge: { label: "Ops", style: "slate" },
+ tags: [
+ ["factor engine", "teal"],
+ ["low latency", "amber"],
+ ["portfolio system", ""],
+ ["real-time", "slate"],
+ ],
+ data: [
+ {
+ label: "Computation",
+ value: "Real-time or high-frequency factor residuals",
+ color: "teal",
+ },
+ {
+ label: "Execution",
+ value: "Low-latency order routing and smart sizing",
+ color: "amber",
+ },
+ {
+ label: "Management",
+ value: "Integrated portfolio and risk system",
+ color: "slate",
+ },
+ ],
+ body: [
+ "Statistical arbitrage places heavier demands on infrastructure than classic medium-term factor investing. Factor exposures and residuals must be recomputed frequently—often intraday—so that signals remain current and unintended factor drift is detected promptly. This requires a robust, low-latency factor-model engine fed by clean, point-in-time market and fundamental data.",
+ "Execution infrastructure must support rapid, cost-aware trading of potentially hundreds of names. Low-latency connectivity, smart-order routing, and careful management of market impact are necessary because the residual edge is typically measured in tens of basis points and can be eroded quickly by slippage.",
+ "A comprehensive portfolio-management system integrates signal generation, position sizing, factor-exposure monitoring, residual diagnostics, and real-time risk limits. Corporate actions, dividends, and borrow availability for short positions must be handled accurately. Operational failures—stale factor loadings, missed corporate events, or execution glitches—can convert a market-neutral residual book into a source of large, unexpected losses.",
+ ],
+ keyPoint:
+ "Statistical arbitrage is as much a technology and data problem as a statistical one; the quality of the real-time residual engine and execution stack determines whether the theoretical edge is captured.",
+ },
+ {
+ era: "Failures",
+ icon: "⚠️",
+ title: "Common Failure Modes",
+ desc: "Cointegration or residual-model breakdown, omitted-factor leakage, and crowded residual trades",
+ badge: { label: "Risk", style: "red" },
+ tags: [
+ ["model break", "red"],
+ ["omitted factors", "amber"],
+ ["crowding", ""],
+ ["liquidity", "slate"],
+ ],
+ data: [
+ {
+ label: "Structural",
+ value: "Residual mean-reversion relationship fails",
+ color: "red",
+ },
+ {
+ label: "Specification",
+ value: "Omitted factors create residual leakage",
+ color: "amber",
+ },
+ {
+ label: "Competitive",
+ value: "Crowding compresses residual opportunities",
+ color: "slate",
+ },
+ ],
+ body: [
+ "The most fundamental failure is the breakdown of the residual mean-reversion relationship itself. A pair or residual series that has been stationary for an extended period can become non-stationary after a merger, a major earnings surprise, a regulatory change, or a shift in the competitive landscape. Continuing to trade the old residual produces systematic losses.",
+ "A second failure mode arises from incomplete factor models. If an important common factor is omitted, residual portfolios retain unintended systematic exposure. When that omitted factor moves sharply, the supposedly market-neutral book experiences correlated losses across many positions simultaneously.",
+ "Crowding constitutes a third risk. As more capital pursues the same residual signals, the size and duration of residual dislocations shrink, and the available alpha after costs declines. In extreme cases the residual strategies themselves become a source of liquidity demand, amplifying adverse moves when many participants attempt to exit at once.",
+ ],
+ keyPoint:
+ "Statistical arbitrage fails when the residual ceases to mean-revert, when hidden factor exposures reappear, or when too many competitors compete for the same residual opportunities.",
+ },
+ ];
+ function render() {
+ document.getElementById("entries-root").innerHTML = entries
+ .map(
+ (e, i) =>
+ `<article class="entry ${i === 0 ? "open" : ""}"><div class="entry-card"><div class="entry-header" onclick="toggleEntry(this.parentElement.parentElement)"><div class="entry-era">${e.era}</div><div class="entry-icon">${e.icon}</div><div class="entry-title-block"><div class="entry-title">${e.title}</div><div class="entry-desc">${e.desc}</div></div><div class="entry-badge badge-${e.badge.style}">${e.badge.label}</div><div class="entry-toggle">›</div></div><div class="entry-body">${e.body.map((p) => `<p>${p}</p>`).join("")}<div class="key-insight"><div class="key-insight-bar"></div><div class="key-insight-text">${e.keyPoint}</div></div><div class="data-strip">${e.data.map((d) => `<div class="data-cell"><div class="data-cell-label">${d.label}</div><div class="data-cell-value ${d.color}">${d.value}</div></div>`).join("")}</div><div class="tags">${e.tags.map((t) => `<span class="tag ${t[1] || ""}">${t[0]}</span>`).join("")}</div></div></div></article>`,
+ )
+ .join("");
+ }
+ function toggleEntry(entry) {
+ entry.classList.toggle("open");
+ }
+ function toggleAll(open) {
+ document
+ .querySelectorAll(".entry")
+ .forEach((entry) => entry.classList.toggle("open", open));
+ }
+ render();
+ </script>
+ </body>
+</html>
